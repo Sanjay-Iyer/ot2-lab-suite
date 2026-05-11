@@ -1,0 +1,27 @@
+pipettes:
+  p20_single_gen2:
+    min_volume_ul: 1
+    max_volume_ul: 20
+    recommended_min_volume_ul: 2
+    recommended_max_volume_ul: 20
+    mounts_allowed:
+      - left
+      - right
+
+  p300_single_gen2:
+    min_volume_ul: 20
+    max_volume_ul: 300
+    recommended_min_volume_ul: 30
+    recommended_max_volume_ul: 300
+    mounts_allowed:
+      - left
+      - right
+
+  p1000_single_gen2:
+    min_volume_ul: 100
+    max_volume_ul: 1000
+    recommended_min_volume_ul: 100
+    recommended_max_volume_ul: 1000
+    mounts_allowed:
+      - left
+      - right

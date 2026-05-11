@@ -1,0 +1,37 @@
+experiment:
+  date: '2026-04-29'
+  name: AuNS_Dilution_Series
+  protocol_file: protocols/pipette_test.py
+labware:
+  1:
+    description: AuNS Stock Rack
+    load_name: opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap
+  2:
+    description: AuNS_Dilution Plate
+    load_name: nest_96_wellplate_200ul_flat
+  3:
+    description: Diluent Reservoir
+    load_name: nest_12_reservoir_15ml
+  11:
+    description: Tip Rack
+    load_name: opentrons_96_tiprack_300ul
+pipette:
+  model: p300_single_gen2
+  mount: right
+  tip_rack_slot: 11
+robot:
+  ip_address: 169.254.46.57
+  local_data_path: /home/sanjay/opentrons_home/OT-2_instrument/OT-2/data
+schema_version: '2.0'
+test_parameters:
+  destination_start_well: A1
+  dilution_factors:
+  - 2
+  - 5
+  - 10
+  - 20
+  - 100
+  final_volume_ul: 200
+  mix_repetitions: 5
+  source_diluent_well: A1
+  source_stock_well: A1

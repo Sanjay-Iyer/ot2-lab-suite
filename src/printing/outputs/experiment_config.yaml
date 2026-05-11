@@ -1,0 +1,68 @@
+experiment_name: AuNS_Printing_Optimization
+project: nanostars
+date: '2026-05-08'
+operator: ''
+notes: ''
+stock_concentration_ugml: 100.0
+stock_available_volume_ul: 2000.0
+stock_material: AuNS
+stock_display_name: gold nanostars
+dilution_factors:
+- 1
+- 10
+- 100
+size_variants:
+- small
+- large
+print_volumes_nl:
+- 100
+- 500
+target_final_volume_ul: 200.0
+p20_mount: left
+p300_mount: right
+deck_layout:
+- slot: 1
+  labware_type: opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap
+  reagent_name: stock_ns
+  description: Stock NS vial
+- slot: 2
+  labware_type: nest_12_reservoir_15ml
+  reagent_name: water
+  description: Water reservoir
+- slot: 3
+  labware_type: nest_1_reservoir_195ml
+  reagent_name: waste
+  description: Waste reservoir
+- slot: 4
+  labware_type: opentrons_15_tuberack_falcon_15ml_conical
+  reagent_name: size_pool_A
+  description: Size A pool (small)
+- slot: 5
+  labware_type: opentrons_15_tuberack_falcon_15ml_conical
+  reagent_name: size_pool_B
+  description: Size B pool (medium)
+- slot: 6
+  labware_type: opentrons_15_tuberack_falcon_15ml_conical
+  reagent_name: size_pool_C
+  description: Size C pool (large)
+- slot: 7
+  labware_type: opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap
+  reagent_name: output_rack_1
+  description: Concentration output rack 1
+- slot: 8
+  labware_type: opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap
+  reagent_name: output_rack_2
+  description: Concentration output rack 2
+- slot: 9
+  labware_type: nest_96_wellplate_200ul_flat
+  reagent_name: printer_tray
+  description: Printer input tray
+- slot: 10
+  labware_type: opentrons_96_tiprack_300ul
+  reagent_name: tips_p300
+  description: Tip rack for P300
+- slot: 11
+  labware_type: opentrons_96_tiprack_20ul
+  reagent_name: tips_p20
+  description: Tip rack for P20
+robot_ip: 169.254.46.57

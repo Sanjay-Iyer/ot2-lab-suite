@@ -1,0 +1,321 @@
+{
+  "metadata": {
+    "experiment": "AuNS_Printing_Optimization",
+    "date": "2026-05-08",
+    "operator": ""
+  },
+  "configuration": {
+    "experiment_name": "AuNS_Printing_Optimization",
+    "project": "nanostars",
+    "date": "2026-05-08",
+    "operator": "",
+    "notes": "",
+    "stock_concentration_ugml": 100.0,
+    "stock_available_volume_ul": 2000.0,
+    "stock_material": "AuNS",
+    "stock_display_name": "gold nanostars",
+    "dilution_factors": [
+      1,
+      10,
+      100
+    ],
+    "size_variants": [
+      "small",
+      "large"
+    ],
+    "print_volumes_nl": [
+      100,
+      500
+    ],
+    "target_final_volume_ul": 200.0,
+    "pipette_type": "p300_multi_gen2",
+    "pipette_mount": "right",
+    "pipette_min_ul": 20.0,
+    "pipette_max_ul": 300.0,
+    "deck_layout": [
+      {
+        "slot": 1,
+        "labware_type": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+        "reagent_name": "stock_ns",
+        "description": "Stock NS vial"
+      },
+      {
+        "slot": 2,
+        "labware_type": "nest_12_reservoir_15ml",
+        "reagent_name": "water",
+        "description": "Water reservoir"
+      },
+      {
+        "slot": 3,
+        "labware_type": "nest_1_reservoir_195ml",
+        "reagent_name": "waste",
+        "description": "Waste reservoir"
+      },
+      {
+        "slot": 4,
+        "labware_type": "opentrons_15_tuberack_falcon_15ml_conical",
+        "reagent_name": "size_pool_A",
+        "description": "Size A pool (small)"
+      },
+      {
+        "slot": 5,
+        "labware_type": "opentrons_15_tuberack_falcon_15ml_conical",
+        "reagent_name": "size_pool_B",
+        "description": "Size B pool (medium)"
+      },
+      {
+        "slot": 6,
+        "labware_type": "opentrons_15_tuberack_falcon_15ml_conical",
+        "reagent_name": "size_pool_C",
+        "description": "Size C pool (large)"
+      },
+      {
+        "slot": 7,
+        "labware_type": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "reagent_name": "output_rack_1",
+        "description": "Concentration output rack 1"
+      },
+      {
+        "slot": 8,
+        "labware_type": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+        "reagent_name": "output_rack_2",
+        "description": "Concentration output rack 2"
+      },
+      {
+        "slot": 9,
+        "labware_type": "nest_96_wellplate_200ul_flat",
+        "reagent_name": "printer_tray",
+        "description": "Printer input tray"
+      },
+      {
+        "slot": 10,
+        "labware_type": "opentrons_96_tiprack_300ul",
+        "reagent_name": "tips_main",
+        "description": "Main tip rack for 8-channel pipette"
+      }
+    ],
+    "robot_ip": "169.254.46.57"
+  },
+  "data": {
+    "samples": [
+      {
+        "sample_id": "S001",
+        "concentration_level": "stock",
+        "dilution_factor": 1,
+        "final_concentration_ugml": 100.0,
+        "size_variant": "small",
+        "source_dilution_slot": 7,
+        "source_dilution_well": "A1",
+        "source_size_pool_slot": 4,
+        "destination_slot": 7,
+        "destination_well": "A1",
+        "volume_ul": 200.0,
+        "final_description": "stock conc. + small NS"
+      },
+      {
+        "sample_id": "S002",
+        "concentration_level": "stock",
+        "dilution_factor": 1,
+        "final_concentration_ugml": 100.0,
+        "size_variant": "large",
+        "source_dilution_slot": 7,
+        "source_dilution_well": "A1",
+        "source_size_pool_slot": 6,
+        "destination_slot": 7,
+        "destination_well": "A2",
+        "volume_ul": 200.0,
+        "final_description": "stock conc. + large NS"
+      },
+      {
+        "sample_id": "S003",
+        "concentration_level": "10x",
+        "dilution_factor": 10,
+        "final_concentration_ugml": 10.0,
+        "size_variant": "small",
+        "source_dilution_slot": 7,
+        "source_dilution_well": "A2",
+        "source_size_pool_slot": 4,
+        "destination_slot": 7,
+        "destination_well": "A3",
+        "volume_ul": 200.0,
+        "final_description": "10x conc. + small NS"
+      },
+      {
+        "sample_id": "S004",
+        "concentration_level": "10x",
+        "dilution_factor": 10,
+        "final_concentration_ugml": 10.0,
+        "size_variant": "large",
+        "source_dilution_slot": 7,
+        "source_dilution_well": "A2",
+        "source_size_pool_slot": 6,
+        "destination_slot": 7,
+        "destination_well": "A4",
+        "volume_ul": 200.0,
+        "final_description": "10x conc. + large NS"
+      },
+      {
+        "sample_id": "S005",
+        "concentration_level": "100x",
+        "dilution_factor": 100,
+        "final_concentration_ugml": 1.0,
+        "size_variant": "small",
+        "source_dilution_slot": 7,
+        "source_dilution_well": "A3",
+        "source_size_pool_slot": 4,
+        "destination_slot": 7,
+        "destination_well": "A5",
+        "volume_ul": 200.0,
+        "final_description": "100x conc. + small NS"
+      },
+      {
+        "sample_id": "S006",
+        "concentration_level": "100x",
+        "dilution_factor": 100,
+        "final_concentration_ugml": 1.0,
+        "size_variant": "large",
+        "source_dilution_slot": 7,
+        "source_dilution_well": "A3",
+        "source_size_pool_slot": 6,
+        "destination_slot": 7,
+        "destination_well": "A6",
+        "volume_ul": 200.0,
+        "final_description": "100x conc. + large NS"
+      }
+    ],
+    "manifest": [
+      {
+        "sample_id": "S001",
+        "concentration_level": "stock",
+        "size_variant": "small",
+        "source_slot": 7,
+        "source_well": "A1",
+        "tray_position": "A1",
+        "print_volume_nl": 100,
+        "replicates": 3,
+        "expected_diameter_um": 50.0
+      },
+      {
+        "sample_id": "S001",
+        "concentration_level": "stock",
+        "size_variant": "small",
+        "source_slot": 7,
+        "source_well": "A1",
+        "tray_position": "B1",
+        "print_volume_nl": 500,
+        "replicates": 3,
+        "expected_diameter_um": 250.0
+      },
+      {
+        "sample_id": "S002",
+        "concentration_level": "stock",
+        "size_variant": "large",
+        "source_slot": 7,
+        "source_well": "A2",
+        "tray_position": "C1",
+        "print_volume_nl": 100,
+        "replicates": 3,
+        "expected_diameter_um": 50.0
+      },
+      {
+        "sample_id": "S002",
+        "concentration_level": "stock",
+        "size_variant": "large",
+        "source_slot": 7,
+        "source_well": "A2",
+        "tray_position": "D1",
+        "print_volume_nl": 500,
+        "replicates": 3,
+        "expected_diameter_um": 250.0
+      },
+      {
+        "sample_id": "S003",
+        "concentration_level": "10x",
+        "size_variant": "small",
+        "source_slot": 7,
+        "source_well": "A3",
+        "tray_position": "E1",
+        "print_volume_nl": 100,
+        "replicates": 3,
+        "expected_diameter_um": 50.0
+      },
+      {
+        "sample_id": "S003",
+        "concentration_level": "10x",
+        "size_variant": "small",
+        "source_slot": 7,
+        "source_well": "A3",
+        "tray_position": "F1",
+        "print_volume_nl": 500,
+        "replicates": 3,
+        "expected_diameter_um": 250.0
+      },
+      {
+        "sample_id": "S004",
+        "concentration_level": "10x",
+        "size_variant": "large",
+        "source_slot": 7,
+        "source_well": "A4",
+        "tray_position": "G1",
+        "print_volume_nl": 100,
+        "replicates": 3,
+        "expected_diameter_um": 50.0
+      },
+      {
+        "sample_id": "S004",
+        "concentration_level": "10x",
+        "size_variant": "large",
+        "source_slot": 7,
+        "source_well": "A4",
+        "tray_position": "H1",
+        "print_volume_nl": 500,
+        "replicates": 3,
+        "expected_diameter_um": 250.0
+      },
+      {
+        "sample_id": "S005",
+        "concentration_level": "100x",
+        "size_variant": "small",
+        "source_slot": 7,
+        "source_well": "A5",
+        "tray_position": "A2",
+        "print_volume_nl": 100,
+        "replicates": 3,
+        "expected_diameter_um": 50.0
+      },
+      {
+        "sample_id": "S005",
+        "concentration_level": "100x",
+        "size_variant": "small",
+        "source_slot": 7,
+        "source_well": "A5",
+        "tray_position": "B2",
+        "print_volume_nl": 500,
+        "replicates": 3,
+        "expected_diameter_um": 250.0
+      },
+      {
+        "sample_id": "S006",
+        "concentration_level": "100x",
+        "size_variant": "large",
+        "source_slot": 7,
+        "source_well": "A6",
+        "tray_position": "C2",
+        "print_volume_nl": 100,
+        "replicates": 3,
+        "expected_diameter_um": 50.0
+      },
+      {
+        "sample_id": "S006",
+        "concentration_level": "100x",
+        "size_variant": "large",
+        "source_slot": 7,
+        "source_well": "A6",
+        "tray_position": "D2",
+        "print_volume_nl": 500,
+        "replicates": 3,
+        "expected_diameter_um": 250.0
+      }
+    ]
+  }
+}

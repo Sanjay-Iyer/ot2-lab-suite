@@ -1,0 +1,75 @@
+# Opentrons Nanoparticle Relative Dilution Config v2.0
+# Example for Gold Nanostars (AuNS)
+
+schema_version: "2.0"
+# Robot Hardware Metadata
+robot:
+  ip_address: "169.254.46.57"
+  local_data_path: "/home/sanjay/opentrons_home/OT-2_instrument/OT-2/data"
+
+
+experiment:
+  name: "AuNS_Relative_Dilution_Series"
+  project: "nanostars"
+  date: "2026-04-28"
+  operator: "Sanjay"
+  notes: "Synthesized batch #5. Testing relative concentration effects."
+
+nanoparticle_stock:
+  material: "AuNS"
+  display_name: "gold nanostars"
+  label: "AuNS_stock"
+  source_slot: 1
+  source_well: "A1"
+  available_volume_uL: 1000
+  concentration_basis: "relative_to_stock"
+  stock_relative_concentration: 1.0
+  absolute_concentration: null
+  characterization:
+    uvvis_measured: true
+    uvvis_lambda_max_nm: 535.0
+    absorbance_at_lambda_max: 0.85
+    notes: "Peak looks sharp, indicating good monodispersity."
+
+diluent:
+  name: "water"
+  source_slot: 5
+  source_well: "A1"
+  available_volume_uL: 10000
+
+requested_dilutions:
+  - dilution_factor: 2.0
+    final_volume_uL: 200
+    destination_well: "B1"
+  - dilution_factor: 4.0
+    final_volume_uL: 200
+    destination_well: "B2"
+  - dilution_factor: 8.0
+    final_volume_uL: 200
+    destination_well: "B3"
+  - dilution_factor: 16.0
+    final_volume_uL: 200
+    destination_well: "B4"
+
+labware:
+  1:
+    load_name: "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap"
+    description: "Material/Ink tube rack"
+  2:
+    load_name: "nest_96_wellplate_200ul_flat"
+    description: "Dispersion destination plate"
+  5:
+    load_name: "nest_12_reservoir_15ml"
+    description: "Solvent reservoir"
+  11:
+    load_name: "opentrons_96_tiprack_300ul"
+    description: "Tip rack for P300"
+
+pipette:
+  model: "p300_single_gen2"
+  mount: "right"
+  tip_rack_slot: 11
+
+outputs:
+  log_file: "logs/20260428/nanostars/auns_relative_series.log"
+  transcript: "outputs/20260428/nanostars/auns_relative_series_transcript.txt"

@@ -1,0 +1,21 @@
+# OT-2 Lab Suite - Master Requirements
+# Install: pip install -r requirements.txt
+
+# --- Core Lab Automation ---
+opentrons>=7.0,<9.0
+pydantic>=2.0
+pydantic-settings
+pyyaml
+
+# --- AI & LangChain ---
+langchain>=0.1.0
+langchain-google-genai>=1.0.0
+langchain-community
+google-generativeai
+python-dotenv
+
+# --- Data Science (Optional but recommended for planners) ---
+numpy>=1.23
+pandas>=1.5
+matplotlib>=3.6
+scipy

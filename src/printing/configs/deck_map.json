@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-05-11T10:48:30",
+  "experiment_name": "AuNS_Printing_Optimization",
+  "slots": {
+    "1": {
+      "labware_type": "opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap",
+      "reagent_name": "stock_ns",
+      "description": "Stock NS vial",
+      "well_count": 24
+    },
+    "2": {
+      "labware_type": "nest_12_reservoir_15ml",
+      "reagent_name": "water",
+      "description": "Water reservoir",
+      "well_count": 12
+    },
+    "3": {
+      "labware_type": "nest_1_reservoir_195ml",
+      "reagent_name": "waste",
+      "description": "Waste reservoir",
+      "well_count": 1
+    },
+    "4": {
+      "labware_type": "opentrons_15_tuberack_falcon_15ml_conical",
+      "reagent_name": "size_pool_A",
+      "description": "Size A pool (small)",
+      "well_count": 15
+    },
+    "5": {
+      "labware_type": "opentrons_15_tuberack_falcon_15ml_conical",
+      "reagent_name": "size_pool_B",
+      "description": "Size B pool (medium)",
+      "well_count": 15
+    },
+    "6": {
+      "labware_type": "opentrons_15_tuberack_falcon_15ml_conical",
+      "reagent_name": "size_pool_C",
+      "description": "Size C pool (large)",
+      "well_count": 15
+    },
+    "7": {
+      "labware_type": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+      "reagent_name": "output_rack_1",
+      "description": "Concentration output rack 1",
+      "well_count": 24
+    },
+    "8": {
+      "labware_type": "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap",
+      "reagent_name": "output_rack_2",
+      "description": "Concentration output rack 2",
+      "well_count": 24
+    },
+    "9": {
+      "labware_type": "nest_96_wellplate_200ul_flat",
+      "reagent_name": "printer_tray",
+      "description": "Printer input tray",
+      "well_count": 96
+    },
+    "10": {
+      "labware_type": "opentrons_96_tiprack_300ul",
+      "reagent_name": "tips_main",
+      "description": "Main tip rack for 8-channel pipette",
+      "well_count": 96
+    }
+  },
+  "pipettes": {
+    "main": {
+      "mount": "right",
+      "tip_rack_slot": 10,
+      "type": "p300_multi_gen2"
+    }
+  }
+}

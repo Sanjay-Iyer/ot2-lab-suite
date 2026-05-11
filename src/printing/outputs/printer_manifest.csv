@@ -1,0 +1,13 @@
+sample_id,concentration_level,size_variant,tray_position,print_volume_nl,replicates,expected_diameter_um
+S001,stock,small,A1,100,3,50.0
+S001,stock,small,B1,500,3,250.0
+S002,stock,large,C1,100,3,50.0
+S002,stock,large,D1,500,3,250.0
+S003,10x,small,E1,100,3,50.0
+S003,10x,small,F1,500,3,250.0
+S004,10x,large,G1,100,3,50.0
+S004,10x,large,H1,500,3,250.0
+S005,100x,small,A2,100,3,50.0
+S005,100x,small,B2,500,3,250.0
+S006,100x,large,C2,100,3,50.0
+S006,100x,large,D2,500,3,250.0

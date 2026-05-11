@@ -1,0 +1,1004 @@
+[
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 1,
+    "action": "SIMULATION_START",
+    "num_samples": 6,
+    "sample_volume_ul": 10.0,
+    "water_volume_ul": 90.0,
+    "mix_volume_ul": 60.0,
+    "mix_repetitions": 5,
+    "mode": "local_simulation_only"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 2,
+    "action": "HOME",
+    "position": "home"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 3,
+    "action": "SAMPLE_START",
+    "sample_index": 1,
+    "sample_source": "A1",
+    "water_source": "C1",
+    "destination": "B1"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 4,
+    "action": "PICK_UP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 5,
+    "action": "MOVE_TO",
+    "location": "A1",
+    "x_mm": 10.0,
+    "y_mm": 10.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 6,
+    "action": "ASPIRATE",
+    "volume_ul": 10.0,
+    "source": "A1",
+    "source_remaining_ul": 40.0,
+    "liquid": "sample_1",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 7,
+    "action": "MOVE_TO",
+    "location": "B1",
+    "x_mm": 10.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 8,
+    "action": "DISPENSE",
+    "volume_ul": 10.0,
+    "destination": "B1",
+    "destination_volume_ul": 10.0,
+    "destination_liquid_before": "empty",
+    "destination_liquid_after": "sample_1",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 9,
+    "action": "MOVE_TO",
+    "location": "C1",
+    "x_mm": 10.0,
+    "y_mm": 28.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 10,
+    "action": "ASPIRATE",
+    "volume_ul": 90.0,
+    "source": "C1",
+    "source_remaining_ul": 110.0,
+    "liquid": "water",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 11,
+    "action": "MOVE_TO",
+    "location": "B1",
+    "x_mm": 10.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 12,
+    "action": "DISPENSE",
+    "volume_ul": 90.0,
+    "destination": "B1",
+    "destination_volume_ul": 100.0,
+    "destination_liquid_before": "sample_1",
+    "destination_liquid_after": "mixture(sample_1+water)",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 13,
+    "action": "MIX_CYCLE",
+    "location": "B1",
+    "rep": 1,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 14,
+    "action": "MIX_CYCLE",
+    "location": "B1",
+    "rep": 2,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 15,
+    "action": "MIX_CYCLE",
+    "location": "B1",
+    "rep": 3,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 16,
+    "action": "MIX_CYCLE",
+    "location": "B1",
+    "rep": 4,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 17,
+    "action": "MIX_CYCLE",
+    "location": "B1",
+    "rep": 5,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 18,
+    "action": "DROP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 19,
+    "action": "SAMPLE_COMPLETE",
+    "sample_index": 1,
+    "destination": "B1",
+    "final_destination_volume_ul": 100.0,
+    "destination_liquid": "mixture(sample_1+water)"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 20,
+    "action": "SAMPLE_START",
+    "sample_index": 2,
+    "sample_source": "A2",
+    "water_source": "C2",
+    "destination": "B2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 21,
+    "action": "PICK_UP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 22,
+    "action": "MOVE_TO",
+    "location": "A2",
+    "x_mm": 19.0,
+    "y_mm": 10.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 23,
+    "action": "ASPIRATE",
+    "volume_ul": 10.0,
+    "source": "A2",
+    "source_remaining_ul": 40.0,
+    "liquid": "sample_2",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 24,
+    "action": "MOVE_TO",
+    "location": "B2",
+    "x_mm": 19.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 25,
+    "action": "DISPENSE",
+    "volume_ul": 10.0,
+    "destination": "B2",
+    "destination_volume_ul": 10.0,
+    "destination_liquid_before": "empty",
+    "destination_liquid_after": "sample_2",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 26,
+    "action": "MOVE_TO",
+    "location": "C2",
+    "x_mm": 19.0,
+    "y_mm": 28.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 27,
+    "action": "ASPIRATE",
+    "volume_ul": 90.0,
+    "source": "C2",
+    "source_remaining_ul": 110.0,
+    "liquid": "water",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 28,
+    "action": "MOVE_TO",
+    "location": "B2",
+    "x_mm": 19.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 29,
+    "action": "DISPENSE",
+    "volume_ul": 90.0,
+    "destination": "B2",
+    "destination_volume_ul": 100.0,
+    "destination_liquid_before": "sample_2",
+    "destination_liquid_after": "mixture(sample_2+water)",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 30,
+    "action": "MIX_CYCLE",
+    "location": "B2",
+    "rep": 1,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 31,
+    "action": "MIX_CYCLE",
+    "location": "B2",
+    "rep": 2,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 32,
+    "action": "MIX_CYCLE",
+    "location": "B2",
+    "rep": 3,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 33,
+    "action": "MIX_CYCLE",
+    "location": "B2",
+    "rep": 4,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 34,
+    "action": "MIX_CYCLE",
+    "location": "B2",
+    "rep": 5,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 35,
+    "action": "DROP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 36,
+    "action": "SAMPLE_COMPLETE",
+    "sample_index": 2,
+    "destination": "B2",
+    "final_destination_volume_ul": 100.0,
+    "destination_liquid": "mixture(sample_2+water)"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 37,
+    "action": "SAMPLE_START",
+    "sample_index": 3,
+    "sample_source": "A3",
+    "water_source": "C3",
+    "destination": "B3"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 38,
+    "action": "PICK_UP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 39,
+    "action": "MOVE_TO",
+    "location": "A3",
+    "x_mm": 28.0,
+    "y_mm": 10.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 40,
+    "action": "ASPIRATE",
+    "volume_ul": 10.0,
+    "source": "A3",
+    "source_remaining_ul": 40.0,
+    "liquid": "sample_3",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 41,
+    "action": "MOVE_TO",
+    "location": "B3",
+    "x_mm": 28.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 42,
+    "action": "DISPENSE",
+    "volume_ul": 10.0,
+    "destination": "B3",
+    "destination_volume_ul": 10.0,
+    "destination_liquid_before": "empty",
+    "destination_liquid_after": "sample_3",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 43,
+    "action": "MOVE_TO",
+    "location": "C3",
+    "x_mm": 28.0,
+    "y_mm": 28.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 44,
+    "action": "ASPIRATE",
+    "volume_ul": 90.0,
+    "source": "C3",
+    "source_remaining_ul": 110.0,
+    "liquid": "water",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 45,
+    "action": "MOVE_TO",
+    "location": "B3",
+    "x_mm": 28.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 46,
+    "action": "DISPENSE",
+    "volume_ul": 90.0,
+    "destination": "B3",
+    "destination_volume_ul": 100.0,
+    "destination_liquid_before": "sample_3",
+    "destination_liquid_after": "mixture(sample_3+water)",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 47,
+    "action": "MIX_CYCLE",
+    "location": "B3",
+    "rep": 1,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 48,
+    "action": "MIX_CYCLE",
+    "location": "B3",
+    "rep": 2,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 49,
+    "action": "MIX_CYCLE",
+    "location": "B3",
+    "rep": 3,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 50,
+    "action": "MIX_CYCLE",
+    "location": "B3",
+    "rep": 4,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 51,
+    "action": "MIX_CYCLE",
+    "location": "B3",
+    "rep": 5,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 52,
+    "action": "DROP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 53,
+    "action": "SAMPLE_COMPLETE",
+    "sample_index": 3,
+    "destination": "B3",
+    "final_destination_volume_ul": 100.0,
+    "destination_liquid": "mixture(sample_3+water)"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 54,
+    "action": "SAMPLE_START",
+    "sample_index": 4,
+    "sample_source": "A4",
+    "water_source": "C4",
+    "destination": "B4"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 55,
+    "action": "PICK_UP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 56,
+    "action": "MOVE_TO",
+    "location": "A4",
+    "x_mm": 37.0,
+    "y_mm": 10.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 57,
+    "action": "ASPIRATE",
+    "volume_ul": 10.0,
+    "source": "A4",
+    "source_remaining_ul": 40.0,
+    "liquid": "sample_4",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 58,
+    "action": "MOVE_TO",
+    "location": "B4",
+    "x_mm": 37.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 59,
+    "action": "DISPENSE",
+    "volume_ul": 10.0,
+    "destination": "B4",
+    "destination_volume_ul": 10.0,
+    "destination_liquid_before": "empty",
+    "destination_liquid_after": "sample_4",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 60,
+    "action": "MOVE_TO",
+    "location": "C4",
+    "x_mm": 37.0,
+    "y_mm": 28.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 61,
+    "action": "ASPIRATE",
+    "volume_ul": 90.0,
+    "source": "C4",
+    "source_remaining_ul": 110.0,
+    "liquid": "water",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 62,
+    "action": "MOVE_TO",
+    "location": "B4",
+    "x_mm": 37.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 63,
+    "action": "DISPENSE",
+    "volume_ul": 90.0,
+    "destination": "B4",
+    "destination_volume_ul": 100.0,
+    "destination_liquid_before": "sample_4",
+    "destination_liquid_after": "mixture(sample_4+water)",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 64,
+    "action": "MIX_CYCLE",
+    "location": "B4",
+    "rep": 1,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 65,
+    "action": "MIX_CYCLE",
+    "location": "B4",
+    "rep": 2,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 66,
+    "action": "MIX_CYCLE",
+    "location": "B4",
+    "rep": 3,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 67,
+    "action": "MIX_CYCLE",
+    "location": "B4",
+    "rep": 4,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 68,
+    "action": "MIX_CYCLE",
+    "location": "B4",
+    "rep": 5,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 69,
+    "action": "DROP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 70,
+    "action": "SAMPLE_COMPLETE",
+    "sample_index": 4,
+    "destination": "B4",
+    "final_destination_volume_ul": 100.0,
+    "destination_liquid": "mixture(sample_4+water)"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 71,
+    "action": "SAMPLE_START",
+    "sample_index": 5,
+    "sample_source": "A5",
+    "water_source": "C5",
+    "destination": "B5"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 72,
+    "action": "PICK_UP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 73,
+    "action": "MOVE_TO",
+    "location": "A5",
+    "x_mm": 46.0,
+    "y_mm": 10.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 74,
+    "action": "ASPIRATE",
+    "volume_ul": 10.0,
+    "source": "A5",
+    "source_remaining_ul": 40.0,
+    "liquid": "sample_5",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 75,
+    "action": "MOVE_TO",
+    "location": "B5",
+    "x_mm": 46.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 76,
+    "action": "DISPENSE",
+    "volume_ul": 10.0,
+    "destination": "B5",
+    "destination_volume_ul": 10.0,
+    "destination_liquid_before": "empty",
+    "destination_liquid_after": "sample_5",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 77,
+    "action": "MOVE_TO",
+    "location": "C5",
+    "x_mm": 46.0,
+    "y_mm": 28.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 78,
+    "action": "ASPIRATE",
+    "volume_ul": 90.0,
+    "source": "C5",
+    "source_remaining_ul": 110.0,
+    "liquid": "water",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 79,
+    "action": "MOVE_TO",
+    "location": "B5",
+    "x_mm": 46.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 80,
+    "action": "DISPENSE",
+    "volume_ul": 90.0,
+    "destination": "B5",
+    "destination_volume_ul": 100.0,
+    "destination_liquid_before": "sample_5",
+    "destination_liquid_after": "mixture(sample_5+water)",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 81,
+    "action": "MIX_CYCLE",
+    "location": "B5",
+    "rep": 1,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 82,
+    "action": "MIX_CYCLE",
+    "location": "B5",
+    "rep": 2,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 83,
+    "action": "MIX_CYCLE",
+    "location": "B5",
+    "rep": 3,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 84,
+    "action": "MIX_CYCLE",
+    "location": "B5",
+    "rep": 4,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 85,
+    "action": "MIX_CYCLE",
+    "location": "B5",
+    "rep": 5,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 86,
+    "action": "DROP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 87,
+    "action": "SAMPLE_COMPLETE",
+    "sample_index": 5,
+    "destination": "B5",
+    "final_destination_volume_ul": 100.0,
+    "destination_liquid": "mixture(sample_5+water)"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 88,
+    "action": "SAMPLE_START",
+    "sample_index": 6,
+    "sample_source": "A6",
+    "water_source": "C6",
+    "destination": "B6"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 89,
+    "action": "PICK_UP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 90,
+    "action": "MOVE_TO",
+    "location": "A6",
+    "x_mm": 55.0,
+    "y_mm": 10.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 91,
+    "action": "ASPIRATE",
+    "volume_ul": 10.0,
+    "source": "A6",
+    "source_remaining_ul": 40.0,
+    "liquid": "sample_6",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 92,
+    "action": "MOVE_TO",
+    "location": "B6",
+    "x_mm": 55.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 93,
+    "action": "DISPENSE",
+    "volume_ul": 10.0,
+    "destination": "B6",
+    "destination_volume_ul": 10.0,
+    "destination_liquid_before": "empty",
+    "destination_liquid_after": "sample_6",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 94,
+    "action": "MOVE_TO",
+    "location": "C6",
+    "x_mm": 55.0,
+    "y_mm": 28.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 95,
+    "action": "ASPIRATE",
+    "volume_ul": 90.0,
+    "source": "C6",
+    "source_remaining_ul": 110.0,
+    "liquid": "water",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 96,
+    "action": "MOVE_TO",
+    "location": "B6",
+    "x_mm": 55.0,
+    "y_mm": 19.0,
+    "z_mm": 6.0,
+    "z_offset_mm": 1.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 97,
+    "action": "DISPENSE",
+    "volume_ul": 90.0,
+    "destination": "B6",
+    "destination_volume_ul": 100.0,
+    "destination_liquid_before": "sample_6",
+    "destination_liquid_after": "mixture(sample_6+water)",
+    "flow_rate_ul_s": 5.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 98,
+    "action": "MIX_CYCLE",
+    "location": "B6",
+    "rep": 1,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 99,
+    "action": "MIX_CYCLE",
+    "location": "B6",
+    "rep": 2,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 100,
+    "action": "MIX_CYCLE",
+    "location": "B6",
+    "rep": 3,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 101,
+    "action": "MIX_CYCLE",
+    "location": "B6",
+    "rep": 4,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 102,
+    "action": "MIX_CYCLE",
+    "location": "B6",
+    "rep": 5,
+    "total_reps": 5,
+    "mix_volume_ul": 60.0,
+    "location_total_volume_ul": 100.0
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 103,
+    "action": "DROP_TIP",
+    "pipette": "p300_single_gen2"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 104,
+    "action": "SAMPLE_COMPLETE",
+    "sample_index": 6,
+    "destination": "B6",
+    "final_destination_volume_ul": 100.0,
+    "destination_liquid": "mixture(sample_6+water)"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 105,
+    "action": "HOME",
+    "position": "home"
+  },
+  {
+    "timestamp": "2026-04-27T15:36:37",
+    "step": 106,
+    "action": "SIMULATION_COMPLETE",
+    "status": "success",
+    "message": "Completed simulated 6-sample dilution workflow."
+  }
+]

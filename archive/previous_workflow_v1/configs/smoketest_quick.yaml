@@ -1,0 +1,63 @@
+# ============================================================
+#  Quick Smoke Test — Fast-Iteration Config
+#
+#  Purpose:  Rapid feedback during development (~10s runtime).
+#  Protocol: protocols/smoketest_protocol.py (same as full test).
+#  Coverage: Exercises every protocol stage with reduced params.
+#
+#  For full verification, use configs/smoketest_example.yaml.
+# ============================================================
+
+schema_version: "1.0"
+# Robot Hardware Metadata
+robot:
+  ip_address: "169.254.46.57"
+  local_data_path: "/home/sanjay/opentrons_home/OT-2_instrument/OT-2/data"
+
+
+experiment:
+  name: "quick_smoketest"
+  date: "2026-04-28"
+  operator: "Dev"
+  notes: >
+    Fast-iteration variant of the smoke test. ~10s runtime. Use for
+    rapid feedback during development; use smoketest_example.yaml for
+    full verification.
+
+labware:
+  1:
+    load_name: "opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap"
+    description: "Sample tube rack"
+  2:
+    load_name: "nest_96_wellplate_200ul_flat"
+    description: "96-well plate (corner visits + lawnmower)"
+  3:
+    load_name: "nest_96_wellplate_200ul_flat"
+    description: "96-well plate (corner visits)"
+  5:
+    load_name: "nest_12_reservoir_15ml"
+    description: "Reservoir (aspirate/dispense source)"
+  11:
+    load_name: "opentrons_96_tiprack_300ul"
+    description: "Tip rack for P300"
+
+pipette:
+  model: "p300_single_gen2"
+  mount: "right"
+  tip_rack_slot: 11
+
+smoketest:
+  source_slot: 5
+  source_well: "A1"
+  volumes_ul: [50, 200]
+  flow_rate_multipliers: [1.0]
+  mix_repetitions: 2
+  mix_volume_ul: 100
+  lawnmower_rows: 1
+  delays_seconds: [1]
+  return_tip: true
+
+outputs:
+  log_file: "logs/quick_smoketest_2026-04-28.log"
+  transcript: "outputs/quick_smoketest_2026-04-28_transcript.txt"
+  summary: "outputs/quick_smoketest_2026-04-28_summary.yaml"

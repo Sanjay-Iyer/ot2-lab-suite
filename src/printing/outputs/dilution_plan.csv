@@ -1,0 +1,4 @@
+dilution_name,dilution_factor,stock_volume_ul,water_volume_ul,final_volume_ul,final_concentration_ugml,stock_pipette,water_pipette,output_slot,output_well,notes
+stock,1,200.0,0.0,200.0,100.0,p300,p300,7,A1,
+10x,10,20.0,180.0,200.0,10.0,p20,p300,7,A2,
+100x,100,2.0,198.0,200.0,1.0,p20,p300,7,A3,

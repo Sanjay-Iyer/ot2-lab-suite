@@ -1,0 +1,29 @@
+workflow_type: dilution
+labware:
+  source:
+    type: corning_96_wellplate_360ul_flat
+    slot: 1
+  dilution:
+    type: corning_96_wellplate_360ul_flat
+    slot: 2
+  destination:
+    type: corning_96_wellplate_360ul_flat
+    slot: 3
+  tiprack:
+    type: opentrons_96_tiprack_300ul
+    slot: 10
+dilution:
+  steps: 2
+  factors:
+  - 5
+  - 10
+  final_volume_ul: 250
+  replicates: 1
+pipette:
+  left_mount: p300_single_gen2
+  right_mount: null
+  max_transfer_volume_ul: 300
+  allow_split_transfers: true
+simulation:
+  local_only: true
+  connect_to_robot: false

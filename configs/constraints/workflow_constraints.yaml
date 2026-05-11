@@ -1,0 +1,17 @@
+workflows:
+  dilution:
+    required_labware_roles:
+      - source
+      - dilution
+      - destination
+    require_unique_slots: true
+    allow_robot_connection: false
+    default_simulation_only: true
+
+  printing:
+    required_labware_roles:
+      - source
+      - destination
+    require_unique_slots: true
+    allow_robot_connection: false
+    default_simulation_only: true

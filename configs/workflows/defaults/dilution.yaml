@@ -1,0 +1,31 @@
+workflow_type: dilution
+description: "Default 2-step dilution workflow for local OT-2 simulation"
+
+labware:
+  source:
+    name: corning_96_wellplate_360ul_flat
+    slot: 1
+  dilution:
+    name: corning_96_wellplate_360ul_flat
+    slot: 2
+  destination:
+    name: corning_96_wellplate_360ul_flat
+    slot: 3
+  tiprack:
+    name: opentrons_96_tiprack_300ul
+    slot: 10
+
+dilution:
+  steps: 2
+  factors: [5, 10]
+  final_volume_ul: 300
+  replicates: 1
+
+pipette:
+  name: p300_single_gen2
+  mount: left
+  allow_split_transfers: true
+
+simulation:
+  local_only: true
+  connect_to_robot: false

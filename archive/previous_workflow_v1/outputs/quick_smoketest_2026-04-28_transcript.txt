@@ -1,0 +1,80 @@
+[LOAD] Config file: /home/sanjay/opentrons/configs/smoketest_quick.yaml
+[LOAD] Experiment: quick_smoketest  |  Date: 2026-04-28  |  Operator: Dev
+[LOAD] Slot 1: opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap (Sample tube rack)
+[LOAD] Slot 2: nest_96_wellplate_200ul_flat (96-well plate (corner visits + lawnmower))
+[LOAD] Slot 3: nest_96_wellplate_200ul_flat (96-well plate (corner visits))
+[LOAD] Slot 5: nest_12_reservoir_15ml (Reservoir (aspirate/dispense source))
+[LOAD] Slot 11: opentrons_96_tiprack_300ul (Tip rack for P300)
+[LOAD] Pipette: p300_single_gen2 on right mount  |  Tip rack: slot 11
+[VALIDATE] Running smoke-test config validation …
+[VALIDATE] Config OK — all checks passed.
+Picking up tip from A1 of Opentrons 96 Tip Rack 300 µL on 11
+[TIP] Picked up tip from slot 11
+[CORNERS] Starting corner visits …
+Moving to A1 of NEST 96 Well Plate 200 µL Flat on 2
+[CORNERS] Visited slot 2 A1 at top
+Moving to A12 of NEST 96 Well Plate 200 µL Flat on 2
+[CORNERS] Visited slot 2 A12 at top
+Moving to H1 of NEST 96 Well Plate 200 µL Flat on 2
+[CORNERS] Visited slot 2 H1 at top
+Moving to H12 of NEST 96 Well Plate 200 µL Flat on 2
+[CORNERS] Visited slot 2 H12 at top
+Moving to A1 of NEST 96 Well Plate 200 µL Flat on 3
+[CORNERS] Visited slot 3 A1 at top
+Moving to A12 of NEST 96 Well Plate 200 µL Flat on 3
+[CORNERS] Visited slot 3 A12 at top
+Moving to H1 of NEST 96 Well Plate 200 µL Flat on 3
+[CORNERS] Visited slot 3 H1 at top
+Moving to H12 of NEST 96 Well Plate 200 µL Flat on 3
+[CORNERS] Visited slot 3 H12 at top
+[VOLUME_SWEEP] Starting sweep: 2 volume(s) at slot 5 A1
+Aspirating 50.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 50.0 uL into A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+[VOLUME_SWEEP] V=50.0 µL aspirate+dispense at slot 5 A1
+Aspirating 200.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 200.0 uL into A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+[VOLUME_SWEEP] V=200.0 µL aspirate+dispense at slot 5 A1
+[FLOW_RATE] Starting flow-rate test: 1 multiplier(s), V=100.0 µL
+Aspirating 100.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 100.0 uL into A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+[FLOW_RATE] V=100.0 µL at 1.0x default rate
+[FLOW_RATE] Default flow rates restored.
+Mixing 2 times with a volume of 100.0 ul
+	Aspirating 100.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+	Dispensing 100.0 uL into A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+	Aspirating 100.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+	Dispensing 100.0 uL into A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+[MIX_IN_PLACE] reps=2 volume=100.0 at slot 5 A1
+[LAWNMOWER] Starting serpentine: 12 well(s), rows A–A
+Moving to A1 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A1
+Moving to A2 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A2
+Moving to A3 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A3
+Moving to A4 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A4
+Moving to A5 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A5
+Moving to A6 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A6
+Moving to A7 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A7
+Moving to A8 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A8
+Moving to A9 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A9
+Moving to A10 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A10
+Moving to A11 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A11
+Moving to A12 of NEST 96 Well Plate 200 µL Flat on 2
+[LAWNMOWER] Visited slot 2 A12
+[DELAY] Starting delays: 1 pause(s)
+Delaying for 0 minutes and 1.0 seconds
+[DELAY] Paused 1.0s
+Returning tip
+	Dropping tip into A1 of Opentrons 96 Tip Rack 300 µL on 11
+[TIP] Returned tip to rack
+[SUMMARY] corners=8 volume_sweeps=2 flow_rates=1 mixes=1 lawnmower_wells=12 delays=1 tips_used=1
+[DONE] Smoke test finished: quick_smoketest

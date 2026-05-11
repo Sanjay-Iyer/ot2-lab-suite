@@ -1,0 +1,9 @@
+{
+  "metrics": {
+    "droplet_diameter_um": "Measured in microns via microscopy",
+    "coverage_percent": "0-100% area coverage",
+    "color_intensity": "0-255 grayscale value",
+    "edge_uniformity": "1-5 rating (5 is best)",
+    "substrate_adhesion": "Pass/Fail"
+  }
+}

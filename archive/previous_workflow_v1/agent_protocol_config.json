@@ -1,0 +1,35 @@
+{
+    "total_mix_volume": 200,
+    "jobs": [
+        {
+            "fraction": 1.0,
+            "print_volume": 10,
+            "mix_well": "A1",
+            "print_well": "A1"
+        },
+        {
+            "fraction": 0.75,
+            "print_volume": 10,
+            "mix_well": "A2",
+            "print_well": "A2"
+        },
+        {
+            "fraction": 0.5,
+            "print_volume": 10,
+            "mix_well": "A3",
+            "print_well": "A3"
+        },
+        {
+            "fraction": 0.25,
+            "print_volume": 10,
+            "mix_well": "A4",
+            "print_well": "A4"
+        },
+        {
+            "fraction": 0.1,
+            "print_volume": 10,
+            "mix_well": "A5",
+            "print_well": "A5"
+        }
+    ]
+}

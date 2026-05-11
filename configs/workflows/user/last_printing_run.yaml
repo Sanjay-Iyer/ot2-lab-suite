@@ -1,0 +1,49 @@
+apiLevel: '2.15'
+concentration_unit: ug/mL
+deck:
+  labware:
+  - name: stock_reagent_rack
+    slot: 1
+    type: opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap
+  - name: solvent_reservoir
+    slot: 2
+    type: nest_12_reservoir_15ml
+  - name: output_rack_1
+    slot: 7
+    type: opentrons_24_tuberack_eppendorf_1.5ml_safelock_snapcap
+  - name: printer_tray
+    slot: 9
+    type: nest_96_wellplate_200ul_flat
+  - name: tips_300
+    slot: 10
+    type: opentrons_96_tiprack_300ul
+  modules: []
+  pipettes:
+  - mount: left
+    tip_rack_slots:
+    - 10
+    - 11
+    type: p300_single_gen2
+dilution_factors:
+- 1
+- 10
+- 50
+- 100
+metadata:
+  author: Sanjay
+  description: Unified dilution, mixing, and printing suite
+  protocolName: Standard Nanoparticle Printing
+mix_after: true
+mix_count: 3
+mix_volume_ul: 50.0
+print_targets:
+- labware_name: printer_tray
+  starting_well: A1
+reagent_concentration: 100.0
+reagent_source: stock_reagent_rack
+replicates_per_position: 1
+simulate: true
+target_final_volume_ul: 200.0
+total_print_positions: 24
+volume_per_print_ul: 5.0
+workflow: printing

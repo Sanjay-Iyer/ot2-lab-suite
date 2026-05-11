@@ -1,0 +1,85 @@
+[LOAD] Experiment: AuNS_Relative_Dilution_Series
+[LOAD] Project: nanostars
+[LOAD] Stock: gold nanostars
+[PROCESS] Starting 4 relative dilutions.
+[DILUTE] DF: 2.0 | RelConc: 0.5 | V_stock: 100.0uL | V_diluent: 100.0uL | Well: B1
+Picking up tip from A1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 100.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 100.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+Picking up tip from B1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 100.0 uL from A1 of Opentrons 24 Tube Rack with Eppendorf 1.5 mL Safe-Lock Snapcap on 1 at 92.86 uL/sec
+Dispensing 100.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Mixing 5 times with a volume of 160.0 ul
+	Aspirating 160.0 uL from B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B1 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+[DILUTE] DF: 4.0 | RelConc: 0.25 | V_stock: 50.0uL | V_diluent: 150.0uL | Well: B2
+Picking up tip from C1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 150.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 150.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+Picking up tip from D1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 50.0 uL from A1 of Opentrons 24 Tube Rack with Eppendorf 1.5 mL Safe-Lock Snapcap on 1 at 92.86 uL/sec
+Dispensing 50.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Mixing 5 times with a volume of 160.0 ul
+	Aspirating 160.0 uL from B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B2 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+[DILUTE] DF: 8.0 | RelConc: 0.125 | V_stock: 25.0uL | V_diluent: 175.0uL | Well: B3
+Picking up tip from E1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 175.0 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 175.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+Picking up tip from F1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 25.0 uL from A1 of Opentrons 24 Tube Rack with Eppendorf 1.5 mL Safe-Lock Snapcap on 1 at 92.86 uL/sec
+Dispensing 25.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Mixing 5 times with a volume of 160.0 ul
+	Aspirating 160.0 uL from B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B3 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+[DILUTE] DF: 16.0 | RelConc: 0.0625 | V_stock: 12.5uL | V_diluent: 187.5uL | Well: B4
+Picking up tip from G1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 187.5 uL from A1 of NEST 12 Well Reservoir 15 mL on 5 at 92.86 uL/sec
+Dispensing 187.5 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+Picking up tip from H1 of Opentrons 96 Tip Rack 300 µL on 11
+Aspirating 12.5 uL from A1 of Opentrons 24 Tube Rack with Eppendorf 1.5 mL Safe-Lock Snapcap on 1 at 92.86 uL/sec
+Dispensing 12.5 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Mixing 5 times with a volume of 160.0 ul
+	Aspirating 160.0 uL from B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Aspirating 160.0 uL from B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+	Dispensing 160.0 uL into B4 of NEST 96 Well Plate 200 µL Flat on 2 at 92.86 uL/sec
+Dropping tip into A1 of Opentrons Fixed Trash on 12
+[DONE] All relative dilutions complete.

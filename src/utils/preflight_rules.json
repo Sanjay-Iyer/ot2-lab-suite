@@ -1,0 +1,35 @@
+{
+  "filesystem": {
+    "absolute_paths": "ERROR",
+    "user_paths": "ERROR",
+    "backslash_literals": "WARN",
+    "env_vars": "ERROR",
+    "illegal_filenames": "ERROR",
+    "non_ascii_filenames": "WARN"
+  },
+  "encoding": {
+    "utf8_required": "ERROR",
+    "line_endings_crlf": "WARN",
+    "bom_present": "ERROR",
+    "non_printable": "ERROR"
+  },
+  "python": {
+    "syntax_valid": "ERROR",
+    "windows_imports": "ERROR",
+    "missing_robot_deps": "WARN",
+    "shebang_valid": "ERROR",
+    "subprocess_windows": "ERROR",
+    "os_sep_usage": "WARN",
+    "manual_backslash": "ERROR"
+  },
+  "opentrons": {
+    "metadata_missing": "ERROR",
+    "api_level_valid": "WARN",
+    "run_function_missing": "ERROR",
+    "top_level_io": "ERROR"
+  },
+  "json": {
+    "parse_valid": "ERROR",
+    "path_leak": "ERROR"
+  }
+}

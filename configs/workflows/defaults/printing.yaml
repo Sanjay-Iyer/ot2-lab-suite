@@ -1,0 +1,41 @@
+workflow_type: printing
+description: "Unified nanoparticle printing workflow (Dilution + Mixing + Printing)"
+
+labware:
+  source:
+    name: opentrons_24_tuberack_eppendorf_2ml_safelock_snapcap
+    slot: 1
+  reservoir:
+    name: nest_12_reservoir_15ml
+    slot: 2
+  destination:
+    name: nest_96_wellplate_200ul_flat
+    slot: 9
+  tiprack:
+    name: opentrons_96_tiprack_300ul
+    slot: 10
+
+process:
+  reagent_source: source
+  reagent_concentration: 100.0
+  concentration_unit: ug/mL
+  dilution_factors: [1, 10, 50, 100]
+  target_final_volume_ul: 200.0
+  mix_after: true
+  mix_volume_ul: 50.0
+  mix_count: 3
+
+printing:
+  total_print_positions: 24
+  volume_per_print_ul: 5.0
+  replicates_per_position: 1
+  starting_well: A1
+
+pipette:
+  name: p300_single_gen2
+  mount: left
+  allow_split_transfers: true
+
+simulation:
+  local_only: true
+  connect_to_robot: false
