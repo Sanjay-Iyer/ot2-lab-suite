@@ -44,7 +44,7 @@ def run(protocol: protocol_api.ProtocolContext):
             labware[lw['name']] = protocol.load_labware(lw['type'], lw['slot'])
 
     # 2. Printing Logic
-    protocol.comment(f"Starting printing workflow: {{base_dict['total_print_positions']}} positions")
+    protocol.comment("Starting printing workflow: {base_dict['total_print_positions']} positions")
     
     # Safely get a pipette
     pipette = pipettes.get('left') or pipettes.get('right')
@@ -57,8 +57,8 @@ def run(protocol: protocol_api.ProtocolContext):
     if reagent and target:
         protocol.comment("Transferring reagent to printer tray")
         pipette.pick_up_tip()
-        pipette.aspirate(base_dict['volume_per_print_ul'], reagent.wells()[0])
-        pipette.dispense(base_dict['volume_per_print_ul'], target.wells()[0])
+        pipette.aspirate({base_dict['volume_per_print_ul']}, reagent.wells()[0])
+        pipette.dispense({base_dict['volume_per_print_ul']}, target.wells()[0])
         pipette.drop_tip()
     else:
         protocol.comment("Skipping transfer: reagent or target tray not found in labware map.")
