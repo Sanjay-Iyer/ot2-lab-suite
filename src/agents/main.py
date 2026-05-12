@@ -42,7 +42,9 @@ from .tools import (
     show_full_config
 )
 
-rate_guard = RateLimitGuard(enabled=True)
+# Rate limiter is OFF by default. Pass --rate-limit to enable.
+_rate_limit_enabled = "--rate-limit" in sys.argv
+rate_guard = RateLimitGuard(enabled=_rate_limit_enabled)
 
 # ... (MockToolCallingLLM logic unchanged) ...
 
@@ -98,8 +100,12 @@ def create_opentrons_agent(use_mock: bool = False):
 
 if __name__ == "__main__":
     use_mock = "--mock" in sys.argv
-    args = [a for a in sys.argv[1:] if a != "--mock"]
+    rate_limited = "--rate-limit" in sys.argv
+    args = [a for a in sys.argv[1:] if a not in ("--mock", "--rate-limit")]
     initial_input = " ".join(args) if args else None
+
+    # Update the module-level guard based on CLI flag
+    rate_guard.enabled = rate_limited
 
     executor = create_opentrons_agent(use_mock=use_mock)
     chat_history = []
