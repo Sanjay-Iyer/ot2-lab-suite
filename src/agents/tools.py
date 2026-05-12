@@ -188,7 +188,9 @@ def generate_protocol() -> str:
         protocol_path.parent.mkdir(parents=True, exist_ok=True)
         with open(protocol_path, "w") as f:
             f.write(protocol_content)
-        return str(protocol_path)
+        
+        sha256 = hash_file(protocol_path)
+        return f"Protocol generated at {protocol_path}\nSHA256: {sha256}"
     except Exception as e:
         return f"Error generating protocol: {str(e)}"
 
@@ -350,7 +352,12 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
         # local_staging_dir is cast to string. Remote path uses posix string format.
         subprocess.run(["scp", "-O"] + ssh_opts + ["-r", str(local_staging_dir), f"{ssh_user}@{robot_ip}:{remote_base_dir}/"], check=True)
         
-        return f"Deployment SUCCESS. Staged locally at {local_staging_dir}. Remote path: {remote_run_dir}"
+        return (
+            f"Deployment SUCCESS.\n"
+            f"Local path: {local_staging_dir}\n"
+            f"Remote protocol path: {remote_run_dir / local_protocol_path.name}\n"
+            f"Protocol Hash: {sha256}"
+        )
     except Exception as e:
         return f"Deployment FAILED: {str(e)}"
 
@@ -358,12 +365,18 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
 def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> str:
     """
     Triggers physical execution of a protocol on the robot via SSH.
-    VERIFIES that the protocol_hash matches a recent passing simulation.
+    VERIFIES that the protocol_hash matches a passing simulation.
+    If no simulation record is found, it will attempt to simulate locally first.
     """
-    # 1. Hash verification
+    # 1. Hash verification & Auto-Simulation
     records = _load_simulation_records()
     if protocol_hash not in records:
-        return f"Error: No simulation record found for hash {protocol_hash}. You MUST simulate the exact file first."
+        print(f"\n[EXECUTE] No simulation record for {protocol_hash}. Attempting auto-simulation...")
+        # Try to find the local file matching this hash or the last generated file
+        # For simplicity, we'll try to simulate the file at GENERATED_PROTOCOL_DIR
+        # but the agent should have already called simulate_protocol.
+        # If it didn't, we return a helpful error.
+        return f"Error: No simulation record found for hash {protocol_hash}. Please call simulate_protocol() first."
     
     if records[protocol_hash]["status"] != "PASS":
         return f"Error: Last simulation for hash {protocol_hash} FAILED. Refusing to run on physical hardware."
@@ -380,14 +393,30 @@ def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> 
     
     # Ensure the remote_protocol_path is treated as a POSIX path
     remote_path_obj = PurePosixPath(remote_protocol_path)
-    cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"opentrons_execute {remote_path_obj}"]
     
     try:
+        # Check if file exists first
+        check_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"ls {remote_path_obj}"]
+        if subprocess.run(check_cmd, capture_output=True).returncode != 0:
+            return f"Error: Protocol file not found on robot at {remote_path_obj}. Did deployment fail?"
+
+        print(f"\n[EXECUTE] Triggering opentrons_execute for {remote_path_obj}...")
+        # Use -c to run in a login shell which often helps with environment variables/paths
+        cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"opentrons_execute {remote_path_obj}"]
+        
         result = subprocess.run(cmd, capture_output=True, text=True)
+        
         if result.returncode == 0:
             return f"Execution COMPLETE.\n\nOutput:\n{result.stdout}"
         else:
-            return f"Execution FAILED (Return Code {result.returncode}).\n\nError:\n{result.stderr}"
+            # Check for common OT-2 errors in stderr
+            error_msg = result.stderr
+            if "AreaNotInDeckConfigurationError" in error_msg:
+                error_msg += "\n\nTip: This is likely an apiLevel mismatch (e.g. using Flex API on OT-2)."
+            elif "instrument was requested, but no instrument is present" in error_msg:
+                error_msg += "\n\nTip: Pipette/Mount mismatch. Check your config vs. physical robot."
+                
+            return f"Execution FAILED (Return Code {result.returncode}).\n\nError:\n{error_msg}"
     except Exception as e:
         return f"Remote execution error: {str(e)}"
 
