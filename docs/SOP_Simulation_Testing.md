@@ -86,8 +86,8 @@ $KEY = "C:\Users\iyersn\.ssh\id_rsa_opentrons"
 # Create a folder on the robot
 ssh -i $KEY root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
 
-# Copy the file to the robot
-scp -i $KEY src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
+# Copy the file to the robot (-O forces legacy SCP protocol; the OT-2 lacks sftp-server)
+scp -O -i $KEY src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
 ```
 
 **Step C: Execute via SSH**

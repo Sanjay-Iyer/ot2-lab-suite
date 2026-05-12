@@ -299,7 +299,7 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
         
         # SCP staging dir
         # local_staging_dir is cast to string. Remote path uses posix string format.
-        subprocess.run(["scp"] + ssh_opts + ["-r", str(local_staging_dir), f"{ssh_user}@{robot_ip}:{remote_base_dir}/"], check=True)
+        subprocess.run(["scp", "-O"] + ssh_opts + ["-r", str(local_staging_dir), f"{ssh_user}@{robot_ip}:{remote_base_dir}/"], check=True)
         
         return f"Deployment SUCCESS. Staged locally at {local_staging_dir}. Remote path: {remote_run_dir}"
     except Exception as e:
