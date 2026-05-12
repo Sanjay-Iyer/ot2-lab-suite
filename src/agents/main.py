@@ -10,9 +10,11 @@ from datetime import datetime
 # Import centralized paths
 from src.utils.paths import PROJECT_ROOT, AGENT_LOG_DIR, ensure_project_dirs
 
-# Ensure root is in path for imports
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+# Run this script using `python -m src.agents.main` from the project root.
+if __name__ == "__main__" and not __package__:
+    print("ERROR: This script must be run as a module from the project root.")
+    print("Command: python -m src.agents.main")
+    sys.exit(1)
 
 from src.core.config import Config
 from src.utils.limits_per_minute import RateLimitGuard

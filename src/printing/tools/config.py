@@ -29,6 +29,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 
+from src.core.config import Config
+
 # =====================================================================
 #  Constants
 # =====================================================================
@@ -119,7 +121,7 @@ class ExperimentConfig:
     ])
 
     # ── Robot ─────────────────────────────────────────────────────────
-    robot_ip: str = "169.254.46.57"
+    robot_ip: str = field(default_factory=lambda: Config.ROBOT_IP)
 
     def total_samples(self) -> int:
         """Number of unique concentration × size combinations."""

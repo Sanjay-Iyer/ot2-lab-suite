@@ -7,8 +7,10 @@ from pathlib import Path
 # --- Root-Aware Discovery ---
 # This file is in src/agents, so root is 2 levels up.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
+if __name__ == "__main__" and not __package__:
+    print("ERROR: This script must be run as a module from the project root.")
+    print("Command: python -m src.agents.check_models")
+    sys.exit(1)
 
 from src.utils.paths import PROJECT_ROOT
 
@@ -16,11 +18,14 @@ from src.utils.paths import PROJECT_ROOT
 env_path = PROJECT_ROOT / ".env"
 load_dotenv(env_path)
 
+from src.core.config import Config
+
 api_key = os.getenv("GOOGLE_API_KEY")
 
 # 2. Ask Google's API for the list of available models
 print("Fetching available models from Google...\n")
-url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+base_url = Config.GEMINI_BASE_URL.rstrip('/') if Config.GEMINI_BASE_URL else "https://generativelanguage.googleapis.com"
+url = f"{base_url}/v1beta/models?key={api_key}"
 response = requests.get(url)
 
 # 3. Print out the names

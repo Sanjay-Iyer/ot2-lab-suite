@@ -1,0 +1,150 @@
+import os
+import sys
+import socket
+import subprocess
+from urllib.parse import urlparse
+import requests
+from pathlib import Path
+
+# Run this script using `python -m scripts.check_connectivity` from the project root.
+
+
+from src.core.config import Config
+
+def mask_secret(secret: str) -> str:
+    if not secret:
+        return ""
+    if len(secret) <= 8:
+        return "***"
+    return secret[:4] + "***" + secret[-4:]
+
+def main():
+    print("=" * 60)
+    print("OT-2 Lab Suite - Connectivity Diagnostics")
+    print("=" * 60)
+
+    # --- SECTION 1: Configuration Loaded ---
+    print("\n--- 1. Configuration Loaded ---")
+    
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    print(f"GOOGLE_API_KEY: {mask_secret(api_key)}")
+    print(f"GEMINI_MODEL: {Config.GEMINI_MODEL}")
+    print(f"GEMINI_BASE_URL: {Config.GEMINI_BASE_URL or '(default Google API)'}")
+    print(f"HTTP_PROXY: {os.getenv('HTTP_PROXY', '(not set)')}")
+    print(f"HTTPS_PROXY: {os.getenv('HTTPS_PROXY', '(not set)')}")
+    
+    no_proxy = os.getenv('NO_PROXY', '(not set)')
+    print(f"NO_PROXY: {no_proxy}")
+    
+    robot_ip = Config.ROBOT_IP
+    if robot_ip and robot_ip not in no_proxy.split(','):
+        print("WARNING: ROBOT_IP is not in NO_PROXY. Local robot traffic might be routed to a proxy and fail.")
+    
+    print(f"ROBOT_IP: {Config.ROBOT_IP}")
+    print(f"ROBOT_SSH_USER: {Config.ROBOT_SSH_USER}")
+    
+    key_path_val = Config.ROBOT_SSH_KEY_PATH
+    if key_path_val:
+        key_exists = Path(key_path_val).exists()
+        masked_path = mask_secret(key_path_val)
+        print(f"ROBOT_SSH_KEY_PATH: {masked_path} (Exists: {key_exists})")
+    else:
+        print("ROBOT_SSH_KEY_PATH: (not set)")
+
+    # --- SECTION 2: Gemini/API DNS Check ---
+    print("\n--- 2. Gemini/API DNS Check ---")
+    base_url = Config.GEMINI_BASE_URL or "https://generativelanguage.googleapis.com"
+    parsed = urlparse(base_url)
+    hostname = parsed.hostname
+    if not hostname:
+        print("FAIL: Could not parse hostname from base URL.")
+    else:
+        try:
+            ip = socket.gethostbyname(hostname)
+            print(f"PASS: DNS resolved {hostname} to {ip}")
+        except socket.gaierror as e:
+            print(f"FAIL: DNS resolution failed for {hostname}: {e}")
+            print("\nTroubleshooting Stale DNS/VPN State on Windows:")
+            print("If you recently switched networks or VPNs, try running this command to flush DNS:")
+            print("  ipconfig /flushdns")
+            print("Also consider clearing stale proxy environment variables in your terminal:")
+            print("  Remove-Item Env:HTTP_PROXY -ErrorAction SilentlyContinue")
+            print("  Remove-Item Env:HTTPS_PROXY -ErrorAction SilentlyContinue")
+            print("  Remove-Item Env:NO_PROXY -ErrorAction SilentlyContinue")
+            
+            import shutil
+            if shutil.which("gcloud"):
+                print("\nIf you are using Google Cloud CLI, verify its proxy configuration:")
+                print("  gcloud config get-value proxy/type")
+                print("  gcloud config get-value proxy/address")
+                print("  gcloud config get-value proxy/port")
+
+    # --- SECTION 3: Gemini/API Request Check ---
+    print("\n--- 3. Gemini/API Request Check ---")
+    if not api_key:
+        print("SKIP: Missing GOOGLE_API_KEY, cannot perform request.")
+    else:
+        try:
+            url = f"{base_url.rstrip('/')}/v1beta/models?key={api_key}"
+            # Use short timeout to fail fast
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                print("PASS: Successfully connected and authenticated to Gemini API.")
+            else:
+                print(f"FAIL: API request returned status code {response.status_code}")
+                print(f"Response: {response.text[:200]}")
+        except requests.exceptions.ProxyError as e:
+            print(f"FAIL: Proxy error encountered: {e}")
+            print("Troubleshooting: Verify HTTP_PROXY/HTTPS_PROXY settings and proxy server status.")
+        except requests.exceptions.ConnectionError as e:
+            print(f"FAIL: Connection error: {e}")
+        except requests.exceptions.Timeout:
+            print("FAIL: Connection timed out.")
+            print("Troubleshooting: Check if a proxy is required but not configured, or if the firewall is blocking outbound traffic.")
+
+    # --- SECTION 4: OT-2 IP/Socket Reachability ---
+    print("\n--- 4. OT-2 IP/Socket Reachability ---")
+    robot_ip = Config.ROBOT_IP
+    if robot_ip in ["127.0.0.1", "localhost", ""]:
+        print("FAIL: Physical robot IP not configured properly.")
+    else:
+        try:
+            # Try connecting to SSH port to see if host is reachable
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            result = sock.connect_ex((robot_ip, 22))
+            if result == 0:
+                print(f"PASS: Reached OT-2 on port 22 at {robot_ip}")
+            else:
+                print(f"FAIL: Port 22 unreachable on {robot_ip} (code {result})")
+            sock.close()
+        except Exception as e:
+            print(f"FAIL: Network error attempting to reach {robot_ip}: {e}")
+
+    # --- SECTION 5: OT-2 SSH BatchMode Check ---
+    print("\n--- 5. OT-2 SSH BatchMode Check ---")
+    if not key_path_val:
+        print("FAIL: ROBOT_SSH_KEY_PATH is missing. SSH cannot be tested.")
+    elif not Path(key_path_val).exists():
+        print(f"FAIL: Configured SSH key path does not exist.")
+    else:
+        ssh_user = Config.ROBOT_SSH_USER
+        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-i", key_path_val]
+        cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "echo 'SSH Connection Successful'"]
+        
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode == 0:
+                print(f"PASS: Non-interactive SSH access works. ({res.stdout.strip()})")
+            else:
+                print("FAIL: SSH authentication rejected or timed out.")
+                print(f"Error output: {res.stderr.strip()}")
+                print("\nTroubleshooting Commands:")
+                print(f"  ssh -i \"{key_path_val}\" {ssh_user}@{robot_ip}")
+        except Exception as e:
+            print(f"FAIL: Failed to run SSH command: {e}")
+
+    print("\n" + "=" * 60)
+
+if __name__ == "__main__":
+    main()

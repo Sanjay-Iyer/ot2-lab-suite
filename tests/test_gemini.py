@@ -2,9 +2,8 @@ import os
 import sys
 from pathlib import Path
 
-# Add project root to sys.path to import src
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.append(str(PROJECT_ROOT))
+# Test execution should use `python -m pytest tests`
+
 
 try:
     from src.core.config import Config

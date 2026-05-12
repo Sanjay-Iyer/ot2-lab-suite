@@ -134,16 +134,25 @@ class PreflightEngine:
             findings.append(Finding(self.get_severity("python", "syntax_valid"), f"Syntax Error: {e.msg}", e.lineno, e.offset))
             return
 
-        win_modules = {"winreg", "winsound", "msvcrt", "pywin32", "win32api", "win32con", "win32com"}
+        win_modules = {"winreg", "winsound", "msvcrt", "pywin32", "win32api", "win32con", "win32com", "wintypes"}
         robot_warn_modules = {"pandas", "matplotlib", "scipy", "tkinter"}
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 modules = [n.name for n in node.names] if isinstance(node, ast.Import) else [node.module]
+                # Also check aliases (e.g. from ctypes import wintypes -> n.name is 'wintypes')
+                if isinstance(node, ast.ImportFrom):
+                    modules.extend([n.name for n in node.names])
+                
                 for mod in modules:
-                    if mod in win_modules:
-                        findings.append(Finding(self.get_severity("python", "windows_imports"), f"Windows-only import: {mod}", node.lineno))
-                    if mod in robot_warn_modules:
+                    if mod and any(w in mod for w in win_modules):
+                        msg = (
+                            f"Windows-only module found: '{mod}'. "
+                            f"This will fail on the Linux-based OT-2 robot. "
+                            f"Please use cross-platform alternatives."
+                        )
+                        findings.append(Finding(self.get_severity("python", "windows_imports"), msg, node.lineno))
+                    elif mod in robot_warn_modules:
                         findings.append(Finding(self.get_severity("python", "missing_robot_deps"), f"Module might be missing on robot: {mod}", node.lineno))
 
     def check_python_windows_artifacts(self, path: pathlib.Path, content: str, findings: List[Finding]):

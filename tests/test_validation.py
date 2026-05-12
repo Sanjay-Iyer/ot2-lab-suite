@@ -1,6 +1,9 @@
 import pytest
+import pathlib
+import shutil
 from src.core.config_loader import load_default_config
 from src.core.validation.workflow_validator import validate_workflow_against_constraints
+from src.utils.preflight import PreflightEngine
 
 def test_default_dilution_loads():
     config = load_default_config("dilution")
@@ -70,3 +73,46 @@ def test_duplicate_slots_fail():
     result = validate_workflow_against_constraints(config)
     assert result.valid is False
     assert any("Duplicate deck slot assignments" in e.message for e in result.errors)
+
+# --- Preflight AST Checks ---
+@pytest.fixture(scope="module")
+def preflight_engine():
+    return PreflightEngine()
+
+@pytest.fixture
+def temp_fixture_dir(tmp_path):
+    d = tmp_path / "preflight_test_fixtures"
+    d.mkdir()
+    return d
+
+def test_preflight_catches_import_winreg(preflight_engine, temp_fixture_dir):
+    p = temp_fixture_dir / "test_import_winreg.py"
+    p.write_text("import winreg\n")
+    res = preflight_engine.validate_file(p)
+    assert any("Windows-only module found: 'winreg'" in f.message for f in res.findings)
+
+def test_preflight_catches_from_winreg_import(preflight_engine, temp_fixture_dir):
+    p = temp_fixture_dir / "test_from_winreg.py"
+    p.write_text("from winreg import OpenKey\n")
+    res = preflight_engine.validate_file(p)
+    assert any("Windows-only module found: 'winreg'" in f.message for f in res.findings)
+
+def test_preflight_catches_import_msvcrt(preflight_engine, temp_fixture_dir):
+    p = temp_fixture_dir / "test_import_msvcrt.py"
+    p.write_text("import msvcrt\n")
+    res = preflight_engine.validate_file(p)
+    assert any("Windows-only module found: 'msvcrt'" in f.message for f in res.findings)
+
+def test_preflight_catches_ctypes_wintypes(preflight_engine, temp_fixture_dir):
+    p = temp_fixture_dir / "test_wintypes.py"
+    p.write_text("from ctypes import wintypes\n")
+    res = preflight_engine.validate_file(p)
+    assert any("Windows-only module found: 'wintypes'" in f.message for f in res.findings)
+
+def test_preflight_allows_safe_imports(preflight_engine, temp_fixture_dir):
+    p = temp_fixture_dir / "test_safe_imports.py"
+    p.write_text("import json\nimport pathlib\nimport typing\nfrom opentrons import protocol_api\ndef run(ctx): pass\nmetadata = {'apiLevel': '2.15'}\n")
+    res = preflight_engine.validate_file(p)
+    # Should not flag anything related to windows imports
+    win_errs = [f for f in res.findings if "Windows-only module" in f.message]
+    assert len(win_errs) == 0

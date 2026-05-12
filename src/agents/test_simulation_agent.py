@@ -1,14 +1,15 @@
 import os
 import sys
 import pathlib
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
-# Add current directory to path so we can import main and tools
-sys.path.append(str(pathlib.Path(__file__).resolve().parent))
-
-from main import MockToolCallingLLM
-from tools import run_mock_simulation, configure_printing_parameters
+from src.agents.main import MockToolCallingLLM
+# tools.py no longer has run_mock_simulation, but we update the import to be absolute
+try:
+    from src.agents.tools import run_mock_simulation, configure_printing_parameters
+except ImportError:
+    pass
 
 def test_simulation_workflow():
     print("--- Initializing High-Fidelity Simulation Test ---")
@@ -26,15 +27,14 @@ def test_simulation_workflow():
     ])
     
     # 3. Initialize Agent
-    agent = create_tool_calling_agent(llm, tools, prompt)
-    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = create_react_agent(llm, tools)
     
     # 4. Run Test Prompt
     user_request = "Configure a print with 5 dilutions and then run a simulation of the dilution_protocol to check for errors."
     print(f"User Request: {user_request}\n")
     
     try:
-        result = executor.invoke({"input": user_request})
+        result = agent.invoke({"messages": [("user", user_request)]})
         print("\n--- Test Result ---")
         print(result["output"])
     except Exception as e:

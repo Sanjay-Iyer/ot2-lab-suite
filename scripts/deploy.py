@@ -3,8 +3,11 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to path so we can use Config
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+if __name__ == "__main__" and not __package__:
+    print("ERROR: This script must be run as a module from the project root.")
+    print("Command: python -m scripts.deploy")
+    sys.exit(1)
+
 from src.core.config import Config
 
 def deploy():

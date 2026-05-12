@@ -17,10 +17,12 @@ import pathlib
 import sys
 from typing import Any, Dict, List, Tuple
 
-# Ensure we can find 'config' in the same directory
-sys.path.append(str(pathlib.Path(__file__).resolve().parent))
+if __name__ == "__main__" and not __package__:
+    print("ERROR: This script must be run as a module from the project root.")
+    print("Command: python -m src.printing.tools.dilution_planner")
+    sys.exit(1)
 
-from config import (
+from .config import (
     ExperimentConfig, load_config, select_pipette, setup_logging,
     SUITE_DIR, OUTPUTS_DIR, LOGS_DIR,
     P20_MIN_UL, P20_MAX_UL, P300_MIN_UL, P300_MAX_UL,

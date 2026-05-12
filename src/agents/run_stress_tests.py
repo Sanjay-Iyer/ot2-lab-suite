@@ -3,10 +3,12 @@ import sys
 import pathlib
 import datetime
 
-# Add current directory to path
-sys.path.append(str(pathlib.Path(__file__).resolve().parent))
+if __name__ == "__main__" and not __package__:
+    print("ERROR: This script must be run as a module from the project root.")
+    print("Command: python -m src.agents.run_stress_tests")
+    sys.exit(1)
 
-from main import create_opentrons_agent
+from src.agents.main import create_opentrons_agent
 
 # --- THE 5 STRESS TEST SCENARIOS ---
 STRESS_TESTS = [
