@@ -32,8 +32,8 @@ printing:
   starting_well: A1
 
 pipette:
-  name: p300_single_gen2
-  mount: left
+  name: p300_multi_gen2
+  mount: right
   allow_split_transfers: true
 
 simulation:
