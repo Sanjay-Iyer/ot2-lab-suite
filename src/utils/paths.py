@@ -32,6 +32,10 @@ OUTPUT_DIR = ROBOT_DATA_MIRROR / "outputs"
 PROTOCOL_DIR = PROJECT_ROOT / "src" / "protocols"
 GENERATED_PROTOCOL_DIR = PROTOCOL_DIR / "generated"
 
+# Staging & Tracking
+DEPLOY_BASE_DIR = ROBOT_DATA_DIR / "deploy"
+SIMULATION_RECORDS_PATH = ROBOT_DATA_MIRROR / "simulations.json"
+
 def ensure_project_dirs():
     """Ensures all critical project directories exist."""
     dirs = [
@@ -46,7 +50,8 @@ def ensure_project_dirs():
         AGENT_LOG_DIR,
         OUTPUT_DIR,
         PROTOCOL_DIR,
-        GENERATED_PROTOCOL_DIR
+        GENERATED_PROTOCOL_DIR,
+        DEPLOY_BASE_DIR
     ]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)

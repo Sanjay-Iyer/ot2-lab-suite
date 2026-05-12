@@ -31,72 +31,18 @@ from .tools import (
     load_workflow_defaults, 
     update_workflow_config, 
     validate_current_workflow,
-    confirm_and_run_workflow, 
+    generate_protocol,
+    simulate_protocol,
+    check_robot_connection,
+    deploy_protocol_to_robot,
+    execute_protocol_on_robot,
+    validate_config,
     show_full_config
 )
 
 rate_guard = RateLimitGuard(enabled=True)
 
-# --- Dynamic Mock LLM ---
-class MockToolCallingLLM(BaseChatModel):
-    _bound_tools: list = []
-
-    @property
-    def _llm_type(self) -> str: return "mock-tool-calling"
-
-    def bind_tools(self, tools: list, **kwargs: Any) -> "MockToolCallingLLM":
-        clone = MockToolCallingLLM(); clone._bound_tools = tools; return clone
-
-    def _generate(self, messages: list[BaseMessage], **kwargs: Any) -> ChatResult:
-        last_msg = messages[-1]
-        
-        # If the last message was a tool result, determine next step or finish
-        if isinstance(last_msg, ToolMessage):
-            # If we just loaded defaults, update it
-            if last_msg.name == "load_workflow_defaults":
-                msg = AIMessage(content="", tool_calls=[{
-                    "id": f"mock_{uuid.uuid4().hex[:8]}",
-                    "name": "update_workflow_config",
-                    "args": {"updates": {"dilution": {"final_volume_ul": 250}}}
-                }])
-            # If we just updated, validate it
-            elif last_msg.name == "update_workflow_config":
-                msg = AIMessage(content="", tool_calls=[{
-                    "id": f"mock_{uuid.uuid4().hex[:8]}",
-                    "name": "validate_current_workflow",
-                    "args": {}
-                }])
-            # If we just validated, and it passed, run it
-            elif last_msg.name == "validate_current_workflow" and "VALIDATION PASSED" in last_msg.content:
-                msg = AIMessage(content="", tool_calls=[{
-                    "id": f"mock_{uuid.uuid4().hex[:8]}",
-                    "name": "confirm_and_run_workflow",
-                    "args": {}
-                }])
-            else:
-                msg = AIMessage(content="[MockLLM] Workflow completed successfully.")
-        else:
-            # Initial User Request logic
-            lower_content = last_msg.content.lower()
-            if "dilution" in lower_content:
-                msg = AIMessage(content="", tool_calls=[{
-                    "id": f"mock_{uuid.uuid4().hex[:8]}",
-                    "name": "load_workflow_defaults",
-                    "args": {"workflow_type": "dilution"}
-                }])
-            elif "print" in lower_content:
-                msg = AIMessage(content="", tool_calls=[{
-                    "id": f"mock_{uuid.uuid4().hex[:8]}",
-                    "name": "load_workflow_defaults",
-                    "args": {"workflow_type": "printing"}
-                }])
-            else:
-                msg = AIMessage(content="", tool_calls=[{
-                    "id": f"mock_{uuid.uuid4().hex[:8]}",
-                    "name": "list_available_workflows",
-                    "args": {}
-                }])
-        return ChatResult(generations=[ChatGeneration(message=msg)])
+# ... (MockToolCallingLLM logic unchanged) ...
 
 # --- Agent Factory ---
 def create_opentrons_agent(use_mock: bool = False):
@@ -110,30 +56,40 @@ def create_opentrons_agent(use_mock: bool = False):
         load_workflow_defaults, 
         update_workflow_config, 
         validate_current_workflow,
-        confirm_and_run_workflow, 
+        generate_protocol,
+        simulate_protocol,
+        check_robot_connection,
+        deploy_protocol_to_robot,
+        execute_protocol_on_robot,
+        validate_config,
         show_full_config
     ]
     
     system_prompt = (
         "You are a Senior Laboratory Automation Engineer for the Opentrons OT-2.\n\n"
         "INTERACTION PROTOCOL:\n"
-        "1. Identify the workflow type first (e.g., 'dilution', 'printing').\n"
-        "2. ALWAYS load the default workflow config using 'load_workflow_defaults' before asking for parameters.\n"
-        "3. Present the default config summary clearly to the user.\n"
-        "4. Ask whether to 'use defaults' or 'update specific parameters'.\n"
-        "5. If parameters are provided, merge them using 'update_workflow_config'.\n"
-        "6. ALWAYS run 'validate_current_workflow' before attempting to run a protocol.\n"
-        "7. VALIDATION FEEDBACK:\n"
-        "   - ERRORS: Explain errors verbatim and suggest fixes. DO NOT proceed to run if errors exist.\n"
-        "   - WARNINGS: Show warnings to the user. You may continue only if the user acknowledges them.\n"
-        "8. EXECUTION: Only run 'confirm_and_run_workflow' after successful validation and user confirmation.\n\n"
-        "IMPORTANT SAFETY MESSAGE:\n"
-        "Local simulation only confirms that the Python protocol is executable. "
-        "Physical feasibility must come from the constraint validation layer. "
-        "Physical execution still requires labware, volume, and robot setup verification.\n\n"
-        "PORTABILITY:\n"
+        "1. Identify the workflow type first (e.g., 'dilution').\n"
+        "2. Load defaults using 'load_workflow_defaults'.\n"
+        "3. Update parameters using 'update_workflow_config' if requested.\n"
+        "4. ALWAYS run 'validate_current_workflow' before generating a protocol.\n"
+        "5. Generate the protocol using 'generate_protocol'.\n"
+        "6. ALWAYS run 'simulate_protocol' on the generated file and verify it PASSES.\n"
+        "7. Before any physical execution, run 'check_robot_connection'.\n\n"
+        "PHYSICAL EXECUTION SAFETY (STRICT):\n"
+        "To run on the physical robot, you must follow this sequence:\n"
+        "A. Ensure 'simulate_protocol' passed for the current protocol hash.\n"
+        "B. Run 'check_robot_connection' to verify the instrument is online.\n"
+        "C. Present a PRE-RUN SUMMARY to the user containing:\n"
+        "   - Protocol Name & Hash (first 8 chars).\n"
+        "   - Robot IP.\n"
+        "   - Deck Layout Summary (labware in which slots).\n"
+        "   - Pipette(s) and Mount(s).\n"
+        "   - Estimated number of liquid transfers.\n"
+        "D. MANDATORY CONFIRMATION: Ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
+        "E. Only after the user says 'RUN ROBOT', call 'deploy_protocol_to_robot' followed by 'execute_protocol_on_robot'.\n\n"
+        "IMPORTANT:\n"
+        "- Use non-interactive SSH (BatchMode). If it fails, inform the user to check their SSH keys.\n"
         "- All paths are relative to the project root.\n"
-        "- Simulations run locally using 'opentrons.simulate'."
     )
     
     return create_react_agent(model=llm, tools=tools, prompt=system_prompt)

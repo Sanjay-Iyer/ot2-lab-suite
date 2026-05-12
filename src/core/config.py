@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from src.utils.paths import PROJECT_ROOT, ROBOT_DATA_MIRROR, LOG_DIR
+from src.utils.paths import PROJECT_ROOT, ROBOT_DATA_MIRROR, LOG_DIR, ROBOT_DATA_DIR, DEPLOY_BASE_DIR
 
 # Load .env from root
 load_dotenv(PROJECT_ROOT / ".env")
@@ -9,6 +9,9 @@ load_dotenv(PROJECT_ROOT / ".env")
 class Config:
     """Central Configuration and Factory for the OT-2 Lab Suite."""
     ROOT = PROJECT_ROOT
+    ROBOT_DATA = ROBOT_DATA_DIR
+    DEPLOY_BASE_DIR = DEPLOY_BASE_DIR
+    REMOTE_USER_STORAGE = "/var/lib/opentrons/user_storage"
     
     # ─── Robot Connection ─────────────
     ROBOT_IP = os.getenv("ROBOT_IP", "127.0.0.1")

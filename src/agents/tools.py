@@ -3,10 +3,20 @@ import os
 import sys
 import json
 import yaml
+import shutil
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from langchain.tools import tool
-from src.utils.paths import USER_WORKFLOW_CONFIG_DIR, GENERATED_PROTOCOL_DIR, ensure_project_dirs
+
+from src.utils.paths import (
+    USER_WORKFLOW_CONFIG_DIR, 
+    GENERATED_PROTOCOL_DIR, 
+    SIMULATION_RECORDS_PATH,
+    DEPLOY_BASE_DIR,
+    ensure_project_dirs
+)
+from src.core.config import Config
 from src.core.workflows.registry import WORKFLOWS
 from src.core.config_loader import (
     load_default_config, 
@@ -16,16 +26,40 @@ from src.core.config_loader import (
     summarize_config
 )
 from src.core.validation.workflow_validator import validate_workflow_against_constraints
+from src.utils.hashing import hash_file
 
 # --- Global Working State ---
 _WORKING_CONFIG = None
 _CURRENT_WORKFLOW = None
 
+# --- Helper Functions ---
+def _load_simulation_records() -> dict:
+    if not SIMULATION_RECORDS_PATH.exists():
+        return {}
+    try:
+        with open(SIMULATION_RECORDS_PATH, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def _save_simulation_record(protocol_path: Path, sha256: str, status: str, result: str):
+    records = _load_simulation_records()
+    records[sha256] = {
+        "path": str(protocol_path),
+        "timestamp": datetime.now().isoformat(),
+        "status": status,
+        "result": result
+    }
+    SIMULATION_RECORDS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(SIMULATION_RECORDS_PATH, "w") as f:
+        json.dump(records, f, indent=2)
+
+# --- Tools ---
+
 @tool
 def list_available_workflows() -> str:
     """
     Returns a list of all registered lab workflows and their descriptions.
-    Use this to discover what capabilities the system has.
     """
     lines = ["Available Workflows:"]
     for name, entry in WORKFLOWS.items():
@@ -36,8 +70,6 @@ def list_available_workflows() -> str:
 def load_workflow_defaults(workflow_type: str) -> str:
     """
     Loads the default configuration for a given workflow type (e.g., 'dilution', 'printing').
-    Returns the default parameters and a human-readable summary.
-    Always start here when a user asks for a workflow.
     """
     global _WORKING_CONFIG, _CURRENT_WORKFLOW
     try:
@@ -58,9 +90,6 @@ def load_workflow_defaults(workflow_type: str) -> str:
 def update_workflow_config(updates: dict) -> str:
     """
     Applies user-provided changes to the currently loaded workflow configuration.
-    Input should be a dictionary of fields to update. Nested fields are supported.
-    Example: {"dilution": {"final_volume_ul": 1000}, "labware": {"source": {"name": "corning_96_wellplate_360ul_flat"}}}
-    This tool does NOT perform full constraint validation. Call validate_current_workflow() after updates.
     """
     global _WORKING_CONFIG
     if _WORKING_CONFIG is None:
@@ -69,13 +98,8 @@ def update_workflow_config(updates: dict) -> str:
     try:
         updated_config = merge_user_updates(_WORKING_CONFIG, updates)
         _WORKING_CONFIG = updated_config
-        
         summary = summarize_config(_WORKING_CONFIG)
-        return (
-            f"Configuration updated locally.\n\n"
-            f"{summary}\n"
-            "Updates applied. Please run validate_current_workflow() to check for physical safety and constraints."
-        )
+        return f"Configuration updated locally.\n\n{summary}"
     except Exception as e:
         return f"Update Error: {str(e)}"
 
@@ -84,15 +108,13 @@ def validate_current_workflow() -> str:
     """
     Runs Pydantic validation and full constraint validation (hardware limits, safety).
     Returns a detailed report of errors and warnings.
-    Always call this before confirm_and_run_workflow().
     """
     global _WORKING_CONFIG
     if _WORKING_CONFIG is None:
-        return "Error: No workflow loaded."
+        return "Error: No workflow loaded. Call load_workflow_defaults first."
     
     try:
         result = validate_workflow_against_constraints(_WORKING_CONFIG)
-        
         output = []
         if result.valid:
             output.append("VALIDATION PASSED: Workflow is physically safe according to current constraints.")
@@ -102,60 +124,47 @@ def validate_current_workflow() -> str:
         if result.errors:
             output.append("\nERRORS:")
             for e in result.errors:
-                msg = f"- [{e.field}] {e.message}"
-                if e.suggested_fix:
-                    msg += f" (Suggested Fix: {e.suggested_fix})"
-                output.append(msg)
-                
-        if result.warnings:
-            output.append("\nWARNINGS:")
-            for w in result.warnings:
-                output.append(f"- [{w.field}] {w.message}")
-                
-        if result.valid:
-            output.append("\nYou can now proceed to confirm_and_run_workflow().")
-        else:
-            output.append("\nPlease address the errors above before running.")
-            
+                output.append(f"- [{e.field}] {e.message}")
         return "\n".join(output)
     except Exception as e:
         return f"Internal Validation Error: {str(e)}"
 
 @tool
-def show_full_config() -> str:
-    """Returns the full raw YAML representation of the current working configuration."""
-    global _WORKING_CONFIG
-    if _WORKING_CONFIG is None:
-        return "Error: No workflow loaded."
-    return yaml.dump(_WORKING_CONFIG, sort_keys=False)
+def validate_config(config_path: str) -> str:
+    """
+    Validates a YAML workflow configuration file against schemas and hardware constraints.
+    Returns a success message or a detailed list of errors.
+    """
+    try:
+        with open(config_path, "r") as f:
+            config_data = yaml.safe_load(f)
+        
+        result = validate_workflow_against_constraints(config_data)
+        
+        output = []
+        if result.valid:
+            output.append(f"VALIDATION PASSED for {config_path}")
+        else:
+            output.append(f"VALIDATION FAILED for {config_path}")
+            
+        if result.errors:
+            for e in result.errors:
+                output.append(f"- [{e.field}] {e.message}")
+        return "\n".join(output)
+    except Exception as e:
+        return f"Validation error: {str(e)}"
 
 @tool
-def confirm_and_run_workflow() -> str:
+def generate_protocol() -> str:
     """
-    Finalizes the workflow:
-    1. Validates the final config (must have no errors).
-    2. Saves the run config to configs/workflows/user/last_{workflow_type}_run.yaml.
-    3. Generates the OT-2 protocol to src/protocols/generated/generated_{workflow_type}.py.
-    4. Runs a local simulation.
+    Generates the OT-2 protocol based on current working configuration.
+    Returns the absolute path to the generated protocol file.
     """
     global _WORKING_CONFIG, _CURRENT_WORKFLOW
     if _WORKING_CONFIG is None:
         return "Error: No workflow loaded."
     
     try:
-        # 1. Final Validation Check
-        validation_result = validate_workflow_against_constraints(_WORKING_CONFIG)
-        if not validation_result.valid:
-            return "Error: Cannot run workflow. Validation has errors. Call validate_current_workflow() to see details."
-        
-        # 2. Save Run Config
-        run_id = f"last_{_CURRENT_WORKFLOW}_run"
-        config_path = USER_WORKFLOW_CONFIG_DIR / f"{run_id}.yaml"
-        USER_WORKFLOW_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(config_path, "w") as f:
-            yaml.dump(_WORKING_CONFIG, f, sort_keys=False)
-        
-        # 3. Generate Protocol
         entry = WORKFLOWS[_CURRENT_WORKFLOW]
         config_obj = entry.schema(**_WORKING_CONFIG)
         protocol_content = entry.protocol_generator(config_obj)
@@ -164,18 +173,168 @@ def confirm_and_run_workflow() -> str:
         protocol_path.parent.mkdir(parents=True, exist_ok=True)
         with open(protocol_path, "w") as f:
             f.write(protocol_content)
-            
-        # 4. Run Simulation
-        cmd = [sys.executable, "-m", "opentrons.simulate", str(protocol_path)]
+        return str(protocol_path)
+    except Exception as e:
+        return f"Error generating protocol: {str(e)}"
+
+@tool
+def simulate_protocol(protocol_path: str) -> str:
+    """
+    Runs a local Opentrons simulation using 'conda run -n ai'.
+    Saves a SHA256 record of the result for traceability.
+    """
+    p_path = Path(protocol_path)
+    if not p_path.exists():
+        return f"Error: Protocol file not found at {protocol_path}"
+    
+    try:
+        sha256 = hash_file(p_path)
+        # Use conda run to ensure correct environment
+        cmd = ["conda", "run", "-n", "ai", "python", "-m", "opentrons.simulate", str(p_path)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
-        if result.returncode != 0:
-            return f"SIMULATION FAILED:\n{result.stderr}"
+        status = "PASS" if result.returncode == 0 else "FAIL"
+        output = result.stdout if result.returncode == 0 else result.stderr
         
-        return (
-            f"Local simulation passed. The protocol is generated, but physical execution still requires labware, volume, and robot setup verification.\n\n"
-            f"- Config Saved: {config_path}\n"
-            f"- Protocol Saved: {protocol_path}\n"
-        )
+        _save_simulation_record(p_path, sha256, status, output)
+        
+        if result.returncode == 0:
+            return (
+                f"SIMULATION PASSED for hash {sha256[:8]}.\n"
+                f"Record saved to simulations.json.\n\n"
+                f"Output summary:\n{result.stdout[:500]}..."
+            )
+        else:
+            return f"SIMULATION FAILED for hash {sha256[:8]}.\n\nError:\n{result.stderr}"
     except Exception as e:
-        return f"Error finalizing workflow: {str(e)}"
+        return f"Simulation error: {str(e)}"
+
+@tool
+def check_robot_connection() -> str:
+    """
+    Verifies ROBOT_IP connectivity and SSH access (non-interactive BatchMode).
+    Checks for 'opentrons_execute' availability on the instrument.
+    """
+    robot_ip = Config.ROBOT_IP
+    if robot_ip in ["127.0.0.1", "localhost"]:
+        return f"Error: ROBOT_IP is set to {robot_ip}. Physical robot IP required in .env."
+
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+    
+    try:
+        # 1. Test SSH + path existence
+        cmd_ls = ["ssh"] + ssh_opts + [f"root@{robot_ip}", f"mkdir -p {Config.REMOTE_USER_STORAGE}/ot2_runs && ls -d {Config.REMOTE_USER_STORAGE}"]
+        result_ls = subprocess.run(cmd_ls, capture_output=True, text=True)
+        
+        if result_ls.returncode != 0:
+            return f"Connectivity FAILED: SSH unreachable at {robot_ip} (check keys/BatchMode). Error: {result_ls.stderr}"
+
+        # 2. Check for opentrons_execute
+        cmd_exe = ["ssh"] + ssh_opts + [f"root@{robot_ip}", "which opentrons_execute"]
+        result_exe = subprocess.run(cmd_exe, capture_output=True, text=True)
+        
+        if result_exe.returncode != 0:
+            return f"Connectivity WARNING: SSH connected, but 'opentrons_execute' missing on robot."
+
+        return f"Connectivity PASSED: Instrument {robot_ip} is READY (SSH/BatchMode)."
+    except Exception as e:
+        return f"Connection check internal error: {str(e)}"
+
+@tool
+def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str]] = None) -> str:
+    """
+    Stages and SCPs the protocol and configs to a unique run folder on the robot.
+    Returns the remote run directory path.
+    """
+    p_path = Path(protocol_path)
+    if not p_path.exists():
+        return f"Error: Protocol not found: {protocol_path}"
+    
+    run_id = f"run_{datetime.now().strftime('%Y%m%d_%HH%MM%SS')}"
+    staging_dir = DEPLOY_BASE_DIR / run_id
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # 1. Stage files
+        shutil.copy2(p_path, staging_dir)
+        if config_paths:
+            for cp in config_paths:
+                shutil.copy2(Path(cp), staging_dir)
+        
+        # 2. Create manifest
+        sha256 = hash_file(p_path)
+        manifest = {
+            "run_id": run_id,
+            "protocol": p_path.name,
+            "protocol_hash": sha256,
+            "timestamp": datetime.now().isoformat(),
+            "robot_ip": Config.ROBOT_IP
+        }
+        with open(staging_dir / "manifest.json", "w") as f:
+            json.dump(manifest, f, indent=2)
+            
+        # 3. SCP to robot
+        robot_ip = Config.ROBOT_IP
+        remote_base = Config.REMOTE_USER_STORAGE + "/ot2_runs"
+        remote_run_dir = f"{remote_base}/{run_id}"
+        
+        # Ensure remote base exists
+        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+        subprocess.run(["ssh"] + ssh_opts + [f"root@{robot_ip}", f"mkdir -p {remote_base}"], check=True)
+        
+        # SCP staging dir
+        subprocess.run(["scp"] + ssh_opts + ["-r", str(staging_dir), f"root@{robot_ip}:{remote_base}/"], check=True)
+        
+        return f"Deployment SUCCESS. Staged locally at {staging_dir}. Remote path: {remote_run_dir}"
+    except Exception as e:
+        return f"Deployment FAILED: {str(e)}"
+
+@tool
+def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> str:
+    """
+    Triggers physical execution of a protocol on the robot via SSH.
+    VERIFIES that the protocol_hash matches a recent passing simulation.
+    """
+    # 1. Hash verification
+    records = _load_simulation_records()
+    if protocol_hash not in records:
+        return f"Error: No simulation record found for hash {protocol_hash}. You MUST simulate the exact file first."
+    
+    if records[protocol_hash]["status"] != "PASS":
+        return f"Error: Last simulation for hash {protocol_hash} FAILED. Refusing to run on physical hardware."
+    
+    # 2. SSH Execution
+    robot_ip = Config.ROBOT_IP
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+    cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", f"opentrons_execute {remote_protocol_path}"]
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return f"Execution COMPLETE.\n\nOutput:\n{result.stdout}"
+        else:
+            return f"Execution FAILED (Return Code {result.returncode}).\n\nError:\n{result.stderr}"
+    except Exception as e:
+        return f"Remote execution error: {str(e)}"
+
+@tool
+def deploy_and_run_on_robot(protocol_path: str) -> str:
+    """
+    High-level wrapper: Check Connection -> Deploy -> Execute.
+    Requires manual user confirmation 'RUN ROBOT' before calling.
+    """
+    # This tool is intended for the agent to orchestrate the sub-tools.
+    return (
+        "Deployment wrapper ready. Please call the following tools in order:\n"
+        "1. check_robot_connection()\n"
+        "2. deploy_protocol_to_robot(protocol_path)\n"
+        "3. execute_protocol_on_robot(remote_path, hash)"
+    )
+
+@tool
+def show_full_config() -> str:
+    """Returns the full raw YAML representation of the current working configuration."""
+    global _WORKING_CONFIG
+    if _WORKING_CONFIG is None:
+        return "Error: No workflow loaded."
+    return yaml.dump(_WORKING_CONFIG, sort_keys=False)
