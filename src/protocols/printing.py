@@ -22,7 +22,7 @@ from opentrons import protocol_api
 metadata = {{
     "protocolName": "Automated Printing",
     "author": "AI Agent",
-    "apiLevel": "2.15"
+    "apiLevel": "2.13"
 }}
 
 def run(protocol: protocol_api.ProtocolContext):

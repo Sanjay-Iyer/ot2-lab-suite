@@ -6,7 +6,7 @@ Used for verifying local simulation setups.
 metadata = {
     "protocolName": "Mock Test Protocol",
     "author": "Validation Script",
-    "apiLevel": "2.14"
+    "apiLevel": "2.13"
 }
 
 def run(protocol):

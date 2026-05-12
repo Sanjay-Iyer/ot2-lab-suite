@@ -40,7 +40,7 @@ class DilutionWorkflowConfig(BaseModel):
         """Converts this nested config to the flatter BaseWorkflowConfig format for protocol generators."""
         return {
             "workflow": "dilution",
-            "apiLevel": "2.15",
+            "apiLevel": "2.13",
             "simulate": self.simulation.local_only,
             "metadata": {"protocolName": "Automated Dilution"},
             "deck": {
@@ -100,7 +100,7 @@ class PrintingWorkflowConfig(BaseModel):
         """Converts this nested config to the flatter BaseWorkflowConfig format."""
         return {
             "workflow": "printing",
-            "apiLevel": "2.15",
+            "apiLevel": "2.13",
             "simulate": self.simulation.local_only,
             "metadata": {"protocolName": "Automated Printing"},
             "deck": {
