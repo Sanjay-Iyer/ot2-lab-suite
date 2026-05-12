@@ -97,6 +97,7 @@ def create_opentrons_agent(use_mock: bool = False):
         "IMPORTANT:\n"
         "- Use non-interactive SSH (BatchMode). If it fails, inform the user to check their SSH keys.\n"
         "- All paths are relative to the project root.\n"
+        "- TRUST TOOLS OVER MEMORY: If a tool output (like show_full_config or generate_protocol) says a pipette is 'p300_multi_gen2', DO NOT report it as 'p300_single_gen2' in your chat, even if you thought it was single-channel earlier.\n"
     )
     
     return create_react_agent(model=llm, tools=tools, prompt=system_prompt)

@@ -230,8 +230,8 @@ def simulate_protocol(protocol_path: str) -> str:
 @tool
 def get_robot_hardware_status() -> str:
     """
-    Queries the physical OT-2 robot via SSH to find exactly which pipettes are attached to which mounts.
-    Use this to verify the hardware matches your configuration before generating a protocol.
+    Queries the physical OT-2 robot via SSH to find exactly which pipettes are attached.
+    Checks multiple possible system paths to ensure compatibility with different firmware versions.
     """
     robot_ip = Config.ROBOT_IP
     key_path = Config.ROBOT_SSH_KEY_PATH
@@ -242,21 +242,37 @@ def get_robot_hardware_status() -> str:
 
     ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", key_path]
     
+    # Common paths for instrument storage on OT-2
+    paths = [
+        "/var/lib/opentrons/attached_instruments.json",
+        "/var/lib/opentrons/pipettes.json",
+        "/data/attached_instruments.json"
+    ]
+    
     try:
-        # OT-2 stores attached instruments in this JSON file
-        cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "cat /var/lib/opentrons/attached_instruments.json"]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        found_data = None
+        for p in paths:
+            cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"cat {p}"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                found_data = json.loads(result.stdout)
+                break
         
-        if result.returncode != 0:
-            return f"Hardware check FAILED: {result.stderr}"
+        if not found_data:
+            # Fallback: try to find any json file in the opentrons lib dir that might be it
+            fallback_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "ls /var/lib/opentrons/*.json"]
+            subprocess.run(fallback_cmd, capture_output=True, text=True)
+            return "Hardware check FAILED: Could not locate instrument configuration file on robot. Please verify pipettes manually."
             
-        data = json.loads(result.stdout)
-        summary = ["Physical Robot Hardware:"]
-        for mount in ["left", "right"]:
-            info = data.get(mount, {})
-            model = info.get("model", "None")
-            summary.append(f"- {mount.upper()} Mount: {model}")
-            
+        summary = ["Physical Robot Hardware Found:"]
+        # Handle different JSON formats (some are flat, some are nested by mount)
+        if isinstance(found_data, dict):
+            for mount in ["left", "right"]:
+                info = found_data.get(mount, {})
+                # Handle both {'model': '...'} and just 'p300_single_v2.1'
+                model = info.get("model") if isinstance(info, dict) else info
+                summary.append(f"- {mount.upper()} Mount: {model or 'None'}")
+        
         return "\n".join(summary)
     except Exception as e:
         return f"Hardware check error: {str(e)}"
