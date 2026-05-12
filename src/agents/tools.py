@@ -225,7 +225,7 @@ def check_robot_connection() -> str:
         return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
     ssh_user = Config.ROBOT_SSH_USER
-    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", key_path]
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path]
     
     try:
         # 1. Test SSH + path existence
@@ -294,7 +294,7 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
         remote_run_dir = remote_base_dir / run_id
         
         # Ensure remote base exists
-        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", key_path]
+        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path]
         subprocess.run(["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"mkdir -p {remote_base_dir}"], check=True)
         
         # SCP staging dir
@@ -327,7 +327,7 @@ def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> 
         return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
     ssh_user = Config.ROBOT_SSH_USER
-    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", key_path]
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path]
     
     # Ensure the remote_protocol_path is treated as a POSIX path
     remote_path_obj = PurePosixPath(remote_protocol_path)

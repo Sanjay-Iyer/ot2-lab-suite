@@ -129,7 +129,7 @@ def main():
         print(f"FAIL: Configured SSH key path does not exist.")
     else:
         ssh_user = Config.ROBOT_SSH_USER
-        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-i", key_path_val]
+        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path_val]
         cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "echo 'SSH Connection Successful'"]
         
         try:
