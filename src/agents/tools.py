@@ -78,6 +78,10 @@ def load_workflow_defaults(workflow_type: str) -> str:
         _CURRENT_WORKFLOW = workflow_type
         
         summary = summarize_config(config)
+        # Terminal-level debug for the user
+        print(f"\n[DEBUG] Loaded YAML defaults for {workflow_type}:")
+        print(f"        Pipette: {config.get('pipette', {}).get('name')} on {config.get('pipette', {}).get('mount')}")
+        
         return (
             f"Defaults for '{workflow_type}' loaded successfully.\n\n"
             f"{summary}\n"
@@ -165,9 +169,20 @@ def generate_protocol() -> str:
         return "Error: No workflow loaded."
     
     try:
+        # Safety: Re-read pipette config from YAML defaults to prevent LLM hallucination
+        fresh_defaults = load_default_config(_CURRENT_WORKFLOW)
+        if "pipette" in fresh_defaults and "pipette" in _WORKING_CONFIG:
+            _WORKING_CONFIG["pipette"] = fresh_defaults["pipette"]
+        
         entry = WORKFLOWS[_CURRENT_WORKFLOW]
         config_obj = entry.schema(**_WORKING_CONFIG)
         protocol_content = entry.protocol_generator(config_obj)
+        
+        # Log actual values used
+        base = config_obj.to_base_config()
+        pipette_info = base.get("deck", {}).get("pipettes", [{}])[0]
+        print(f"[GENERATE] Pipette: {pipette_info.get('type')} on {pipette_info.get('mount')}")
+        print(f"[GENERATE] API Level: {base.get('apiLevel')}")
         
         protocol_path = GENERATED_PROTOCOL_DIR / f"generated_{_CURRENT_WORKFLOW}.py"
         protocol_path.parent.mkdir(parents=True, exist_ok=True)
@@ -209,6 +224,40 @@ def simulate_protocol(protocol_path: str) -> str:
             return f"SIMULATION FAILED for hash {sha256[:8]}.\n\nError:\n{result.stderr}"
     except Exception as e:
         return f"Simulation error: {str(e)}"
+
+@tool
+def get_robot_hardware_status() -> str:
+    """
+    Queries the physical OT-2 robot via SSH to find exactly which pipettes are attached to which mounts.
+    Use this to verify the hardware matches your configuration before generating a protocol.
+    """
+    robot_ip = Config.ROBOT_IP
+    key_path = Config.ROBOT_SSH_KEY_PATH
+    ssh_user = Config.ROBOT_SSH_USER
+    
+    if not key_path:
+        return "Error: ROBOT_SSH_KEY_PATH is missing. Cannot check hardware."
+
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", key_path]
+    
+    try:
+        # OT-2 stores attached instruments in this JSON file
+        cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "cat /var/lib/opentrons/attached_instruments.json"]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            return f"Hardware check FAILED: {result.stderr}"
+            
+        data = json.loads(result.stdout)
+        summary = ["Physical Robot Hardware:"]
+        for mount in ["left", "right"]:
+            info = data.get(mount, {})
+            model = info.get("model", "None")
+            summary.append(f"- {mount.upper()} Mount: {model}")
+            
+        return "\n".join(summary)
+    except Exception as e:
+        return f"Hardware check error: {str(e)}"
 
 @tool
 def check_robot_connection() -> str:

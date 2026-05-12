@@ -39,7 +39,8 @@ from .tools import (
     deploy_protocol_to_robot,
     execute_protocol_on_robot,
     validate_config,
-    show_full_config
+    show_full_config,
+    get_robot_hardware_status
 )
 
 # Rate limiter is OFF by default. Pass --rate-limit to enable.
@@ -66,7 +67,8 @@ def create_opentrons_agent(use_mock: bool = False):
         deploy_protocol_to_robot,
         execute_protocol_on_robot,
         validate_config,
-        show_full_config
+        show_full_config,
+        get_robot_hardware_status
     ]
     
     system_prompt = (
@@ -82,14 +84,15 @@ def create_opentrons_agent(use_mock: bool = False):
         "PHYSICAL EXECUTION SAFETY (STRICT):\n"
         "To run on the physical robot, you must follow this sequence:\n"
         "A. Ensure 'simulate_protocol' passed for the current protocol hash.\n"
-        "B. Run 'check_robot_connection' to verify the instrument is online.\n"
-        "C. Present a PRE-RUN SUMMARY to the user containing:\n"
+        "B. Run 'get_robot_hardware_status' to verify the pipette matches your config.\n"
+        "C. Run 'check_robot_connection' to verify the instrument is online.\n"
+        "D. Present a PRE-RUN SUMMARY to the user containing:\n"
         "   - Protocol Name & Hash (first 8 chars).\n"
         "   - Robot IP.\n"
         "   - Deck Layout Summary (labware in which slots).\n"
-        "   - Pipette(s) and Mount(s).\n"
+        "   - Pipette(s) and Mount(s) (ACTUAL vs CONFIG).\n"
         "   - Estimated number of liquid transfers.\n"
-        "D. MANDATORY CONFIRMATION: Ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
+        "E. MANDATORY CONFIRMATION: Ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
         "E. Only after the user says 'RUN ROBOT', call 'deploy_protocol_to_robot' followed by 'execute_protocol_on_robot'.\n\n"
         "IMPORTANT:\n"
         "- Use non-interactive SSH (BatchMode). If it fails, inform the user to check their SSH keys.\n"
