@@ -53,8 +53,8 @@ Before running Phase 3 or 4, confirm **every item** on this list:
 - [ ] **OT-2 is powered on** and the status light is solid blue
 - [ ] **Ethernet cable** is connected between your laptop and the OT-2
 - [ ] **Robot IP is set** in `.env`: `ROBOT_IP=169.254.46.57`
-- [ ] **SSH private key exists** on disk (e.g., `keys\ot2_automation_key`)
-- [ ] **SSH key path is set** in `.env`: `ROBOT_SSH_KEY_PATH=C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key`
+- [ ] **SSH private key exists** on disk at the path you configured
+- [ ] **SSH key path is set** in `.env`: `ROBOT_SSH_KEY_PATH=<path to your private key>`
 - [ ] **Connectivity check passes** — run this and confirm SSH is reachable:
   ```powershell
   python -m scripts.check_connectivity
@@ -71,22 +71,28 @@ If you generated a protocol and want to manually send it to the physical OT-2 an
 **Ensure your Robot config is set in `.env`:**
 ```env
 ROBOT_IP=169.254.46.57
-ROBOT_SSH_KEY_PATH=C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key
+ROBOT_SSH_KEY_PATH=C:\Users\iyersn\.ssh\id_rsa_opentrons
+```
+> ⚠️ The `ROBOT_SSH_KEY_PATH` is **machine-specific**. Use the actual path to YOUR private key on THIS laptop. The commands below use `$KEY` as a shorthand — set it first.
+
+**Step A: Set your key path variable in PowerShell**
+```powershell
+$KEY = "C:\Users\iyersn\.ssh\id_rsa_opentrons"
 ```
 
-**Step A: Transfer the file via SCP**
+**Step B: Transfer the file via SCP**
 *(Replace `run_123` with a unique folder name, and `generated_printing.py` with your actual file).*
 ```powershell
 # Create a folder on the robot
-ssh -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
+ssh -i $KEY root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
 
 # Copy the file to the robot
-scp -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key robot_data\deploy\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
+scp -i $KEY src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
 ```
 
-**Step B: Execute via SSH**
+**Step C: Execute via SSH**
 ```powershell
-ssh -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/run_123/generated_printing.py"
+ssh -i $KEY root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/run_123/generated_printing.py"
 ```
 
 ---
