@@ -1,0 +1,42 @@
+# ──────────────────────────────────────────────────────────────────
+# OT-2 Machine Vision — Configuration
+# ──────────────────────────────────────────────────────────────────
+# All environment-variable references are resolved at runtime by
+# vision/config.py.  Relative local paths are resolved against the
+# project root (ot2-lab-suite/).
+
+robot:
+  # Environment variable names (NOT literal values)
+  host_env_var: ROBOT_IP
+  username: root
+  ssh_key_env_var: ROBOT_SSH_KEY_PATH
+
+  # Remote directories to search for image files (searched recursively)
+  remote_image_dirs:
+    - /data/runs
+    - /var/lib/opentrons
+
+local:
+  base_dir: data/vision
+  raw_dir: data/vision/raw
+  processed_dir: data/vision/processed
+  logs_dir: data/vision/logs
+
+transfer:
+  file_extensions:
+    - .jpg
+    - .jpeg
+    - .png
+    - .zip
+  recursive: true
+  overwrite_existing: false
+  create_timestamped_run_folder: true
+  dry_run: false
+
+validation:
+  min_file_size_bytes: 1000
+  allowed_extensions:
+    - .jpg
+    - .jpeg
+    - .png
+    - .zip
