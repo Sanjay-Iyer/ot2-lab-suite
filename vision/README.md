@@ -1,99 +1,128 @@
 # OT-2 Machine Vision Module
 
-> **Purpose** — Pull camera image files from an Opentrons OT-2 robot, store them locally in a structured directory tree, and perform basic validation in preparation for downstream nanoparticle printing quality analysis.
+> **Purpose** — Capture camera images on the Opentrons OT-2 robot, transfer them to the local laptop, and prepare for future nanoparticle printing quality analysis.
 
 ---
 
 ## Quick Start
 
 ```powershell
-# 1. Install dependencies (from the project root)
-pip install python-dotenv pyyaml pandas pillow
+# Take 2 pictures on the OT-2 and transfer them to the laptop
+python vision/ot2_camera_workflow.py
 
-# 2. Configure connection (edit .env in the project root)
-#    ROBOT_IP=169.254.46.57
-#    ROBOT_SSH_KEY_PATH=C:\Users\<you>\.ssh\ot2_ssh_key
-
-# 3. Dry run (no files are transferred)
-python scripts/pull_ot2_images.py --dry-run
-
-# 4. Full transfer
-python scripts/pull_ot2_images.py
+# Dry run — see what commands would execute
+python vision/ot2_camera_workflow.py --dry-run
 ```
 
 ---
 
 ## Dependencies
 
-| Package        | Purpose                                     |
-| -------------- | ------------------------------------------- |
-| `python-dotenv`| Load `.env` variables                       |
-| `pyyaml`       | Parse `configs/vision.yaml`                 |
-| `pandas`       | Inventory and validation CSV reports        |
-| `pillow`       | Verify image file integrity (JPG, PNG)      |
+| Package   | Purpose                |
+| --------- | ---------------------- |
+| `pyyaml`  | Parse `configs/vision.yaml` |
 
-> **Optional:** `opencv-python` may be added later for advanced image analysis.
+All other operations use Python builtins (`subprocess`, `pathlib`, `argparse`).
+
+```powershell
+pip install pyyaml
+```
 
 ---
 
 ## Configuration
 
-### `.env` (project root)
-
-```ini
-ROBOT_IP=169.254.46.57
-ROBOT_SSH_KEY_PATH=C:\Users\<you>\.ssh\ot2_ssh_key
-```
-
 ### `configs/vision.yaml`
 
-Adjustable parameters for remote directories, local paths, transfer behaviour, and validation thresholds.  See the file for inline comments.
+All connection and workflow settings are in one file — nothing is hardcoded in the scripts.
+
+```yaml
+robot:
+  ip: 169.254.46.57          # Your OT-2's USB/Ethernet IP
+  user: root                  # OT-2 SSH user (always root)
+  ssh_key_path: C:\Users\iyersn\.ssh\id_rsa_opentrons
+
+remote:
+  vision_dir: /data/vision    # Where images are saved on the robot
+  camera_endpoint: http://localhost:31950/camera/picture
+  opentrons_version_header: "*"
+
+local:
+  raw_dir: vision/raw         # Where images are saved on the laptop
+
+capture:
+  default_count: 2            # Number of images per capture
+  default_delay_seconds: 3    # Seconds between captures
+  filename_prefix: ot2_image
+
+transfer:
+  use_legacy_scp: true        # Must be true (OT-2 lacks sftp-server)
+  overwrite_existing: true
+```
 
 ---
 
 ## Usage
 
-### Transfer images from the robot
+### Capture images on the OT-2
 
 ```powershell
-python scripts/pull_ot2_images.py
+# Take 2 pictures (default)
+python vision/capture_ot2_images.py
+
+# Take 5 pictures with 2-second delay
+python vision/capture_ot2_images.py --count 5 --delay 2
+
+# Dry run
+python vision/capture_ot2_images.py --dry-run
 ```
 
-### Dry run (preview only)
+### Transfer images to the laptop
 
 ```powershell
-python scripts/pull_ot2_images.py --dry-run
+# Copy all images from the robot
+python vision/transfer_ot2_images.py
+
+# Dry run
+python vision/transfer_ot2_images.py --dry-run
+
+# Custom directories
+python vision/transfer_ot2_images.py --remote-dir /data/vision --local-dir vision/raw
 ```
 
-### Overwrite existing local files
+### Full workflow (capture + transfer)
 
 ```powershell
-python scripts/pull_ot2_images.py --overwrite
-```
+# Take pictures and transfer in one step
+python vision/ot2_camera_workflow.py --count 2 --delay 3
 
-### Search a specific remote directory
-
-```powershell
-python scripts/pull_ot2_images.py --remote-dir /data/runs
-```
-
-### Custom local output directory
-
-```powershell
-python scripts/pull_ot2_images.py --output-dir C:\data\custom
+# Dry run
+python vision/ot2_camera_workflow.py --dry-run
 ```
 
 ---
 
-## Where Files Are Saved
+## Where Images Are Saved
 
-| Artifact                | Default Location                            |
-| ----------------------- | ------------------------------------------- |
-| Raw images              | `data/vision/raw/run_YYYYMMDD_HHMMSS/`     |
-| Processed images        | `data/vision/processed/`  *(future use)*    |
-| Transfer logs           | `data/vision/logs/vision_transfer_*.log`    |
-| Image inventory CSV     | `data/vision/logs/image_inventory.csv`      |
-| Validation report CSV   | `data/vision/logs/image_validation_report.csv` |
+| Location | Path |
+| -------- | ---- |
+| **On the OT-2** | `/data/vision/ot2_image_YYYYMMDD_HHMMSS.jpg` |
+| **On the laptop** | `vision/raw/ot2_image_YYYYMMDD_HHMMSS.jpg` |
+
+---
+
+## Why `scp -O` Is Required
+
+The OT-2 does not have `/usr/libexec/sftp-server` installed.
+Normal SCP (which uses SFTP internally) fails with:
+
+```
+sh: /usr/libexec/sftp-server: not found
+```
+
+The `-O` flag (capital O) forces the **legacy SCP protocol**, which works.
+
+> **Warning:** Do not confuse `-O` (capital, legacy SCP) with `-o` (lowercase, SSH option).
 
 ---
 
@@ -101,23 +130,25 @@ python scripts/pull_ot2_images.py --output-dir C:\data\custom
 
 ```
 vision/
-├── __init__.py           # Package init
-├── config.py             # Loads .env + vision.yaml, resolves paths
-├── transfer_images.py    # SSH discovery + SCP file transfer
-├── image_inventory.py    # Scan local files → CSV inventory
-├── validate_images.py    # Integrity checks → CSV report
-└── README.md             # This file
+├── __init__.py               # Package init
+├── capture_ot2_images.py     # SSH + curl to take pictures on the robot
+├── transfer_ot2_images.py    # SCP -O to copy images to the laptop
+├── ot2_camera_workflow.py    # Full workflow: capture → transfer
+├── raw/                      # Local image storage (git-ignored)
+├── config.py                 # Advanced config loader (env-var based)
+├── transfer_images.py        # Advanced transfer module (SSH find)
+├── image_inventory.py        # CSV inventory generator
+├── validate_images.py        # Image integrity checker
+└── README.md                 # This file
 ```
 
 ---
 
-## How This Connects to Future Analysis
+## Future: Machine Vision Analysis
 
-This module is **step 1** of a larger machine-vision pipeline:
+This module handles **Step 1 — image acquisition**.
+Future steps will add:
 
-1. **Image Acquisition** ← *this module*
-2. **Pre-processing** — crop, normalise, denoise (future, in `data/vision/processed/`)
-3. **Analysis** — nanoparticle dot detection, coverage metrics, quality scoring
-4. **Reporting** — automated quality dashboards
-
-The structured directory layout and CSV inventories are designed to feed directly into an image-analysis pipeline without manual file wrangling.
+1. **Pre-processing** — crop, normalise, denoise
+2. **Analysis** — nanoparticle dot detection, coverage, quality scoring
+3. **Reporting** — automated quality dashboards

@@ -1,42 +1,27 @@
 # ──────────────────────────────────────────────────────────────────
 # OT-2 Machine Vision — Configuration
 # ──────────────────────────────────────────────────────────────────
-# All environment-variable references are resolved at runtime by
-# vision/config.py.  Relative local paths are resolved against the
-# project root (ot2-lab-suite/).
+# Loaded by the vision/ scripts at runtime.
+# Edit values here instead of hardcoding them in Python files.
 
 robot:
-  # Environment variable names (NOT literal values)
-  host_env_var: ROBOT_IP
-  username: root
-  ssh_key_env_var: ROBOT_SSH_KEY_PATH
+  ip: 169.254.46.57
+  user: root
+  ssh_key_path: C:\Users\iyersn\.ssh\id_rsa_opentrons
 
-  # Remote directories to search for image files (searched recursively)
-  remote_image_dirs:
-    - /data/runs
-    - /var/lib/opentrons
+remote:
+  vision_dir: /data/vision
+  camera_endpoint: http://localhost:31950/camera/picture
+  opentrons_version_header: "*"
 
 local:
-  base_dir: data/vision
-  raw_dir: data/vision/raw
-  processed_dir: data/vision/processed
-  logs_dir: data/vision/logs
+  raw_dir: vision/raw
+
+capture:
+  default_count: 2
+  default_delay_seconds: 3
+  filename_prefix: ot2_image
 
 transfer:
-  file_extensions:
-    - .jpg
-    - .jpeg
-    - .png
-    - .zip
-  recursive: true
-  overwrite_existing: false
-  create_timestamped_run_folder: true
-  dry_run: false
-
-validation:
-  min_file_size_bytes: 1000
-  allowed_extensions:
-    - .jpg
-    - .jpeg
-    - .png
-    - .zip
+  use_legacy_scp: true
+  overwrite_existing: true
