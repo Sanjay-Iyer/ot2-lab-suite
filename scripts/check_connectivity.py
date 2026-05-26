@@ -144,7 +144,67 @@ def main():
         except Exception as e:
             print(f"FAIL: Failed to run SSH command: {e}")
 
+    # --- SECTION 6: OT-2 Calibration Paths Check ---
+    if robot_ip and robot_ip not in ["127.0.0.1", "localhost", ""] and key_path_val and Path(key_path_val).exists():
+        check_robot_calibration_paths(robot_ip, key_path_val)
+
     print("\n" + "=" * 60)
+
+def check_robot_calibration_paths(robot_ip: str, ssh_key: str) -> None:
+    """SSH into the robot and report details for legacy and current calibration paths."""
+    print("\n--- 6. OT-2 Calibration Paths Check ---")
+    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-i", ssh_key]
+    
+    paths_to_check = [
+        "/data/deck_calibration.json",
+        "/data/robot/deck_calibration.json",
+        "/data/robot/pipettes",
+        "/data/tip_lengths",
+        "/data/pipettes"
+    ]
+    
+    check_script = (
+        "for path in " + " ".join(f"'{p}'" for p in paths_to_check) + "; do "
+        "  echo \"Path: $path\"; "
+        "  if [ -e \"$path\" ]; then "
+        "    if [ -d \"$path\" ]; then "
+        "      echo \"  Status: Exists (Directory)\"; "
+        "      ls -lah \"$path\" | head -n 10 | sed 's/^/  /'; "
+        "    else "
+        "      mod_time=$(stat -c '%y' \"$path\" 2>/dev/null || stat -f '%Sm' \"$path\" 2>/dev/null || echo 'unknown'); "
+        "      echo \"  Status: Exists (File), Modified: $mod_time\"; "
+        "      ls -lah \"$path\" | sed 's/^/  /'; "
+        "    fi; "
+        "  else "
+        "    echo \"  Status: Missing\"; "
+        "  fi; "
+        "  echo \"---\"; "
+        "done"
+    )
+    
+    cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", check_script]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if res.returncode == 0:
+            print("Remote path check completed successfully:\n")
+            print(res.stdout)
+            
+            # Warn interpretation
+            has_legacy = "/data/deck_calibration.json\n  Status: Exists" in res.stdout
+            has_current = "/data/robot/deck_calibration.json\n  Status: Exists" in res.stdout
+            
+            if not has_legacy and has_current:
+                print("NOTE: opentrons_execute reported that the legacy /data/deck_calibration.json file was not found,")
+                print("but this robot stores calibration data under the current path: /data/robot/deck_calibration.json.")
+                print("Since the current calibration file exists, the robot has calibration data.")
+            elif not has_legacy and not has_current:
+                print("WARNING: Deck calibration files were not found at either legacy (/data/deck_calibration.json)")
+                print("or current (/data/robot/deck_calibration.json) paths. Calibration may be missing.")
+        else:
+            print(f"FAIL: SSH command to check paths failed with code {res.returncode}")
+            print(f"Error output: {res.stderr.strip()}")
+    except Exception as e:
+        print(f"FAIL: Failed to run calibration path checks: {e}")
 
 if __name__ == "__main__":
     main()

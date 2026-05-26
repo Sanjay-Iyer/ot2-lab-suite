@@ -132,3 +132,17 @@ If transferred images are placed in the `errors/` directory:
   ```bash
   ssh -i <key_path> root@<ROBOT_IP> "curl -s -X POST -H 'opentrons-version: *' http://localhost:31950/camera/picture --output /data/vision/manual_test.jpg"
   ```
+
+### 4. Calibration file locations
+opentrons_execute may report a warning message:
+```
+/data/deck_calibration.json not found. Loading defaults
+```
+This warning message refers to a legacy filepath. On modern OT-2 software versions, the active calibration data is stored at:
+`/data/robot/deck_calibration.json`
+
+Therefore, a warning about `/data/deck_calibration.json` being missing should not be treated as proof that the robot has no calibration. As long as `/data/robot/deck_calibration.json` is present on the robot's filesystem, the calibration settings are active. To inspect this, run the connectivity diagnostics script:
+```bash
+conda run -n AI python -m scripts.check_connectivity
+```
+It will run checks for legacy and current calibration paths and report their timestamps and directory contents.
