@@ -247,6 +247,36 @@ if HAS_PYDANTIC:
                     if pos.source_well not in allowed_sources:
                         raise ValueError(f"Water print source well {pos.source_well} is not in layout.water_source_wells or layout.print_source_wells.")
 
+            # 3. Coordinate Safety Envelope validation
+            if HAS_OPENTRONS:
+                try:
+                    from opentrons import simulate
+                    ctx = simulate.get_protocol_api('2.13')
+                    paper_ref = ctx.load_labware(self.plate.labware, self.printing.paper_slot)
+                    paper_a1 = paper_ref.wells()[0]
+                    point = paper_a1.bottom().point
+                    
+                    X_MIN, X_MAX = 0.0, 418.0
+                    Y_MIN, Y_MAX = 0.0, 353.0
+                    
+                    for pos in self.printing.print_positions:
+                        target_x = point.x + pos.x_mm
+                        target_y = point.y + pos.y_mm
+                        if not (X_MIN <= target_x <= X_MAX):
+                            raise ValueError(
+                                f"Print position '{pos.label}' (source: {pos.source_well}) computed absolute coordinate "
+                                f"X={target_x:.2f} mm is outside the safe OT-2 envelope [{X_MIN}, {X_MAX}] (limit 418.0)."
+                            )
+                        if not (Y_MIN <= target_y <= Y_MAX):
+                            raise ValueError(
+                                f"Print position '{pos.label}' (source: {pos.source_well}) computed absolute coordinate "
+                                f"Y={target_y:.2f} mm is outside the safe OT-2 envelope [{Y_MIN}, {Y_MAX}] (limit 353.0)."
+                            )
+                except Exception as e:
+                    if isinstance(e, ValueError):
+                        raise e
+                    logger.warning(f"Could not validate absolute coordinates due to simulation error: {e}")
+
             return self
 
 # ─── OT-2 PROTOCOL LOGIC ──────────────────────────────────────────────
