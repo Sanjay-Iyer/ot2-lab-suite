@@ -73,7 +73,7 @@ def test_dilution_unprepared_destination_aspiration():
     
     with pytest.raises(ValueError) as exc:
         PrintingDemoConfig(**config_data)
-    assert "before it was prepared" in str(exc.value).lower()
+    assert "unprepared" in str(exc.value).lower()
 
 def test_dispense_into_source_well():
     """Verify validation error raises if a dilution step attempts to dispense into a food coloring or water source well."""
@@ -167,3 +167,22 @@ def test_calibration_only_mode():
     assert len(pipette_stock_steps) == 0
     assert len(print_droplet_steps) == 0
     assert len(calibrate_steps) == len(config_data["printing"]["print_positions"])
+
+def test_tip_strategy_validates_loaded_tip_count_gt_0():
+    """Verify that loaded_tip_count must be >= 1."""
+    with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
+        config_data = yaml.safe_load(f)
+    
+    config_data["tip_strategy"]["loaded_tip_count"] = 0
+    with pytest.raises(ValueError):
+        PrintingDemoConfig(**config_data)
+
+def test_tip_strategy_validates_starting_tip():
+    """Verify starting_tip validates well format."""
+    with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
+        config_data = yaml.safe_load(f)
+        
+    config_data["tip_strategy"]["starting_tip"] = "Z1" # Invalid well
+    with pytest.raises(ValueError) as exc:
+        PrintingDemoConfig(**config_data)
+    assert "starting_tip must be a valid well" in str(exc.value)

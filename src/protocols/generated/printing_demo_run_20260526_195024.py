@@ -202,9 +202,9 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
 
         target_well = allowed_wells[tip_index]
         if strategy_mode == "reuse_single_tip_for_demo":
-            dbg_comment(f"picking up demo tip {target_well.well_name}")
+            dbg_comment(f"picking up demo tip {target_well.api_name}")
         else:
-            dbg_comment(f"picking up tip from {target_well.well_name}")
+            dbg_comment(f"picking up tip from {target_well.api_name}")
 
         pipette.pick_up_tip(target_well)
 

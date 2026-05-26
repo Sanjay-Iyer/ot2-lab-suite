@@ -195,3 +195,52 @@ class TestSafetyCheckFunction:
         bad_script = "from PIL import Image\nCONFIG = {}\ndef run(p):\n    p.is_simulating()\n"
         with pytest.raises(RuntimeError, match="pil"):
             _check_generated_script(bad_script, Path("fake.py"))
+
+    def test_single_tip_reuse_logic_generated(self) -> None:
+        """Verify generated code structure for reuse_single_tip_for_demo mode."""
+        import yaml
+        from src.protocols.printing_demo_protocol import _build_robot_script
+
+        with open(CONFIG_YAML, "r", encoding="utf-8") as f:
+            config_data = yaml.safe_load(f)
+
+        # Set single-tip-reuse configuration explicitly
+        config_data["tip_strategy"] = {
+            "mode": "reuse_single_tip_for_demo",
+            "loaded_tip_count": 8,
+            "starting_tip": "A1",
+            "return_tip_at_end": True,
+            "drop_tip_at_end": False,
+            "reuse_for_water": True,
+            "reuse_for_stock": True,
+            "reuse_for_mixing": True,
+            "reuse_for_printing": True,
+            "allowed_modes": ["reuse_single_tip_for_demo"]
+        }
+
+        # Enable debug comments to check for verbose statements
+        config_data["debug"]["enabled"] = True
+        config_data["debug"]["verbose_protocol_comments"] = True
+
+        script_text = _build_robot_script(config_data)
+
+        # Assert tip strategy configuration is embedded in CONFIG
+        assert "'mode': 'reuse_single_tip_for_demo'" in script_text
+        assert "'starting_tip': 'A1'" in script_text
+
+        # Helper functions should be present
+        assert "def ensure_tip(" in script_text
+        assert "def finish_tip(" in script_text
+
+        # Verify end-of-run behavior
+        assert "pipette.return_tip()" in script_text
+
+        # Verify debug messages are printed
+        assert "reusing same tip for water transfer" in script_text
+        assert "reusing same tip for stock transfer" in script_text
+        assert "reusing same tip for mixing" in script_text
+        assert "reusing same tip for printing" in script_text
+
+        # Double check no forbidden imports
+        assert "import yaml" not in script_text.lower()
+        assert "pydantic" not in script_text.lower()

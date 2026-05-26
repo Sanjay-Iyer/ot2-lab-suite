@@ -148,12 +148,24 @@ if HAS_PYDANTIC:
     class TipStrategyConfig(BaseModel):
         mode: str
         allowed_modes: List[str]
+        loaded_tip_count: Optional[int] = Field(None, ge=1)
+        starting_tip: Optional[str] = None
+        return_tip_at_end: Optional[bool] = None
+        drop_tip_at_end: Optional[bool] = None
+        reuse_for_water: Optional[bool] = None
+        reuse_for_stock: Optional[bool] = None
+        reuse_for_mixing: Optional[bool] = None
+        reuse_for_printing: Optional[bool] = None
 
         @model_validator(mode="after")
         def validate_strategy(self) -> "TipStrategyConfig":
             if self.mode not in self.allowed_modes:
                 raise ValueError(
                     f"Tip mode '{self.mode}' not in allowed modes: {self.allowed_modes}"
+                )
+            if self.starting_tip is not None and not is_valid_well(self.starting_tip):
+                raise ValueError(
+                    f"starting_tip must be a valid well (A1-H12). Got: {self.starting_tip}"
                 )
             return self
 
@@ -373,6 +385,68 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         dbg_comment("protocol completed")
         return
 
+    # ── 2.5 Tip Strategy Setup and Helpers ───────────────────────────
+    strategy_cfg = CONFIG.get("tip_strategy", {})
+    strategy_mode = strategy_cfg.get("mode", "new_tip_each_transfer")
+    starting_tip = strategy_cfg.get("starting_tip", "A1")
+    loaded_tip_count = strategy_cfg.get("loaded_tip_count", 96) or 96
+
+    dbg_comment(f"tip strategy = {strategy_mode}")
+
+    if strategy_mode == "reuse_single_tip_for_demo":
+        protocol.comment("WARNING: reuse_single_tip_for_demo mode is enabled. This is for demonstration only and may cause carryover.")
+
+    # Build list of allowed wells based on starting tip and loaded count
+    all_wells = tiprack.wells()
+    try:
+        start_idx = all_wells.index(tiprack.wells_by_name()[starting_tip])
+    except Exception:
+        start_idx = 0
+
+    allowed_wells = all_wells[start_idx : start_idx + loaded_tip_count]
+    tip_index = 0
+
+    def ensure_tip(phase: str) -> None:
+        """Ensure the pipette has a tip, picking one up if needed."""
+        if pipette.has_tip:
+            return
+
+        nonlocal tip_index
+        if tip_index >= len(allowed_wells):
+            raise RuntimeError(
+                f"Exceeded loaded_tip_count limit of {loaded_tip_count} tips. "
+                f"Cannot pick up another tip for phase: {phase}."
+            )
+
+        target_well = allowed_wells[tip_index]
+        if strategy_mode == "reuse_single_tip_for_demo":
+            dbg_comment(f"picking up demo tip {target_well.well_name}")
+        else:
+            dbg_comment(f"picking up tip from {target_well.well_name}")
+
+        pipette.pick_up_tip(target_well)
+
+        if strategy_mode != "reuse_single_tip_for_demo":
+            tip_index += 1
+
+    def finish_tip() -> None:
+        """Handle end-of-run tip disposal."""
+        if not pipette.has_tip:
+            return
+
+        if strategy_mode == "reuse_single_tip_for_demo":
+            if strategy_cfg.get("return_tip_at_end", True):
+                dbg_comment("returning tip at end")
+                pipette.return_tip()
+            elif strategy_cfg.get("drop_tip_at_end", False):
+                dbg_comment("dropping tip at end")
+                pipette.drop_tip()
+            else:
+                protocol.comment("WARNING: Protocol completed but tip remains attached to pipette.")
+        else:
+            dbg_comment("dropping tip at end")
+            pipette.drop_tip()
+
     # ── 3. Camera capture helper ─────────────────────────────────────
     def capture_image(filename: str) -> None:
         """Capture a JPEG from the robot camera via the HTTP API."""
@@ -450,7 +524,6 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         and not printing_cfg.get("calibration_only", False)
     ):
         dil_steps = list(CONFIG["dilution"]["steps"])
-        strategy_mode = CONFIG.get("tip_strategy", {}).get("mode", "new_tip_each_transfer")
 
         if strategy_mode == "reuse_low_to_high":
             def _get_concentration_ratio(s):
@@ -462,7 +535,9 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         # Distribute water first (single tip, efficient)
         water_steps = [s for s in dil_steps if s["water_volume_ul"] > 0]
         if water_steps:
-            pipette.pick_up_tip()
+            ensure_tip("water")
+            if strategy_mode == "reuse_single_tip_for_demo":
+                dbg_comment("reusing same tip for water transfer")
             for step in water_steps:
                 src_well = plate.wells_by_name()[step["water_source_well"]]
                 dest_well = plate.wells_by_name()[step["destination_well"]]
@@ -473,17 +548,22 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                 )
                 pipette.aspirate(vol, src_well)
                 pipette.dispense(vol, dest_well)
-            pipette.drop_tip()
+            
+            if strategy_mode != "reuse_single_tip_for_demo":
+                pipette.drop_tip()
 
         # Transfer food coloring and mix
         reusing_tip = False
-        if strategy_mode in ("reuse_low_to_high", "reuse_per_phase"):
-            pipette.pick_up_tip()
+        if strategy_mode in ("reuse_low_to_high", "reuse_per_phase", "reuse_single_tip_for_demo"):
+            ensure_tip("stock")
             reusing_tip = True
 
         for idx, step in enumerate(dil_steps):
             if not reusing_tip:
-                pipette.pick_up_tip()
+                ensure_tip("stock")
+
+            if strategy_mode == "reuse_single_tip_for_demo":
+                dbg_comment("reusing same tip for stock transfer")
 
             src_well = plate.wells_by_name()[step["food_coloring_source_well"]]
             dest_well = plate.wells_by_name()[step["destination_well"]]
@@ -500,6 +580,8 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             mix_vol = step.get("mix_volume_ul", 0.0)
             mix_reps = step.get("mix_repetitions", 0)
             if mix_reps > 0 and mix_vol > 0.0:
+                if strategy_mode == "reuse_single_tip_for_demo":
+                    dbg_comment("reusing same tip for mixing")
                 protocol.comment(
                     f"Mixing well {step['destination_well']} ({mix_reps} x {mix_vol} uL)"
                 )
@@ -513,7 +595,7 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                     f"wellplate_step_{idx + 1:03d}_well_{step['destination_well']}.jpg"
                 )
 
-        if reusing_tip:
+        if reusing_tip and strategy_mode != "reuse_single_tip_for_demo":
             pipette.drop_tip()
 
     # ── Phase 3: Printing / Calibration ─────────────────────────────
@@ -525,7 +607,7 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
 
     if is_calibration:
         protocol.comment("Executing Calibration Mode: verifying coordinates above paper.")
-        pipette.pick_up_tip()
+        ensure_tip("printing")
         for idx, pos in enumerate(print_positions):
             dest_loc = paper_a1.bottom().move(
                 Point(x=pos["x_mm"], y=pos["y_mm"], z=dispense_h)
@@ -544,10 +626,21 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                 )
             if camera_cfg["enabled"] and camera_cfg["capture_after_each_print_step"]:
                 capture_image(f"paper_print_{idx + 1:03d}_well_{pos['source_well']}.jpg")
-        pipette.drop_tip()
+        
+        if strategy_mode != "reuse_single_tip_for_demo":
+            pipette.drop_tip()
     else:
+        reusing_print_tip = (strategy_mode == "reuse_single_tip_for_demo")
+        if reusing_print_tip:
+            ensure_tip("printing")
+
         for idx, pos in enumerate(print_positions):
-            pipette.pick_up_tip()
+            if not reusing_print_tip:
+                ensure_tip("printing")
+            
+            if strategy_mode == "reuse_single_tip_for_demo":
+                dbg_comment("reusing same tip for printing")
+
             src_well = plate.wells_by_name()[pos["source_well"]]
 
             protocol.comment(
@@ -562,7 +655,9 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                 f"Printing droplet on paper at X={pos['x_mm']} mm, Y={pos['y_mm']} mm"
             )
             pipette.dispense(droplet_vol, dest_loc)
-            pipette.drop_tip()
+            
+            if not reusing_print_tip:
+                pipette.drop_tip()
 
             if camera_cfg["enabled"] and camera_cfg["capture_after_each_print_step"]:
                 capture_image(f"paper_print_{idx + 1:03d}_well_{pos['source_well']}.jpg")
@@ -571,6 +666,9 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
     if camera_cfg["enabled"] and camera_cfg["capture_after"]:
         capture_image("after_deck.jpg")
         capture_image("after_wellplate.jpg")
+
+    finish_tip()
+    dbg_comment("protocol completed")
 '''
 
 # ─── Forbidden / Required patterns for generated protocol safety check ─

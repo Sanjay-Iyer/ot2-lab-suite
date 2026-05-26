@@ -67,11 +67,20 @@ printing:
       y_mm: 15.0
 
 tip_strategy:
-  mode: reuse_low_to_high  # reuse_low_to_high, new_tip_each_transfer, reuse_per_phase
+  mode: reuse_single_tip_for_demo
+  loaded_tip_count: 8
+  starting_tip: A1
+  return_tip_at_end: true
+  drop_tip_at_end: false
+  reuse_for_water: true
+  reuse_for_stock: true
+  reuse_for_mixing: true
+  reuse_for_printing: true
   allowed_modes:
     - new_tip_each_transfer
     - reuse_low_to_high
     - reuse_per_phase
+    - reuse_single_tip_for_demo
 
 debug:
   enabled: true
