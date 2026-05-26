@@ -48,7 +48,7 @@ dilution:
 
 printing:
   calibration_only: false
-  paper_slot: 9
+  paper_slot: 3
   droplet_volume_ul: 10.0
   dispense_height_mm: 1.0
   safe_z_mm: 20.0
@@ -89,7 +89,7 @@ debug:
   move_only: false
 
 camera:
-  enabled: false
+  enabled: true
   capture_before: true
   capture_after: true
   capture_after_each_dilution_step: true

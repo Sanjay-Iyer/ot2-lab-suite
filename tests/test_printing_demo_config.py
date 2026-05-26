@@ -24,7 +24,7 @@ def test_default_config_validates():
     config_obj = PrintingDemoConfig(**config_data)
     assert config_obj.demo_mode == "dilution_print"
     assert config_obj.plate.slot == 2
-    assert config_obj.printing.paper_slot == 9
+    assert config_obj.printing.paper_slot == 3
 
 def test_overlap_validation_food_coloring_and_water():
     """Verify validation error raises when food coloring and water source wells overlap."""
