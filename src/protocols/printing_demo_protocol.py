@@ -846,7 +846,9 @@ def host_run(args: argparse.Namespace) -> None:
     image_manifest_data = []
 
     # 5. Execute run (Mock vs Real Robot)
-    is_mock = args.mock or (not args.robot_ip and config_dict.get("robot_ip") is None)
+    from src.core.config import Config
+    robot_ip = args.robot_ip or config_dict.get("robot_ip") or Config.ROBOT_IP
+    is_mock = args.mock or (not robot_ip) or (robot_ip in ("127.0.0.1", "localhost"))
     run_ok = True
     start_time = datetime.utcnow().isoformat() + "Z"
 
@@ -877,7 +879,6 @@ def host_run(args: argparse.Namespace) -> None:
                 })
     else:
         # Real robot run
-        robot_ip = args.robot_ip or config_dict.get("robot_ip")
         logger.info(f"Connecting to physical OT-2 robot: {robot_ip}")
 
         # Check existing project path utility config or load default SSH path
