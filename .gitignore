@@ -6,3 +6,5 @@ robot_data/data/logs/
 robot_data/data/outputs/
 configs/user/*.yaml
 !configs/user/.gitkeep
+archive/
+
