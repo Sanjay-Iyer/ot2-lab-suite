@@ -17,11 +17,7 @@ import os
 import re
 import sys
 import json
-import yaml
 import logging
-import argparse
-import subprocess
-import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
@@ -181,6 +177,12 @@ if HAS_PYDANTIC:
         create_metadata: bool
         create_image_manifest: bool
 
+    class DebugConfig(BaseModel):
+        enabled: bool = True
+        verbose_protocol_comments: bool = True
+        dry_run_no_liquid: bool = False
+        move_only: bool = False
+
     class PrintingDemoConfig(BaseModel):
         demo_mode: str
         plate: PlateConfig
@@ -191,12 +193,16 @@ if HAS_PYDANTIC:
         printing: PrintingConfig
         tip_strategy: TipStrategyConfig
         camera: CameraConfig
+        debug: DebugConfig = DebugConfig()
         output: OutputConfig
 
         @model_validator(mode="after")
         def validate_experiment_rules(self) -> 'PrintingDemoConfig':
-            if self.demo_mode not in ("water_print", "dilution_print"):
-                raise ValueError(f"Invalid demo_mode: {self.demo_mode}. Must be water_print or dilution_print.")
+            if self.demo_mode not in ("water_print", "dilution_print", "dry_run"):
+                raise ValueError(f"Invalid demo_mode: {self.demo_mode}. Must be water_print, dilution_print, or dry_run.")
+
+            if self.demo_mode == "dry_run":
+                return self
 
             fc_wells = set(self.layout.food_coloring_source_wells)
             w_wells = set(self.layout.water_source_wells)
@@ -259,6 +265,7 @@ def run(protocol: 'protocol_api.ProtocolContext') -> None:
         # Fallback local loading for standalone simulations
         config_path = os.environ.get("OT2_PRINTING_DEMO_CONFIG", "configs/workflows/defaults/printing_demo.yaml")
         try:
+            import yaml
             with open(config_path, "r", encoding="utf-8") as f:
                 CONFIG = yaml.safe_load(f)
             protocol.comment(f"Loaded config from environment path: {config_path}")
@@ -266,9 +273,22 @@ def run(protocol: 'protocol_api.ProtocolContext') -> None:
             protocol.comment(f"Warning: Could not load configuration: {e}")
             raise ValueError(f"Failed to resolve CONFIG: {e}")
 
-    protocol.comment(f"Starting Demo Mode: {CONFIG['demo_mode']}")
+    # Set up debug config flags
+    debug_cfg = CONFIG.get("debug", {})
+    debug_enabled = debug_cfg.get("enabled", False)
+    verbose_comments = debug_cfg.get("verbose_protocol_comments", False)
+    dry_run_no_liquid = debug_cfg.get("dry_run_no_liquid", False)
+    move_only = debug_cfg.get("move_only", False)
+
+    def dbg_comment(msg: str) -> None:
+        if debug_enabled and verbose_comments:
+            protocol.comment(f"DEBUG: {msg}")
+
+    dbg_comment("entered run()")
+    dbg_comment("config loaded")
 
     # 1. Deck validations
+    dbg_comment("labware loading started")
     plate_cfg = CONFIG["plate"]
     tiprack_cfg = CONFIG["tiprack"]
     pipette_cfg = CONFIG["pipette"]
@@ -281,14 +301,24 @@ def run(protocol: 'protocol_api.ProtocolContext') -> None:
 
     # 2. Load labware
     plate = protocol.load_labware(plate_cfg["labware"], plate_cfg["slot"])
+    dbg_comment("plate loaded")
     tiprack = protocol.load_labware(tiprack_cfg["labware"], tiprack_cfg["slot"])
+    dbg_comment("tiprack loaded")
     paper_ref = protocol.load_labware(plate_cfg["labware"], printing_cfg["paper_slot"]) # flat block reference
 
+    dbg_comment("pipette loading started")
     pipette = protocol.load_instrument(
         pipette_cfg["name"],
         pipette_cfg["mount"],
         tip_racks=[tiprack]
     )
+    dbg_comment("pipette loaded")
+
+    if CONFIG.get("demo_mode") == "dry_run" or dry_run_no_liquid:
+        protocol.comment("robot dry protocol reached run function")
+        protocol.comment("Dry run check complete. Labware and pipettes loaded successfully.")
+        dbg_comment("protocol completed")
+        return
 
     # 3. Camera capture function
     def capture_image(filename: str) -> None:
@@ -335,6 +365,7 @@ def run(protocol: 'protocol_api.ProtocolContext') -> None:
         cmd = [
             "curl", "-s", "-X", "POST",
             "-H", "opentrons-version: *",
+            "--max-time", "5",
             endpoint,
             "--output", output_path
         ]
@@ -548,6 +579,23 @@ def build_flat_step_log(config_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     
     step_idx = 1
     
+    if demo_mode == "dry_run":
+        steps.append({
+            "step_index": step_idx,
+            "phase": "dry_run",
+            "action": "dry_run_check",
+            "source_well": "",
+            "destination_well": "",
+            "volume_ul": 0.0,
+            "print_label": "",
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "image_expected": False,
+            "image_name": "",
+            "status": "pending"
+        })
+        return steps
+
     # 1. Before snaps
     if camera_cfg.get("enabled") and camera_cfg.get("capture_before"):
         steps.append({
@@ -811,7 +859,7 @@ def create_mock_images(local_dir: Path, expected_images: List[Dict[str, Any]]) -
         img.save(dest_dir / filename)
         logger.debug(f"Saved mock image {dest_dir / filename}")
 
-def host_run(args: argparse.Namespace) -> None:
+def host_run(args: Any) -> None:
     """The host-side execution pipeline loader."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s")
     logger.info(f"Loading YAML config: {args.config}")
@@ -970,16 +1018,31 @@ def host_run(args: argparse.Namespace) -> None:
         
         run_res = subprocess.run(exec_cmd, capture_output=True, text=True, check=False)
         
-        # Write robot execute log
+        # Write detailed robot execute log
         with open(local_run_dir / "logs" / "run.log", "w", encoding="utf-8") as lf:
-            lf.write(run_res.stdout)
-            lf.write(run_res.stderr)
+            lf.write(f"=== REMOTE COMMAND ===\n{' '.join(exec_cmd)}\n\n")
+            lf.write(f"=== RETURN CODE ===\n{run_res.returncode}\n\n")
+            lf.write(f"=== STDOUT ===\n{run_res.stdout}\n\n")
+            lf.write(f"=== STDERR ===\n{run_res.stderr}\n\n")
             
         if run_res.returncode != 0:
-            logger.error(f"Remote protocol execution FAILED! Check logs/run.log")
+            logger.error("=" * 80)
+            logger.error(" REMOTE PROTOCOL EXECUTION FAILED ")
+            logger.error("=" * 80)
+            logger.error(f"Command    : {' '.join(exec_cmd)}")
+            logger.error(f"Exit Code  : {run_res.returncode}")
+            logger.error("--------------------------------------------------------------------------------")
+            logger.error(" REMOTE STDOUT ")
+            logger.error("--------------------------------------------------------------------------------")
+            logger.error(run_res.stdout or "(No stdout)")
+            logger.error("--------------------------------------------------------------------------------")
+            logger.error(" REMOTE STDERR ")
+            logger.error("--------------------------------------------------------------------------------")
+            logger.error(run_res.stderr or "(No stderr)")
+            logger.error("=" * 80)
             run_ok = False
         else:
-            logger.info("Remote execution completed.")
+            logger.info("Remote execution completed successfully.")
 
         # 6. SCP images back and reconcile
         if camera_cfg["enabled"]:
@@ -1184,6 +1247,7 @@ def host_run(args: argparse.Namespace) -> None:
     logger.info("Done execution run.")
 
 if __name__ == '__main__':
+    import argparse
     parser = argparse.ArgumentParser(description="Compile and orchestrate the OT-2 Printing Demo.")
     parser.add_argument("--config", type=str, default="configs/workflows/defaults/printing_demo.yaml", help="Path to config YAML.")
     parser.add_argument("--mock", action="store_true", help="Run local simulation only + mock camera snaps.")
