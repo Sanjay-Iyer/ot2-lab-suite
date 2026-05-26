@@ -12,7 +12,7 @@ tiprack:
   labware: opentrons_96_tiprack_300ul
 
 pipette:
-  name: p300_single_gen2
+  name: p300_multi_gen2
   mount: right
 
 layout:
