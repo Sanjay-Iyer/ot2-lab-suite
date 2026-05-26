@@ -30,7 +30,10 @@ from typing import List, Dict, Any, Tuple, Optional
 try:
     import numpy as np
     if not hasattr(np, "trapz"):
-        np.trapz = getattr(np, "trapezoid", None)
+        if hasattr(np, "trapezoid"):
+            np.trapz = np.trapezoid
+        else:
+            raise AttributeError("NumPy compatibility error: neither 'trapz' nor 'trapezoid' attributes found in numpy.")
 except ImportError:
     pass
 
@@ -293,23 +296,80 @@ def run(protocol: 'protocol_api.ProtocolContext') -> None:
             protocol.comment(f"[SIMULATION] Mock photo: {filename}")
             return
 
+        protocol.comment(f"--- DIAGNOSTIC CAPTURE START: {filename} ---")
+        
+        import os
+        import sys
+        import shutil
         import subprocess
-        remote_dir = camera_cfg.get("robot_image_dir", "/data/vision/printing_demo")
-        subprocess.run(["mkdir", "-p", remote_dir], check=False)
-        output_path = f"{remote_dir}/{filename}"
 
+        # Debug 1: Environment and PATH
+        protocol.comment(f"Debug: sys.executable = {sys.executable}")
+        protocol.comment(f"Debug: PATH = {os.environ.get('PATH', '')}")
+        protocol.comment(f"Debug: current working directory = {os.getcwd()}")
+
+        remote_dir = camera_cfg.get("robot_image_dir", "/data/vision/printing_demo")
+        protocol.comment(f"Debug: target remote_dir = {remote_dir}")
+
+        # Debug 2: Directory creation and permissions
+        try:
+            os.makedirs(remote_dir, exist_ok=True)
+            protocol.comment(f"Debug: os.makedirs succeeded for {remote_dir}")
+            # Check write permissions
+            test_file_path = os.path.join(remote_dir, ".write_test")
+            with open(test_file_path, "w") as f:
+                f.write("test")
+            os.remove(test_file_path)
+            protocol.comment(f"Debug: write permissions verified for {remote_dir}")
+        except Exception as e:
+            protocol.comment(f"Warning: Directory/write test failed for {remote_dir}: {e}")
+
+        output_path = os.path.join(remote_dir, filename)
         endpoint = "http://localhost:31950/camera/picture"
+
+        # Debug 3: Try to check if curl exists
+        curl_path = shutil.which("curl")
+        protocol.comment(f"Debug: shutil.which('curl') = {curl_path}")
+
+        # Debug 4: Execute curl command and capture all output
         cmd = [
             "curl", "-s", "-X", "POST",
             "-H", "opentrons-version: *",
             endpoint,
             "--output", output_path
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if result.returncode == 0:
-            protocol.comment(f"Captured photo: {filename}")
-        else:
-            protocol.comment(f"Camera capture failed for {filename}: {result.stderr}")
+        protocol.comment(f"Debug: Running curl cmd: {' '.join(cmd)}")
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            protocol.comment(f"Debug: curl process returned code {result.returncode}")
+            if result.stdout:
+                protocol.comment(f"Debug: curl stdout = {result.stdout[:200]}")
+            if result.stderr:
+                protocol.comment(f"Debug: curl stderr = {result.stderr[:200]}")
+                
+            # Verify file created
+            if os.path.exists(output_path):
+                sz = os.path.getsize(output_path)
+                protocol.comment(f"Debug: Created image file size = {sz} bytes")
+                if sz < 1000:
+                    protocol.comment(f"Warning: captured file is suspicious (too small: {sz} bytes)")
+                    # Print first 200 bytes to see if it is an HTML error page!
+                    try:
+                        with open(output_path, "r", encoding="utf-8", errors="ignore") as tf:
+                            content_preview = tf.read(200)
+                        protocol.comment(f"Debug: file preview: {content_preview}")
+                    except Exception as pe:
+                        protocol.comment(f"Debug: preview read failed: {pe}")
+            else:
+                protocol.comment(f"Warning: File {output_path} was NOT created.")
+                
+        except FileNotFoundError:
+            protocol.comment(f"Warning: 'curl' executable not found on robot. Cannot capture {filename}.")
+        except Exception as e:
+            protocol.comment(f"Warning: Camera capture execution error for {filename}: {e}")
+
+        protocol.comment(f"--- DIAGNOSTIC CAPTURE END: {filename} ---")
 
     # ── Phase 1: Before Overview ──
     if camera_cfg["enabled"] and camera_cfg["capture_before"]:

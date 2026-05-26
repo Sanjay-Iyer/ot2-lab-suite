@@ -1,0 +1,4 @@
+source_well,target_label,x_mm,y_mm,volume_ul,concentration
+B7,dilution_1,20.0,20.0,10.0,Diluted
+B8,dilution_2,30.0,20.0,10.0,Diluted
+B9,dilution_3,40.0,20.0,10.0,Diluted
