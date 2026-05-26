@@ -13,7 +13,7 @@ tiprack:
 
 pipette:
   name: p300_single_gen2
-  mount: left
+  mount: right
 
 layout:
   food_coloring_source_wells: ["A1", "A2", "A3", "A4", "A5", "A6"]
