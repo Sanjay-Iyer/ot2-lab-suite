@@ -1,0 +1,26 @@
+[
+  {
+    "source_well": "B7",
+    "target_label": "dilution_1",
+    "x_mm": 20.0,
+    "y_mm": 20.0,
+    "volume_ul": 10.0,
+    "concentration": "Diluted"
+  },
+  {
+    "source_well": "B8",
+    "target_label": "dilution_2",
+    "x_mm": 30.0,
+    "y_mm": 20.0,
+    "volume_ul": 10.0,
+    "concentration": "Diluted"
+  },
+  {
+    "source_well": "B9",
+    "target_label": "dilution_3",
+    "x_mm": 40.0,
+    "y_mm": 20.0,
+    "volume_ul": 10.0,
+    "concentration": "Diluted"
+  }
+]
