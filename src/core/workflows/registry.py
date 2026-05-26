@@ -54,6 +54,7 @@ def load_workflow_config(name: str, config_path: Optional[Path] = None) -> BaseM
 from src.core.models.config_models import DilutionWorkflowConfig, PrintingWorkflowConfig
 from src.protocols.printing import generate_printing_protocol
 from src.protocols.dilution import generate_dilution_protocol
+from src.protocols.printing_demo_protocol import PrintingDemoConfig
 
 register_workflow(
     name="dilution",
@@ -69,6 +70,25 @@ register_workflow(
     default_config_path=DEFAULT_CONFIG_DIR / "printing.yaml",
     protocol_generator=generate_printing_protocol,
     description="Unified nanoparticle printing workflow (Dilution + Mixing + Printing)"
+)
+
+def generate_printing_demo_protocol(config) -> str:
+    """Reads printing_demo_protocol.py, injects the config dict, and returns it."""
+    import json
+    template_path = Path(__file__).resolve().parent.parent.parent / "protocols" / "printing_demo_protocol.py"
+    with open(template_path, "r", encoding="utf-8") as f:
+        code = f.read()
+    
+    config_dict = config.model_dump()
+    config_json = json.dumps(config_dict, indent=2)
+    return code.replace("CONFIG = None", f"CONFIG = {config_json}")
+
+register_workflow(
+    name="printing_demo",
+    schema=PrintingDemoConfig,
+    default_config_path=DEFAULT_CONFIG_DIR / "printing_demo.yaml",
+    protocol_generator=generate_printing_demo_protocol,
+    description="OT-2 Paper Printing Demo Workflow with Integrated Camera Capture"
 )
 
 def stub_generator(config):

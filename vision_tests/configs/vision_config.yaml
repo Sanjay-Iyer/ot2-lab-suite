@@ -1,0 +1,68 @@
+# ──────────────────────────────────────────────────────────────────
+# OT-2 Machine Vision Tests — Configuration
+# ──────────────────────────────────────────────────────────────────
+# Shared settings for all vision_tests/scripts/*.py scripts.
+# Paths are relative to the project root (ot2-lab-suite/).
+# Edit detection parameters here when tuning — no Python edits needed.
+
+# ─── Directory layout ────────────────────────────────────────────
+raw_dir: "vision_tests/raw"
+output_dir: "vision_tests/outputs"
+annotated_dir: "vision_tests/outputs/annotated"
+mask_dir: "vision_tests/outputs/masks"
+log_dir: "vision_tests/outputs/logs"
+
+# ─── Slot grid (3 cols × 4 rows = 12 OT-2 deck slots) ───────────
+# The ROI crops the image to the deck area before gridding.
+# Set roi_width / roi_height to null to use the full image.
+slot_grid:
+  enabled: true
+  roi_x: 0          # left pixel of deck region
+  roi_y: 0          # top pixel of deck region
+  roi_width: null    # null = full image width
+  roi_height: null   # null = full image height
+  rows: 4
+  cols: 3
+  # Row-major, top-to-bottom as the camera sees the deck.
+  # Adjust if your camera is rotated differently.
+  slot_layout:
+    - [10, 11, 12]
+    - [7,  8,  9]
+    - [4,  5,  6]
+    - [1,  2,  3]
+
+# ─── Object detection parameters ────────────────────────────────
+# Tune these first when detection is noisy or misses tips.
+detection:
+  min_area: 50         # Increase if counting noise blobs
+  max_area: 10000      # Increase if large tips are missed
+  threshold_method: "adaptive"   # "adaptive" | "otsu" | "fixed"
+  fixed_threshold: 127           # Used only when method = "fixed"
+  blur_kernel: 5                 # Gaussian blur kernel (odd number)
+  morph_kernel: 3                # Morphological close/open kernel
+  morph_iterations: 2            # Iterations for morphological ops
+  invert: true                   # Invert binary mask (tips brighter than bg)
+
+# ─── Color analysis ─────────────────────────────────────────────
+color_analysis:
+  enabled: true
+  compare_to_baseline: false
+  baseline_image: null   # e.g. "vision_tests/raw/baseline.jpg"
+
+# ─── Shape analysis ─────────────────────────────────────────────
+shape_analysis:
+  enabled: true
+  calculate_circularity: true
+  calculate_aspect_ratio: true
+  min_circularity: 0.0     # Filter: keep objects with circ >= this
+  max_aspect_ratio: 10.0   # Filter: keep objects with AR <= this
+
+# ─── Annotation drawing style ───────────────────────────────────
+annotation:
+  contour_color: [0, 255, 0]    # BGR green
+  bbox_color: [255, 0, 0]       # BGR blue
+  centroid_color: [0, 0, 255]   # BGR red
+  slot_line_color: [0, 255, 255] # BGR yellow
+  text_color: [255, 255, 255]   # BGR white
+  line_thickness: 2
+  font_scale: 0.5
