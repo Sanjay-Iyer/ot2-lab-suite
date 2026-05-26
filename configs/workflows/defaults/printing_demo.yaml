@@ -76,8 +76,8 @@ tip_strategy:
 debug:
   enabled: true
   verbose_protocol_comments: true
-  dry_run_no_liquid: true
-  move_only: true
+  dry_run_no_liquid: false
+  move_only: false
 
 camera:
   enabled: false
