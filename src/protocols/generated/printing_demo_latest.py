@@ -64,7 +64,10 @@ CONFIG = { 'camera': { 'capture_after': True,
               'create_metadata': True,
               'local_run_root': 'runs'},
   'pipette': {'mount': 'right', 'name': 'p300_multi_gen2'},
-  'plate': {'labware': 'usa_scientific_12well_12_wellplate_6000ul', 'slot': 2},
+  'plate': { 'labware': 'usascientific12well_12_wellplate_6000ul',
+             'namespace': 'custom_beta',
+             'slot': 2,
+             'version': 1},
   'printing': { 'calibration_only': False,
                 'dispense_height_mm': 1.0,
                 'droplet_volume_ul': 10.0,
@@ -127,11 +130,53 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
 
     # ── 2. Load labware and instrument ───────────────────────────────
     dbg_comment("labware loading started")
-    plate = protocol.load_labware(plate_cfg["labware"], plate_cfg["slot"])
+
+    # Safety Check: Detect old labware name usage
+    if plate_cfg["labware"] == "usa_scientific_12well_12_wellplate_6000ul":
+        raise ValueError(
+            "Old incorrect labware name detected. Use "
+            "usascientific12well_12_wellplate_6000ul with "
+            "namespace custom_beta and version 1."
+        )
+
+    if plate_cfg["labware"] != "usascientific12well_12_wellplate_6000ul":
+        raise ValueError(f"Unexpected plate labware: {plate_cfg['labware']}")
+
+    if plate_cfg.get("namespace", "custom_beta") != "custom_beta":
+        raise ValueError(f"Unexpected plate namespace: {plate_cfg.get('namespace')}")
+
+    if int(plate_cfg.get("version", 1)) != 1:
+        raise ValueError(f"Unexpected plate version: {plate_cfg.get('version')}")
+
+    print(
+        f"DEBUG: loading plate labware={plate_cfg['labware']} "
+        f"namespace={plate_cfg.get('namespace', 'custom_beta')} "
+        f"version={plate_cfg.get('version', 1)} "
+        f"slot={plate_cfg['slot']}"
+    )
+    plate = protocol.load_labware(
+        plate_cfg["labware"],
+        plate_cfg["slot"],
+        namespace=plate_cfg.get("namespace", "custom_beta"),
+        version=plate_cfg.get("version", 1),
+    )
+    print("DEBUG: plate labware loaded successfully")
     dbg_comment("plate loaded")
     tiprack = protocol.load_labware(tiprack_cfg["labware"], tiprack_cfg["slot"])
     dbg_comment("tiprack loaded")
-    paper_ref = protocol.load_labware(plate_cfg["labware"], printing_cfg["paper_slot"])
+    print(
+        f"DEBUG: loading paper_ref labware={plate_cfg['labware']} "
+        f"namespace={plate_cfg.get('namespace', 'custom_beta')} "
+        f"version={plate_cfg.get('version', 1)} "
+        f"slot={printing_cfg['paper_slot']}"
+    )
+    paper_ref = protocol.load_labware(
+        plate_cfg["labware"],
+        printing_cfg["paper_slot"],
+        namespace=plate_cfg.get("namespace", "custom_beta"),
+        version=plate_cfg.get("version", 1),
+    )
+    print("DEBUG: paper_ref labware loaded successfully")
 
     pipette = protocol.load_instrument(
         pipette_cfg["name"],

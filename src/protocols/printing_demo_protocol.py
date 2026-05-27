@@ -776,6 +776,12 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             dest_loc = paper_a1.bottom().move(
                 Point(x=pos["x_mm"], y=pos["y_mm"], z=dispense_h)
             )
+            # Safety check: Prevent gantry out of bounds move on the X axis
+            if dest_loc.point.x > 418.0:
+                raise ValueError(
+                    f"Out of bounds move detected: X={dest_loc.point.x:.3f} mm is too high for physical limit of 418.0 mm. "
+                    f"Check coordinates for print position '{pos['label']}'."
+                )
             protocol.comment(
                 f"Printing droplet on paper at X={pos['x_mm']} mm, Y={pos['y_mm']} mm"
             )
