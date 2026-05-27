@@ -57,7 +57,7 @@ CONFIG = {
     },
     "debug": {
         "dry_run_no_liquid": False,
-        "dry_position_check": True,   # ← START WITH TRUE; set False for live run
+        "dry_position_check": False,   # ← START WITH TRUE; set False for live run
         "enabled": True,
         "move_only": False,
         "verbose_protocol_comments": True,
