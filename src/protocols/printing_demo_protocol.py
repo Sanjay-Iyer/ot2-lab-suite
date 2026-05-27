@@ -1385,14 +1385,19 @@ def host_run(args: Any) -> None:
 
         try:
             from src.core.config import Config as RobotConfig
-            ssh_key = RobotConfig.ROBOT_SSH_KEY_PATH
+            ssh_key = args.ssh_key or os.environ.get("ROBOT_SSH_KEY_PATH") or RobotConfig.ROBOT_SSH_KEY_PATH
             ssh_user = RobotConfig.ROBOT_SSH_USER
         except ImportError:
-            ssh_key = None
+            ssh_key = args.ssh_key or os.environ.get("ROBOT_SSH_KEY_PATH")
             ssh_user = "root"
 
         if not ssh_key:
-            logger.error("ROBOT_SSH_KEY_PATH is missing. Check .env configuration.")
+            default_key = r"C:\Users\iyersn\.ssh\id_rsa_opentrons"
+            if os.path.exists(default_key):
+                ssh_key = default_key
+
+        if not ssh_key:
+            logger.error("ROBOT_SSH_KEY_PATH is missing. Check .env configuration or pass via --ssh-key.")
             sys.exit(1)
 
         ssh_opts = [
@@ -1667,6 +1672,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="IP address of the physical OT-2 robot.",
+    )
+    parser.add_argument(
+        "--ssh-key",
+        type=str,
+        default=None,
+        help="Path to the SSH key for connection.",
     )
     host_args = parser.parse_args()
     host_run(host_args)
