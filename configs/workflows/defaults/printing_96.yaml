@@ -50,22 +50,22 @@ dilution:
     - destination_well: "A5"
       water_source_well: "A3"
       food_coloring_source_well: "A1"
-      water_volume_ul: 90.0     # 90 + 10 = 100 µL total (50% of 200 µL max)
-      stock_volume_ul: 10.0
-      mix_volume_ul: 50.0
+      water_volume_ul: 144.0     # 144 + 16 = 160 µL total (80% of 200 µL max)
+      stock_volume_ul: 16.0
+      mix_volume_ul: 80.0
       mix_repetitions: 3
     - destination_well: "A6"
       water_source_well: "A4"
       food_coloring_source_well: "A2"
-      water_volume_ul: 75.0     # 75 + 25 = 100 µL total (50% of 200 µL max)
-      stock_volume_ul: 25.0
-      mix_volume_ul: 50.0
+      water_volume_ul: 120.0     # 120 + 40 = 160 µL total (80% of 200 µL max)
+      stock_volume_ul: 40.0
+      mix_volume_ul: 80.0
       mix_repetitions: 3
 
 printing:
   calibration_only: false
   paper_slot: 3
-  droplet_volume_ul: 10.0
+  droplet_volume_ul: 80.0
   dispense_height_mm: 5.0
   safe_z_mm: 20.0
   print_positions:
@@ -99,7 +99,7 @@ debug:
   verbose_protocol_comments: true
   dry_run_no_liquid: false
   move_only: false
-  dry_position_check: true  # true = move to wells at safe top height, no liquid
+  dry_position_check: false  # true = move to wells at safe top height, no liquid
 
 camera:
   enabled: true

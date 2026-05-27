@@ -67,24 +67,24 @@ CONFIG = {
         "enabled": True,
         "steps": [
             {
-                # Column 5 (A5-H5): 90 µL water + 10 µL dye = 100 µL total (50% of 200 µL max)
+                # Column 5 (A5-H5): 144 µL water + 16 µL dye = 160 µL total (80% of 200 µL max)
                 "destination_well": "A5",
                 "food_coloring_source_well": "A1",
                 "mix_repetitions": 3,
-                "mix_volume_ul": 50.0,
-                "stock_volume_ul": 10.0,
+                "mix_volume_ul": 80.0,
+                "stock_volume_ul": 16.0,
                 "water_source_well": "A3",
-                "water_volume_ul": 90.0,
+                "water_volume_ul": 144.0,
             },
             {
-                # Column 6 (A6-H6): 75 µL water + 25 µL dye = 100 µL total (50% of 200 µL max)
+                # Column 6 (A6-H6): 120 µL water + 40 µL dye = 160 µL total (80% of 200 µL max)
                 "destination_well": "A6",
                 "food_coloring_source_well": "A2",
                 "mix_repetitions": 3,
-                "mix_volume_ul": 50.0,
-                "stock_volume_ul": 25.0,
+                "mix_volume_ul": 80.0,
+                "stock_volume_ul": 40.0,
                 "water_source_well": "A4",
-                "water_volume_ul": 75.0,
+                "water_volume_ul": 120.0,
             },
         ],
     },
@@ -114,7 +114,7 @@ CONFIG = {
     "printing": {
         "calibration_only": False,
         "dispense_height_mm": DISPENSE_HEIGHT_MM,
-        "droplet_volume_ul": 10.0,
+        "droplet_volume_ul": 80.0,
         "paper_slot": 3,
         "print_positions": [
             {"label": "dilution_1", "source_well": "A5", "x_mm": 5.0, "y_mm": 5.0},
