@@ -5,7 +5,10 @@ demo_mode: dilution_print  # water_print or dilution_print
 
 plate:
   slot: 2
-  labware: usa_scientific_12well_12_wellplate_6000ul  # Custom 12 well CytoOne plate
+  labware: usascientific12well_12_wellplate_6000ul  # Custom 12 well CytoOne plate
+  namespace: custom_beta
+  version: 1
+
 
 tiprack:
   slot: 1

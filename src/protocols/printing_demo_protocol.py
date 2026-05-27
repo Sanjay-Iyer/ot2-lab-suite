@@ -93,6 +93,9 @@ if HAS_PYDANTIC:
     class PlateConfig(BaseModel):
         slot: int = Field(..., ge=1, le=11)
         labware: str
+        namespace: Optional[str] = None
+        version: Optional[int] = None
+
 
     class TiprackConfig(BaseModel):
         slot: int = Field(..., ge=1, le=11)
@@ -240,8 +243,31 @@ if HAS_PYDANTIC:
             if self.demo_mode == "dry_run":
                 return self
 
+            # Safety check: Detect old labware name usage
+            if self.plate.labware == "usa_scientific_12well_12_wellplate_6000ul":
+                raise ValueError(
+                    "Incorrect old labware name detected: usa_scientific_12well_12_wellplate_6000ul. "
+                    "Use usascientific12well_12_wellplate_6000ul with namespace custom_beta and version 1."
+                )
+
+            # Safety check: Enforce correct namespace and version for the custom labware
+            if self.plate.labware == "usascientific12well_12_wellplate_6000ul":
+                if self.plate.namespace != "custom_beta" or self.plate.version != 1:
+                    raise ValueError(
+                        f"Custom labware '{self.plate.labware}' must be loaded from namespace 'custom_beta' "
+                        f"with version 1. (Got namespace={self.plate.namespace}, version={self.plate.version})"
+                    )
+
+            # Out-of-bounds X safety validation (OT-2 gantry limits)
+            for pos in self.printing.print_positions:
+                if pos.x_mm > 418.0:
+                    raise ValueError(
+                        f"Print position '{pos.label}' X coordinate {pos.x_mm} mm exceeds physical OT-2 limit of 418.0 mm."
+                    )
+
             # Verify that all configured wells exist within the plate's boundaries
             plate_labware = self.plate.labware
+
             for name, wells in [
                 ("food_coloring_source_wells", self.layout.food_coloring_source_wells),
                 ("water_source_wells", self.layout.water_source_wells),
@@ -425,11 +451,45 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
 
     # ── 2. Load labware and instrument ───────────────────────────────
     dbg_comment("labware loading started")
-    plate = protocol.load_labware(plate_cfg["labware"], plate_cfg["slot"])
-    dbg_comment("plate loaded")
+    
+    # Safety Check: Detect old labware name usage
+    if plate_cfg.get("labware") == "usa_scientific_12well_12_wellplate_6000ul":
+        raise ValueError(
+            "Incorrect old labware name detected: usa_scientific_12well_12_wellplate_6000ul. "
+            "Use usascientific12well_12_wellplate_6000ul with namespace custom_beta and version 1."
+        )
+
+    # Safety Check: Validate custom labware properties
+    if plate_cfg.get("labware") == "usascientific12well_12_wellplate_6000ul":
+        if plate_cfg.get("namespace") != "custom_beta" or int(plate_cfg.get("version", 1)) != 1:
+            raise ValueError(
+                f"Custom labware '{plate_cfg['labware']}' must be loaded from namespace 'custom_beta' "
+                f"with version 1. (Got namespace={plate_cfg.get('namespace')}, version={plate_cfg.get('version')})"
+            )
+
+    protocol.comment(
+        f"DEBUG: loading plate labware={plate_cfg.get('labware')} "
+        f"namespace={plate_cfg.get('namespace', 'custom_beta')} "
+        f"version={plate_cfg.get('version', 1)} slot={plate_cfg.get('slot')}"
+    )
+    plate = protocol.load_labware(
+        plate_cfg["labware"],
+        plate_cfg["slot"],
+        namespace=plate_cfg.get("namespace", "custom_beta"),
+        version=plate_cfg.get("version", 1),
+    )
+    protocol.comment("DEBUG: plate labware loaded successfully")
+    
     tiprack = protocol.load_labware(tiprack_cfg["labware"], tiprack_cfg["slot"])
     dbg_comment("tiprack loaded")
-    paper_ref = protocol.load_labware(plate_cfg["labware"], printing_cfg["paper_slot"])
+    
+    paper_ref = protocol.load_labware(
+        plate_cfg["labware"],
+        printing_cfg["paper_slot"],
+        namespace=plate_cfg.get("namespace", "custom_beta"),
+        version=plate_cfg.get("version", 1),
+    )
+
 
     pipette = protocol.load_instrument(
         pipette_cfg["name"],
@@ -671,6 +731,12 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             dest_loc = paper_a1.bottom().move(
                 Point(x=pos["x_mm"], y=pos["y_mm"], z=dispense_h)
             )
+            # Safety check: Prevent gantry out of bounds move on the X axis
+            if dest_loc.point.x > 418.0:
+                raise ValueError(
+                    f"Out of bounds move detected: X={dest_loc.point.x:.3f} mm is too high for physical limit of 418.0 mm. "
+                    f"Check coordinates for print position '{pos['label']}'."
+                )
             protocol.comment(
                 f"Moving tip above paper X={pos['x_mm']} mm, "
                 f"Y={pos['y_mm']} mm, Z={dispense_h} mm"
