@@ -1,0 +1,11 @@
+image_name,phase,step_index,source_well,destination_well,print_label,expected_path,status,validation_result,timestamp
+before_deck.jpg,before,1,,,,images/before_after/before_deck.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+before_wellplate.jpg,before,2,,,,images/before_after/before_wellplate.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+wellplate_step_001_well_C1.jpg,dilution,8,,C1,,images/plate/wellplate_step_001_well_C1.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+wellplate_step_002_well_C2.jpg,dilution,11,,C2,,images/plate/wellplate_step_002_well_C2.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+wellplate_step_003_well_C3.jpg,dilution,14,,C3,,images/plate/wellplate_step_003_well_C3.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+paper_print_001_well_C1.jpg,printing,17,C1,,dilution_1,images/paper/paper_print_001_well_C1.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+paper_print_002_well_C2.jpg,printing,20,C2,,dilution_2,images/paper/paper_print_002_well_C2.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+paper_print_003_well_C3.jpg,printing,23,C3,,dilution_3,images/paper/paper_print_003_well_C3.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+after_deck.jpg,after,24,,,,images/before_after/after_deck.jpg,valid,passed,2026-05-27T17:42:49.581178Z
+after_wellplate.jpg,after,25,,,,images/before_after/after_wellplate.jpg,valid,passed,2026-05-27T17:42:49.581178Z

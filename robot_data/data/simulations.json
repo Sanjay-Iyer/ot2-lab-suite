@@ -1,8 +1,0 @@
-{
-  "2f60ebf5cfd29420f95e00aa36a13d882881665bb35d95e3dc3dbff1aa9be511": {
-    "path": "C:\\code\\opentrons_home\\ot2-lab-suite\\src\\protocols\\generated\\generated_printing.py",
-    "timestamp": "2026-05-12T14:52:24.517925",
-    "status": "PASS",
-    "result": "Starting printing workflow: 24 positions\nTransferring reagent to printer tray\nPicking up tip from A1 of Opentrons OT-2 96 Tip Rack 300 \u00b5L on slot 10\nAspirating 5.0 uL from A1 of Opentrons 24 Tube Rack with Eppendorf 2 mL Safe-Lock Snapcap on slot 1 at 92.86 uL/sec\nDispensing 5.0 uL into A1 of NEST 96 Well Plate 200 \u00b5L Flat on slot 9 at 92.86 uL/sec\nDropping tip into A1 of Opentrons Fixed Trash on slot 12\n"
-  }
-}

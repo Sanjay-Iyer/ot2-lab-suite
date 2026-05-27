@@ -67,9 +67,10 @@ def test_dilution_unprepared_destination_aspiration():
     with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as f:
         config_data = yaml.safe_load(f)
         
-    # Set step to aspirate from dilution_destination well B8, but B8 is only prepared in step 2 (index 1), 
+    # Set step to aspirate from dilution_destination well C2, but C2 is only prepared in step 2 (index 1), 
     # but we attempt to use it as stock source in step 1 (index 0).
-    config_data["dilution"]["steps"][0]["food_coloring_source_well"] = "B8" 
+    config_data["dilution"]["steps"][0]["food_coloring_source_well"] = "C2" 
+
     
     with pytest.raises(ValueError) as exc:
         PrintingDemoConfig(**config_data)

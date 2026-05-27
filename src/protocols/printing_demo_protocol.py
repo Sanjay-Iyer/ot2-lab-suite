@@ -59,6 +59,34 @@ def is_valid_well(well: str) -> bool:
     """Check if a well name is a valid 96-well format (A1 to H12)."""
     return bool(re.match(r"^[A-H]([1-9]|1[0-2])$", well))
 
+def get_well_bounds_for_labware(labware: str) -> Tuple[str, int]:
+    """Return the maximum row letter and column number for the given labware name."""
+    lw_lower = labware.lower()
+    if "96_wellplate" in lw_lower or "96_tiprack" in lw_lower:
+        return "H", 12
+    elif "24_wellplate" in lw_lower or "24_tuberack" in lw_lower:
+        return "D", 6
+    elif "12_wellplate" in lw_lower or "12well" in lw_lower:
+        return "C", 4
+    # Default fallback to 96-well
+    return "H", 12
+
+
+def is_valid_well_for_labware(well: str, labware: str) -> bool:
+    """Validate that a well name is structurally correct and lies within the boundaries of the labware."""
+    match = re.match(r"^([A-Z])([0-9]+)$", well)
+    if not match:
+        return False
+    row, col_str = match.groups()
+    col = int(col_str)
+    max_row, max_col = get_well_bounds_for_labware(labware)
+    if not ("A" <= row <= max_row):
+        return False
+    if not (1 <= col <= max_col):
+        return False
+    return True
+
+
 # ─── Pydantic Models for Config Validation (Host-Side Only) ──────────
 
 if HAS_PYDANTIC:
@@ -212,7 +240,38 @@ if HAS_PYDANTIC:
             if self.demo_mode == "dry_run":
                 return self
 
+            # Verify that all configured wells exist within the plate's boundaries
+            plate_labware = self.plate.labware
+            for name, wells in [
+                ("food_coloring_source_wells", self.layout.food_coloring_source_wells),
+                ("water_source_wells", self.layout.water_source_wells),
+                ("dilution_destination_wells", self.layout.dilution_destination_wells),
+                ("print_source_wells", self.layout.print_source_wells),
+            ]:
+                for well in wells:
+                    if not is_valid_well_for_labware(well, plate_labware):
+                        max_row, max_col = get_well_bounds_for_labware(plate_labware)
+                        raise ValueError(
+                            f"Well '{well}' in layout.{name} is invalid for plate '{plate_labware}' "
+                            f"(valid bounds: A1 to {max_row}{max_col})."
+                        )
+
+            if self.demo_mode == "dilution_print" and self.dilution.enabled:
+                for idx, step in enumerate(self.dilution.steps):
+                    for field, well in [
+                        ("destination_well", step.destination_well),
+                        ("water_source_well", step.water_source_well),
+                        ("food_coloring_source_well", step.food_coloring_source_well),
+                    ]:
+                        if not is_valid_well_for_labware(well, plate_labware):
+                            max_row, max_col = get_well_bounds_for_labware(plate_labware)
+                            raise ValueError(
+                                f"Well '{well}' in dilution step {idx+1} ({field}) is invalid for plate '{plate_labware}' "
+                                f"(valid bounds: A1 to {max_row}{max_col})."
+                            )
+
             fc_wells = set(self.layout.food_coloring_source_wells)
+
             w_wells = set(self.layout.water_source_wells)
             d_wells = set(self.layout.dilution_destination_wells)
 
@@ -769,11 +828,16 @@ def validate_print_positions_bounds(config_dict: Dict[str, Any]) -> None:
 def generate_plate_map(config: Dict[str, Any]) -> Tuple[Dict[str, str], str]:
     """Generate visual ASCII plate grid and role dictionary."""
     plate_map: Dict[str, str] = {}
-    rows = list("ABCDEFGH")
-    cols = list(range(1, 13))
+    labware = config.get("plate", {}).get("labware", "corning_96_wellplate_360ul_flat")
+    max_row_char, max_col = get_well_bounds_for_labware(labware)
+    
+    rows = [chr(r) for r in range(ord("A"), ord(max_row_char) + 1)]
+    cols = list(range(1, max_col + 1))
+    
     for r in rows:
         for c in cols:
             plate_map[f"{r}{c}"] = "Empty"
+
 
     layout = config.get("layout", {})
     for w in layout.get("food_coloring_source_wells", []):

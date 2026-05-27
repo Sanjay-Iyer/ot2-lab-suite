@@ -1,0 +1,642 @@
+{
+  "demo_name": "dilution_print",
+  "start_utc_timestamp": "2026-05-27T17:42:49.439638Z",
+  "end_utc_timestamp": "2026-05-27T17:42:49.581178Z",
+  "robot_ip": null,
+  "plate_map_ascii": "Col:   1   2   3   4   5   6\nA:   [S] [S] [S] [ ] [ ] [ ] \nB:   [W] [W] [W] [ ] [ ] [ ] \nC:   [D] [D] [D] [ ] [ ] [ ] \nD:   [ ] [ ] [ ] [ ] [ ] [ ] ",
+  "plate_map_roles": {
+    "A1": "Food Coloring Stock",
+    "A2": "Food Coloring Stock",
+    "A3": "Food Coloring Stock",
+    "A4": "Empty",
+    "A5": "Empty",
+    "A6": "Empty",
+    "B1": "Water Source",
+    "B2": "Water Source",
+    "B3": "Water Source",
+    "B4": "Empty",
+    "B5": "Empty",
+    "B6": "Empty",
+    "C1": "Dilution Destination",
+    "C2": "Dilution Destination",
+    "C3": "Dilution Destination",
+    "C4": "Empty",
+    "C5": "Empty",
+    "C6": "Empty",
+    "D1": "Empty",
+    "D2": "Empty",
+    "D3": "Empty",
+    "D4": "Empty",
+    "D5": "Empty",
+    "D6": "Empty"
+  },
+  "config_parameters": {
+    "demo_mode": "dilution_print",
+    "plate": {
+      "slot": 2,
+      "labware": "corning_24_wellplate_3.4ml_flat"
+    },
+    "tiprack": {
+      "slot": 1,
+      "labware": "opentrons_96_tiprack_300ul"
+    },
+    "pipette": {
+      "name": "p300_multi_gen2",
+      "mount": "right"
+    },
+    "layout": {
+      "food_coloring_source_wells": [
+        "A1",
+        "A2",
+        "A3"
+      ],
+      "water_source_wells": [
+        "B1",
+        "B2",
+        "B3"
+      ],
+      "dilution_destination_wells": [
+        "C1",
+        "C2",
+        "C3"
+      ],
+      "print_source_wells": [
+        "C1",
+        "C2",
+        "C3"
+      ]
+    },
+    "dilution": {
+      "enabled": true,
+      "steps": [
+        {
+          "destination_well": "C1",
+          "water_source_well": "B1",
+          "food_coloring_source_well": "A1",
+          "water_volume_ul": 180.0,
+          "stock_volume_ul": 20.0,
+          "mix_volume_ul": 100.0,
+          "mix_repetitions": 3
+        },
+        {
+          "destination_well": "C2",
+          "water_source_well": "B2",
+          "food_coloring_source_well": "A1",
+          "water_volume_ul": 150.0,
+          "stock_volume_ul": 50.0,
+          "mix_volume_ul": 100.0,
+          "mix_repetitions": 3
+        },
+        {
+          "destination_well": "C3",
+          "water_source_well": "B3",
+          "food_coloring_source_well": "A1",
+          "water_volume_ul": 100.0,
+          "stock_volume_ul": 100.0,
+          "mix_volume_ul": 100.0,
+          "mix_repetitions": 3
+        }
+      ]
+    },
+    "printing": {
+      "calibration_only": false,
+      "paper_slot": 3,
+      "droplet_volume_ul": 10.0,
+      "dispense_height_mm": 1.0,
+      "safe_z_mm": 20.0,
+      "print_positions": [
+        {
+          "source_well": "C1",
+          "label": "dilution_1",
+          "x_mm": 5.0,
+          "y_mm": 5.0
+        },
+        {
+          "source_well": "C2",
+          "label": "dilution_2",
+          "x_mm": 10.0,
+          "y_mm": 10.0
+        },
+        {
+          "source_well": "C3",
+          "label": "dilution_3",
+          "x_mm": 15.0,
+          "y_mm": 15.0
+        }
+      ]
+    },
+    "tip_strategy": {
+      "mode": "reuse_single_tip_for_demo",
+      "allowed_modes": [
+        "new_tip_each_transfer",
+        "reuse_low_to_high",
+        "reuse_per_phase",
+        "reuse_single_tip_for_demo"
+      ],
+      "loaded_tip_count": 8,
+      "starting_tip": "A1",
+      "return_tip_at_end": true,
+      "drop_tip_at_end": false,
+      "reuse_for_water": true,
+      "reuse_for_stock": true,
+      "reuse_for_mixing": true,
+      "reuse_for_printing": true
+    },
+    "camera": {
+      "enabled": true,
+      "capture_before": true,
+      "capture_after": true,
+      "capture_after_each_dilution_step": true,
+      "capture_after_each_print_step": true,
+      "robot_image_dir": "/data/vision/printing_demo",
+      "image_filename_prefix": "printing_demo"
+    },
+    "debug": {
+      "enabled": true,
+      "verbose_protocol_comments": true,
+      "dry_run_no_liquid": false,
+      "move_only": false
+    },
+    "output": {
+      "local_run_root": "runs",
+      "create_metadata": true,
+      "create_image_manifest": true
+    }
+  },
+  "execution_steps": [
+    {
+      "step_index": 1,
+      "phase": "before",
+      "action": "capture_before_deck",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "before_deck.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 2,
+      "phase": "before",
+      "action": "capture_before_wellplate",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "before_wellplate.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 3,
+      "phase": "dilution",
+      "action": "pipette_water",
+      "source_well": "B1",
+      "destination_well": "C1",
+      "volume_ul": 180.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 4,
+      "phase": "dilution",
+      "action": "pipette_water",
+      "source_well": "B2",
+      "destination_well": "C2",
+      "volume_ul": 150.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 5,
+      "phase": "dilution",
+      "action": "pipette_water",
+      "source_well": "B3",
+      "destination_well": "C3",
+      "volume_ul": 100.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 6,
+      "phase": "dilution",
+      "action": "pipette_stock",
+      "source_well": "A1",
+      "destination_well": "C1",
+      "volume_ul": 20.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 7,
+      "phase": "dilution",
+      "action": "mix_well_3x",
+      "source_well": "",
+      "destination_well": "C1",
+      "volume_ul": 100.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 8,
+      "phase": "dilution",
+      "action": "capture_dilution_step",
+      "source_well": "",
+      "destination_well": "C1",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "wellplate_step_001_well_C1.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 9,
+      "phase": "dilution",
+      "action": "pipette_stock",
+      "source_well": "A1",
+      "destination_well": "C2",
+      "volume_ul": 50.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 10,
+      "phase": "dilution",
+      "action": "mix_well_3x",
+      "source_well": "",
+      "destination_well": "C2",
+      "volume_ul": 100.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 11,
+      "phase": "dilution",
+      "action": "capture_dilution_step",
+      "source_well": "",
+      "destination_well": "C2",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "wellplate_step_002_well_C2.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 12,
+      "phase": "dilution",
+      "action": "pipette_stock",
+      "source_well": "A1",
+      "destination_well": "C3",
+      "volume_ul": 100.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 13,
+      "phase": "dilution",
+      "action": "mix_well_3x",
+      "source_well": "",
+      "destination_well": "C3",
+      "volume_ul": 100.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 14,
+      "phase": "dilution",
+      "action": "capture_dilution_step",
+      "source_well": "",
+      "destination_well": "C3",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "wellplate_step_003_well_C3.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 15,
+      "phase": "printing",
+      "action": "aspirate_print_source",
+      "source_well": "C1",
+      "destination_well": "",
+      "volume_ul": 10.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 16,
+      "phase": "printing",
+      "action": "print_droplet",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 10.0,
+      "print_label": "dilution_1",
+      "x_mm": 5.0,
+      "y_mm": 5.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 17,
+      "phase": "printing",
+      "action": "capture_print_step",
+      "source_well": "C1",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "dilution_1",
+      "x_mm": 5.0,
+      "y_mm": 5.0,
+      "image_expected": true,
+      "image_name": "paper_print_001_well_C1.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 18,
+      "phase": "printing",
+      "action": "aspirate_print_source",
+      "source_well": "C2",
+      "destination_well": "",
+      "volume_ul": 10.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 19,
+      "phase": "printing",
+      "action": "print_droplet",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 10.0,
+      "print_label": "dilution_2",
+      "x_mm": 10.0,
+      "y_mm": 10.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 20,
+      "phase": "printing",
+      "action": "capture_print_step",
+      "source_well": "C2",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "dilution_2",
+      "x_mm": 10.0,
+      "y_mm": 10.0,
+      "image_expected": true,
+      "image_name": "paper_print_002_well_C2.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 21,
+      "phase": "printing",
+      "action": "aspirate_print_source",
+      "source_well": "C3",
+      "destination_well": "",
+      "volume_ul": 10.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 22,
+      "phase": "printing",
+      "action": "print_droplet",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 10.0,
+      "print_label": "dilution_3",
+      "x_mm": 15.0,
+      "y_mm": 15.0,
+      "image_expected": false,
+      "image_name": "",
+      "status": "ok"
+    },
+    {
+      "step_index": 23,
+      "phase": "printing",
+      "action": "capture_print_step",
+      "source_well": "C3",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "dilution_3",
+      "x_mm": 15.0,
+      "y_mm": 15.0,
+      "image_expected": true,
+      "image_name": "paper_print_003_well_C3.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 24,
+      "phase": "after",
+      "action": "capture_after_deck",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "after_deck.jpg",
+      "status": "ok"
+    },
+    {
+      "step_index": 25,
+      "phase": "after",
+      "action": "capture_after_wellplate",
+      "source_well": "",
+      "destination_well": "",
+      "volume_ul": 0.0,
+      "print_label": "",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "image_expected": true,
+      "image_name": "after_wellplate.jpg",
+      "status": "ok"
+    }
+  ],
+  "image_manifest": [
+    {
+      "image_name": "before_deck.jpg",
+      "phase": "before",
+      "step_index": 1,
+      "source_well": "",
+      "destination_well": "",
+      "print_label": "",
+      "expected_path": "images/before_after/before_deck.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "before_wellplate.jpg",
+      "phase": "before",
+      "step_index": 2,
+      "source_well": "",
+      "destination_well": "",
+      "print_label": "",
+      "expected_path": "images/before_after/before_wellplate.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "wellplate_step_001_well_C1.jpg",
+      "phase": "dilution",
+      "step_index": 8,
+      "source_well": "",
+      "destination_well": "C1",
+      "print_label": "",
+      "expected_path": "images/plate/wellplate_step_001_well_C1.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "wellplate_step_002_well_C2.jpg",
+      "phase": "dilution",
+      "step_index": 11,
+      "source_well": "",
+      "destination_well": "C2",
+      "print_label": "",
+      "expected_path": "images/plate/wellplate_step_002_well_C2.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "wellplate_step_003_well_C3.jpg",
+      "phase": "dilution",
+      "step_index": 14,
+      "source_well": "",
+      "destination_well": "C3",
+      "print_label": "",
+      "expected_path": "images/plate/wellplate_step_003_well_C3.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "paper_print_001_well_C1.jpg",
+      "phase": "printing",
+      "step_index": 17,
+      "source_well": "C1",
+      "destination_well": "",
+      "print_label": "dilution_1",
+      "expected_path": "images/paper/paper_print_001_well_C1.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "paper_print_002_well_C2.jpg",
+      "phase": "printing",
+      "step_index": 20,
+      "source_well": "C2",
+      "destination_well": "",
+      "print_label": "dilution_2",
+      "expected_path": "images/paper/paper_print_002_well_C2.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "paper_print_003_well_C3.jpg",
+      "phase": "printing",
+      "step_index": 23,
+      "source_well": "C3",
+      "destination_well": "",
+      "print_label": "dilution_3",
+      "expected_path": "images/paper/paper_print_003_well_C3.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "after_deck.jpg",
+      "phase": "after",
+      "step_index": 24,
+      "source_well": "",
+      "destination_well": "",
+      "print_label": "",
+      "expected_path": "images/before_after/after_deck.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    },
+    {
+      "image_name": "after_wellplate.jpg",
+      "phase": "after",
+      "step_index": 25,
+      "source_well": "",
+      "destination_well": "",
+      "print_label": "",
+      "expected_path": "images/before_after/after_wellplate.jpg",
+      "status": "valid",
+      "validation_result": "passed",
+      "timestamp": "2026-05-27T17:42:49.581178Z"
+    }
+  ],
+  "simulation_output": "DEBUG: entered run()\nDEBUG: config loaded\nDEBUG: labware loading started\nDEBUG: plate loaded\nDEBUG: tiprack loaded\nDEBUG: pipette loaded\nDEBUG: tip strategy = reuse_single_tip_for_demo\nWARNING: reuse_single_tip_for_demo mode is enabled. This is for demonstration only and may cause carryover.\n[SIMULATION] Mock photo: before_deck.jpg\n[SIMULATION] Mock photo: before_wellplate.jpg\nDEBUG: picking up demo tip A1\nPicking up tip from A1 of Opentrons OT-2 96 Tip Rack 300 \u00b5L on 1\nDEBUG: reusing same tip for water transfer\nPipetting 180.0 uL water from B1 to C1\nAspirating 180.0 uL from B1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDispensing 180.0 uL into C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nPipetting 150.0 uL water from B2 to C2\nAspirating 150.0 uL from B2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDispensing 150.0 uL into C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nPipetting 100.0 uL water from B3 to C3\nAspirating 100.0 uL from B3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDispensing 100.0 uL into C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDEBUG: reusing same tip for stock transfer\nPipetting 20.0 uL stock from A1 to C1\nAspirating 20.0 uL from A1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDispensing 20.0 uL into C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDEBUG: reusing same tip for mixing\nMixing well C1 (3 x 100.0 uL)\nMixing 3 times with a volume of 100.0 ul\n\tAspirating 100.0 uL from C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tAspirating 100.0 uL from C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tAspirating 100.0 uL from C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n[SIMULATION] Mock photo: wellplate_step_001_well_C1.jpg\nDEBUG: reusing same tip for stock transfer\nPipetting 50.0 uL stock from A1 to C2\nAspirating 50.0 uL from A1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDispensing 50.0 uL into C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDEBUG: reusing same tip for mixing\nMixing well C2 (3 x 100.0 uL)\nMixing 3 times with a volume of 100.0 ul\n\tAspirating 100.0 uL from C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tAspirating 100.0 uL from C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tAspirating 100.0 uL from C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n[SIMULATION] Mock photo: wellplate_step_002_well_C2.jpg\nDEBUG: reusing same tip for stock transfer\nPipetting 100.0 uL stock from A1 to C3\nAspirating 100.0 uL from A1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDispensing 100.0 uL into C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nDEBUG: reusing same tip for mixing\nMixing well C3 (3 x 100.0 uL)\nMixing 3 times with a volume of 100.0 ul\n\tAspirating 100.0 uL from C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tAspirating 100.0 uL from C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tAspirating 100.0 uL from C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n\tDispensing 100.0 uL into C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\n[SIMULATION] Mock photo: wellplate_step_003_well_C3.jpg\nDEBUG: reusing same tip for printing\nAspirating 10.0 uL from C1 for printing\nAspirating 10.0 uL from C1 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nPrinting droplet on paper at X=5.0 mm, Y=5.0 mm\nDispensing 10.0 uL into A1 of Corning 24 Well Plate 3.4 mL Flat on 3 at 94.0 uL/sec\n[SIMULATION] Mock photo: paper_print_001_well_C1.jpg\nDEBUG: reusing same tip for printing\nAspirating 10.0 uL from C2 for printing\nAspirating 10.0 uL from C2 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nPrinting droplet on paper at X=10.0 mm, Y=10.0 mm\nDispensing 10.0 uL into A1 of Corning 24 Well Plate 3.4 mL Flat on 3 at 94.0 uL/sec\n[SIMULATION] Mock photo: paper_print_002_well_C2.jpg\nDEBUG: reusing same tip for printing\nAspirating 10.0 uL from C3 for printing\nAspirating 10.0 uL from C3 of Corning 24 Well Plate 3.4 mL Flat on 2 at 94.0 uL/sec\nPrinting droplet on paper at X=15.0 mm, Y=15.0 mm\nDispensing 10.0 uL into A1 of Corning 24 Well Plate 3.4 mL Flat on 3 at 94.0 uL/sec\n[SIMULATION] Mock photo: paper_print_003_well_C3.jpg\n[SIMULATION] Mock photo: after_deck.jpg\n[SIMULATION] Mock photo: after_wellplate.jpg\nDEBUG: returning tip at end\nReturning tip\n\tDropping tip into A1 of Opentrons OT-2 96 Tip Rack 300 \u00b5L on 1\nDEBUG: protocol completed\n",
+  "overall_status": "SUCCESS"
+}

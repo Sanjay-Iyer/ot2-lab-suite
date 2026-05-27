@@ -10,6 +10,41 @@ labware:
       - printing
     notes: "Standard 96-well plate. Do not use for 1000 µL final volume."
 
+  corning_24_wellplate_3.4ml_flat:
+    display_name: "Corning/CytoOne 24 Well Plate 3.4 mL Flat"
+    format: "24_well_plate"
+    max_well_volume_ul: 3400
+    recommended_max_working_volume_ul: 3000
+    min_working_volume_ul: 20
+    compatible_workflows:
+      - dilution
+      - printing
+    notes: "24-well flat bottom plate (e.g. Corning or CytoOne with similar dimensions)."
+
+  corning_12_wellplate_6.9ml_flat:
+    display_name: "Corning/CytoOne 12 Well Plate 6.9 mL Flat"
+    format: "12_well_plate"
+    max_well_volume_ul: 6900
+    recommended_max_working_volume_ul: 6000
+    min_working_volume_ul: 50
+    compatible_workflows:
+      - dilution
+      - printing
+    notes: "12-well flat bottom plate (e.g. Corning or CytoOne with similar dimensions)."
+
+  usa_scientific_12well_12_wellplate_6000ul:
+    display_name: "USA Scientific CytoOne 12 Well Plate 6 mL"
+    format: "12_well_plate"
+    max_well_volume_ul: 6000
+    recommended_max_working_volume_ul: 5000
+    min_working_volume_ul: 50
+    compatible_workflows:
+      - dilution
+      - printing
+    notes: "Custom CytoOne 12 well plate definition."
+
+
+
   nest_96_wellplate_2ml_deep:
     display_name: "NEST 96 Deep Well Plate 2 mL"
     format: "96_deep_well_plate"
