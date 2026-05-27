@@ -159,14 +159,37 @@ if HAS_PYDANTIC:
     class PrintPosition(BaseModel):
         source_well: str
         label: str
-        x_mm: float
-        y_mm: float
+        x_mm: Optional[float] = None
+        y_mm: Optional[float] = None
+        x_index: Optional[int] = None
+        y_index: Optional[int] = None
 
         @model_validator(mode="after")
         def validate_pos(self) -> "PrintPosition":
             if not is_valid_well(self.source_well):
                 raise ValueError(f"Invalid print source well: {self.source_well}")
+            has_indices = self.x_index is not None and self.y_index is not None
+            has_coords = self.x_mm is not None and self.y_mm is not None
+            if not (has_indices or has_coords):
+                raise ValueError(
+                    f"PrintPosition '{self.label}' must have either x_index and y_index, or x_mm and y_mm."
+                )
             return self
+
+    class PrintOriginConfig(BaseModel):
+        x_mm: float
+        y_mm: float
+
+    class PrintSpacingConfig(BaseModel):
+        x_mm: float
+        y_mm: float
+
+        @field_validator("x_mm", "y_mm")
+        @classmethod
+        def validate_spacing(cls, v: float) -> float:
+            if v <= 0:
+                raise ValueError("Spacing must be greater than 0.")
+            return v
 
     class PrintingConfig(BaseModel):
         calibration_only: bool = False
@@ -174,6 +197,8 @@ if HAS_PYDANTIC:
         droplet_volume_ul: float = Field(..., gt=0)
         dispense_height_mm: float = Field(..., ge=0)
         safe_z_mm: float = Field(..., ge=0)
+        print_origin: Optional[PrintOriginConfig] = None
+        print_spacing: Optional[PrintSpacingConfig] = None
         print_positions: List[PrintPosition]
 
     class TipStrategyConfig(BaseModel):
@@ -259,10 +284,16 @@ if HAS_PYDANTIC:
                     )
 
             # Out-of-bounds X safety validation (OT-2 gantry limits)
+            origin = self.printing.print_origin
+            spacing = self.printing.print_spacing
             for pos in self.printing.print_positions:
-                if pos.x_mm > 418.0:
+                if pos.x_index is not None and pos.y_index is not None and origin and spacing:
+                    x_mm = origin.x_mm + pos.x_index * spacing.x_mm
+                else:
+                    x_mm = pos.x_mm or 0.0
+                if x_mm > 418.0:
                     raise ValueError(
-                        f"Print position '{pos.label}' X coordinate {pos.x_mm} mm exceeds physical OT-2 limit of 418.0 mm."
+                        f"Print position '{pos.label}' X coordinate {x_mm} mm exceeds physical OT-2 limit of 418.0 mm."
                     )
 
             # Verify that all configured wells exist within the plate's boundaries
@@ -416,6 +447,42 @@ CONFIG = \
 '''
 
 _ROBOT_SCRIPT_POST_CONFIG = '''
+
+def resolve_print_position(printing_cfg, pos_cfg):
+    origin = printing_cfg.get("print_origin", {"x_mm": 5.0, "y_mm": 5.0})
+    spacing = printing_cfg.get("print_spacing", {"x_mm": 20.0, "y_mm": 10.0})
+
+    if float(spacing.get("x_mm", 0)) <= 0 or float(spacing.get("y_mm", 0)) <= 0:
+        raise ValueError(
+            f"Invalid print_spacing: x_mm={spacing.get('x_mm')}, y_mm={spacing.get('y_mm')}. "
+            "Spacing must be greater than 0."
+        )
+
+    x_index = pos_cfg.get("x_index")
+    y_index = pos_cfg.get("y_index")
+
+    if x_index is not None or y_index is not None:
+        x_index = int(x_index or 0)
+        y_index = int(y_index or 0)
+        x_mm = float(origin["x_mm"]) + x_index * float(spacing["x_mm"])
+        y_mm = float(origin["y_mm"]) + y_index * float(spacing["y_mm"])
+    else:
+        x_mm = float(pos_cfg["x_mm"])
+        y_mm = float(pos_cfg["y_mm"])
+
+    if not (0.0 <= x_mm <= 100.0):
+        raise ValueError(
+            f"Resolved X coordinate {x_mm:.2f} mm is out of safe range (0 to 100 mm) "
+            f"for print position '{pos_cfg.get('label')}'."
+        )
+    if not (0.0 <= y_mm <= 80.0):
+        raise ValueError(
+            f"Resolved Y coordinate {y_mm:.2f} mm is out of safe range (0 to 80 mm) "
+            f"for print position '{pos_cfg.get('label')}'."
+        )
+
+    return x_mm, y_mm
+
 
 def run(protocol: protocol_api.ProtocolContext) -> None:
     """Main entry point called by the Opentrons execution engine on the robot."""
@@ -728,8 +795,12 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         protocol.comment("Executing Calibration Mode: verifying coordinates above paper.")
         ensure_tip("printing")
         for idx, pos in enumerate(print_positions):
+            x_mm, y_mm = resolve_print_position(printing_cfg, pos)
+            print(f"DEBUG: print position label={pos.get('label')} source_well={pos.get('source_well')} "
+                  f"x_index={pos.get('x_index')} y_index={pos.get('y_index')} "
+                  f"resolved_x_mm={x_mm} resolved_y_mm={y_mm}")
             dest_loc = paper_a1.bottom().move(
-                Point(x=pos["x_mm"], y=pos["y_mm"], z=dispense_h)
+                Point(x=x_mm, y=y_mm, z=dispense_h)
             )
             # Safety check: Prevent gantry out of bounds move on the X axis
             if dest_loc.point.x > 418.0:
@@ -738,8 +809,8 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                     f"Check coordinates for print position '{pos['label']}'."
                 )
             protocol.comment(
-                f"Moving tip above paper X={pos['x_mm']} mm, "
-                f"Y={pos['y_mm']} mm, Z={dispense_h} mm"
+                f"Moving tip above paper X={x_mm} mm, "
+                f"Y={y_mm} mm, Z={dispense_h} mm"
             )
             pipette.move_to(dest_loc)
             if protocol.is_simulating():
@@ -760,6 +831,10 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             ensure_tip("printing")
 
         for idx, pos in enumerate(print_positions):
+            x_mm, y_mm = resolve_print_position(printing_cfg, pos)
+            print(f"DEBUG: print position label={pos.get('label')} source_well={pos.get('source_well')} "
+                  f"x_index={pos.get('x_index')} y_index={pos.get('y_index')} "
+                  f"resolved_x_mm={x_mm} resolved_y_mm={y_mm}")
             if not reusing_print_tip:
                 ensure_tip("printing")
             
@@ -774,7 +849,7 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             pipette.aspirate(droplet_vol, src_well)
 
             dest_loc = paper_a1.bottom().move(
-                Point(x=pos["x_mm"], y=pos["y_mm"], z=dispense_h)
+                Point(x=x_mm, y=y_mm, z=dispense_h)
             )
             # Safety check: Prevent gantry out of bounds move on the X axis
             if dest_loc.point.x > 418.0:
@@ -783,7 +858,7 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
                     f"Check coordinates for print position '{pos['label']}'."
                 )
             protocol.comment(
-                f"Printing droplet on paper at X={pos['x_mm']} mm, Y={pos['y_mm']} mm"
+                f"Printing droplet on paper at X={x_mm} mm, Y={y_mm} mm"
             )
             pipette.dispense(droplet_vol, dest_loc)
             
@@ -880,9 +955,18 @@ def validate_print_positions_bounds(config_dict: Dict[str, Any]) -> None:
     more accurate.
     """
     print_positions = config_dict.get("printing", {}).get("print_positions", [])
+    printing_cfg = config_dict.get("printing", {})
+    origin = printing_cfg.get("print_origin")
+    spacing = printing_cfg.get("print_spacing")
     for pos in print_positions:
-        x_mm = pos.get("x_mm", 0.0)
-        y_mm = pos.get("y_mm", 0.0)
+        x_index = pos.get("x_index")
+        y_index = pos.get("y_index")
+        if x_index is not None and y_index is not None and origin and spacing:
+            x_mm = float(origin.get("x_mm", 5.0)) + int(x_index) * float(spacing.get("x_mm", 20.0))
+            y_mm = float(origin.get("y_mm", 5.0)) + int(y_index) * float(spacing.get("y_mm", 10.0))
+        else:
+            x_mm = float(pos.get("x_mm", 0.0))
+            y_mm = float(pos.get("y_mm", 0.0))
         if x_mm > _X_WARN_LIMIT_MM:
             logger.warning(
                 f"Print position '{pos.get('label')}' x_mm={x_mm} exceeds conservative "
@@ -1056,14 +1140,25 @@ def build_flat_step_log(config_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     print_positions = printing_cfg.get("print_positions", [])
     droplet_vol = printing_cfg.get("droplet_volume_ul", 0.0)
+    origin = printing_cfg.get("print_origin")
+    spacing = printing_cfg.get("print_spacing")
     for i, pos in enumerate(print_positions):
+        x_index = pos.get("x_index")
+        y_index = pos.get("y_index")
+        if x_index is not None and y_index is not None and origin and spacing:
+            x_mm = float(origin.get("x_mm", 5.0)) + int(x_index) * float(spacing.get("x_mm", 20.0))
+            y_mm = float(origin.get("y_mm", 5.0)) + int(y_index) * float(spacing.get("y_mm", 10.0))
+        else:
+            x_mm = float(pos.get("x_mm", 0.0))
+            y_mm = float(pos.get("y_mm", 0.0))
+
         if is_calibration:
             steps.append({
                 "step_index": step_idx, "phase": "printing",
                 "action": "calibrate_coordinate",
                 "source_well": pos["source_well"], "destination_well": "",
                 "volume_ul": 0.0, "print_label": pos["label"],
-                "x_mm": pos["x_mm"], "y_mm": pos["y_mm"],
+                "x_mm": x_mm, "y_mm": y_mm,
                 "image_expected": False, "image_name": "", "status": "pending",
             })
             step_idx += 1
@@ -1081,7 +1176,7 @@ def build_flat_step_log(config_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "step_index": step_idx, "phase": "printing", "action": "print_droplet",
                 "source_well": "", "destination_well": "",
                 "volume_ul": droplet_vol, "print_label": pos["label"],
-                "x_mm": pos["x_mm"], "y_mm": pos["y_mm"],
+                "x_mm": x_mm, "y_mm": y_mm,
                 "image_expected": False, "image_name": "", "status": "pending",
             })
             step_idx += 1
@@ -1093,11 +1188,11 @@ def build_flat_step_log(config_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "action": "capture_print_step",
                 "source_well": src, "destination_well": "",
                 "volume_ul": 0.0, "print_label": pos["label"],
-                "x_mm": pos["x_mm"], "y_mm": pos["y_mm"],
+                "x_mm": x_mm, "y_mm": y_mm,
                 "image_expected": True,
                 "image_name": f"paper_print_{i + 1:03d}_well_{src}.jpg",
                 "status": "pending",
-            })
+                })
             step_idx += 1
 
     if camera_cfg.get("enabled") and camera_cfg.get("capture_after"):
@@ -1477,19 +1572,29 @@ def host_run(args: Any) -> None:
         json.dump(run_metadata, mf, indent=2)
     logger.info(f"Saved run metadata to: {metadata_path}")
 
-    manifest_data = [
-        {
+    printing_cfg = config_dict.get("printing", {})
+    origin = printing_cfg.get("print_origin")
+    spacing = printing_cfg.get("print_spacing")
+    manifest_data = []
+    for pos in config_dict["printing"]["print_positions"]:
+        x_index = pos.get("x_index")
+        y_index = pos.get("y_index")
+        if x_index is not None and y_index is not None and origin and spacing:
+            x_mm = float(origin.get("x_mm", 5.0)) + int(x_index) * float(spacing.get("x_mm", 20.0))
+            y_mm = float(origin.get("y_mm", 5.0)) + int(y_index) * float(spacing.get("y_mm", 10.0))
+        else:
+            x_mm = float(pos.get("x_mm", 0.0))
+            y_mm = float(pos.get("y_mm", 0.0))
+        manifest_data.append({
             "source_well": pos["source_well"],
             "target_label": pos["label"],
-            "x_mm": pos["x_mm"],
-            "y_mm": pos["y_mm"],
+            "x_mm": x_mm,
+            "y_mm": y_mm,
             "volume_ul": config_dict["printing"]["droplet_volume_ul"],
             "concentration": (
                 "Water" if config_dict["demo_mode"] == "water_print" else "Diluted"
             ),
-        }
-        for pos in config_dict["printing"]["print_positions"]
-    ]
+        })
 
     pm_json = local_run_dir / "metadata" / "printer_manifest.json"
     with open(pm_json, "w", encoding="utf-8") as f:

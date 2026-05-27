@@ -36,6 +36,15 @@ When the `p300_multi_gen2` addresses `A1`, all 8 tips align over column 1
 | Dilution destination | A5 (col 5), A6 (col 6) |
 | Print source | A5, A6 |
 
+### Print Position Spacing and Indices
+
+To avoid hardcoded coordinates, the print positions are calculated dynamically from origin and spacing values:
+- `print_origin` sets the first printed spot line location (e.g., `x_mm: 5.0, y_mm: 5.0`).
+- `print_spacing` controls distance between indexed positions (e.g., `x_mm: 20.0, y_mm: 10.0`).
+- `x_index` moves the next 8-tip printed line left/right.
+- `y_index` moves the whole 8-tip printed line up/down.
+- With an 8-channel pipette, each print position creates one vertical line of 8 spots, so X spacing is usually the best way to separate printed groups.
+
 ### Safe Z offsets
 
 ```python

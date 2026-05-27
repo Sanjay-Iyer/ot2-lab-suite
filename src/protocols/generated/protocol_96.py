@@ -67,24 +67,24 @@ CONFIG = {
         "enabled": True,
         "steps": [
             {
-                # Column 5 (A5-H5): 144 µL water + 16 µL dye = 160 µL total (80% of 200 µL max)
+                # Column 5 (A5-H5): 90 µL water + 10 µL dye = 100 µL total (50% of 200 µL max)
                 "destination_well": "A5",
                 "food_coloring_source_well": "A1",
                 "mix_repetitions": 3,
-                "mix_volume_ul": 80.0,
-                "stock_volume_ul": 16.0,
+                "mix_volume_ul": 50.0,
+                "stock_volume_ul": 10.0,
                 "water_source_well": "A3",
-                "water_volume_ul": 144.0,
+                "water_volume_ul": 90.0,
             },
             {
-                # Column 6 (A6-H6): 120 µL water + 40 µL dye = 160 µL total (80% of 200 µL max)
+                # Column 6 (A6-H6): 75 µL water + 25 µL dye = 100 µL total (50% of 200 µL max)
                 "destination_well": "A6",
                 "food_coloring_source_well": "A2",
                 "mix_repetitions": 3,
-                "mix_volume_ul": 80.0,
-                "stock_volume_ul": 40.0,
+                "mix_volume_ul": 50.0,
+                "stock_volume_ul": 25.0,
                 "water_source_well": "A4",
-                "water_volume_ul": 120.0,
+                "water_volume_ul": 75.0,
             },
         ],
     },
@@ -112,13 +112,27 @@ CONFIG = {
         "slot": 2,
     },
     "printing": {
+        # Printing Parameters:
+        # - droplet_volume_ul: controls the spot size printed on the paper target.
+        # - x_mm: controls left-right spacing between the printed 8-spot lines.
+        # - y_mm: controls up-down movement of the whole 8-tip line.
+        # - For this test, spacing is increased mostly through x_mm since the 8-channel
+        #   pipette already spaces tips vertically in Y at 9 mm increments.
         "calibration_only": False,
         "dispense_height_mm": DISPENSE_HEIGHT_MM,
-        "droplet_volume_ul": 80.0,
+        "droplet_volume_ul": 20.0,
         "paper_slot": 3,
+        "print_origin": {
+            "x_mm": 5.0,
+            "y_mm": 5.0,
+        },
+        "print_spacing": {
+            "x_mm": 20.0,
+            "y_mm": 10.0,
+        },
         "print_positions": [
-            {"label": "dilution_1", "source_well": "A5", "x_mm": 5.0, "y_mm": 5.0},
-            {"label": "dilution_2", "source_well": "A6", "x_mm": 10.0, "y_mm": 10.0},
+            {"label": "dilution_10_percent", "source_well": "A5", "x_index": 0, "y_index": 0},
+            {"label": "dilution_25_percent", "source_well": "A6", "x_index": 1, "y_index": 0},
         ],
         "safe_z_mm": 20.0,
     },
@@ -181,6 +195,47 @@ def load_plate(protocol, plate_cfg):
 
     print(f"DEBUG: plate labware loaded successfully -> {labware_name} slot={slot}")
     return lw
+
+
+def resolve_print_position(printing_cfg, pos_cfg):
+    origin = printing_cfg.get("print_origin", {"x_mm": 5.0, "y_mm": 5.0})
+    spacing = printing_cfg.get("print_spacing", {"x_mm": 20.0, "y_mm": 10.0})
+
+    # Validation: print_spacing.x_mm must be greater than 0, print_spacing.y_mm must be greater than 0
+    if float(spacing.get("x_mm", 0)) <= 0 or float(spacing.get("y_mm", 0)) <= 0:
+        raise ValueError(
+            f"Invalid print_spacing: x_mm={spacing.get('x_mm')}, y_mm={spacing.get('y_mm')}. "
+            "Spacing must be greater than 0."
+        )
+
+    x_index = pos_cfg.get("x_index")
+    y_index = pos_cfg.get("y_index")
+
+    if x_index is not None or y_index is not None:
+        x_index = int(x_index or 0)
+        y_index = int(y_index or 0)
+        x_mm = float(origin["x_mm"]) + x_index * float(spacing["x_mm"])
+        y_mm = float(origin["y_mm"]) + y_index * float(spacing["y_mm"])
+    else:
+        # Backward compatibility for old configs:
+        x_mm = float(pos_cfg["x_mm"])
+        y_mm = float(pos_cfg["y_mm"])
+
+    # Validation: resolved coordinates must be within safe ranges:
+    # x_mm: 0 to 100 mm
+    # y_mm: 0 to 80 mm
+    if not (0.0 <= x_mm <= 100.0):
+        raise ValueError(
+            f"Resolved X coordinate {x_mm:.2f} mm is out of safe range (0 to 100 mm) "
+            f"for print position '{pos_cfg.get('label')}'."
+        )
+    if not (0.0 <= y_mm <= 80.0):
+        raise ValueError(
+            f"Resolved Y coordinate {y_mm:.2f} mm is out of safe range (0 to 80 mm) "
+            f"for print position '{pos_cfg.get('label')}'."
+        )
+
+    return x_mm, y_mm
 
 
 def run(protocol: protocol_api.ProtocolContext) -> None:
@@ -480,14 +535,18 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
         protocol.comment("Calibration Mode: verifying coordinates above paper.")
         ensure_tip("printing")
         for idx, pos in enumerate(print_positions):
+            x_mm, y_mm = resolve_print_position(printing_cfg, pos)
+            print(f"DEBUG: print position label={pos.get('label')} source_well={pos.get('source_well')} "
+                  f"x_index={pos.get('x_index')} y_index={pos.get('y_index')} "
+                  f"resolved_x_mm={x_mm} resolved_y_mm={y_mm}")
             dest_loc = paper_a1.bottom(dispense_h).move(
-                Point(x=pos["x_mm"], y=pos["y_mm"], z=0)
+                Point(x=x_mm, y=y_mm, z=0)
             )
-            print(f"DEBUG: moving to paper X={pos['x_mm']} Y={pos['y_mm']} "
+            print(f"DEBUG: moving to paper X={x_mm} Y={y_mm} "
                   f"Z(bottom+{dispense_h})")
             protocol.comment(
-                f"Moving tip above paper X={pos['x_mm']} mm, "
-                f"Y={pos['y_mm']} mm, Z(bottom+{dispense_h}) mm"
+                f"Moving tip above paper X={x_mm} mm, "
+                f"Y={y_mm} mm, Z(bottom+{dispense_h}) mm"
             )
             pipette.move_to(dest_loc)
             if protocol.is_simulating():
@@ -507,6 +566,10 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             ensure_tip("printing")
 
         for idx, pos in enumerate(print_positions):
+            x_mm, y_mm = resolve_print_position(printing_cfg, pos)
+            print(f"DEBUG: print position label={pos.get('label')} source_well={pos.get('source_well')} "
+                  f"x_index={pos.get('x_index')} y_index={pos.get('y_index')} "
+                  f"resolved_x_mm={x_mm} resolved_y_mm={y_mm}")
             if not reusing_print_tip:
                 ensure_tip("printing")
             src_well = plate.wells_by_name()[pos["source_well"]]
@@ -518,12 +581,12 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
             pipette.aspirate(droplet_vol, src_well.bottom(ASPIRATE_HEIGHT_MM))
 
             dest_loc = paper_a1.bottom(dispense_h).move(
-                Point(x=pos["x_mm"], y=pos["y_mm"], z=0)
+                Point(x=x_mm, y=y_mm, z=0)
             )
-            print(f"DEBUG: dispensing at paper X={pos['x_mm']} Y={pos['y_mm']} "
+            print(f"DEBUG: dispensing at paper X={x_mm} Y={y_mm} "
                   f"Z(bottom+{dispense_h})")
             protocol.comment(
-                f"Printing droplet on paper at X={pos['x_mm']} mm, Y={pos['y_mm']} mm"
+                f"Printing droplet on paper at X={x_mm} mm, Y={y_mm} mm"
             )
             pipette.dispense(droplet_vol, dest_loc)
 

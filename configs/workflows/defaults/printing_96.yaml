@@ -50,33 +50,45 @@ dilution:
     - destination_well: "A5"
       water_source_well: "A3"
       food_coloring_source_well: "A1"
-      water_volume_ul: 144.0     # 144 + 16 = 160 µL total (80% of 200 µL max)
-      stock_volume_ul: 16.0
-      mix_volume_ul: 80.0
+      water_volume_ul: 90.0     # 90 + 10 = 100 µL total (50% of 200 µL max)
+      stock_volume_ul: 10.0
+      mix_volume_ul: 50.0
       mix_repetitions: 3
     - destination_well: "A6"
       water_source_well: "A4"
       food_coloring_source_well: "A2"
-      water_volume_ul: 120.0     # 120 + 40 = 160 µL total (80% of 200 µL max)
-      stock_volume_ul: 40.0
-      mix_volume_ul: 80.0
+      water_volume_ul: 75.0     # 75 + 25 = 100 µL total (50% of 200 µL max)
+      stock_volume_ul: 25.0
+      mix_volume_ul: 50.0
       mix_repetitions: 3
 
+# Printing Parameters:
+# - droplet_volume_ul: controls the spot size printed on the paper target.
+# - x_mm: controls left-right spacing between the printed 8-spot lines.
+# - y_mm: controls up-down movement of the whole 8-tip line.
+# - For this test, spacing is increased mostly through x_mm since the 8-channel
+#   pipette already spaces tips vertically in Y at 9 mm increments.
 printing:
   calibration_only: false
   paper_slot: 3
-  droplet_volume_ul: 80.0
+  droplet_volume_ul: 20.0
   dispense_height_mm: 5.0
   safe_z_mm: 20.0
+  print_origin:
+    x_mm: 5.0
+    y_mm: 5.0
+  print_spacing:
+    x_mm: 20.0
+    y_mm: 10.0
   print_positions:
     - source_well: "A5"
-      label: "dilution_1"
-      x_mm: 5.0
-      y_mm: 5.0
+      label: "dilution_10_percent"
+      x_index: 0
+      y_index: 0
     - source_well: "A6"
-      label: "dilution_2"
-      x_mm: 10.0
-      y_mm: 10.0
+      label: "dilution_25_percent"
+      x_index: 1
+      y_index: 0
 
 tip_strategy:
   mode: reuse_single_tip_for_demo
