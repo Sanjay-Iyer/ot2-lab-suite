@@ -67,24 +67,24 @@ CONFIG = {
         "enabled": True,
         "steps": [
             {
-                # Column 5 (A5-H5) receives dilution from column 1 stock + column 3 water
+                # Column 5 (A5-H5): 90 µL water + 10 µL dye = 100 µL total (50% of 200 µL max)
                 "destination_well": "A5",
                 "food_coloring_source_well": "A1",
                 "mix_repetitions": 3,
-                "mix_volume_ul": 100.0,
-                "stock_volume_ul": 20.0,
+                "mix_volume_ul": 50.0,
+                "stock_volume_ul": 10.0,
                 "water_source_well": "A3",
-                "water_volume_ul": 180.0,
+                "water_volume_ul": 90.0,
             },
             {
-                # Column 6 (A6-H6) receives dilution from column 2 stock + column 4 water
+                # Column 6 (A6-H6): 75 µL water + 25 µL dye = 100 µL total (50% of 200 µL max)
                 "destination_well": "A6",
                 "food_coloring_source_well": "A2",
                 "mix_repetitions": 3,
-                "mix_volume_ul": 100.0,
-                "stock_volume_ul": 50.0,
+                "mix_volume_ul": 50.0,
+                "stock_volume_ul": 25.0,
                 "water_source_well": "A4",
-                "water_volume_ul": 150.0,
+                "water_volume_ul": 75.0,
             },
         ],
     },
