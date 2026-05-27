@@ -111,7 +111,7 @@ debug:
   verbose_protocol_comments: true
   dry_run_no_liquid: false
   move_only: false
-  dry_position_check: false  # true = move to wells at safe top height, no liquid
+  dry_position_check: false  # false = live run with liquid transfer
 
 camera:
   enabled: true
