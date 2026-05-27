@@ -1,0 +1,121 @@
+# OT-2 Printing Demo Configuration — 12-Well Variant (Custom USA Scientific Plate)
+# ──────────────────────────────────────────────────────────────────────────────
+# EXPERIMENTAL / UNSAFE until custom labware geometry is manually validated.
+#
+# Known issues from 2026-05-27 physical test:
+#   - Pipette hit plate/well bottom — dispense_height_mm was too low.
+#   - An 8-channel (multi) pipette is poorly matched to a 12-well layout.
+#
+# DO NOT run this protocol with p300_multi_gen2 unless you have validated
+# multi-channel tip alignment against the 12-well plate geometry.
+# Use printing_96.yaml / protocol_96.py for the first safe physical test.
+#
+# Labware:
+#   loadName:  usascientific12well_12_wellplate_6000ul
+#   namespace: custom_beta
+#   version:   1
+#   installed: /data/labware/v2/custom_definitions/custom_beta/
+#              usascientific12well_12_wellplate_6000ul/1.json
+# ──────────────────────────────────────────────────────────────────────────────
+
+demo_mode: dilution_print  # water_print | dilution_print | dry_run
+
+plate:
+  slot: 2
+  labware: usascientific12well_12_wellplate_6000ul  # Custom 12-well CytoOne plate
+  namespace: custom_beta
+  version: 1
+
+tiprack:
+  slot: 1
+  labware: opentrons_96_tiprack_300ul
+
+pipette:
+  name: p300_multi_gen2
+  mount: right
+  # WARNING: multi-channel pipette + 12-well plate requires manual validation.
+  # The protocol will raise an error unless allow_multi_on_12well: true.
+  allow_multi_on_12well: false
+
+# Safe Z offsets — increased from previous run to avoid well-bottom collision.
+z_offsets:
+  travel_clearance_mm: 15.0   # top offset for safe lateral travel
+  aspirate_height_mm: 5.0     # bottom offset during aspiration
+  dispense_height_mm: 5.0     # bottom offset during dispense
+
+layout:
+  food_coloring_source_wells: ["A1", "A2"]
+  water_source_wells: ["B1", "B2"]
+  dilution_destination_wells: ["C1", "C2"]
+  print_source_wells: ["C1", "C2"]
+
+dilution:
+  enabled: true
+  steps:
+    - destination_well: "C1"
+      water_source_well: "B1"
+      food_coloring_source_well: "A1"
+      water_volume_ul: 180.0
+      stock_volume_ul: 20.0
+      mix_volume_ul: 100.0
+      mix_repetitions: 3
+    - destination_well: "C2"
+      water_source_well: "B2"
+      food_coloring_source_well: "A1"
+      water_volume_ul: 150.0
+      stock_volume_ul: 50.0
+      mix_volume_ul: 100.0
+      mix_repetitions: 3
+
+printing:
+  calibration_only: false
+  paper_slot: 3
+  droplet_volume_ul: 10.0
+  dispense_height_mm: 5.0
+  safe_z_mm: 20.0
+  print_positions:
+    - source_well: "C1"
+      label: "dilution_1"
+      x_mm: 5.0
+      y_mm: 5.0
+    - source_well: "C2"
+      label: "dilution_2"
+      x_mm: 10.0
+      y_mm: 10.0
+
+tip_strategy:
+  mode: reuse_single_tip_for_demo
+  loaded_tip_count: 8
+  starting_tip: A1
+  return_tip_at_end: true
+  drop_tip_at_end: false
+  reuse_for_water: true
+  reuse_for_stock: true
+  reuse_for_mixing: true
+  reuse_for_printing: true
+  allowed_modes:
+    - new_tip_each_transfer
+    - reuse_low_to_high
+    - reuse_per_phase
+    - reuse_single_tip_for_demo
+
+debug:
+  enabled: true
+  verbose_protocol_comments: true
+  dry_run_no_liquid: false
+  move_only: false
+  dry_position_check: false  # true = move only, no liquid
+
+camera:
+  enabled: true
+  capture_before: true
+  capture_after: true
+  capture_after_each_dilution_step: true
+  capture_after_each_print_step: true
+  robot_image_dir: /data/vision/printing_demo_12
+  image_filename_prefix: printing_12
+
+output:
+  local_run_root: runs
+  create_metadata: true
+  create_image_manifest: true
