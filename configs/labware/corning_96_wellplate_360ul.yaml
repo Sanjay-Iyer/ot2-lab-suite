@@ -1,0 +1,38 @@
+# ──────────────────────────────────────────────────────────────────
+# Example: standard 96-well flat-bottom plate (Corning-style, 360 µL)
+# ──────────────────────────────────────────────────────────────────
+# A regular 8 x 12 SBS plate. Because plate_format is "96Standard", an
+# 8-channel pipette can address whole columns. Well coordinates match the
+# standard 9 mm SBS pitch.
+#
+#     python scripts/generate_labware.py configs/labware/corning_96_wellplate_360ul.yaml
+# ──────────────────────────────────────────────────────────────────
+
+load_name: corning_96_wellplate_360ul_custom
+display_name: Corning 96 Well Plate 360 µL (custom)
+brand: Corning
+brand_ids: ["3650"]
+display_category: wellPlate
+plate_format: 96Standard
+
+# 8 rows (A-H) x 12 columns = 96 wells
+rows: 8
+cols: 12
+
+# Standard SBS layout: A1 near back-left, 9 mm pitch in both axes.
+x_offset: 14.38
+y_offset: 74.24
+x_spacing: 9.0
+y_spacing: 9.0
+
+# Well geometry
+shape: circular
+diameter: 6.86
+depth: 10.67
+total_liquid_volume: 360
+well_bottom_shape: flat
+
+# Footprint (standard SBS). well_z auto-computes to 14.22 - 10.67 = 3.55.
+x_dimension: 127.76
+y_dimension: 85.48
+z_dimension: 14.22

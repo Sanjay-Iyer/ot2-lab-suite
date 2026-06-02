@@ -1,0 +1,43 @@
+# ──────────────────────────────────────────────────────────────────
+# Example: 6 vials held in a custom 3D-printed mold (20 mL, v-bottom)
+# ──────────────────────────────────────────────────────────────────
+# A non-standard part: a 3D-printed insert that holds 6 round vials in a
+# 2 x 3 grid. plate_format is "irregular" (no multichannel). The outer
+# footprint still matches an OT-2 deck slot so it seats correctly.
+#
+# >>> MEASURE YOUR PRINTED MOLD AND UPDATE THESE NUMBERS <<<
+# The values below are a plausible starting point, not a real part.
+#
+#     python scripts/generate_labware.py configs/labware/printed_6vial_mold_20ml.yaml
+# ──────────────────────────────────────────────────────────────────
+
+load_name: printed_6vial_mold_20ml
+display_name: 3D-Printed 6 Vial Mold 20 mL
+brand: LabCustom
+brand_ids: []
+display_category: tubeRack
+plate_format: irregular
+
+# 2 rows (A-B) x 3 columns = 6 vials
+rows: 2
+cols: 3
+
+# Vial centres (mm) measured from the mold's front-left corner.
+# Column 1/2/3 at x = 30 / 65 / 100 ; row A/B at y = 60 / 25.
+x_offset: 30.0
+y_offset: 60.0
+x_spacing: 35.0
+y_spacing: 35.0
+
+# Vial geometry — v-bottom, deep.
+shape: circular
+diameter: 25.0             # vial inner mouth diameter
+depth: 55.0               # depth from rim to bottom of vial
+total_liquid_volume: 20000
+well_bottom_shape: v
+
+# Footprint of the printed mold (keep ~SBS so it fits the slot).
+# well_z auto-computes to 60.0 - 55.0 = 5.0 (vial floor sits 5 mm up).
+x_dimension: 127.76
+y_dimension: 85.48
+z_dimension: 60.0

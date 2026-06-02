@@ -19,3 +19,7 @@ numpy>=1.23
 pandas>=1.5
 matplotlib>=3.6
 scipy
+
+# --- Computer Vision ---
+opencv-python>=4.8
+rich>=13.0

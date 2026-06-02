@@ -1,0 +1,117 @@
+{
+    "ordering": [
+        [
+            "A1",
+            "B1"
+        ],
+        [
+            "A2",
+            "B2"
+        ],
+        [
+            "A3",
+            "B3"
+        ]
+    ],
+    "brand": {
+        "brand": "LabCustom",
+        "brandId": []
+    },
+    "metadata": {
+        "displayName": "3D-Printed 6 Vial Mold 20 mL",
+        "displayCategory": "tubeRack",
+        "displayVolumeUnits": "µL",
+        "tags": []
+    },
+    "dimensions": {
+        "xDimension": 127.76,
+        "yDimension": 85.48,
+        "zDimension": 60.0
+    },
+    "wells": {
+        "A1": {
+            "depth": 55.0,
+            "totalLiquidVolume": 20000,
+            "shape": "circular",
+            "diameter": 25.0,
+            "x": 30.0,
+            "y": 60.0,
+            "z": 5.0
+        },
+        "B1": {
+            "depth": 55.0,
+            "totalLiquidVolume": 20000,
+            "shape": "circular",
+            "diameter": 25.0,
+            "x": 30.0,
+            "y": 25.0,
+            "z": 5.0
+        },
+        "A2": {
+            "depth": 55.0,
+            "totalLiquidVolume": 20000,
+            "shape": "circular",
+            "diameter": 25.0,
+            "x": 65.0,
+            "y": 60.0,
+            "z": 5.0
+        },
+        "B2": {
+            "depth": 55.0,
+            "totalLiquidVolume": 20000,
+            "shape": "circular",
+            "diameter": 25.0,
+            "x": 65.0,
+            "y": 25.0,
+            "z": 5.0
+        },
+        "A3": {
+            "depth": 55.0,
+            "totalLiquidVolume": 20000,
+            "shape": "circular",
+            "diameter": 25.0,
+            "x": 100.0,
+            "y": 60.0,
+            "z": 5.0
+        },
+        "B3": {
+            "depth": 55.0,
+            "totalLiquidVolume": 20000,
+            "shape": "circular",
+            "diameter": 25.0,
+            "x": 100.0,
+            "y": 25.0,
+            "z": 5.0
+        }
+    },
+    "groups": [
+        {
+            "metadata": {
+                "wellBottomShape": "v"
+            },
+            "wells": [
+                "A1",
+                "B1",
+                "A2",
+                "B2",
+                "A3",
+                "B3"
+            ]
+        }
+    ],
+    "parameters": {
+        "format": "irregular",
+        "quirks": [],
+        "isTiprack": false,
+        "isMagneticModuleCompatible": false,
+        "loadName": "printed_6vial_mold_20ml"
+    },
+    "namespace": "custom_beta",
+    "version": 1,
+    "schemaVersion": 2,
+    "cornerOffsetFromSlot": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+    }
+}

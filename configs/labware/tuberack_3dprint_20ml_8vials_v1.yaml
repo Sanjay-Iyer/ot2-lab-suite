@@ -1,0 +1,47 @@
+# ──────────────────────────────────────────────────────────────────
+# 8 × 20 mL vials in a custom 3D-printed tube rack (2 rows × 4 cols)
+# ──────────────────────────────────────────────────────────────────
+# Reproduces labware/tuberack_3dprint_20ml_8vials_v1.json, which was
+# originally authored in the Opentrons Labware Creator. This config
+# wires the part into the repo's YAML → generate_labware.py pipeline so
+# it can be regenerated and version-controlled like the others.
+#
+#     python scripts/generate_labware.py configs/labware/tuberack_3dprint_20ml_8vials_v1.yaml
+#
+# Geometry is identical to the existing JSON. The generated file omits
+# the cosmetic groups[].brand / groups[].metadata.displayCategory keys
+# that the Labware Creator adds (Opentrons ignores their absence).
+# ──────────────────────────────────────────────────────────────────
+
+load_name: tuberack_3dprint_20ml_8vials_v1
+display_name: TubeRack_3Dprint_20ml_8vials_v1
+brand: custom
+brand_ids: [custom]
+namespace: custom_beta
+version: 1
+display_category: tubeRack
+plate_format: irregular
+
+# 2 rows (A-B) × 4 columns = 8 vials
+rows: 2
+cols: 4
+
+# Vial centres (mm) from the rack's front-left corner.
+# Columns at x = 17.38 / 48.38 / 79.38 / 110.38 ; rows A/B at y = 59.74 / 25.74.
+x_offset: 17.38
+y_offset: 59.74
+x_spacing: 31.0
+y_spacing: 34.0
+well_z: null            # auto-computes to 60 - 55 = 5.0
+
+# Vial geometry — flat-bottom, deep, 28 mm mouth.
+shape: circular
+diameter: 28.0
+depth: 55.0
+total_liquid_volume: 20000
+well_bottom_shape: flat
+
+# Footprint (SBS so it seats in an OT-2 deck slot); 60 mm overall height = vial top.
+x_dimension: 127.76
+y_dimension: 85.48
+z_dimension: 60.0

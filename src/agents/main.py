@@ -29,9 +29,9 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 # Tool Imports
 from .tools import (
-    list_available_workflows, 
-    load_workflow_defaults, 
-    update_workflow_config, 
+    list_available_workflows,
+    load_workflow_defaults,
+    update_workflow_config,
     validate_current_workflow,
     generate_protocol,
     simulate_protocol,
@@ -41,6 +41,14 @@ from .tools import (
     validate_config,
     show_full_config,
     get_robot_hardware_status
+)
+from .labware_tools import (
+    list_labware_configs,
+    list_generated_labware,
+    list_labware_presets,
+    describe_labware_config,
+    create_labware_config,
+    generate_labware_from_config,
 )
 
 # Rate limiter is OFF by default. Pass --rate-limit to enable.
@@ -57,9 +65,10 @@ def create_opentrons_agent(use_mock: bool = False):
         llm = Config.get_llm(temperature=0)
 
     tools = [
-        list_available_workflows, 
-        load_workflow_defaults, 
-        update_workflow_config, 
+        # Workflow execution tools
+        list_available_workflows,
+        load_workflow_defaults,
+        update_workflow_config,
         validate_current_workflow,
         generate_protocol,
         simulate_protocol,
@@ -68,7 +77,14 @@ def create_opentrons_agent(use_mock: bool = False):
         execute_protocol_on_robot,
         validate_config,
         show_full_config,
-        get_robot_hardware_status
+        get_robot_hardware_status,
+        # Labware creation tools
+        list_labware_configs,
+        list_generated_labware,
+        list_labware_presets,
+        describe_labware_config,
+        create_labware_config,
+        generate_labware_from_config,
     ]
     
     system_prompt = (
@@ -97,7 +113,18 @@ def create_opentrons_agent(use_mock: bool = False):
         "IMPORTANT:\n"
         "- Use non-interactive SSH (BatchMode). If it fails, inform the user to check their SSH keys.\n"
         "- All paths are relative to the project root.\n"
-        "- TRUST TOOLS OVER MEMORY: If a tool output (like show_full_config or generate_protocol) says a pipette is 'p300_multi_gen2', DO NOT report it as 'p300_single_gen2' in your chat, even if you thought it was single-channel earlier.\n"
+        "- TRUST TOOLS OVER MEMORY: If a tool output (like show_full_config or generate_protocol) says a pipette is 'p300_multi_gen2', DO NOT report it as 'p300_single_gen2' in your chat, even if you thought it was single-channel earlier.\n\n"
+        "LABWARE CREATION PROTOCOL:\n"
+        "When the user asks you to create, define, or generate custom labware:\n"
+        "1. If the user describes a standard plate type (96-well, 24-well, reservoir, tube rack, etc.), call list_labware_presets() to identify the best matching preset.\n"
+        "2. Call create_labware_config() with the preset name and any custom overrides (load_name, display_name, depth, volume, dimensions, etc.).\n"
+        "   - load_name MUST be lowercase letters, digits, underscores, or dots only — no spaces, hyphens, or capitals.\n"
+        "   - display_name can be any human-readable string.\n"
+        "   - If the user specifies custom well dimensions or a non-standard grid, calculate the parameters from their description before calling the tool.\n"
+        "3. Call describe_labware_config() on the new config to show the user a summary for review.\n"
+        "4. After the user confirms the config is correct, call generate_labware_from_config() to produce the JSON.\n"
+        "5. Inform the user: the JSON in labware/<load_name>.json can be imported into the Opentrons App, and the load_name/namespace/version needed for protocol code.\n"
+        "If the user only wants to view or list existing labware, use list_labware_configs(), list_generated_labware(), or describe_labware_config() as appropriate.\n"
     )
     
     return create_react_agent(model=llm, tools=tools, prompt=system_prompt)

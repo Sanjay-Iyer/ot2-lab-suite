@@ -1,0 +1,78 @@
+# ──────────────────────────────────────────────────────────────────
+# Labware definition config — TEMPLATE (every possible parameter)
+# ──────────────────────────────────────────────────────────────────
+# Copy this file, rename it, and edit the values. Then run:
+#
+#     python scripts/generate_labware.py configs/labware/your_file.yaml
+#
+# Output JSON is written to  labware/<load_name>.json  (override with
+# output_dir below). Every key here maps 1:1 to a field in LabwareSpec
+# in scripts/generate_labware.py. Unknown keys are REJECTED (typo guard).
+#
+# Values shown are the script DEFAULTS — you only need to override the
+# ones that differ for your part. The handful marked REQUIRED have no
+# safe default and must be set.
+#
+# Coordinate convention (mm):
+#   * Origin = front-left-bottom of the labware.
+#   * x → right, y → back, z → up.
+#   * Row A is the BACK row (highest y). Wells auto-fill back-to-front.
+#   * All x/y/z must be >= 0 (the generator errors if a grid goes negative).
+# ──────────────────────────────────────────────────────────────────
+
+# ─── Identity ─────────────────────────────────────────────────────
+load_name: my_labware_loadname          # REQUIRED. lowercase/digits/._ ONLY (no spaces, hyphens, capitals)
+display_name: My Labware Display Name    # REQUIRED. human-readable, shown in the Opentrons app
+brand: Custom                            # manufacturer name
+brand_ids: []                            # list of catalog/part numbers, e.g. ["CC7672-7512"]
+namespace: custom_beta                   # keep "custom_beta" for custom labware. lowercase/digits/._ only
+version: 1                               # bump if you revise the definition
+display_category: wellPlate              # wellPlate | reservoir | tubeRack | tipRack | aluminumBlock | trash
+
+# ─── Layout format ────────────────────────────────────────────────
+# "96Standard"/"384Standard" let multichannel pipettes address the plate.
+# Use "irregular" for non-standard grids, "trough" for reservoirs.
+plate_format: irregular                  # 96Standard | 384Standard | trough | irregular | trash
+
+# ─── Grid layout ──────────────────────────────────────────────────
+rows: 3                                  # number of rows  → letters A, B, C ...
+cols: 4                                  # number of columns → numbers 1, 2, 3 ...
+
+# ─── Well position (mm) ───────────────────────────────────────────
+# Position of well A1 (back-left), then even spacing across the grid.
+x_offset: 24.88                          # x of column 1 centre
+y_offset: 68.74                          # y of row A centre (back-most row)
+x_spacing: 26.0                          # centre-to-centre between columns
+y_spacing: 26.0                          # centre-to-centre between rows
+# well_z = center-bottom of the well above the labware floor.
+# Leave UNSET (null) to auto-compute as (z_dimension - depth). Only set a
+# number if you have a measured value that differs.
+well_z: null
+
+# ─── Well geometry ────────────────────────────────────────────────
+shape: circular                          # circular | rectangular
+diameter: 22.1                           # REQUIRED if shape=circular (well opening diameter)
+x_length: null                           # REQUIRED if shape=rectangular (well width, x)
+y_length: null                           # REQUIRED if shape=rectangular (well depth, y)
+depth: 12.9                              # how far down the well goes (z)
+total_liquid_volume: 6000                # max volume per well (µL)
+well_bottom_shape: flat                  # flat | u | v
+
+# ─── Outer footprint (mm) ─────────────────────────────────────────
+# Standard SBS footprint by default (fits an OT-2 deck slot). Change only
+# for non-standard parts (e.g. a custom 3D-printed mold).
+x_dimension: 127.76
+y_dimension: 85.48
+z_dimension: 12.9                         # overall height of the labware
+
+# ─── Tip rack fields (only if this IS a tip rack) ─────────────────
+is_tiprack: false
+tip_length: null                          # REQUIRED when is_tiprack: true (mm)
+tip_overlap: null                         # optional: tip/nozzle overlap (mm)
+
+# ─── Misc ─────────────────────────────────────────────────────────
+is_magnetic_module_compatible: false
+quirks: []                                # e.g. ["centerMultichannelOnWells", "touchTipDisabled"]
+
+# ─── Output (optional) ────────────────────────────────────────────
+# output_dir: labware                     # where to write <load_name>.json (default: repo labware/)

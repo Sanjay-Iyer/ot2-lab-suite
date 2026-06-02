@@ -17,6 +17,10 @@ USER_WORKFLOW_CONFIG_DIR = WORKFLOW_CONFIG_DIR / "user"
 # Layer 2: Hardware/Labware Constraints (Safety & Reality)
 CONSTRAINT_CONFIG_DIR = CONFIG_DIR / "constraints"
 
+# Labware definitions
+LABWARE_CONFIG_DIR = CONFIG_DIR / "labware"
+LABWARE_OUTPUT_DIR = PROJECT_ROOT / "labware"
+
 LABWARE_CONSTRAINTS_PATH = CONSTRAINT_CONFIG_DIR / "labware_constraints.yaml"
 PIPETTE_CONSTRAINTS_PATH = CONSTRAINT_CONFIG_DIR / "pipette_constraints.yaml"
 DECK_CONSTRAINTS_PATH = CONSTRAINT_CONFIG_DIR / "deck_constraints.yaml"
@@ -51,7 +55,9 @@ def ensure_project_dirs():
         OUTPUT_DIR,
         PROTOCOL_DIR,
         GENERATED_PROTOCOL_DIR,
-        DEPLOY_BASE_DIR
+        DEPLOY_BASE_DIR,
+        LABWARE_CONFIG_DIR,
+        LABWARE_OUTPUT_DIR,
     ]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)

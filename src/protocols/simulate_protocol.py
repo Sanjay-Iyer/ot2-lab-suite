@@ -19,7 +19,15 @@ def simulate(protocol_path: str):
         print(f"ERROR: Protocol path is not a file: {p_path}")
         sys.exit(1)
 
-    cmd = [sys.executable, "-m", "opentrons.simulate", p_path.name]
+    labware_dir = Path(__file__).resolve().parent.parent.parent / "labware"
+    cmd = [
+        sys.executable,
+        "-c",
+        "import numpy as np; np.trapz = getattr(np, 'trapezoid', np.trapz if hasattr(np, 'trapz') else None); from opentrons.simulate import main; main()",
+        "-L",
+        str(labware_dir),
+        p_path.name
+    ]
     
     print(f"--- Simulating Protocol ---")
     print(f"File: {p_path.name}")
