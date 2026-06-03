@@ -17,11 +17,16 @@ ot2-lab-suite/
 │   ├── core/           # Config registry & base classes
 │   ├── agents/         # LangChain logic & Tool library
 │   ├── printing/       # Lab automation scripts (Protocols, Planners)
+│   ├── protocols/      # OT-2 protocols (verify_tuberack.py, simulate_protocol.py, generated/)
 │   └── utils/          # Preflight & Rate-limiting utilities
+├── configs/
+│   ├── labware/        # Labware YAML configs (→ generate_labware.py)
+│   └── workflows/      # Workflow YAML configs
+├── labware/            # Generated Opentrons labware JSON (deployed to the robot)
 ├── robot_data/         # Shared data mirror
 │   ├── data/           # Mirrors /data on the OT-2 (Logs, Calibration)
 │   └── deploy/         # Local staging for robot uploads
-├── scripts/            # Deployment & Synchronization scripts
+├── scripts/            # Deploy / sync / generate_labware / validate_protocol
 ├── tests/              # Unit & Integration tests
 └── docs/               # System & Agent guides
 ```
@@ -58,5 +63,17 @@ python scripts/sync_robot.py
 ```
 
 ## 📖 Documentation
+
+**Workflows & guides**
+- [Tube Rack Verification Protocol](verify_tuberack.md) — simulate, deploy & physically run the custom-rack checker
 - [AI Agent Architecture](LangChain_ot2_agent_guide.md)
 - [Preflight Validation Guide](../src/utils/README_preflight.md)
+
+**SOPs**
+- [Simulation & Testing](SOP_Simulation_Testing.md) — run modes, `validate_protocol.py`, gates
+- [Robot Deployment](SOP_Robot_Deployment.md) — connectivity, custom-labware deploy, execute
+
+**Skills** (`skills/`)
+- [ot2-labware](../skills/ot2-labware/SKILL.md) — create/regenerate labware definitions
+- [ot2-protocols](../skills/ot2-protocols/SKILL.md) — build, validate & simulate protocols
+- [ot2-robot-control](../skills/ot2-robot-control/SKILL.md) — deploy & run on hardware (lab laptop)

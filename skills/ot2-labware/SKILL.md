@@ -93,11 +93,19 @@ python -m src.agents.main
 
 ## Using the result
 
-- **Opentrons App:** Labware → Import → select `labware/<load_name>.json`.
 - **In a protocol:** reference by `load_name`, `namespace` (`custom_beta`), and `version`.
-- To make custom labware loadable on the robot, the JSON must be available to the
-  protocol (bundle it or place it in the robot's custom labware path). See
-  [ot2-robot-control](../ot2-robot-control/SKILL.md) for deployment.
+- **Opentrons App:** Labware → Import → select `labware/<load_name>.json`.
+- **Headless robot (`opentrons_execute`):** the JSON must live in the robot's
+  custom-labware store at
+  `/data/labware/v2/custom_definitions/<namespace>/<load_name>/<version>.json`.
+  Deploy it there with the helper (reads namespace/loadName/version from the JSON,
+  creates the nested dir, copies to `<version>.json`, and verifies):
+  ```bash
+  python -m scripts.deploy --labware labware/<load_name>.json            # lab laptop
+  python -m scripts.deploy --labware labware/<load_name>.json --dry-run  # preview path
+  ```
+  See [ot2-robot-control](../ot2-robot-control/SKILL.md). If you revise a
+  definition, bump `version` in the JSON (and in the protocol's `load_labware`).
 
 ## Verify before shipping
 

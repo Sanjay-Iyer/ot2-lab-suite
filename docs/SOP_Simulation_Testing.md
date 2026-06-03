@@ -23,6 +23,27 @@ python -m opentrons.simulate src\protocols\mock_test_protocol.py
 
 ---
 
+## 1b. Multi-Mode Validation (diagnostic protocols)
+
+Some protocols have several run modes (e.g. the tube-rack verification —
+see [verify_tuberack.md](verify_tuberack.md)). Validate **every mode at once**:
+
+```powershell
+python scripts\validate_protocol.py
+```
+
+It runs each flag combination through the simulator and **asserts on the output
+text**, then prints `ALL CASES PASSED` / `SOME CASES FAILED`.
+
+> ⚠️ **Exit code ≠ success.** `opentrons.simulate` returns **0 even when a
+> protocol raises at runtime** (it prints the error but exits clean). So the
+> `simulate_protocol.py` "SIMULATION SUCCESS" banner — keyed off the exit code —
+> can mask a real error (this is how a removed-API call slipped through once).
+> For anything non-trivial, use `validate_protocol.py` or read the simulator
+> output for `Error`/`Exception`, rather than trusting the banner alone.
+
+---
+
 ## 2. AI-Orchestrated Simulation (Requires API Key)
 Use the AI Agent to configure a real workflow, generate the protocol file, and simulate it automatically.
 

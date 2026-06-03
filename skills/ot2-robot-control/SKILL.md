@@ -130,9 +130,20 @@ python scripts/run_smoke_test.py --robot-ip 169.254.46.57 --ssh-key "C:\path\to\
 # Bulk-deploy the staging directory contents to the robot
 python -m scripts.deploy
 
+# Deploy ONE custom labware JSON to the robot's custom_definitions store
+# (reads namespace/loadName/version from the JSON; --dry-run previews the path)
+python -m scripts.deploy --labware labware/<load_name>.json
+
 # Pull config / labware / pipettes / logs back FROM the robot
 python -m scripts.sync_robot
 ```
+
+> **Custom labware path.** `opentrons_execute` resolves
+> `load_labware(name, namespace=, version=)` from
+> `/data/labware/v2/custom_definitions/<namespace>/<loadName>/<version>.json`
+> (the on-robot filename is the **version**, e.g. `1.json`). `scripts.deploy
+> --labware` puts it there; the Opentrons App's Labware Import writes to the same
+> place. Neither the bulk `deploy` nor `sync_robot` manage this path.
 
 ## Common errors & fixes
 

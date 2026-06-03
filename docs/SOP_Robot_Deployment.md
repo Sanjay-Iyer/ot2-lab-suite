@@ -112,7 +112,26 @@ ssh -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key root@169.254
 scp -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/my_run/
 ```
 
-### 5b. Execute the Protocol
+### 5b. Deploy Custom Labware (only if your protocol uses it)
+
+If the protocol calls `load_labware(name, namespace="custom_beta", version=...)`,
+the definition must be in the robot's custom-labware store **first**, or analysis
+fails with `Labware "<name>" not found ... namespace "custom_beta"`.
+
+```powershell
+# Reads namespace/loadName/version from the JSON, makes the nested dir, copies + verifies
+python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v1.json
+
+# Preview the destination only (no SSH/SCP)
+python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v1.json --dry-run
+```
+
+Lands at `/data/labware/v2/custom_definitions/<namespace>/<loadName>/<version>.json`
+— the on-robot filename is the **version** (e.g. `1.json`). The Opentrons App's
+**Labware → Import** writes to the same place. (The bulk `deploy` and `sync_robot`
+do **not** manage this path.)
+
+### 5c. Execute the Protocol
 ```powershell
 ssh -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/my_run/generated_printing.py"
 ```
