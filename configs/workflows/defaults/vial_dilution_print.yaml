@@ -32,6 +32,12 @@ deck:
     namespace: custom_beta
     version: 1
   paper:
+    # A flat sheet of paper on the deck. Modelled as a 96-well plate SOLELY for
+    # coordinate anchoring — the OT-2 needs a labware object to compute X/Y/Z
+    # dispense positions. No liquid is loaded into this "plate"; the robot uses
+    # well A1 (paper_start_well) as the spatial reference for droplet placement.
+    # dispense_z_mm (in the printing block) controls the actual tip height above
+    # the paper surface relative to the bottom of that reference well.
     slot: 3
     load_name: corning_96_wellplate_360ul_custom
     namespace: custom_beta
@@ -63,7 +69,7 @@ dilution:
     mode: explicit          # explicit | geometric | linear | log
     # explicit : use this list verbatim (1 = undiluted stock)
     explicit: [1, 2, 5, 10, 20, 30, 40, 50]
-    # geometric: factor[i] = start * step_factor**i  (e.g. step 2 -> 1,2,4,8,...; step 10 -> 1,10,100,...)
+    # geometric: factor[i] = start * step_factor**i  (e.g. step 2 -> 1,2,4,8,...)
     step_factor: 2
     # linear/log: evenly / log spaced from start..end over `count`
     start: 1
@@ -74,22 +80,41 @@ dilution:
   mix_volume_ul: 120.0      # per mix cycle (<= total_volume_ul, <= 300)
 
   # Single-channel dilution tips are auto-allocated from these tiprack COLUMNS,
-  # skipping the print block column. Need >= (1 + number of wells) tips here.
+  # skipping the print block column.
+  #
+  # ⚠ ORDER MATTERS: tips are allocated sequentially starting from the first row
+  # (A) of the first listed column. The very first tip allocated (A of the first
+  # column) becomes the dedicated water-only pass tip; subsequent tips are used
+  # one-per-well for the stock + mix pass. If you reorder this list the water tip
+  # source column changes, which is safe but may affect tip usage symmetry.
+  #
+  # Need >= (1 + number_of_dilution_wells) tips across all listed columns.
   single_tip_columns: [12, 11]
 
 # ── Printing ─────────────────────────────────────────────────────────────────────
 # An 8-channel print of one plate column = 8 droplets at once (one per channel).
-# To print fewer/more droplets, change which/how-many wells the dilution fills.
 printing:
   enabled: true
   source_column: "1"        # plate column to print (defaults to the dilution column)
   droplet_volume_ul: 15.0
   num_replicates: 1         # print the column this many times across the paper
   paper_start_well: A1      # where the top droplet lands on the paper reference
-  dispense_z_mm: 3.0        # height above the paper-reference well bottom
-  replicate_spacing_mm:     # x/y offset between replicate columns on the paper
+
+  # Height above the bottom of the paper-proxy well (paper_start_well).
+  # For corning_96_wellplate_360ul_custom the well bottom sits ~5 mm above the
+  # deck surface. dispense_z_mm=3.0 therefore places the tip ~8 mm above the deck,
+  # i.e. roughly 3 mm above the actual paper sheet. Adjust if the paper reference
+  # labware changes or if the paper is raised (e.g. on a mat).
+  dispense_z_mm: 3.0
+
+  # X/Y/Z offset (mm) between successive replicate columns on the paper.
+  # z: 0.0 is correct for a flat paper surface; set non-zero only if replicates
+  # are stacked vertically (unusual).
+  replicate_spacing_mm:
     x: 12.0
     y: 0.0
+    z: 0.0
+
   print_block_column: 1     # tiprack column grabbed as the 8-tip block (reserved)
   blow_out: false           # blow out after each dispense
   touch_tip: false          # touch tip after each dispense
@@ -103,14 +128,23 @@ camera:
   enabled: true
   capture_before: true
   capture_after: true
-  capture_mid_wells: [C1, E1, H1]    # snapshot after these dilution wells finish
+
+  # ROW LETTERS ONLY — do NOT include the column number here.
+  # The protocol appends destination_column at runtime (e.g. 'C' + '1' → 'C1').
+  # This means changing destination_column in the dilution block automatically
+  # shifts camera capture to the correct wells without editing this list.
+  capture_mid_rows: ["C", "E", "H"]
+
+  # Robot-side image storage (OT-2 Linux path — runtime only; simulation skips this).
   robot_image_dir: /data/vision/vial_dilution_print
+  robot_api_url: "http://localhost:31950/camera/picture"
+  capture_timeout_s: 5
 
 # ── Flow rates (uL/s); null = Opentrons default ──────────────────────────────────
 flow_rates:
   aspirate: null
   dispense: null
-  mix: null
+  mix: null                 # informational only — OT-2 API has no separate mix rate
 
 # ── Computer-vision expectations (used HOST-side by verify_print_droplets.py) ─────
 # Pass --expect equal to cv.expected_droplets when you run the CV check.
@@ -132,6 +166,13 @@ safety:
   expected_col_spacing_mm: 31.0
   geometry_tolerance_mm: 0.5
   pipette_min_accurate_ul: 20.0
+
+  # ── Dynamic-validation constants ──────────────────────────────────────────────
+  # Used by build_vial_dilution_print.py and test_vial_print.py to derive physical
+  # bounds without hardcoding them in script logic.
+  expected_plate_well_count: 96    # pre-flight checks plate + paper well count
+  tiprack_rows_per_column: 8       # standard 96-tip = 8; update if rack changes
+  pipette_max_volume_ul: 300.0     # p300_multi_gen2 max aspiration volume
 
 # ── Run modes (App Runtime Parameters; map to the protocol's DEFAULT_* flags) ─────
 # NOT part of CONFIG — the builder writes these into the DEFAULT_* constants so a

@@ -30,6 +30,13 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 def load_config() -> dict:
     if not CONFIG_PATH.exists():
+        import warnings
+        warnings.warn(
+            f"Vision config not found at {CONFIG_PATH}. "
+            "Create this file with a 'droplet_detection:' block to override "
+            "OpenCV detection parameters at runtime. Using built-in defaults.",
+            stacklevel=2,
+        )
         return {}
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return yaml.safe_load(f) or {}

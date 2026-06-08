@@ -17,6 +17,7 @@ area, with the exact commands, file paths, and safety gates needed to perform it
 | **ot2-labware** | [`ot2-labware/`](ot2-labware/SKILL.md) | Create custom Opentrons labware definitions (YAML config → JSON) via the agent tools or the CLI generator |
 | **ot2-protocols** | [`ot2-protocols/`](ot2-protocols/SKILL.md) | Build, validate, generate, and simulate OT-2 workflow protocols (dilution, printing) |
 | **ot2-robot-control** | [`ot2-robot-control/`](ot2-robot-control/SKILL.md) | Interact with the live OT-2 from the lab laptop: connectivity checks, SCP deploy, SSH, and running workflows with `opentrons_execute` |
+| **vial-dilution-print** | [`vial-dilution-print/`](vial-dilution-print/SKILL.md) | The flagship 20 mL vial → 96-well dilution → 8-channel paper-print demo: build/validate/simulate/CV tools, protocol mechanics, and the full `vial_dilution_print.yaml` parameter dictionary |
 
 ## How these relate to the AI agent
 
