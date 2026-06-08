@@ -1,0 +1,17 @@
+============================================================
+  PRINTED-DROPLET CV VERIFICATION REPORT
+============================================================
+Generated : 2026-06-08T16:34:35.945811Z
+Expected droplets per image : 8
+OVERALL   : FAIL
+
+Image: paper_print.jpg
+  droplets found : 4  (expected 8)  -> MISMATCH
+  shape          : min circularity 0.867 (round)
+  colour gradient: detected
+  verdict        : FAIL
+
+     A1 fold=  1x  RGB=(12,40,146)  bright=66  circ=0.867
+     B1 fold=  2x  RGB=(26,55,157)  bright=79  circ=0.909
+     C1 fold=  5x  RGB=(42,70,166)  bright=93  circ=0.909
+     D1 fold= 10x  RGB=(58,88,178)  bright=108  circ=0.909

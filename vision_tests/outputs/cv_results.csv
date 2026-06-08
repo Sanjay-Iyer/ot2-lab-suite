@@ -1,0 +1,5 @@
+image,droplet_index,well,fold,centroid_x,centroid_y,area_pixels,circularity,aspect_ratio,r,g,b,h,s,v,brightness
+paper_print.jpg,1,A1,1,180,55,1200.0,0.867,1.0,11.7,40.4,146.0,114,236,146,66.0
+paper_print.jpg,2,B1,2,180,107,1196.0,0.909,1.0,25.6,55.2,156.9,113,214,156,79.2
+paper_print.jpg,3,C1,5,180,160,1196.0,0.909,1.0,42.1,70.4,166.5,113,190,166,93.0
+paper_print.jpg,4,D1,10,180,213,1196.0,0.909,1.0,58.0,87.7,177.6,113,171,177,107.8

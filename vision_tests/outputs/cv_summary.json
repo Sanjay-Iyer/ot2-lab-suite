@@ -1,0 +1,19 @@
+{
+  "generated_utc": "2026-06-08T16:34:35.945811Z",
+  "expected_count": 8,
+  "overall_status": "FAIL",
+  "images_analyzed": 1,
+  "per_image": [
+    {
+      "image": "paper_print.jpg",
+      "expected_count": 8,
+      "found_count": 4,
+      "count_pass": false,
+      "shape_pass": true,
+      "min_circularity": 0.867,
+      "mean_circularity": 0.899,
+      "gradient_detected": true,
+      "status": "FAIL"
+    }
+  ]
+}

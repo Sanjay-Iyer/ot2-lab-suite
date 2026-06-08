@@ -1,0 +1,142 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# Vial Dilution -> 8-Channel Paper Print Demo — configuration
+# ══════════════════════════════════════════════════════════════════════════════
+# This is the single source of truth for the demo. Edit it, then build a
+# robot-ready protocol with the YAML embedded:
+#
+#   conda activate ai
+#   python scripts/build_vial_dilution_print.py --config configs/workflows/defaults/vial_dilution_print.yaml
+#
+# The builder validates this file, embeds it into a generated copy of
+# src/protocols/vial_dilution_print.py, and simulates it. See
+# docs/vial_dilution_print_demo.md for the full knob reference.
+#
+# Every top-level block below (except `run_modes`) becomes the protocol's CONFIG
+# dict. Defaults reproduce the verified demo. Anything marked HARDWARE is fixed by
+# the physical setup — change with care.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Deck: which slot + labware sits where ────────────────────────────────────────
+# Tip box MUST NOT be the slot directly behind the tuberack (single-nozzle idle
+# nozzles collide). Slot 6 is verified clear. Plate & paper are 96-well so the
+# 8-channel head can address a whole column.
+deck:
+  tuberack:
+    slot: 1
+    load_name: tuberack_3dprint_20ml_8vials_v2
+    namespace: custom_beta
+    version: 1
+  plate:
+    slot: 2
+    load_name: corning_96_wellplate_360ul_custom
+    namespace: custom_beta
+    version: 1
+  paper:
+    slot: 3
+    load_name: corning_96_wellplate_360ul_custom
+    namespace: custom_beta
+    version: 1
+  tiprack:
+    slot: 6
+    load_name: opentrons_96_tiprack_300ul
+
+# ── Pipette (HARDWARE: 8-channel p300 on the right mount — do not change) ─────────
+pipette:
+  name: p300_multi_gen2
+  mount: right
+  single_start: H1          # which nozzle is active in single-tip mode (H1 = front)
+
+# ── Liquid sources: which VIAL in the rack (slot 1) holds what ───────────────────
+sources:
+  water_vial: A1            # vial well holding water
+  food_coloring_vial: A2    # vial well holding the dye stock
+
+# ── Dilution series ──────────────────────────────────────────────────────────────
+dilution:
+  enabled: true
+  destination_column: "1"   # plate column that holds the series (its A..H wells)
+  total_volume_ul: 200.0    # volume per well (<= 360 well max, <= 300 tip max)
+
+  # How the fold factors are chosen. The number of factors = number of wells used
+  # (top A down). A column has 8 rows, so keep it <= 8.
+  factors:
+    mode: explicit          # explicit | geometric | linear | log
+    # explicit : use this list verbatim (1 = undiluted stock)
+    explicit: [1, 2, 5, 10, 20, 30, 40, 50]
+    # geometric: factor[i] = start * step_factor**i  (e.g. step 2 -> 1,2,4,8,...; step 10 -> 1,10,100,...)
+    step_factor: 2
+    # linear/log: evenly / log spaced from start..end over `count`
+    start: 1
+    end: 50
+    count: 8
+
+  mix_reps: 3
+  mix_volume_ul: 120.0      # per mix cycle (<= total_volume_ul, <= 300)
+
+  # Single-channel dilution tips are auto-allocated from these tiprack COLUMNS,
+  # skipping the print block column. Need >= (1 + number of wells) tips here.
+  single_tip_columns: [12, 11]
+
+# ── Printing ─────────────────────────────────────────────────────────────────────
+# An 8-channel print of one plate column = 8 droplets at once (one per channel).
+# To print fewer/more droplets, change which/how-many wells the dilution fills.
+printing:
+  enabled: true
+  source_column: "1"        # plate column to print (defaults to the dilution column)
+  droplet_volume_ul: 15.0
+  num_replicates: 1         # print the column this many times across the paper
+  paper_start_well: A1      # where the top droplet lands on the paper reference
+  dispense_z_mm: 3.0        # height above the paper-reference well bottom
+  replicate_spacing_mm:     # x/y offset between replicate columns on the paper
+    x: 12.0
+    y: 0.0
+  print_block_column: 1     # tiprack column grabbed as the 8-tip block (reserved)
+  blow_out: false           # blow out after each dispense
+  touch_tip: false          # touch tip after each dispense
+
+# ── Tips: keep your requirement to RETURN tips (true) vs trash them (false) ───────
+tips:
+  return_tips: true
+
+# ── Camera / CV capture timing ───────────────────────────────────────────────────
+camera:
+  enabled: true
+  capture_before: true
+  capture_after: true
+  capture_mid_wells: [C1, E1, H1]    # snapshot after these dilution wells finish
+  robot_image_dir: /data/vision/vial_dilution_print
+
+# ── Flow rates (uL/s); null = Opentrons default ──────────────────────────────────
+flow_rates:
+  aspirate: null
+  dispense: null
+  mix: null
+
+# ── Computer-vision expectations (used HOST-side by verify_print_droplets.py) ─────
+# Pass --expect equal to cv.expected_droplets when you run the CV check.
+cv:
+  expected_droplets: 8      # should equal the number of dilution wells
+  min_circularity_ok: 0.6
+  detection:
+    threshold_method: otsu
+    min_area: 250
+    invert: true
+
+# ── Safety / pre-flight expectations (geometry cross-check of the loaded rack) ────
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_well_count: 8
+  expected_diameter_mm: 28.0
+  expected_depth_mm: 55.0
+  expected_row_spacing_mm: 34.0
+  expected_col_spacing_mm: 31.0
+  geometry_tolerance_mm: 0.5
+  pipette_min_accurate_ul: 20.0
+
+# ── Run modes (App Runtime Parameters; map to the protocol's DEFAULT_* flags) ─────
+# NOT part of CONFIG — the builder writes these into the DEFAULT_* constants so a
+# simulation/headless run uses them. In the Opentrons App you override per run.
+run_modes:
+  dry_run: false            # load + pre-flight + comments only, no liquid motion
+  do_dilution: true
+  do_print: true
