@@ -1,15 +1,15 @@
 ---
 name: vial-dilution-print
-description: Build, validate, simulate, deploy, and CV-verify the 20 mL vial → 96-well dilution → 8-channel paper-print demo. Use when the user works on vial_dilution_print (the YAML, the protocol, the build/validate/vision scripts) or asks about its parameters, tip routine, headspace, or droplet vision QC. Config/generate/simulate/CV work on any machine; deploying to hardware is the lab laptop only (see ot2-robot-control).
+description: Build, validate, simulate, deploy, and CV-verify the 20 mL vial → 96-well dilution → single-tip paper-print demo. Use when the user works on vial_dilution_print (the YAML, the protocol, the build/validate/vision scripts) or asks about its parameters, tip routine, headspace, or droplet vision QC. Config/generate/simulate/CV work on any machine; deploying to hardware is the lab laptop only (see ot2-robot-control).
 ---
 
-# Vial Dilution → 8-Channel Paper Print
+# Vial Dilution → Single-Tip Paper Print
 
 The flagship demo pipeline: draw water + food colouring from two **20 mL
 scintillation vials** in the custom v2 tube rack (slot 7), build an 8-step
-dilution series down **one column** of a 96-well plate (slot 4), then pick up an
-8-tip block and "print" that whole column onto paper (slot 5) as 8 simultaneous
-droplets. Tips are **returned**, not trashed. The host then runs computer-vision
+dilution series down **one column** of a 96-well plate (slot 4), then use
+SINGLE-nozzle mode to pick up **one tip at a time** and print those wells onto
+paper (slot 5) as sequential droplets. Tips are **returned**, not trashed. The host then runs computer-vision
 QC on the resulting droplet image.
 
 This skill is the ground truth for that pipeline. For its sub-topics see:
@@ -41,7 +41,7 @@ This skill is the ground truth for that pipeline. For its sub-topics see:
 2. python scripts/build_vial_dilution_print.py                   build → embed CONFIG → simulate
 3. python scripts/validate_vial_print.py                         5-case run-mode matrix gate
 4. python vision_tests/scripts/verify_print_droplets.py --mock   CV sanity (8-droplet gradient)
-5. (lab laptop) deploy + opentrons_execute                       see ot2-robot-control
+5. (lab laptop) python scripts/run_vial_print_robot.py --live     HTTP API terminal run
 ```
 
 Steps 2–4 run from the **conda `ai`** environment (has `opentrons`, `numpy`,
@@ -76,9 +76,9 @@ See [TOOLS.md](TOOLS.md) §5 for the tool list and the knob→YAML mapping.
    (31 mm) against `safety:` to ±0.5 mm **before any motion**. A geometry/identity
    mismatch aborts the run — this is what prevents the Z-axis from driving a tip
    into glass on fallback defaults.
-2. **Tip-column separation.** `printing.print_block_column` must not appear in
-   `dilution.single_tip_columns`, or the 8-tip print block would be clobbered by
-   single-tip dilution pickups.
+2. **Tip-column separation.** `printing.single_tip_columns` must not overlap
+   `dilution.single_tip_columns`; dilution and print tips are both picked one at
+   a time.
 3. **Middle-row layout for single-nozzle labware.** The vial rack, tip rack, and
    plate must stay in the middle deck rows (4-5-6 / 7-8-9) — off the front row (1-2-3)
    and back row (10-11-12) — so partial-tip idle nozzles stay in robot bounds, and

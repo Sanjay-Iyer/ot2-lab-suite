@@ -68,7 +68,7 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
                        'version': 1},
             'tiprack': {'slot': 9, 'load_name': 'opentrons_96_tiprack_300ul'}},
   'pipette': {'name': 'p300_multi_gen2', 'mount': 'right', 'single_start': 'A1'},
-  'sources': {'water_vial': 'A1', 'food_coloring_vial': 'A2'},
+  'sources': {'water_vial': 'A1', 'food_coloring_vial': 'B1'},
   'dilution': { 'enabled': True,
                 'destination_column': '9',
                 'total_volume_ul': 200.0,
@@ -358,13 +358,6 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, single_tips,
         errors.append(
             f"print column {pr['print_block_column']} overlaps dilution single_tip_columns "
             f"{dil['single_tip_columns']} - dilution and print tips would overlap."
-        )
-    print_single_cols = [int(c) for c in pr.get("single_tip_columns", [print_col])]
-    overlap_cols = sorted(set(print_single_cols).intersection(int(c) for c in dil["single_tip_columns"]))
-    if overlap_cols:
-        errors.append(
-            f"printing.single_tip_columns {print_single_cols} overlap dilution "
-            f"single_tip_columns {dil['single_tip_columns']}: {overlap_cols}."
         )
 
     # ── Camera: validate capture_mid_rows entries against actual plate rows ───────

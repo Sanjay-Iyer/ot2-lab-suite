@@ -169,7 +169,7 @@ def main() -> int:
     print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
     print(f"Dilution  : {do_dilution}")
     print(f"Print     : {do_print}")
-    print("\nDeck must be: slot 7 vial rack (A1 water, B1 dye), slot 4 plate, slot 5 paper, slot 9 tips.")
+    print("\nDeck must be: slot 7 vial rack (A1 water, A2 dye), slot 4 plate, slot 5 paper, slot 9 tips.")
 
     protocol_id = _upload_protocol(robot_ip, protocol_path)
     run_id = _create_run(

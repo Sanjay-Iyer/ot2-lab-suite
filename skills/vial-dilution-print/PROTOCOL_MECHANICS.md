@@ -10,7 +10,7 @@ see [PARAMETERS.md](PARAMETERS.md) for the knobs.
 
 | Slot | Labware | Role |
 |------|---------|------|
-| 7 | `tuberack_3dprint_20ml_8vials_v2` (custom_beta v1) | Two 20 mL vials in column 1: **A1 (back/top) = water**, **B1 (front/bottom) = food colouring**. |
+| 7 | `tuberack_3dprint_20ml_8vials_v2` (custom_beta v1) | Two 20 mL vials in row A: **A1 (column 1) = water**, **A2 (column 2) = food colouring**. |
 | 4 | `corning_96_wellplate_360ul_custom` | Dilution series lives in column 9 (rows A→H). |
 | 5 | `corning_96_wellplate_360ul_custom` | **Paper proxy** — a plate object used only as an X/Y/Z coordinate anchor; no liquid is loaded. |
 | 9 | `opentrons_96_tiprack_300ul` | Tips. |
@@ -51,12 +51,12 @@ geometry doesn't match.
 ```
 load labware + pipette
   → derive row/column structure FROM the loaded labware objects
-  → resolve factors, dilution wells, single tips
+  → resolve factors, dilution wells, dilution tips, print tips
   → PRE-FLIGHT (raise to abort, no motion)
   → [dry_run? comment + return]
   → CV: before
   → Phase A: dilution (SINGLE nozzle)
-  → Phase B: 8-channel print (ALL nozzles)
+  → Phase B: single-tip print (SINGLE nozzle)
   → CV: after
 ```
 
@@ -85,7 +85,7 @@ mismatch. It checks:
 - **Volume sanity:** `total_volume_ul` ≤ the most conservative plate-well max;
   every stock draw ≤ pipette max; droplet and mix volumes ≤ pipette max; no
   negative volumes.
-- `print_block_column` does **not** overlap `single_tip_columns`.
+- `printing.single_tip_columns` does **not** overlap `dilution.single_tip_columns`.
 - Every `camera.capture_mid_rows` letter is a real plate row.
 
 On pass it emits non-fatal **accuracy warnings** for any stock draw below the p300
@@ -106,20 +106,17 @@ active, so the head behaves like a single-channel pipette.
 Tips are **returned** to their box slots (`return_tip()`), not trashed —
 `tips.return_tips: true`. This is the reason for apiLevel 2.28.
 
-### Phase B — 8-channel print (all nozzles)
+### Phase B — single-tip print (one nozzle)
 
-`configure_nozzle_layout(style=ALL)` — full 8-channel head.
+`configure_nozzle_layout(style=SINGLE, start=A1)` — one physical tip/nozzle is active.
 
-1. Pick up the reserved **8-tip block** = column `print_block_column` of the
-   tiprack. The block tip is taken from the labware column API
-   (`columns_by_name()[col][0]`), not a hardcoded `"A1"`.
-2. Aspirate `droplet_volume_ul` from the **whole source plate column at once** (one
-   nozzle per well).
-3. Dispense onto the paper at `paper_start_well.bottom(dispense_z_mm)`, offset per
-   replicate by `replicate_spacing_mm` (x/y/z). `dispense_z_mm` is height above the
-   paper-proxy well bottom — the tip never touches the paper.
+1. Pick one print tip at a time from `printing.single_tip_columns` (default column 1).
+2. Aspirate `droplet_volume_ul` from one source plate well.
+3. Dispense onto the matching paper row, offset per replicate by
+   `replicate_spacing_mm` (x/y/z). `dispense_z_mm` is height above the paper-proxy
+   well bottom — the tip never touches the paper.
 4. Optional `blow_out` / `touch_tip` (both off by default).
-5. Return the 8 tips.
+5. Return that single print tip, then move to the next source well.
 
 ## Tip allocation — the single-tip routine in detail
 
@@ -127,8 +124,8 @@ Tips are **returned** to their box slots (`return_tip()`), not trashed —
 
 - Walks `dilution.single_tip_columns` **in order**, and within each column walks
   the tiprack rows **in order** (A→H), emitting `f"{row}{col}"` well names.
-- **Skips** the reserved `print_block_column` entirely (so the print block is never
-  consumed by single picks).
+- Skips the legacy `print_block_column` so dilution tips do not consume the print-tip
+  column.
 - Needs `n_needed = 1 + len(dilution_wells)` tips (1 water + 1 per dilution well).
 - Raises if the listed columns can't supply enough tips.
 

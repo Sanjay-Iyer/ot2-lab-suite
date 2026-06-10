@@ -2,8 +2,8 @@
 
 End-to-end demo that builds a food-colouring **dilution series** in one column of a
 96-well plate — drawing water and dye from two 20 mL vials in the custom
-[v2 tube rack](tuberack_20ml_8vials_v2.md) — then picks up **8 tips at once** and
-"prints" all 8 wells of that column onto **paper** as 8 simultaneous droplets. Tips
+[v2 tube rack](tuberack_20ml_8vials_v2.md) — then uses **one tip at a time** to
+"print" those wells onto **paper** as sequential droplets. Tips
 are **returned to the box, never trashed**. Computer-vision snapshots are taken at the
 start, a few middle steps, and the end, and a CV script logs a reviewable verdict
 (did we get all 8 droplets? what colour/shape?).
@@ -45,7 +45,7 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 | `deck.<pos>.slot` / `.load_name` / `.namespace` / `.version` | where each labware sits + its identity | 7/4/5/9 (rack/plate/paper/tips) |
 | `pipette.name` / `.mount` | **hardware** — leave as p300_multi_gen2 / right | p300_multi_gen2, right |
 | `pipette.single_start` | active nozzle for single-tip work (`A1` back; idle nozzles point off the tall rack) | A1 |
-| `sources.water_vial` / `.food_coloring_vial` | **which vial holds water vs dye** | A1 / B1 |
+| `sources.water_vial` / `.food_coloring_vial` | **which vial holds water vs dye** | A1 / A2 |
 | `dilution.destination_column` | **which 96-plate column** holds the series | "9" |
 | `dilution.total_volume_ul` | volume in every well | 200 |
 | `dilution.factors.mode` | `explicit` / `geometric` / `linear` / `log` | explicit |
@@ -59,7 +59,7 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 | `printing.num_replicates` | **how many times** to print the column on the paper | 4 |
 | `printing.paper_start_well` / `.dispense_z_mm` | where/how-high droplets land | A9 / 3 mm |
 | `printing.replicate_spacing_mm` | x/y gap between replicate columns | 9 / 0 |
-| `printing.print_block_column` | tiprack column grabbed as the 8-tip block | 1 |
+| `printing.single_tip_columns` | tiprack columns for one-at-a-time print tips | [1] |
 | `printing.blow_out` / `.touch_tip` | extra dispense actions | false / false |
 | `tips.return_tips` | **return to box (true)** vs trash (false) | true |
 | `camera.enabled` / `capture_before` / `capture_after` | CV snapshot toggles | true |
@@ -71,11 +71,10 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 | `run_modes.dry_run` / `.do_dilution` / `.do_print` | run-mode flags (also App Runtime Parameters) | false/true/true |
 
 ### Number of droplets vs number of dilutions
-An 8-channel print of one plate column is **8 droplets at once** (one per channel). The
-**number of dilutions = number of droplets that carry liquid** — set it via the factor
-list length (`explicit`) or `factors.count`. Fewer than 8 leaves the lower channels
-printing nothing; keep `cv.expected_droplets` in sync. To print the same series several
-times across the paper, raise `printing.num_replicates`.
+A single-tip print of one plate column is **one active tip at a time**. The number of
+dilution wells controls how many source wells are printed — set it via the factor list
+length (`explicit`) or `factors.count`. Keep `cv.expected_droplets` in sync. To print
+the same series several times across the paper, raise `printing.num_replicates`.
 
 ### Customization examples
 ```yaml
@@ -84,8 +83,8 @@ dilution: {destination_column: "3", factors: {mode: geometric, step_factor: 2, s
 printing: {source_column: "3"}
 cv: {expected_droplets: 6}
 
-# water in vial B1, dye in B2; print the column 3 times; trash tips instead of returning:
-sources: {water_vial: B1, food_coloring_vial: B2}
+# water in A1, dye in A2; print the column 3 times; trash tips instead of returning:
+sources: {water_vial: A1, food_coloring_vial: A2}
 printing: {num_replicates: 3}
 tips: {return_tips: false}
 ```
@@ -109,7 +108,7 @@ tips: {return_tips: false}
 
 | Slot | Labware | Contents |
 |------|---------|----------|
-| 7 | `tuberack_3dprint_20ml_8vials_v2` | **vial A1 (back) = water**, **vial B1 (front) = food colouring** (20 mL each) |
+| 7 | `tuberack_3dprint_20ml_8vials_v2` | **vial A1 (row A, column 1) = water**, **vial A2 (row A, column 2) = food colouring** (20 mL each) |
 | 4 | `corning_96_wellplate_360ul_custom` | dilution column 9 (A9…H9) |
 | 5 | `corning_96_wellplate_360ul_custom` | paper target (96-well reference so the 8 channels map to 8 spots) |
 | 9 | `opentrons_96_tiprack_300ul` | the "pipette box" |
@@ -150,7 +149,7 @@ tips: {return_tips: false}
 3. **Dilution (single nozzle, `SINGLE` start `A1`)** — direct dilution, total **200 µL**
    per well, `stock = 200 / fold`:
 
-   | Well | Fold | Stock µL (vial B1) | Water µL (vial A1) |
+   | Well | Fold | Stock µL (vial A2) | Water µL (vial A1) |
    |------|------|--------------------|--------------------|
    | A9 | 1× | 200 | 0 |
    | B9 | 2× | 100 | 100 |
@@ -164,15 +163,15 @@ tips: {return_tips: false}
    - **Water pass:** one clean tip (`A12`) distributes water into B9…H9 — the tip only
      ever touches water, so the water vial stays pure.
    - **Stock + mix pass:** a **fresh tip per well** (`B12…H12`, `A11`) draws dye from
-     vial B1, dispenses, and mixes — no dye carry-over and the dye vial never sees a
+     vial A2, dispenses, and mixes — no dye carry-over and the dye vial never sees a
      used tip. Each tip is **returned** to the box.
    - **CV: middle** — a snapshot after wells C9, E9, H9 (`plate_dilution_*.jpg`) plus
      `plate_after_dilution.jpg`.
-4. **Print (full 8-channel, `ALL`)** — picks up **column 1 of the tip box (8 tips) as a
-   block**, aspirates 15 µL from plate column 9 (all 8 wells at once), and dispenses
-   onto the paper → **8 droplets in one shot**, repeated for each of the 4 replicates.
-   Tips **returned**.
-   - **CV: print** — `paper_print_01.jpg` ... `paper_print_04.jpg`.
+4. **Print (single nozzle, `SINGLE` start `A1`)** — picks up **one tip at a time**
+   from tip column 1, aspirates 15 µL from each source well in plate column 9, and
+   dispenses onto the matching paper row. Each source well is printed for each of the
+   4 replicates. Tips **returned**.
+   - **CV: print** — `paper_print_single_tip.jpg`.
 5. **CV: after** — `after_deck.jpg`, `after_plate.jpg`.
 
 > ⚠️ **Accuracy caveat.** The 20×–50× stock volumes (4–10 µL) are **below the p300's

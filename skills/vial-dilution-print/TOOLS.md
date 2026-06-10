@@ -85,10 +85,10 @@ the gate):
 
 | Case | Flags | Expectation |
 |------|-------|-------------|
-| `full_run` | dilution + print | Pre-flight passes; top & bottom wells diluted; SINGLE then ALL nozzle layouts; 8-channel block pickup; 8 droplets printed; tips returned; demo completes. |
+| `full_run` | dilution + print | Pre-flight passes; top & bottom wells diluted; SINGLE nozzle layout for dilution and print; single-tip droplets printed; tips returned; demo completes. |
 | `dry_run` | dry | Pre-flight passes; `DRY RUN`; completes with **no** dilution/print motion. |
 | `dilution_only` | dilution | Dilutes + series complete; **no** printing. |
-| `print_only` | print | 8-channel pickup + 8 droplets; **no** dilution. |
+| `print_only` | print | Single-tip paper print; **no** dilution. |
 | `wrong_labware` | dilution + print, **bad rack name injected** | Pre-flight **FAILS** on the identity/geometry mismatch; demo never completes. |
 
 The `wrong_labware` case desyncs `expected_tuberack_load_name` from the loaded rack

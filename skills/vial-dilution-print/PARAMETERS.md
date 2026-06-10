@@ -37,7 +37,7 @@ uses a 96-well plate purely as a coordinate anchor (no liquid loaded).
 | Key | Type | Units | Physical impact | Safe bounds |
 |-----|------|-------|-----------------|-------------|
 | `water_vial` | str | vial well | Vial aspirated for the diluent (water). | A well in the tube rack (`A1`–`B4`); default `A1`. |
-| `food_coloring_vial` | str | vial well | Vial aspirated for the dye stock. | A different tube-rack well; default `B1` (front/bottom of column 1; water is `A1`, the back/top). Keep ≠ `water_vial`. |
+| `food_coloring_vial` | str | vial well | Vial aspirated for the dye stock. | A different tube-rack well; default `A2` (same row as water, second rack column). Keep ≠ `water_vial`. |
 
 ## `dilution:` — the series
 
@@ -48,7 +48,7 @@ uses a 96-well plate purely as a coordinate anchor (no liquid loaded).
 | `total_volume_ul` | float | µL | Final volume in **every** dilution well; sets fill height. | `0 < total ≤ plate well max` (360 µL) **and** `≤ tip max` (300 µL). Default `200.0`. |
 | `mix_reps` | int | cycles | Mix cycles per well after stock dispense; homogenises the dilution. | `≥ 0` (0 disables mixing). Default `3`. |
 | `mix_volume_ul` | float | µL | Volume per mix stroke. Runtime-capped to `min(this, well_fill, 300)`. | `0 < v ≤ total_volume_ul` and `≤ 300`. Default `120.0`. |
-| `single_tip_columns` | list[int] | tiprack columns | Source columns for single-channel dilution tips, consumed in order. | Each `1`–`12`; **must exclude** `printing.print_block_column`; must supply `≥ 1 + len(factors)` tips total. Default `[12, 11]`. |
+| `single_tip_columns` | list[int] | tiprack columns | Source columns for single-channel dilution tips, consumed in order. | Each `1`–`12`; must not overlap `printing.single_tip_columns`; must supply `≥ 1 + len(factors)` tips total. Default `[12, 11]`. |
 
 ### `dilution.factors:` — fold-factor generator
 
@@ -65,17 +65,18 @@ uses a 96-well plate purely as a coordinate anchor (no liquid loaded).
 > downward). A plate column has 8 rows, so keep ≤ 8. `stock_uL = total/fold`,
 > `water_uL = total − stock`; both must be ≥ 0 and `stock ≤ 300`.
 
-## `printing:` — the 8-channel paper print
+## `printing:` — the single-tip paper print
 
 | Key | Type | Units | Physical impact | Safe bounds |
 |-----|------|-------|-----------------|-------------|
 | `enabled` | bool | — | Run Phase B at all. | `true`/`false`. |
-| `source_column` | str | plate column | Plate column printed (8 wells, one per channel). | Valid plate column; usually equals `dilution.destination_column`. |
-| `droplet_volume_ul` | float | µL | Volume dispensed per channel per replicate; droplet size + tip headspace. | `> 0` and `≤ 300`; keep small (default `15.0`) to preserve the air headspace. |
+| `source_column` | str | plate column | Plate column printed one well at a time. | Valid plate column; usually equals `dilution.destination_column`. |
+| `droplet_volume_ul` | float | µL | Volume dispensed per single-tip droplet per replicate. | `> 0` and `≤ 300`; keep small (default `15.0`) to preserve the air headspace. |
 | `num_replicates` | int | prints | How many times the column is printed across the paper. | `≥ 1`; ensure `(n−1)·spacing` stays on the paper. Default `4`. |
 | `paper_start_well` | str | well | Paper-proxy well used as the spatial origin for the droplet row. | A valid plate well; default `A9`. |
 | `dispense_z_mm` | float | mm | Tip height **above the paper-proxy well bottom**. The tip never touches paper. | `> 0`; default `3.0` (≈3 mm above the sheet given the ~5 mm well bottom). Lower cautiously; raise if paper is on a mat. |
-| `print_block_column` | int | tiprack column | Tiprack column grabbed as the reserved 8-tip block. | `1`–`12`; **must not** be in `single_tip_columns`. Default `1`. |
+| `single_tip_columns` | list[int] | tiprack columns | Source columns for one-at-a-time print tips. | Each `1`–`12`; must not overlap dilution `single_tip_columns`; must supply `≥ len(factors)` tips total. Default `[1]`. |
+| `print_block_column` | int | tiprack column | Legacy alias kept for older tooling; no 8-tip block is picked up. | Default `1`. |
 | `blow_out` | bool | — | Blow out after each dispense (expels the air headspace). | Default `false` — leave off to avoid splatter unless clearing the tip is intended. |
 | `touch_tip` | bool | — | Touch tip to the well wall after dispense. | Default `false` (no wall in the paper proxy). |
 

@@ -65,7 +65,7 @@ pipette:
 # ── Liquid sources: which VIAL in the rack (slot 7) holds what ───────────────────
 sources:
   water_vial: A1            # vial well holding water
-  food_coloring_vial: B1    # vial well holding the dye stock
+  food_coloring_vial: A2    # dye stock: same row as water, second rack column
 
 # ── Dilution series ──────────────────────────────────────────────────────────────
 dilution:
@@ -102,7 +102,7 @@ dilution:
   single_tip_columns: [12, 11]
 
 # ── Printing ─────────────────────────────────────────────────────────────────────
-# An 8-channel print of one plate column = 8 droplets at once (one per channel).
+# A single-nozzle print of one plate column = one physical tip active at a time.
 printing:
   enabled: true
   source_column: "9"        # plate column to print (defaults to the dilution column)
@@ -125,7 +125,8 @@ printing:
     y: 0.0
     z: 0.0
 
-  print_block_column: 1     # tiprack column grabbed as the 8-tip block (reserved)
+  single_tip_columns: [1]   # print tips picked one at a time; no 8-tip pickup
+  print_block_column: 1     # legacy alias; kept so older validators still parse
   blow_out: false           # blow out after each dispense
   touch_tip: false          # touch tip after each dispense
 

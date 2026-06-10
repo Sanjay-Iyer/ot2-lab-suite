@@ -219,16 +219,27 @@ def validate(cfg: dict) -> list:
     # ── Tip allocation feasibility ────────────────────────────────────────────────
     reserved    = int(pr.get("print_block_column", 1))
     single_cols = [int(c) for c in dil.get("single_tip_columns", [])]
+    print_cols  = [int(c) for c in pr.get("single_tip_columns", [reserved])]
     if reserved in single_cols:
         errors.append(
             f"printing.print_block_column {reserved} overlaps "
             f"single_tip_columns {single_cols}")
+    overlap = sorted(set(single_cols).intersection(print_cols))
+    if overlap:
+        errors.append(
+            f"printing.single_tip_columns {print_cols} overlap dilution "
+            f"single_tip_columns {single_cols}: {overlap}")
     n_single = tiprack_rows_per_col * len([c for c in single_cols if c != reserved])
     if factors and n_single < 1 + len(factors):
         errors.append(
             f"single_tip_columns give {n_single} tips "
             f"({tiprack_rows_per_col} rows x {len([c for c in single_cols if c != reserved])} cols); "
             f"need {1 + len(factors)}")
+    n_print = tiprack_rows_per_col * len(print_cols)
+    if factors and n_print < len(factors):
+        errors.append(
+            f"printing.single_tip_columns give {n_print} tips "
+            f"({tiprack_rows_per_col} rows x {len(print_cols)} cols); need {len(factors)}")
 
     # ── Pipette mount ─────────────────────────────────────────────────────────────
     if cfg["pipette"].get("mount") not in ("left", "right"):
