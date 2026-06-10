@@ -14,10 +14,16 @@ Edit CONFIG directly for a quick change, OR keep the canonical settings in
 and run  scripts/build_vial_dilution_print.py  to generate a robot-ready copy with
 that YAML embedded between the CONFIG markers. See docs/vial_dilution_print_demo.md.
 
-DECK / WHY SLOT 6 / WHY apiLevel 2.28 - see the demo guide. Short version:
-  * tip box must NOT be directly behind the tuberack (slot 4) - idle nozzles in
-    single-tip mode collide with it; slot 6 is clear.
+DECK / WHY apiLevel 2.28 / HOW TO RUN - see the demo guide + skills/ot2-robot-profile.
+Short version:
+  * Deck slots are config-driven (see CONFIG["deck"]). Single-nozzle labware must
+    sit in the MIDDLE rows and single_start must point idle nozzles off the tall
+    rack - see skills/ot2-robot-profile for the rule. Verified: rack=7, plate=4,
+    paper=5, tips=9, single_start=A1.
   * apiLevel 2.28 is required for return_tip() in partial (single-nozzle) mode.
+  * RUN PATH: 2.28 uses the new protocol engine, so on the real OT-2 run this from
+    the Opentrons App (it provides the deck configuration). Bare `opentrons_execute`
+    over SSH fails with AreaNotInDeckConfigurationError - that is expected, not a bug.
 
 RUN-MODE FLAGS (App Runtime Parameters; DEFAULT_* mirror them for simulation):
   dry_run / do_dilution / do_print

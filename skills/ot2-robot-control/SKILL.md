@@ -154,7 +154,8 @@ python -m scripts.sync_robot
 | SCP hangs or `subsystem request failed` | Missing `-O` flag | Add `-O` to the `scp` command |
 | `ROBOT_SSH_KEY_PATH is missing` | `.env` blank | Set the key path in `.env` |
 | `opentrons_execute: not found` | Robot software issue | SSH in and check `which opentrons_execute` |
-| `AreaNotInDeckConfigurationError` | apiLevel mismatch (Flex API on OT-2) | Fix `apiLevel` in the protocol/config |
+| `AreaNotInDeckConfigurationError: <slot> not provided…` | a **≥ 2.16** protocol (new engine, e.g. partial-tip 2.28) run via bare `opentrons_execute`, which supplies no deck configuration | **Run it via the Opentrons App** (provides the deck config). Do NOT just lower `apiLevel` if the protocol needs partial tip — that deletes the feature. See [ot2-robot-profile](../ot2-robot-profile/SKILL.md). |
+| `Connection refused` / commands hit `127.0.0.1` | `ROBOT_IP` absent from `.env` (Config defaults to localhost) | Add `ROBOT_IP=<robot link-local ip>` to `.env`; re-run `check_connectivity` |
 | `instrument was requested, but no instrument is present` | Pipette/mount mismatch | Run `get_robot_hardware_status`, align config to actual hardware |
 | Robot traffic routed through proxy | `ROBOT_IP` not in `NO_PROXY` | Add the IP to `NO_PROXY` (config.py does this automatically) |
 
@@ -175,6 +176,7 @@ python -m scripts.sync_robot
 
 ## Related
 
+- [ot2-robot-profile](../ot2-robot-profile/SKILL.md) — **this robot's** hardware + apiLevel/deck-config rules; read before building a protocol
 - [ot2-protocols](../ot2-protocols/SKILL.md) — must produce a PASS simulation first
 - [ot2-labware](../ot2-labware/SKILL.md) — custom labware the protocol may need
 - [docs/SOP_Robot_Deployment.md](../../docs/SOP_Robot_Deployment.md) — deployment SOP

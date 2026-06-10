@@ -14,6 +14,12 @@ NO liquid is moved. One tip is picked up and returned. Keep a hand on the pause 
 e-stop the first time. If anything looks like it will touch glass or the rack wall,
 stop and re-check Labware Position Check / the slot layout.
 
+RUN PATH (IMPORTANT): this uses apiLevel 2.28 partial-tip mode, which runs on the
+new protocol engine. On this OT-2 (opentrons 9.0.0) run it from the **Opentrons App**
+(import the labware JSONs + this file, then Run) so the engine gets a deck
+configuration. Bare `opentrons_execute` over SSH fails with
+`AreaNotInDeckConfigurationError` — that is expected. See skills/ot2-robot-profile.
+
 DECK (must match the workflow):
   slot 7 = tuberack_3dprint_20ml_8vials_v2  (custom_beta v1)   ← the rack under test
   slot 4 = corning_96_wellplate_360ul_custom (custom_beta v1)  ← dilution plate
