@@ -42,11 +42,11 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 
 | Section / key | What it adjusts | Default |
 |---------------|-----------------|---------|
-| `deck.<pos>.slot` / `.load_name` / `.namespace` / `.version` | where each labware sits + its identity | 1/2/3/6 |
+| `deck.<pos>.slot` / `.load_name` / `.namespace` / `.version` | where each labware sits + its identity | 7/4/5/9 (rack/plate/paper/tips) |
 | `pipette.name` / `.mount` | **hardware** — leave as p300_multi_gen2 / right | p300_multi_gen2, right |
-| `pipette.single_start` | active nozzle for single-tip work (`H1` front) | H1 |
-| `sources.water_vial` / `.food_coloring_vial` | **which vial holds water vs dye** | A1 / A2 |
-| `dilution.destination_column` | **which 96-plate column** holds the series | "1" |
+| `pipette.single_start` | active nozzle for single-tip work (`A1` back; idle nozzles point off the tall rack) | A1 |
+| `sources.water_vial` / `.food_coloring_vial` | **which vial holds water vs dye** | A1 / B1 |
+| `dilution.destination_column` | **which 96-plate column** holds the series | "9" |
 | `dilution.total_volume_ul` | volume in every well | 200 |
 | `dilution.factors.mode` | `explicit` / `geometric` / `linear` / `log` | explicit |
 | `dilution.factors.explicit` | **the exact fold list** (1 = stock) | [1,2,5,10,20,30,40,50] |
@@ -54,16 +54,16 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 | `dilution.factors.start`/`end`/`count` | endpoints + **how many dilutions** (geometric/linear/log) | 1 / 50 / 8 |
 | `dilution.mix_reps` / `.mix_volume_ul` | mixing after each dilution | 3 / 120 |
 | `dilution.single_tip_columns` | tiprack columns the single tips come from | [12, 11] |
-| `printing.source_column` | which plate column to print | "1" |
+| `printing.source_column` | which plate column to print | "9" |
 | `printing.droplet_volume_ul` | droplet size | 15 |
-| `printing.num_replicates` | **how many times** to print the column on the paper | 1 |
-| `printing.paper_start_well` / `.dispense_z_mm` | where/how-high droplets land | A1 / 3 mm |
-| `printing.replicate_spacing_mm` | x/y gap between replicate columns | 12 / 0 |
+| `printing.num_replicates` | **how many times** to print the column on the paper | 4 |
+| `printing.paper_start_well` / `.dispense_z_mm` | where/how-high droplets land | A9 / 3 mm |
+| `printing.replicate_spacing_mm` | x/y gap between replicate columns | 9 / 0 |
 | `printing.print_block_column` | tiprack column grabbed as the 8-tip block | 1 |
 | `printing.blow_out` / `.touch_tip` | extra dispense actions | false / false |
 | `tips.return_tips` | **return to box (true)** vs trash (false) | true |
 | `camera.enabled` / `capture_before` / `capture_after` | CV snapshot toggles | true |
-| `camera.capture_mid_wells` | **which middle steps** get a snapshot | [C1, E1, H1] |
+| `camera.capture_mid_rows` | **which middle rows** get a snapshot (dest column appended at runtime) | [C, E, H] |
 | `camera.robot_image_dir` | where the robot saves JPEGs | /data/vision/vial_dilution_print |
 | `flow_rates.aspirate` / `.dispense` / `.mix` | µL/s (null = default) | null |
 | `cv.expected_droplets` / `.min_circularity_ok` / `.detection` | host-side CV check (pass `--expect`) | 8 / 0.6 / otsu |
@@ -99,31 +99,36 @@ tips: {return_tips: false}
  back   ┌───────┬───────┬───────┐
  row    │  10   │  11   │  12🗑 │
         ├───────┼───────┼───────┤
-        │   7   │   8   │   9   │
+        │7 VIAL │   8   │ 9 TIP │   ← rack + tip box (p300 300 µL)
         ├───────┼───────┼───────┤
-        │   4   │   5   │ 6 TIP │   ← tip box (p300 300 µL)
+        │4 PLATE│5 PAPER│   6   │
         ├───────┼───────┼───────┤
- front  │1 VIAL │2 PLATE│3 PAPER│
+ front  │   1   │   2   │   3   │
         └───────┴───────┴───────┘
 ```
 
 | Slot | Labware | Contents |
 |------|---------|----------|
-| 1 | `tuberack_3dprint_20ml_8vials_v2` | **vial A1 = water**, **vial A2 = food colouring** (20 mL each) |
-| 2 | `corning_96_wellplate_360ul_custom` | dilution column 1 (A1…H1) |
-| 3 | `corning_96_wellplate_360ul_custom` | paper target (96-well reference so the 8 channels map to 8 spots) |
-| 6 | `opentrons_96_tiprack_300ul` | the "pipette box" |
+| 7 | `tuberack_3dprint_20ml_8vials_v2` | **vial A1 (back) = water**, **vial B1 (front) = food colouring** (20 mL each) |
+| 4 | `corning_96_wellplate_360ul_custom` | dilution column 9 (A9…H9) |
+| 5 | `corning_96_wellplate_360ul_custom` | paper target (96-well reference so the 8 channels map to 8 spots) |
+| 9 | `opentrons_96_tiprack_300ul` | the "pipette box" |
 
 **Pipette:** `p300_multi_gen2` on the **right mount** (fixed — never changes).
 **apiLevel:** `2.28`.
 
-> ### Why the tip box is in slot 6, not slot 4
-> Slot 4 sits **directly behind** the tuberack (slot 1). In single-nozzle mode the 7
-> idle nozzles swing over the slot behind the active nozzle; reaching the tall 60 mm
-> vials with a tip box in slot 4 throws a hard `PartialTipMovementNotAllowedError`.
-> Using `start="H1"` (front nozzle, idle toward the back) reaches the whole plate
-> column but needs slots 4 **and** 5 empty. Slot 6 (nothing tall behind slots 1 or 2)
-> is the only clean fit — verified end-to-end in simulation.
+> ### Why these slots + `single_start: A1`
+> The dilution runs in single-nozzle (partial-tip) mode, where the 7 idle nozzles of
+> the 8-channel head hang ~63 mm to one side. Two rules follow:
+> 1. **Keep the single-nozzle labware (rack, plate, tips) in the middle rows
+>    (4-5-6 / 7-8-9).** In the front row (1-2-3) or back row (10-11-12) the idle
+>    nozzles fall outside robot bounds → a hard `PartialTipMovementNotAllowedError`.
+> 2. **Point the idle nozzles off the tall (60 mm) vial rack.** The rack is at slot 7
+>    (back of the cluster), so `start="A1"` (back nozzle) makes the idle nozzles hang
+>    **forward** over empty/short slots — never back across the rack. (`H1` simulates
+>    fine but would sweep the bare idle nozzles over the rack — a real collision risk.)
+>
+> Verified end-to-end in simulation: rack 7, plate 4, paper 5, tips 9, `A1`.
 
 > ### Why apiLevel 2.28
 > Returning a tip to the rack while in **partial** (single-nozzle) configuration is
@@ -142,31 +147,32 @@ tips: {return_tips: false}
    `p300_multi_gen2` right, slots are distinct, and all volumes are in range. Aborts
    with `PRE-FLIGHT VALIDATION FAILED` (no motion) on any mismatch.
 2. **CV: before** — `before_deck.jpg`, `before_plate.jpg`.
-3. **Dilution (single nozzle, `SINGLE` start `H1`)** — direct dilution, total **200 µL**
+3. **Dilution (single nozzle, `SINGLE` start `A1`)** — direct dilution, total **200 µL**
    per well, `stock = 200 / fold`:
 
-   | Well | Fold | Stock µL (vial A2) | Water µL (vial A1) |
+   | Well | Fold | Stock µL (vial B1) | Water µL (vial A1) |
    |------|------|--------------------|--------------------|
-   | A1 | 1× | 200 | 0 |
-   | B1 | 2× | 100 | 100 |
-   | C1 | 5× | 40 | 160 |
-   | D1 | 10× | 20 | 180 |
-   | E1 | 20× | 10 | 190 |
-   | F1 | 30× | 6.7 | 193.3 |
-   | G1 | 40× | 5 | 195 |
-   | H1 | 50× | 4 | 196 |
+   | A9 | 1× | 200 | 0 |
+   | B9 | 2× | 100 | 100 |
+   | C9 | 5× | 40 | 160 |
+   | D9 | 10× | 20 | 180 |
+   | E9 | 20× | 10 | 190 |
+   | F9 | 30× | 6.7 | 193.3 |
+   | G9 | 40× | 5 | 195 |
+   | H9 | 50× | 4 | 196 |
 
-   - **Water pass:** one clean tip (`A12`) distributes water into B1…H1 — the tip only
+   - **Water pass:** one clean tip (`A12`) distributes water into B9…H9 — the tip only
      ever touches water, so the water vial stays pure.
    - **Stock + mix pass:** a **fresh tip per well** (`B12…H12`, `A11`) draws dye from
-     vial A2, dispenses, and mixes — no dye carry-over and the dye vial never sees a
+     vial B1, dispenses, and mixes — no dye carry-over and the dye vial never sees a
      used tip. Each tip is **returned** to the box.
-   - **CV: middle** — a snapshot after wells C1, E1, H1 (`plate_dilution_*.jpg`) plus
+   - **CV: middle** — a snapshot after wells C9, E9, H9 (`plate_dilution_*.jpg`) plus
      `plate_after_dilution.jpg`.
 4. **Print (full 8-channel, `ALL`)** — picks up **column 1 of the tip box (8 tips) as a
-   block**, aspirates 15 µL from plate column 1 (all 8 wells at once), and dispenses
-   onto paper column 1 → **8 droplets in one shot**. Tips **returned**.
-   - **CV: print** — `paper_print.jpg`.
+   block**, aspirates 15 µL from plate column 9 (all 8 wells at once), and dispenses
+   onto the paper → **8 droplets in one shot**, repeated for each of the 4 replicates.
+   Tips **returned**.
+   - **CV: print** — `paper_print_01.jpg` ... `paper_print_04.jpg`.
 5. **CV: after** — `after_deck.jpg`, `after_plate.jpg`.
 
 > ⚠️ **Accuracy caveat.** The 20×–50× stock volumes (4–10 µL) are **below the p300's
@@ -236,11 +242,14 @@ trends light→dark down the column).
 2. **Confirm the robot supports API 2.28.** If not, see the apiLevel note above.
 3. **Build from your YAML** (`python scripts/build_vial_dilution_print.py`) and **run the
    generated file** `src/protocols/generated/vial_dilution_print_latest.py` via the
-   Opentrons App (upload, set Runtime Parameters, Run) or `opentrons_execute` over SSH.
+   Opentrons App (upload, set Runtime Parameters, Run). Do not use bare
+   `opentrons_execute` for this API 2.28 protocol; it does not provide the deck
+   configuration this protocol needs.
    Start with **dry_run = True** to confirm loading + pre-flight, then a real run.
 4. **Pull images & run CV:** retrieve `/data/vision/vial_dilution_print/*.jpg` (see
-   [computer_vision.md](computer_vision.md) for `scp -O`), then
-   `python vision_tests/scripts/verify_print_droplets.py --image <paper_print.jpg>`.
+   [computer_vision.md](computer_vision.md) for `scp -O`), then run the CV check on
+   one printed replicate, e.g.
+   `python vision_tests/scripts/verify_print_droplets.py --image <paper_print_01.jpg> --expect 8`.
 
 ### Real-robot watch-outs (simulation cannot catch these)
 - **Run Labware Position Check** for the vial rack, plate, and paper. Nominal positions
@@ -248,7 +257,7 @@ trends light→dark down the column).
 - **Idle-nozzle / vial clearance** in single-nozzle mode — verify by eye with the
   e-stop in hand on the first run (the tall 60 mm vials are the hazard).
 - **Sub-minimum volumes** (20×–50×) print imprecise colours — expected (see caveat).
-- **Paper height** — `PRINT_DISPENSE_Z_MM` (3 mm above the paper-reference well bottom)
+- **Paper height** — `printing.dispense_z_mm` (3 mm above the paper-reference well bottom)
   assumes paper laid flat; adjust if the paper sits high/low.
 - **API 2.28 support** on the robot (see above).
 

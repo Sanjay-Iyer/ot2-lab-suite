@@ -10,18 +10,23 @@ see [PARAMETERS.md](PARAMETERS.md) for the knobs.
 
 | Slot | Labware | Role |
 |------|---------|------|
-| 1 | `tuberack_3dprint_20ml_8vials_v2` (custom_beta v1) | Two 20 mL vials: **A1 = water**, **A2 = food colouring**. |
-| 2 | `corning_96_wellplate_360ul_custom` | Dilution series lives in column 1 (rows A→H). |
-| 3 | `corning_96_wellplate_360ul_custom` | **Paper proxy** — a plate object used only as an X/Y/Z coordinate anchor; no liquid is loaded. |
-| 6 | `opentrons_96_tiprack_300ul` | Tips. **Must be slot 6, not directly behind the tuberack.** |
+| 7 | `tuberack_3dprint_20ml_8vials_v2` (custom_beta v1) | Two 20 mL vials in column 1: **A1 (back/top) = water**, **B1 (front/bottom) = food colouring**. |
+| 4 | `corning_96_wellplate_360ul_custom` | Dilution series lives in column 9 (rows A→H). |
+| 5 | `corning_96_wellplate_360ul_custom` | **Paper proxy** — a plate object used only as an X/Y/Z coordinate anchor; no liquid is loaded. |
+| 9 | `opentrons_96_tiprack_300ul` | Tips. |
 
-**Why slot 6:** in single-nozzle mode the 7 idle nozzles of the 8-channel head
-hang off to one side. If the tip box were directly behind the tuberack, those idle
-nozzles would collide with it. Slot 6 is verified clear.
+**Why these slots (single-nozzle rule):** the dilution runs in single-nozzle
+(partial-tip) mode, where the 7 idle nozzles of the 8-channel head hang ~63 mm to one
+side. The single-nozzle labware (rack 7, plate 4, tips 9) must therefore stay in the
+**middle rows (4-5-6 / 7-8-9)** — off the front row (1-2-3) and back row (10-11-12) —
+or a partial-tip move falls outside robot bounds (`PartialTipMovementNotAllowedError`).
+With the tall rack at the back of the cluster (slot 7), `single_start=A1` (back nozzle)
+points the idle nozzles **forward** over empty/short slots, clearing the 60 mm rack.
+Verified end-to-end in simulation.
 
 **Pipette:** `p300_multi_gen2`, right mount (HARDWARE — fixed).
 
-## The vial tube rack (slot 1) geometry
+## The vial tube rack (slot 7) geometry
 
 The rack is 2 rows × 4 columns = 8 vials. Pulled straight from the labware JSON:
 
@@ -88,7 +93,7 @@ On pass it emits non-fatal **accuracy warnings** for any stock draw below the p3
 
 ### Phase A — dilution (single nozzle)
 
-`configure_nozzle_layout(style=SINGLE, start=H1)` — only the front (H1) nozzle is
+`configure_nozzle_layout(style=SINGLE, start=A1)` — only the back (A1) nozzle is
 active, so the head behaves like a single-channel pipette.
 
 1. **Water pass — one clean tip.** The *first* tip allocated does water only,

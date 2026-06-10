@@ -16,13 +16,13 @@ For each of `tuberack`, `plate`, `paper`, `tiprack`:
 
 | Key | Type | Units | Physical impact | Safe bounds |
 |-----|------|-------|-----------------|-------------|
-| `slot` | int | deck slot # | Where the labware physically sits. | 1–11; **all four must be distinct**; tiprack ≠ slot directly behind tuberack (use **6**). |
+| `slot` | int | deck slot # | Where the labware physically sits. | 1–11; **all four must be distinct**. Keep the single-nozzle labware (tuberack, plate, tiprack) in the **middle rows (4-5-6 / 7-8-9)** — out of the front row (1-2-3) and back row (10-11-12) — or partial-tip moves go out of bounds. |
 | `load_name` | str | — | Selects the labware geometry the OT-2 uses. | Must exactly match a known/loaded definition; tuberack must equal `safety.expected_tuberack_load_name`. |
 | `namespace` | str | — | Custom-labware namespace. | `custom_beta` for the custom rack/plate; omit for standard Opentrons labware. |
 | `version` | int | — | Labware definition version. | Must match the JSON's `version` (currently `1`); bump in lockstep when you revise the JSON. |
 
-Fixed defaults: tuberack→1, plate→2, paper→3, tiprack→6. **Paper** uses a 96-well
-plate purely as a coordinate anchor (no liquid loaded).
+Verified defaults: tuberack→**7**, plate→**4**, paper→**5**, tiprack→**9**. **Paper**
+uses a 96-well plate purely as a coordinate anchor (no liquid loaded).
 
 ## `pipette:` — HARDWARE (do not change without re-rigging)
 
@@ -30,14 +30,14 @@ plate purely as a coordinate anchor (no liquid loaded).
 |-----|------|-------|-----------------|-------------|
 | `name` | str | — | Which pipette is loaded; sets max volume + channel count. | `p300_multi_gen2` (must match the attached pipette). |
 | `mount` | str | — | Physical mount side. | `left` \| `right` (rig is `right`). |
-| `single_start` | str | well | Which nozzle is active in single-tip mode. | A valid head nozzle; `H1` = front nozzle (used so idle nozzles clear the deck). |
+| `single_start` | str | well | Which nozzle is active in single-tip mode; the other 7 idle nozzles hang ~63 mm to one side. | A corner nozzle (`A1`/`H1`). Point idle nozzles AWAY from the tall vial rack: rack at the **back** of the cluster → use **`A1`** (idle forward); rack at the front → `H1`. Default **`A1`** (rack at slot 7). |
 
 ## `sources:` — which vial holds what
 
 | Key | Type | Units | Physical impact | Safe bounds |
 |-----|------|-------|-----------------|-------------|
 | `water_vial` | str | vial well | Vial aspirated for the diluent (water). | A well in the tube rack (`A1`–`B4`); default `A1`. |
-| `food_coloring_vial` | str | vial well | Vial aspirated for the dye stock. | A different tube-rack well; default `A2`. Keep ≠ `water_vial`. |
+| `food_coloring_vial` | str | vial well | Vial aspirated for the dye stock. | A different tube-rack well; default `B1` (front/bottom of column 1; water is `A1`, the back/top). Keep ≠ `water_vial`. |
 
 ## `dilution:` — the series
 
@@ -72,8 +72,8 @@ plate purely as a coordinate anchor (no liquid loaded).
 | `enabled` | bool | — | Run Phase B at all. | `true`/`false`. |
 | `source_column` | str | plate column | Plate column printed (8 wells, one per channel). | Valid plate column; usually equals `dilution.destination_column`. |
 | `droplet_volume_ul` | float | µL | Volume dispensed per channel per replicate; droplet size + tip headspace. | `> 0` and `≤ 300`; keep small (default `15.0`) to preserve the air headspace. |
-| `num_replicates` | int | prints | How many times the column is printed across the paper. | `≥ 1`; ensure `(n−1)·spacing` stays on the paper. Default `1`. |
-| `paper_start_well` | str | well | Paper-proxy well used as the spatial origin for the droplet row. | A valid plate well; default `A1`. |
+| `num_replicates` | int | prints | How many times the column is printed across the paper. | `≥ 1`; ensure `(n−1)·spacing` stays on the paper. Default `4`. |
+| `paper_start_well` | str | well | Paper-proxy well used as the spatial origin for the droplet row. | A valid plate well; default `A9`. |
 | `dispense_z_mm` | float | mm | Tip height **above the paper-proxy well bottom**. The tip never touches paper. | `> 0`; default `3.0` (≈3 mm above the sheet given the ~5 mm well bottom). Lower cautiously; raise if paper is on a mat. |
 | `print_block_column` | int | tiprack column | Tiprack column grabbed as the reserved 8-tip block. | `1`–`12`; **must not** be in `single_tip_columns`. Default `1`. |
 | `blow_out` | bool | — | Blow out after each dispense (expels the air headspace). | Default `false` — leave off to avoid splatter unless clearing the tip is intended. |
@@ -83,7 +83,7 @@ plate purely as a coordinate anchor (no liquid loaded).
 
 | Key | Type | Units | Physical impact | Safe bounds |
 |-----|------|-------|-----------------|-------------|
-| `x` | float | mm | Horizontal step between replicate columns. | `≥ 0`; `(num_replicates−1)·x` must stay on the paper. Default `12.0`. |
+| `x` | float | mm | Horizontal step between replicate columns. | `≥ 0`; `(num_replicates−1)·x` must stay on the paper. Default `9.0`. |
 | `y` | float | mm | Vertical-on-deck (front/back) step. | `≥ 0`; default `0.0`. |
 | `z` | float | mm | Height step between replicates. | `0.0` for flat paper; non-zero only for stacked replicates (unusual). Default `0.0`. |
 

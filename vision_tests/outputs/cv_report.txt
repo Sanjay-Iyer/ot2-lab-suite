@@ -1,17 +1,24 @@
 ============================================================
   PRINTED-DROPLET CV VERIFICATION REPORT
 ============================================================
-Generated : 2026-06-08T16:34:35.945811Z
-Expected droplets per image : 8
-OVERALL   : FAIL
+Generated      : 2026-06-10T19:14:55.859865+00:00
+Workflow YAML  : vial_dilution_print.yaml
+Dest column    : 9
+Fold series    : [1, 2, 5, 10, 20, 30, 40, 50]
+Expected drops : 8
+OVERALL        : PASS
 
 Image: paper_print.jpg
-  droplets found : 4  (expected 8)  -> MISMATCH
+  droplets found : 8  (expected 8)  -> OK
   shape          : min circularity 0.867 (round)
   colour gradient: detected
-  verdict        : FAIL
+  verdict        : PASS
 
-     A1 fold=  1x  RGB=(12,40,146)  bright=66  circ=0.867
-     B1 fold=  2x  RGB=(26,55,157)  bright=79  circ=0.909
-     C1 fold=  5x  RGB=(42,70,166)  bright=93  circ=0.909
-     D1 fold= 10x  RGB=(58,88,178)  bright=108  circ=0.909
+     A9 fold=  1x  RGB=(17,46,149)  bright=71  circ=0.89
+     B9 fold=  2x  RGB=(31,60,159)  bright=83  circ=0.89
+     C9 fold=  5x  RGB=(46,74,168)  bright=96  circ=0.884
+     D9 fold= 10x  RGB=(58,88,177)  bright=108  circ=0.867
+     E9 fold= 20x  RGB=(73,102,186)  bright=121  circ=0.909
+     F9 fold= 30x  RGB=(88,118,197)  bright=134  circ=0.909
+     G9 fold= 40x  RGB=(106,134,208)  bright=149  circ=0.885
+     H9 fold= 50x  RGB=(120,150,219)  bright=163  circ=0.885

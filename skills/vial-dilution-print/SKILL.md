@@ -6,9 +6,9 @@ description: Build, validate, simulate, deploy, and CV-verify the 20 mL vial →
 # Vial Dilution → 8-Channel Paper Print
 
 The flagship demo pipeline: draw water + food colouring from two **20 mL
-scintillation vials** in the custom v2 tube rack (slot 1), build an 8-step
-dilution series down **one column** of a 96-well plate (slot 2), then pick up an
-8-tip block and "print" that whole column onto paper (slot 3) as 8 simultaneous
+scintillation vials** in the custom v2 tube rack (slot 7), build an 8-step
+dilution series down **one column** of a 96-well plate (slot 4), then pick up an
+8-tip block and "print" that whole column onto paper (slot 5) as 8 simultaneous
 droplets. Tips are **returned**, not trashed. The host then runs computer-vision
 QC on the resulting droplet image.
 
@@ -79,8 +79,12 @@ See [TOOLS.md](TOOLS.md) §5 for the tool list and the knob→YAML mapping.
 2. **Tip-column separation.** `printing.print_block_column` must not appear in
    `dilution.single_tip_columns`, or the 8-tip print block would be clobbered by
    single-tip dilution pickups.
-3. **Slot 6 tiprack.** The tip box must not sit directly behind the tuberack;
-   single-nozzle idle nozzles collide. Slot 6 is verified clear.
+3. **Middle-row layout for single-nozzle labware.** The vial rack, tip rack, and
+   plate must stay in the middle deck rows (4-5-6 / 7-8-9) — off the front row (1-2-3)
+   and back row (10-11-12) — so partial-tip idle nozzles stay in robot bounds, and
+   `single_start` must point those idle nozzles off the tall vial rack. Verified
+   layout: rack 7, plate 4, paper 5, tips 9, `single_start: A1`. See
+   [ot2-robot-profile](../ot2-robot-profile/SKILL.md) for the general rule.
 4. **apiLevel 2.28.** Required for `return_tip()` in partial (single-nozzle) mode.
 5. **No hardcoded rows/wells.** Row order is derived from the loaded labware
    (`rows_by_name()`), never the literal `"ABCDEFGH"`. A regression test enforces

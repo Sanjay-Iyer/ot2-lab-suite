@@ -48,112 +48,72 @@ metadata = {
 }
 
 # ── Runtime-parameter DEFAULTS (operator overrides in the App per run) ──────────
-DEFAULT_DRY_RUN     = False   # load + pre-flight + comments only (no liquid motion)
-DEFAULT_DO_DILUTION = True    # run the dilution phase
-DEFAULT_DO_PRINT    = True    # run the 8-channel print phase
+DEFAULT_DRY_RUN     = False
+DEFAULT_DO_DILUTION = True
+DEFAULT_DO_PRINT    = True
 
 # ════════════════════════════════════════════════════════════════════════════════
-# >>> CONFIG START >>>   (the builder replaces everything up to "<<< CONFIG END")
-# ════════════════════════════════════════════════════════════════════════════════
-CONFIG = {
-    # ── Deck: slot + labware identity for each position ──────────────────────────
-    "deck": {
-        "tuberack": {"slot": 7, "load_name": "tuberack_3dprint_20ml_8vials_v2",
-                     "namespace": "custom_beta", "version": 1},
-        "plate":    {"slot": 4, "load_name": "corning_96_wellplate_360ul_custom",
-                     "namespace": "custom_beta", "version": 1},
-        # Paper is modelled as a 96-well plate for coordinate anchoring only.
-        # dispense_z_mm controls the actual tip height above the paper surface.
-        "paper":    {"slot": 5, "load_name": "corning_96_wellplate_360ul_custom",
-                     "namespace": "custom_beta", "version": 1},
-        "tiprack":  {"slot": 9, "load_name": "opentrons_96_tiprack_300ul"},
-    },
-
-    # ── Pipette (FIXED hardware: 8-channel p300 on the right mount) ───────────────
-    "pipette": {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
-
-    # ── Liquid sources: which VIAL in the rack holds what ────────────────────────
-    "sources": {"water_vial": "A1", "food_coloring_vial": "B1"},
-
-    # ── Dilution series ──────────────────────────────────────────────────────────
-    "dilution": {
-        "enabled": True,
-        "destination_column": "9",     # which plate column holds the series (A..H of it)
-        "total_volume_ul": 200.0,      # volume in every well (<= 360 well, <= 300 tip)
-        # Fold factors. mode = explicit | geometric | linear | log
-        "factors": {
-            "mode": "explicit",
-            "explicit": [1, 2, 5, 10, 20, 30, 40, 50],
-            "step_factor": 2,
-            "start": 1, "end": 50, "count": 8,
-        },
-        "mix_reps": 3,
-        "mix_volume_ul": 120.0,
-        # ⚠ ORDER MATTERS: tips allocated A-first from the first column; the very
-        # first tip becomes the water-only pass tip. See YAML for full explanation.
-        "single_tip_columns": [12, 11],
-    },
-
-    # ── Printing ─────────────────────────────────────────────────────────────────
-    "printing": {
-        "enabled": True,
-        "source_column": "9",          # plate column to print (8 wells, one per channel)
-        "droplet_volume_ul": 15.0,
-        "num_replicates": 4,           # print the column this many times on the paper
-        "paper_start_well": "A9",      # where droplet row lands on the paper reference
-        # Height above the bottom of the paper-proxy well. For the custom Corning
-        # plate the well bottom is ~5 mm above the deck; 3.0 mm above that places the
-        # tip roughly 3 mm above the paper surface. Adjust if the reference plate changes.
-        "dispense_z_mm": 3.0,
-        # X/Y/Z offset per replicate. z: 0.0 = flat paper (no vertical stacking).
-        "replicate_spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0},
-        "print_block_column": 1,       # tiprack column grabbed as the 8-tip block
-        "blow_out": False,
-        "touch_tip": False,
-    },
-
-    # ── Tips: return to the box (True) or drop to trash (False) ──────────────────
-    "tips": {"return_tips": True},
-
-    # ── Camera / CV capture timing ───────────────────────────────────────────────
-    "camera": {
-        "enabled": True,
-        "capture_before": True,
-        "capture_after": True,
-        # Row LETTERS only — destination_column is appended at runtime.
-        # e.g. "C" + "1" -> "C1". Changing destination_column auto-shifts captures.
-        "capture_mid_rows": ["C", "E", "H"],
-        "robot_image_dir": "/data/vision/vial_dilution_print",
-        "robot_api_url": "http://localhost:31950/camera/picture",
-        "capture_timeout_s": 5,
-    },
-
-    # ── Flow rates (uL/s); null/None = Opentrons default ─────────────────────────
-    "flow_rates": {"aspirate": None, "dispense": None, "mix": None},
-
-    # ── Computer-vision expectations (used HOST-side by verify_print_droplets) ────
-    "cv": {
-        "expected_droplets": 8,
-        "min_circularity_ok": 0.6,
-        "detection": {"threshold_method": "otsu", "min_area": 250, "invert": True},
-    },
-
-    # ── Safety / pre-flight expectations ─────────────────────────────────────────
-    "safety": {
-        "expected_tuberack_load_name": "tuberack_3dprint_20ml_8vials_v2",
-        "expected_well_count": 8,
-        "expected_diameter_mm": 28.0,
-        "expected_depth_mm": 55.0,
-        "expected_row_spacing_mm": 34.0,
-        "expected_col_spacing_mm": 31.0,
-        "geometry_tolerance_mm": 0.5,
-        "pipette_min_accurate_ul": 20.0,
-        "expected_plate_well_count": 96,
-        "tiprack_rows_per_column": 8,
-        "pipette_max_volume_ul": 300.0,
-    },
-}
-# ════════════════════════════════════════════════════════════════════════════════
+# >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
+CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
+                          'load_name': 'tuberack_3dprint_20ml_8vials_v2',
+                          'namespace': 'custom_beta',
+                          'version': 1},
+            'plate': { 'slot': 4,
+                       'load_name': 'corning_96_wellplate_360ul_custom',
+                       'namespace': 'custom_beta',
+                       'version': 1},
+            'paper': { 'slot': 5,
+                       'load_name': 'corning_96_wellplate_360ul_custom',
+                       'namespace': 'custom_beta',
+                       'version': 1},
+            'tiprack': {'slot': 9, 'load_name': 'opentrons_96_tiprack_300ul'}},
+  'pipette': {'name': 'p300_multi_gen2', 'mount': 'right', 'single_start': 'A1'},
+  'sources': {'water_vial': 'A1', 'food_coloring_vial': 'B1'},
+  'dilution': { 'enabled': True,
+                'destination_column': '9',
+                'total_volume_ul': 200.0,
+                'factors': { 'mode': 'explicit',
+                             'explicit': [1, 2, 5, 10, 20, 30, 40, 50],
+                             'step_factor': 2,
+                             'start': 1,
+                             'end': 50,
+                             'count': 8},
+                'mix_reps': 3,
+                'mix_volume_ul': 120.0,
+                'single_tip_columns': [12, 11]},
+  'printing': { 'enabled': True,
+                'source_column': '9',
+                'droplet_volume_ul': 15.0,
+                'num_replicates': 4,
+                'paper_start_well': 'A9',
+                'dispense_z_mm': 3.0,
+                'replicate_spacing_mm': {'x': 9.0, 'y': 0.0, 'z': 0.0},
+                'print_block_column': 1,
+                'blow_out': False,
+                'touch_tip': False},
+  'tips': {'return_tips': True},
+  'camera': { 'enabled': True,
+              'capture_before': True,
+              'capture_after': True,
+              'capture_mid_rows': ['C', 'E', 'H'],
+              'robot_image_dir': '/data/vision/vial_dilution_print',
+              'robot_api_url': 'http://localhost:31950/camera/picture',
+              'capture_timeout_s': 5},
+  'flow_rates': {'aspirate': None, 'dispense': None, 'mix': None},
+  'cv': { 'expected_droplets': 8,
+          'min_circularity_ok': 0.6,
+          'detection': {'threshold_method': 'otsu', 'min_area': 250, 'invert': True}},
+  'safety': { 'expected_tuberack_load_name': 'tuberack_3dprint_20ml_8vials_v2',
+              'expected_well_count': 8,
+              'expected_diameter_mm': 28.0,
+              'expected_depth_mm': 55.0,
+              'expected_row_spacing_mm': 34.0,
+              'expected_col_spacing_mm': 31.0,
+              'geometry_tolerance_mm': 0.5,
+              'pipette_min_accurate_ul': 20.0,
+              'expected_plate_well_count': 96,
+              'tiprack_rows_per_column': 8,
+              'pipette_max_volume_ul': 300.0}}
 # <<< CONFIG END <<<
 # ════════════════════════════════════════════════════════════════════════════════
 
