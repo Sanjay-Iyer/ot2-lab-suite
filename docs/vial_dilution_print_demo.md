@@ -240,12 +240,17 @@ trends light→dark down the column).
 1. **Deploy the labware** (once): `python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json`
    (and import the Corning plate + tip rack via the App if not already present).
 2. **Confirm the robot supports API 2.28.** If not, see the apiLevel note above.
-3. **Build from your YAML** (`python scripts/build_vial_dilution_print.py`) and **run the
-   generated file** `src/protocols/generated/vial_dilution_print_latest.py` via the
-   Opentrons App (upload, set Runtime Parameters, Run). Do not use bare
-   `opentrons_execute` for this API 2.28 protocol; it does not provide the deck
-   configuration this protocol needs.
-   Start with **dry_run = True** to confirm loading + pre-flight, then a real run.
+3. **Build from your YAML** (`python scripts/build_vial_dilution_print.py`) and run the
+   generated file with `scripts/run_vial_print_robot.py`, which uses the robot HTTP API.
+   Do not use bare `opentrons_execute` for this API 2.28 protocol; it does not provide
+   the deck configuration this protocol needs. Start with the terminal dry run, then
+   run live:
+
+   ```powershell
+   python scripts\run_vial_print_robot.py
+   python scripts\run_vial_print_robot.py --live
+   ```
+
 4. **Pull images & run CV:** retrieve `/data/vision/vial_dilution_print/*.jpg` (see
    [computer_vision.md](computer_vision.md) for `scp -O`), then run the CV check on
    one printed replicate, e.g.
