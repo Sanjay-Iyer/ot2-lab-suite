@@ -190,6 +190,14 @@ def validate(cfg: dict) -> list:
     pip_max  = float(safety.get("pipette_max_volume_ul",
                      _PIPETTE_MAX_UL.get(pip_name, 300.0)))
 
+    # Source vial aspiration height: measured above the modeled vial bottom.
+    source_height = float(cfg["sources"].get("vial_aspirate_height_mm", 1.0))
+    vial_depth = float(safety.get("expected_depth_mm", 55.0))
+    if not (0 < source_height < vial_depth):
+        errors.append(
+            f"sources.vial_aspirate_height_mm {source_height} must be > 0 and "
+            f"< expected vial depth {vial_depth} mm")
+
     # ── Dilution plan ─────────────────────────────────────────────────────────────
     dil = cfg["dilution"]
     pr  = cfg["printing"]

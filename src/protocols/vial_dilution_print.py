@@ -73,7 +73,11 @@ CONFIG = {
     "pipette": {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
 
     # ── Liquid sources: which VIAL in the rack holds what ────────────────────────
-    "sources": {"water_vial": "A1", "food_coloring_vial": "A2"},
+    "sources": {
+        "water_vial": "A1",
+        "food_coloring_vial": "A2",
+        "vial_aspirate_height_mm": 10.0,  # above vial bottom; avoids rounded/glass bottom hits
+    },
 
     # ── Dilution series ──────────────────────────────────────────────────────────
     "dilution": {
@@ -328,6 +332,12 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
         errors.append(f"Vial A1 diameter {a1.diameter} != {safety['expected_diameter_mm']} mm.")
     if abs(a1.depth - safety["expected_depth_mm"]) > tol:
         errors.append(f"Vial A1 depth {a1.depth} != {safety['expected_depth_mm']} mm.")
+    source_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 1.0))
+    if not (0 < source_height < a1.depth):
+        errors.append(
+            f"sources.vial_aspirate_height_mm {source_height} must be > 0 and "
+            f"< vial depth {a1.depth} mm."
+        )
 
     # Row/col spacing: derived from canonical column ordering — no hardcoded well names.
     tuberack_cols = tuberack.columns()   # list of columns; each column = list of wells
@@ -739,6 +749,9 @@ def run(protocol: protocol_api.ProtocolContext):
 
     water_vial = lw["tuberack"][CONFIG["sources"]["water_vial"]]
     fc_vial = lw["tuberack"][CONFIG["sources"]["food_coloring_vial"]]
+    vial_aspirate_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 10.0))
+    water_vial_aspirate = water_vial.bottom(vial_aspirate_height)
+    fc_vial_aspirate = fc_vial.bottom(vial_aspirate_height)
 
     if params.do_dilution and dil["enabled"]:
         pipette.configure_nozzle_layout(
@@ -752,13 +765,16 @@ def run(protocol: protocol_api.ProtocolContext):
             f"One-tip setup: picked tip {setup_tip}. This is the only tip used "
             "while working with the 20 mL vial rack."
         )
+        protocol.comment(
+            f"Vial aspiration height: {vial_aspirate_height} mm above modeled vial bottom."
+        )
 
         for well_name, fold in zip(dil_wells, factors):
             _stock, water_vol = dilution_volumes(total, fold)
             if water_vol <= 0:
                 continue
             protocol.comment(f"Dispensing {water_vol} uL water -> {well_name}.")
-            pipette.aspirate(water_vol, water_vial)
+            pipette.aspirate(water_vol, water_vial_aspirate)
             pipette.dispense(water_vol, lw["plate"][well_name])
 
         for well_name, fold in zip(dil_wells, factors):
@@ -769,7 +785,7 @@ def run(protocol: protocol_api.ProtocolContext):
                 f"Diluting well {well_name} to {fold:g}x (stock {stock} uL); "
                 f"same setup tip {setup_tip}."
             )
-            pipette.aspirate(stock, fc_vial)
+            pipette.aspirate(stock, fc_vial_aspirate)
             pipette.dispense(stock, lw["plate"][well_name])
 
         for well_name, fold in zip(dil_wells, factors):
