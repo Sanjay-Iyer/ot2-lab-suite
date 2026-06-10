@@ -48,6 +48,20 @@ Steps 2–4 run from the **conda `ai`** environment (has `opentrons`, `numpy`,
 `cv2`, `pandas`, `yaml`). They make **no robot connection** and are safe on the
 dev laptop. Only step 5 needs the lab laptop.
 
+### Or drive it conversationally (AI agent)
+
+`src/agents/vial_print_agent.py` is a LangChain + LangGraph (Gemini) agent that runs
+this exact pipeline from natural language — adjust the number of dilutions, droplet
+volume, and replicates by talking to it. It **wraps** the CLI tools (it does not
+bypass any gate) and edits a *user* YAML copy, never the committed default.
+
+```bash
+python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets"   # offline, no API key
+```
+
+See [TOOLS.md](TOOLS.md) §5 for the tool list and the knob→YAML mapping.
+
 > **Why the YAML must be *built* in, not read at runtime:** the robot cannot see
 > the repo. `build_vial_dilution_print.py` embeds the YAML as the `CONFIG` dict
 > between the `# >>> CONFIG START >>>` / `# <<< CONFIG END <<<` markers and writes

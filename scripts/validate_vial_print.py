@@ -27,11 +27,15 @@ the factor list never silently breaks the validator.
 
 USAGE (from the env that has opentrons + numpy, e.g. conda env `ai`):
     python scripts/validate_vial_print.py
+    python scripts/validate_vial_print.py --config configs/workflows/user/my_run.yaml
 
-Exits 0 only if every case passes; 1 otherwise.
+Pass --config with the same YAML used to build the generated protocol so a custom
+factor list / destination column is validated against its own expectations rather
+than the committed default's. Exits 0 only if every case passes; 1 otherwise.
 """
 from __future__ import annotations
 
+import argparse
 import math
 import re
 import subprocess
@@ -208,6 +212,18 @@ def _evaluate(output, expect_ok, must_contain, must_not_contain) -> list:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="Run the generated vial_dilution_print protocol through the "
+                    "Opentrons simulator under a 5-case run-mode matrix.")
+    ap.add_argument(
+        "--config", default=str(_WORKFLOW_YAML),
+        help="Workflow YAML the must-contain assertions are derived from "
+             "(default: the committed default). Pass the same user config used to "
+             "build the generated protocol so a custom factor list / destination "
+             "column validates against its own expectations, not the default's.")
+    args = ap.parse_args()
+    workflow_yaml = Path(args.config)
+
     # ── Announce which file is being validated ────────────────────────────────────
     if PROTOCOL == _GENERATED:
         print(f"Validating GENERATED protocol: {PROTOCOL.relative_to(REPO)}")
@@ -224,10 +240,12 @@ def main() -> int:
         return 1
 
     # ── Load workflow YAML for dynamic case generation ────────────────────────────
-    if not _WORKFLOW_YAML.exists():
-        print(f"ERROR: workflow YAML not found: {_WORKFLOW_YAML}")
+    if not workflow_yaml.exists():
+        print(f"ERROR: workflow YAML not found: {workflow_yaml}")
         return 1
-    workflow_cfg = yaml.safe_load(_WORKFLOW_YAML.read_text(encoding="utf-8")) or {}
+    if workflow_yaml != _WORKFLOW_YAML:
+        print(f"Deriving case assertions from: {workflow_yaml}")
+    workflow_cfg = yaml.safe_load(workflow_yaml.read_text(encoding="utf-8")) or {}
 
     CASES = _build_cases(workflow_cfg)
     source = PROTOCOL.read_text(encoding="utf-8")

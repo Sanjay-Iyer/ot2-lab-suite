@@ -48,15 +48,15 @@ DEFAULT_DO_PRINT    = True
 
 # ════════════════════════════════════════════════════════════════════════════════
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
+CONFIG = { 'deck': { 'tuberack': { 'slot': 10,
                           'load_name': 'tuberack_3dprint_20ml_8vials_v2',
                           'namespace': 'custom_beta',
                           'version': 1},
-            'plate': { 'slot': 4,
+            'plate': { 'slot': 1,
                        'load_name': 'corning_96_wellplate_360ul_custom',
                        'namespace': 'custom_beta',
                        'version': 1},
-            'paper': { 'slot': 5,
+            'paper': { 'slot': 3,
                        'load_name': 'corning_96_wellplate_360ul_custom',
                        'namespace': 'custom_beta',
                        'version': 1},

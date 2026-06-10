@@ -20,6 +20,41 @@ This repo implements a **LangChain + LangGraph ReAct agent** that acts as a conv
 
 ---
 
+## Flagship: Vial-Dilution-Print Conversational Agent
+
+`src/agents/vial_print_agent.py` is a **dedicated, standalone** agent for the 20 mL
+vial → 96-well dilution → 8-channel paper-print demo. It is separate from the general
+`main.py` agent because the vial demo uses the hardened **build-embed-CONFIG** pipeline
+(`scripts/build_vial_dilution_print.py` + `validate_vial_print.py` +
+`verify_print_droplets.py`), not the registry's render path.
+
+Talk to it to set the three dynamic knobs; it edits a **user** YAML copy (never the
+committed default), builds, validates, and CV-checks, then — on the lab laptop only —
+deploys and runs behind the `RUN ROBOT` gate.
+
+```bash
+# Live (needs GOOGLE_API_KEY)
+python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+# Offline, no LLM/API key — runs load→update→build→validate→CV directly
+python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
+```
+
+| Knob | Tool arg | YAML key | Bounds |
+|------|----------|----------|--------|
+| number of dilutions | `num_dilutions` | first N `dilution.factors.explicit` + `cv.expected_droplets` | 1–8 |
+| droplet volume | `droplet_volume_ul` | `printing.droplet_volume_ul` | 0 < v ≤ 300 |
+| replicates | `num_replicates` | `printing.num_replicates` | ≥ 1 |
+| anything else | `advanced_updates` | any documented key | per PARAMETERS.md |
+
+**Tools** (`src/agents/vial_print_tools.py`): `load_vial_print_defaults`,
+`update_vial_print_params`, `preview_dilution_plan`, `show_vial_print_config`,
+`build_vial_print_protocol`, `validate_vial_print_matrix`, `verify_print_droplets_mock`;
+robot deploy/execute are reused from `tools.py`. Ground truth for parameters and
+mechanics: [`skills/vial-dilution-print/`](../skills/vial-dilution-print/SKILL.md).
+Offline tests: `tests/test_vial_print_agent.py`.
+
+---
+
 ## Directory Map — Agent-Related Files
 
 ```
@@ -27,7 +62,9 @@ ot2-lab-suite/
 │
 ├── src/
 │   └── agents/                          ← CORE AGENT CODE
-│       ├── main.py                      ← Agent entry point, REPL loop, session logging
+│       ├── main.py                      ← General agent entry point, REPL, session logging
+│       ├── vial_print_agent.py          ← FLAGSHIP: conversational driver for the 20 mL vial demo
+│       ├── vial_print_tools.py          ← Tools wrapping the vial-dilution-print CLI pipeline
 │       ├── tools.py                     ← 12 LangChain @tool functions
 │       ├── check_models.py              ← Lists available Gemini models (debug utility)
 │       ├── run_stress_tests.py          ← 10-test benchmark suite for agent validation
@@ -173,6 +210,11 @@ REMOTE_USER_STORAGE=/var/lib/jupyter/notebooks   # Robot filesystem path
 | `printing_demo` | `configs/workflows/defaults/printing_demo.yaml` | Demo-scale printing |
 | `printing_12` | `configs/workflows/defaults/printing_12.yaml` | 12-well plate variant |
 | `printing_96` | `configs/workflows/defaults/printing_96.yaml` | 96-well plate variant |
+
+> **Note:** the flagship `vial_dilution_print` demo is **not** a registry workflow — it
+> has its own build-embed-CONFIG pipeline and its own agent
+> (`src/agents/vial_print_agent.py`, see above), driven from
+> `configs/workflows/defaults/vial_dilution_print.yaml`.
 
 ---
 

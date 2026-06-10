@@ -98,6 +98,13 @@ python vision_tests/scripts/verify_print_droplets.py --mock --expect 8
 Steps 1–3 are safe on any machine (no robot connection). Deployment/execution is
 **lab laptop only** — see [ot2-robot-control](skills/ot2-robot-control/SKILL.md).
 
+You can also drive this entire pipeline **conversationally**: the
+`src/agents/vial_print_agent.py` LangChain agent maps natural-language requests
+("5 dilutions, 20 µL droplets, 3 replicates") onto the YAML and runs
+build → validate → CV for you. It **wraps** these gates rather than bypassing them,
+and edits a *user* YAML copy — the rules below still apply in full. See
+[skills/vial-dilution-print/TOOLS.md](skills/vial-dilution-print/TOOLS.md) §5.
+
 > **A green exit code is not proof.** `opentrons.simulate` exits 0 even when a
 > protocol raises at runtime. Trust the text-scan verdicts (`SIMULATION OK`,
 > `ALL CASES PASSED`) — not the exit code alone.

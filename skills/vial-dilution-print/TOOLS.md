@@ -64,11 +64,20 @@ run modes and asserts each behaves correctly. This is the real pass/fail gate.
 
 ```bash
 python scripts/validate_vial_print.py
+python scripts/validate_vial_print.py --config configs/workflows/user/my_run.yaml
 ```
 
-No arguments. **Target file priority:**
+| Argument | Type | Default | Meaning |
+|----------|------|---------|---------|
+| `--config` | path | the committed default YAML | YAML the must-contain assertions are **derived** from. Pass the *same* user config used to build the generated protocol so a custom factor list / `destination_column` validates against its own expectations, not the default's. |
+
+**Target file priority:**
 `src/protocols/generated/vial_dilution_print_latest.py` →
 `src/protocols/vial_dilution_print.py`.
+
+> When the AI agent (below) builds from a user config, it threads that same path
+> into `--config` automatically. Hand-runs of the bare command still validate the
+> default.
 
 **The five cases** (must-contain / must-not-contain strings are generated *from the
 YAML*, so changing `destination_column` or the factor list never silently breaks
@@ -156,6 +165,43 @@ source must not contain `_ROWS = "ABCDEFGH"` — rows must be derived from labwa
 Add new behaviour here as invariant assertions, not hardcoded expected strings.
 
 ---
+
+## 5. `src/agents/vial_print_agent.py` — conversational driver
+
+A standalone LangChain + LangGraph (Gemini) agent that runs the whole pipeline from
+natural language. It wraps the three tools above — it does **not** replace them, so
+every safety gate still fires.
+
+```bash
+# Live agent (needs GOOGLE_API_KEY in .env)
+python -m src.agents.vial_print_agent
+python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+
+# Deterministic offline pipeline — no LLM / API key (load->update->build->validate->CV)
+python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
+```
+
+**The three conversational knobs → YAML** (see [PARAMETERS.md](PARAMETERS.md)):
+
+| Say | YAML key set | Notes |
+|-----|--------------|-------|
+| "N dilutions" | first N canonical `dilution.factors.explicit` **+** `cv.expected_droplets=N` | N = droplets per print; `1 ≤ N ≤ 8` |
+| "V uL droplets" | `printing.droplet_volume_ul` | `0 < V ≤ 300`; keep small |
+| "R replicates" | `printing.num_replicates` | `R ≥ 1` |
+
+Anything else (fold strengths, total volume, mix reps, columns, slots) goes through
+`update_vial_print_params(advanced_updates={...})`.
+
+**Tools** (`src/agents/vial_print_tools.py`): `load_vial_print_defaults`,
+`update_vial_print_params`, `preview_dilution_plan`, `show_vial_print_config`,
+`build_vial_print_protocol` (→ writes a user YAML under `configs/workflows/user/`,
+runs the builder, records a PASS in `simulations.json`), `validate_vial_print_matrix`
+(runs the matrix with `--config`), `verify_print_droplets_mock`. Robot deploy/execute
+are reused unchanged from `src/agents/tools.py` (lab laptop only, behind `RUN ROBOT`).
+
+The agent **edits the YAML, never the generated file**, and never touches the
+committed default — each run leaves a timestamped user YAML for traceability.
+Offline tests: `tests/test_vial_print_agent.py`.
 
 ## Quick recipes
 
