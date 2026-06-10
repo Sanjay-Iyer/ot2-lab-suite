@@ -76,7 +76,7 @@ CONFIG = {
     "sources": {
         "water_vial": "A1",
         "food_coloring_vial": "A2",
-        "vial_aspirate_height_mm": 10.0,  # above vial bottom; avoids rounded/glass bottom hits
+        "vial_aspirate_height_mm": 3.0,  # above vial bottom; absolute model Z = 5 + 3 = 8 mm
     },
 
     # ── Dilution series ──────────────────────────────────────────────────────────
@@ -749,7 +749,7 @@ def run(protocol: protocol_api.ProtocolContext):
 
     water_vial = lw["tuberack"][CONFIG["sources"]["water_vial"]]
     fc_vial = lw["tuberack"][CONFIG["sources"]["food_coloring_vial"]]
-    vial_aspirate_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 10.0))
+    vial_aspirate_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 3.0))
     water_vial_aspirate = water_vial.bottom(vial_aspirate_height)
     fc_vial_aspirate = fc_vial.bottom(vial_aspirate_height)
 
