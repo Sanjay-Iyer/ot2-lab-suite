@@ -91,11 +91,11 @@ def _create_run(
     body = {
         "data": {
             "protocolId": protocol_id,
-            "runTimeParameterValues": [
-                {"variableName": "dry_run", "value": dry_run},
-                {"variableName": "do_dilution", "value": do_dilution},
-                {"variableName": "do_print", "value": do_print},
-            ],
+            "runTimeParameterValues": {
+                "dry_run": dry_run,
+                "do_dilution": do_dilution,
+                "do_print": do_print,
+            },
         }
     }
     print("\n[create run]")
