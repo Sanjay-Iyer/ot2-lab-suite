@@ -170,6 +170,7 @@ def main() -> int:
     print(f"Dilution  : {do_dilution}")
     print(f"Print     : {do_print}")
     print("\nDeck must be: slot 7 vial rack (A1 water, A2 dye), slot 4 plate, slot 5 paper, slot 9 tips.")
+    print("Tip plan  : one setup tip H12 for vial/plate setup, then 8 print tips from column 1.")
 
     protocol_id = _upload_protocol(robot_ip, protocol_path)
     run_id = _create_run(

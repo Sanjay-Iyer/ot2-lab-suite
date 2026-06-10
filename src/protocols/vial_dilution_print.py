@@ -3,10 +3,10 @@
 OT-2 Protocol: 20 mL Vial Dilution -> Single-Tip Paper Print Demo (config-driven)
 ================================================================================
 Builds a food-coloring dilution series in one column of a 96-well plate, drawing
-water and dye from two 20 mL scintillation vials in the custom v2 tube rack, then
-uses the 8-channel pipette in SINGLE-nozzle mode to print one source well at a
-time onto paper. Tips are RETURNED to the box, not trashed. CV snapshots are
-captured at the start, a few middle steps, and the end.
+water and dye from two 20 mL scintillation vials in the custom v2 tube rack with
+exactly one SINGLE-nozzle setup tip, then switches to the full 8-channel head to
+print one 8-droplet row onto paper. Tips are RETURNED to the box, not trashed.
+CV snapshots are captured at the start, a few middle steps, and the end.
 
 >>> EVERYTHING is driven by the CONFIG dict below. <<<
 Edit CONFIG directly for a quick change, OR keep the canonical settings in
@@ -16,10 +16,10 @@ that YAML embedded between the CONFIG markers. See docs/vial_dilution_print_demo
 
 DECK / WHY apiLevel 2.28 / HOW TO RUN - see the demo guide + skills/ot2-robot-profile.
 Short version:
-  * Deck slots are config-driven (see CONFIG["deck"]). Single-nozzle labware must
-    sit in the MIDDLE rows and single_start must point idle nozzles off the tall
-    rack - see skills/ot2-robot-profile for the rule. Verified: rack=7, plate=4,
-    paper=5, tips=9, single_start=A1.
+  * Deck slots are config-driven (see CONFIG["deck"]). Single-nozzle setup uses
+    active nozzle A1 and picks an H-row tip so only one tip engages, matching the
+    3d_print_labware_validate protocol. Verified: rack=7, plate=4, paper=5,
+    tips=9, single_start=A1, setup_tip=H12.
   * apiLevel 2.28 is required for return_tip() in partial (single-nozzle) mode.
   * RUN PATH: 2.28 uses the new protocol engine, so on the real OT-2 run this from
     the Opentrons App (it provides the deck configuration). Bare `opentrons_execute`
@@ -30,7 +30,7 @@ RUN-MODE FLAGS (App Runtime Parameters; DEFAULT_* mirror them for simulation):
 """
 
 from opentrons import protocol_api
-from opentrons.protocol_api import SINGLE
+from opentrons.protocol_api import ALL, SINGLE
 from opentrons.types import Point
 import math
 import os
@@ -38,11 +38,11 @@ import shutil
 import subprocess
 
 metadata = {
-    "protocolName": "OT-2 Vial Dilution -> Single-Tip Paper Print Demo",
+    "protocolName": "OT-2 Vial Dilution -> 8-Channel Paper Print Demo",
     "author": "Antigravity AI Agent",
     "description": (
         "Config-driven direct dilution series from two 20 mL vials into a 96-well "
-        "column, then a single-tip sequential print of that column onto paper."
+        "column using one setup tip, then one 8-channel print of that column onto paper."
     ),
     "apiLevel": "2.28",  # 2.28 REQUIRED: partial-mode return_tip() (blocked < 2.28)
 }
@@ -50,7 +50,7 @@ metadata = {
 # ── Runtime-parameter DEFAULTS (operator overrides in the App per run) ──────────
 DEFAULT_DRY_RUN     = False   # load + pre-flight + comments only (no liquid motion)
 DEFAULT_DO_DILUTION = True    # run the dilution phase
-DEFAULT_DO_PRINT    = True    # run the single-tip print phase
+DEFAULT_DO_PRINT    = True    # run the 8-channel print phase
 
 # ════════════════════════════════════════════════════════════════════════════════
 # >>> CONFIG START >>>   (the builder replaces everything up to "<<< CONFIG END")
@@ -89,9 +89,10 @@ CONFIG = {
         },
         "mix_reps": 3,
         "mix_volume_ul": 120.0,
-        # ⚠ ORDER MATTERS: tips allocated A-first from the first column; the very
-        # first tip becomes the water-only pass tip. See YAML for full explanation.
-        "single_tip_columns": [12, 11],
+        # One setup tip only. With single_start=A1, an H-row tip makes the idle
+        # nozzles hang off the front edge of the tiprack during pickup.
+        "setup_tip": "H12",
+        "single_tip_columns": [12],    # legacy alias; not used by the one-tip setup
     },
 
     # ── Printing ─────────────────────────────────────────────────────────────────
@@ -99,7 +100,7 @@ CONFIG = {
         "enabled": True,
         "source_column": "9",          # plate column to print (8 wells, one per channel)
         "droplet_volume_ul": 15.0,
-        "num_replicates": 4,           # print the column this many times on the paper
+        "num_replicates": 1,           # one 8-channel print of the column
         "paper_start_well": "A9",      # where droplet row lands on the paper reference
         # Height above the bottom of the paper-proxy well. For the custom Corning
         # plate the well bottom is ~5 mm above the deck; 3.0 mm above that places the
@@ -107,8 +108,7 @@ CONFIG = {
         "dispense_z_mm": 3.0,
         # X/Y/Z offset per replicate. z: 0.0 = flat paper (no vertical stacking).
         "replicate_spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0},
-        "single_tip_columns": [1],     # one-at-a-time print tips; no 8-tip pickup
-        "print_block_column": 1,       # legacy alias; kept so older validators still parse
+        "print_block_column": 1,       # full 8-tip pickup from tiprack column 1
         "blow_out": False,
         "touch_tip": False,
     },
@@ -170,7 +170,7 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         default=DEFAULT_DO_DILUTION)
     parameters.add_bool(
         variable_name="do_print", display_name="Run print phase",
-        description="Pick up one tip at a time and print the plate column onto paper.",
+        description="Pick up 8 tips and print the plate column onto paper once.",
         default=DEFAULT_DO_PRINT)
 
 
@@ -219,47 +219,55 @@ def resolve_dilution_wells(dilution_cfg: dict, n: int, plate_rows: list) -> list
     return [f"{plate_rows[i]}{col}" for i in range(n)]
 
 
-def resolve_single_tips(dilution_cfg: dict, printing_cfg: dict,
-                         n_needed: int, tiprack_rows: list) -> list:
-    """Auto-allocate n_needed single dilution tips from single_tip_columns.
+def _well_row(well_name: str) -> str:
+    return "".join(ch for ch in str(well_name).upper() if ch.isalpha())
 
-    Parameters
-    ----------
-    tiprack_rows : ordered row labels from the loaded tiprack, e.g. ['A'..'H'].
-                   Used instead of a hardcoded string so the count adapts if the
-                   tiprack labware changes (e.g. 384-tip = 16 rows).
-    """
+
+def _well_column(well_name: str) -> int:
+    digits = "".join(ch for ch in str(well_name) if ch.isdigit())
+    if not digits:
+        raise ValueError(f"Well name {well_name!r} does not include a column number.")
+    return int(digits)
+
+
+def _edge_pickup_row(single_start: str, tiprack_rows: list) -> str:
+    """Tip row that leaves idle nozzles off the rack during SINGLE pickup."""
+    start_row = _well_row(single_start)
+    if start_row == tiprack_rows[0]:
+        return tiprack_rows[-1]
+    if start_row == tiprack_rows[-1]:
+        return tiprack_rows[0]
+    raise ValueError(
+        f"single_start must use an edge nozzle row ({tiprack_rows[0]} or "
+        f"{tiprack_rows[-1]}), got {single_start!r}."
+    )
+
+
+def resolve_setup_tip(dilution_cfg: dict, printing_cfg: dict,
+                      pipette_cfg: dict, tiprack_rows: list) -> str:
+    """Return the one SINGLE-nozzle setup tip."""
+    if dilution_cfg.get("setup_tip"):
+        return str(dilution_cfg["setup_tip"]).upper()
+    cols = dilution_cfg.get("single_tip_columns", [])
+    if not cols:
+        raise RuntimeError("dilution.setup_tip or dilution.single_tip_columns is required.")
     reserved = int(printing_cfg["print_block_column"])
-    wells = []
-    for col in dilution_cfg["single_tip_columns"]:
-        if int(col) == reserved:
-            continue
-        for r in tiprack_rows:
-            wells.append(f"{r}{int(col)}")
-    if len(wells) < n_needed:
-        raise RuntimeError(
-            f"Need {n_needed} single tips but single_tip_columns only provide "
-            f"{len(wells)} (excluding reserved print column {reserved})."
-        )
-    return wells[:n_needed]
+    for col in cols:
+        if int(col) != reserved:
+            return f"{_edge_pickup_row(pipette_cfg['single_start'], tiprack_rows)}{int(col)}"
+    raise RuntimeError(
+        f"No setup tip column available: dilution.single_tip_columns {cols} only "
+        f"contains the reserved print column {reserved}."
+    )
 
 
-def resolve_print_tips(printing_cfg: dict, n_needed: int, tiprack_rows: list) -> list:
-    """Auto-allocate one-at-a-time print tips from printing.single_tip_columns."""
-    wells = []
-    for col in printing_cfg.get("single_tip_columns", [printing_cfg.get("print_block_column", 1)]):
-        for row in tiprack_rows:
-            wells.append(f"{row}{int(col)}")
-    if len(wells) < n_needed:
-        raise RuntimeError(
-            f"Need {n_needed} single print tips but printing.single_tip_columns only "
-            f"provide {len(wells)}."
-        )
-    return wells[:n_needed]
+def resolve_print_tip(printing_cfg: dict, plate_rows: list) -> str:
+    """Return the top well of the 8-tip print column."""
+    return f"{plate_rows[0]}{int(printing_cfg['print_block_column'])}"
 
 
 def resolve_print_wells(printing_cfg: dict, n: int, plate_rows: list) -> tuple[list, list]:
-    """Return source plate wells and paper reference wells for single-tip printing."""
+    """Return source plate wells and paper reference wells for 8-channel printing."""
     src_col = str(printing_cfg["source_column"])
     paper_start = str(printing_cfg["paper_start_well"])
     paper_col = "".join(ch for ch in paper_start if ch.isdigit())
@@ -278,7 +286,7 @@ def dilution_volumes(total: float, fold: float) -> tuple:
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────────
 
-def _preflight(protocol, lw, pipette, factors, dil_wells, single_tips,
+def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
                plate_rows: list, tiprack_rows: list):
     """Validate config + loaded-labware geometry BEFORE any motion. Raise to abort.
 
@@ -394,17 +402,20 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, single_tips,
 
     # ── Tip column overlap ────────────────────────────────────────────────────────
     print_col = int(pr["print_block_column"])
-    if print_col in [int(c) for c in dil["single_tip_columns"]]:
+    tip_names = set(lw["tiprack"].wells_by_name().keys())
+    if setup_tip not in tip_names:
+        errors.append(f"dilution.setup_tip {setup_tip!r} is not in the loaded tiprack.")
+    if _well_column(setup_tip) == print_col:
         errors.append(
-            f"print column {pr['print_block_column']} overlaps dilution single_tip_columns "
-            f"{dil['single_tip_columns']} - dilution and print tips would overlap."
+            f"dilution.setup_tip {setup_tip} overlaps full 8-tip print column "
+            f"{print_col}; setup and print tips must be separate."
         )
-    print_single_cols = [int(c) for c in pr.get("single_tip_columns", [print_col])]
-    overlap_cols = sorted(set(print_single_cols).intersection(int(c) for c in dil["single_tip_columns"]))
-    if overlap_cols:
+    expected_row = _edge_pickup_row(CONFIG["pipette"]["single_start"], tiprack_rows)
+    if _well_row(setup_tip) != expected_row:
         errors.append(
-            f"printing.single_tip_columns {print_single_cols} overlap dilution "
-            f"single_tip_columns {dil['single_tip_columns']}: {overlap_cols}."
+            f"dilution.setup_tip must be in row {expected_row} when "
+            f"single_start={CONFIG['pipette']['single_start']} so only one tip engages; "
+            f"got {setup_tip}."
         )
 
     # ── Camera: validate capture_mid_rows entries against actual plate rows ───────
@@ -477,7 +488,7 @@ def _apply_flow_rates(pipette):
         pipette.flow_rate.dispense = fr["dispense"]
 
 
-def run(protocol: protocol_api.ProtocolContext):
+def _legacy_run_single_tip_print(protocol: protocol_api.ProtocolContext):
     params = protocol.params
     deck   = CONFIG["deck"]
     dil    = CONFIG["dilution"]
@@ -516,10 +527,9 @@ def run(protocol: protocol_api.ProtocolContext):
     # ── 3. Resolve the experiment from config + labware structure ─────────────────
     factors     = resolve_factors(dil)
     dil_wells   = resolve_dilution_wells(dil, len(factors), _plate_rows)
-    single_tips = resolve_single_tips(dil, pr, 1 + len(dil_wells), _tiprack_rows)
-    print_tips  = resolve_print_tips(pr, len(dil_wells), _tiprack_rows)
+    setup_tip   = resolve_setup_tip(dil, pr, CONFIG["pipette"], _tiprack_rows)
+    print_tip   = resolve_print_tip(pr, _plate_rows)
     print_src_wells, print_paper_wells = resolve_print_wells(pr, len(dil_wells), _plate_rows)
-    water_tip, stock_tips = single_tips[0], single_tips[1:]
     total = dil["total_volume_ul"]
 
     # Build mid-well capture set: row letter + destination column.
@@ -528,7 +538,7 @@ def run(protocol: protocol_api.ProtocolContext):
     mid_wells_set = {f"{r}{dest_col}" for r in cam.get("capture_mid_rows", [])}
 
     # ── 4. PRE-FLIGHT ─────────────────────────────────────────────────────────────
-    _preflight(protocol, lw, pipette, factors, dil_wells, single_tips,
+    _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
                _plate_rows, _tiprack_rows)
 
     protocol.comment("=== Vial Dilution -> Paper Print Demo Started ===")
@@ -652,6 +662,180 @@ def run(protocol: protocol_api.ProtocolContext):
         )
 
     # ── 8. CV: after ──────────────────────────────────────────────────────────────
+    if cam["capture_after"]:
+        _capture_image(protocol, "after_deck.jpg")
+        _capture_image(protocol, "after_plate.jpg")
+
+    protocol.comment("=== Vial Dilution -> Paper Print Demo Completed ===")
+
+
+def run(protocol: protocol_api.ProtocolContext):
+    params = protocol.params
+    deck = CONFIG["deck"]
+    dil = CONFIG["dilution"]
+    pr = CONFIG["printing"]
+    cam = CONFIG["camera"]
+    return_tips = CONFIG["tips"]["return_tips"]
+
+    def _return_or_drop():
+        if pipette.has_tip:
+            pipette.return_tip() if return_tips else pipette.drop_tip()
+
+    def _load(spec):
+        kw = {}
+        if spec.get("namespace"):
+            kw = {"namespace": spec["namespace"], "version": spec.get("version", 1)}
+        return protocol.load_labware(spec["load_name"], spec["slot"], **kw)
+
+    lw = {
+        "tuberack": _load(deck["tuberack"]),
+        "plate": _load(deck["plate"]),
+        "paper": _load(deck["paper"]),
+        "tiprack": _load(deck["tiprack"]),
+    }
+    pipette = protocol.load_instrument(
+        CONFIG["pipette"]["name"], CONFIG["pipette"]["mount"], tip_racks=[lw["tiprack"]]
+    )
+
+    plate_rows = list(lw["plate"].rows_by_name().keys())
+    tiprack_rows = list(lw["tiprack"].rows_by_name().keys())
+    factors = resolve_factors(dil)
+    dil_wells = resolve_dilution_wells(dil, len(factors), plate_rows)
+    setup_tip = resolve_setup_tip(dil, pr, CONFIG["pipette"], tiprack_rows)
+    print_tip = resolve_print_tip(pr, plate_rows)
+    print_src_wells, print_paper_wells = resolve_print_wells(pr, len(dil_wells), plate_rows)
+    total = dil["total_volume_ul"]
+    dest_col = str(dil["destination_column"])
+    mid_wells_set = {f"{row}{dest_col}" for row in cam.get("capture_mid_rows", [])}
+
+    _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip, plate_rows, tiprack_rows)
+
+    protocol.comment("=== Vial Dilution -> Paper Print Demo Started ===")
+    protocol.comment(
+        f"Flags: dry_run={params.dry_run}, do_dilution={params.do_dilution}, "
+        f"do_print={params.do_print}"
+    )
+    protocol.comment(
+        f"Sources: water=vial {CONFIG['sources']['water_vial']}, "
+        f"food colouring=vial {CONFIG['sources']['food_coloring_vial']} "
+        f"(slot {deck['tuberack']['slot']}). Series: "
+        + ", ".join(f"{w}={f:g}x" for w, f in zip(dil_wells, factors))
+    )
+    protocol.comment(
+        f"Tip plan: one setup tip {setup_tip} for all 20 mL vial work; "
+        f"8-channel print tips from column {pr['print_block_column']}."
+    )
+
+    if params.dry_run:
+        protocol.comment("DRY RUN: labware + pipette loaded, pre-flight passed. No liquid motion.")
+        protocol.comment("=== Vial Dilution -> Paper Print Demo Completed (dry run) ===")
+        return
+
+    _apply_flow_rates(pipette)
+
+    if cam["capture_before"]:
+        _capture_image(protocol, "before_deck.jpg")
+        _capture_image(protocol, "before_plate.jpg")
+
+    water_vial = lw["tuberack"][CONFIG["sources"]["water_vial"]]
+    fc_vial = lw["tuberack"][CONFIG["sources"]["food_coloring_vial"]]
+
+    if params.do_dilution and dil["enabled"]:
+        pipette.configure_nozzle_layout(
+            style=SINGLE, start=CONFIG["pipette"]["single_start"], tip_racks=[lw["tiprack"]]
+        )
+        protocol.comment(
+            f"Nozzle layout: SINGLE ({CONFIG['pipette']['single_start']}) for one-tip setup."
+        )
+        pipette.pick_up_tip(lw["tiprack"][setup_tip])
+        protocol.comment(
+            f"One-tip setup: picked tip {setup_tip}. This is the only tip used "
+            "while working with the 20 mL vial rack."
+        )
+
+        for well_name, fold in zip(dil_wells, factors):
+            _stock, water_vol = dilution_volumes(total, fold)
+            if water_vol <= 0:
+                continue
+            protocol.comment(f"Dispensing {water_vol} uL water -> {well_name}.")
+            pipette.aspirate(water_vol, water_vial)
+            pipette.dispense(water_vol, lw["plate"][well_name])
+
+        for well_name, fold in zip(dil_wells, factors):
+            stock, _water_vol = dilution_volumes(total, fold)
+            if stock <= 0:
+                continue
+            protocol.comment(
+                f"Diluting well {well_name} to {fold:g}x (stock {stock} uL); "
+                f"same setup tip {setup_tip}."
+            )
+            pipette.aspirate(stock, fc_vial)
+            pipette.dispense(stock, lw["plate"][well_name])
+
+        for well_name, fold in zip(dil_wells, factors):
+            stock, water_vol = dilution_volumes(total, fold)
+            well_fill = stock + water_vol
+            mix_vol = min(dil["mix_volume_ul"], well_fill, float(pipette.max_volume))
+            protocol.comment(f"Mixing {well_name} ({dil['mix_reps']} x {mix_vol} uL).")
+            if dil["mix_reps"] > 0 and mix_vol > 0:
+                pipette.mix(dil["mix_reps"], mix_vol, lw["plate"][well_name])
+            if well_name in mid_wells_set:
+                _capture_image(protocol, f"plate_dilution_{well_name}.jpg")
+
+        _return_or_drop()
+        protocol.comment(
+            f"One-tip setup done; {'returned' if return_tips else 'dropped'} tip {setup_tip}."
+        )
+        protocol.comment(f"Dilution series complete in plate column {dil['destination_column']}.")
+        _capture_image(protocol, "plate_after_dilution.jpg")
+
+    if params.do_print and pr["enabled"]:
+        _return_or_drop()
+        pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
+        protocol.comment("Nozzle layout: ALL for 8-channel paper print.")
+
+        src_anchor = print_src_wells[0]
+        paper_anchor = print_paper_wells[0]
+        paper_well = lw["paper"][paper_anchor]
+        spacing = pr["replicate_spacing_mm"]
+
+        pipette.pick_up_tip(lw["tiprack"][print_tip])
+        protocol.comment(
+            f"8-channel print: picked tips from column {pr['print_block_column']} "
+            f"starting at {print_tip}."
+        )
+        for rep in range(int(pr["num_replicates"])):
+            protocol.comment(
+                f"Aspirating {pr['droplet_volume_ul']} uL from plate column "
+                f"{pr['source_column']}; 8-channel paper replicate {rep + 1}."
+            )
+            pipette.aspirate(pr["droplet_volume_ul"], lw["plate"][src_anchor])
+            dest = paper_well.bottom(pr["dispense_z_mm"]).move(
+                Point(
+                    x=rep * spacing["x"],
+                    y=rep * spacing.get("y", 0.0),
+                    z=rep * spacing.get("z", 0.0),
+                )
+            )
+            protocol.comment(
+                f"Printing 8 droplets onto paper (slot {deck['paper']['slot']}) "
+                f"from plate column {pr['source_column']}, replicate {rep + 1}, "
+                f"z={pr['dispense_z_mm']} mm."
+            )
+            pipette.dispense(pr["droplet_volume_ul"], dest)
+            if pr.get("blow_out"):
+                pipette.blow_out(dest)
+            if pr.get("touch_tip"):
+                pipette.touch_tip()
+        _return_or_drop()
+
+        _capture_image(protocol, "paper_print_8_channel.jpg")
+        protocol.comment(
+            f"{'Returned' if return_tips else 'Dropped'} 8-channel print tips from "
+            f"column {pr['print_block_column']} "
+            f"({'none disposed' if return_tips else 'disposed to trash'})."
+        )
+
     if cam["capture_after"]:
         _capture_image(protocol, "after_deck.jpg")
         _capture_image(protocol, "after_plate.jpg")

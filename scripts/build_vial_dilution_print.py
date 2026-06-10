@@ -217,29 +217,38 @@ def validate(cfg: dict) -> list:
                     f"{pip_max} uL (from safety config or known pipette map)")
 
     # ── Tip allocation feasibility ────────────────────────────────────────────────
-    reserved    = int(pr.get("print_block_column", 1))
-    single_cols = [int(c) for c in dil.get("single_tip_columns", [])]
-    print_cols  = [int(c) for c in pr.get("single_tip_columns", [reserved])]
-    if reserved in single_cols:
-        errors.append(
-            f"printing.print_block_column {reserved} overlaps "
-            f"single_tip_columns {single_cols}")
-    overlap = sorted(set(single_cols).intersection(print_cols))
-    if overlap:
-        errors.append(
-            f"printing.single_tip_columns {print_cols} overlap dilution "
-            f"single_tip_columns {single_cols}: {overlap}")
-    n_single = tiprack_rows_per_col * len([c for c in single_cols if c != reserved])
-    if factors and n_single < 1 + len(factors):
-        errors.append(
-            f"single_tip_columns give {n_single} tips "
-            f"({tiprack_rows_per_col} rows x {len([c for c in single_cols if c != reserved])} cols); "
-            f"need {1 + len(factors)}")
-    n_print = tiprack_rows_per_col * len(print_cols)
-    if factors and n_print < len(factors):
-        errors.append(
-            f"printing.single_tip_columns give {n_print} tips "
-            f"({tiprack_rows_per_col} rows x {len(print_cols)} cols); need {len(factors)}")
+    reserved = int(pr.get("print_block_column", 1))
+    if not (1 <= reserved <= 12):
+        errors.append(f"printing.print_block_column must be 1-12, got {reserved}")
+
+    setup_tip = str(dil.get("setup_tip", "")).upper()
+    if not setup_tip:
+        single_cols = [int(c) for c in dil.get("single_tip_columns", [])]
+        setup_cols = [c for c in single_cols if c != reserved]
+        if not setup_cols:
+            errors.append("dilution.setup_tip is required when no non-print single_tip_columns exist")
+        else:
+            setup_tip = f"H{setup_cols[0]}"
+
+    if setup_tip:
+        m = re.fullmatch(r"([A-Z]+)(\d+)", setup_tip)
+        if not m:
+            errors.append(f"dilution.setup_tip must look like H12, got {setup_tip!r}")
+        else:
+            setup_row, setup_col_s = m.groups()
+            setup_col = int(setup_col_s)
+            if not (1 <= setup_col <= 12):
+                errors.append(f"dilution.setup_tip column must be 1-12, got {setup_tip}")
+            if setup_col == reserved:
+                errors.append(
+                    f"dilution.setup_tip {setup_tip} overlaps full 8-tip print column "
+                    f"{reserved}")
+            single_start = str(cfg["pipette"].get("single_start", "A1")).upper()
+            expected_setup_row = "H" if single_start.startswith("A") else "A"
+            if setup_row != expected_setup_row:
+                errors.append(
+                    f"dilution.setup_tip must be in row {expected_setup_row} when "
+                    f"pipette.single_start={single_start}; got {setup_tip}")
 
     # ── Pipette mount ─────────────────────────────────────────────────────────────
     if cfg["pipette"].get("mount") not in ("left", "right"):

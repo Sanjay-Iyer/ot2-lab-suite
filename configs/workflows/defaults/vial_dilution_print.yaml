@@ -99,7 +99,8 @@ dilution:
   # source column changes, which is safe but may affect tip usage symmetry.
   #
   # Need >= (1 + number_of_dilution_wells) tips across all listed columns.
-  single_tip_columns: [12, 11]
+  setup_tip: H12             # one setup tip only; active A1 nozzle picks an H-row tip
+  single_tip_columns: [12]   # legacy fallback; setup_tip is the real setting
 
 # ── Printing ─────────────────────────────────────────────────────────────────────
 # A single-nozzle print of one plate column = one physical tip active at a time.
@@ -107,7 +108,7 @@ printing:
   enabled: true
   source_column: "9"        # plate column to print (defaults to the dilution column)
   droplet_volume_ul: 15.0
-  num_replicates: 4         # print the column this many times across the paper
+  num_replicates: 1         # one 8-droplet print
   paper_start_well: A9      # where the top droplet lands on the paper reference
 
   # Height above the bottom of the paper-proxy well (paper_start_well).
@@ -125,8 +126,7 @@ printing:
     y: 0.0
     z: 0.0
 
-  single_tip_columns: [1]   # print tips picked one at a time; no 8-tip pickup
-  print_block_column: 1     # legacy alias; kept so older validators still parse
+  print_block_column: 1     # full 8-tip pickup from tiprack column 1
   blow_out: false           # blow out after each dispense
   touch_tip: false          # touch tip after each dispense
 
