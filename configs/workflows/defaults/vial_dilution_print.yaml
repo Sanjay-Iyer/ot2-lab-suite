@@ -116,7 +116,7 @@ printing:
   # Override per run in the Opentrons App via the "Paper start column" parameter —
   # e.g. set 5 to resume past columns already printed on the same sheet. The
   # pre-flight gate aborts if start_column + num_replicates runs off the sheet.
-  paper_start_column: 1
+  paper_start_column: 5
 
   # Height above the bottom of the paper-proxy well.
   # For corning_96_wellplate_360ul_custom the well bottom sits ~3.55 mm above the
