@@ -12,7 +12,7 @@ Minimal print-ONLY protocol to debug intermittent droplet misses (e.g. one of th
 
 No dilution, no vials, no camera — just the print step, isolated.
 
-RUN FROM THE TERMINAL via opentrons_execute over SSH (apiLevel 2.15 -> no Opentrons
+RUN FROM THE TERMINAL via opentrons_execute over SSH (apiLevel 2.13 -> no Opentrons
 App / deck configuration needed):
 
     # copy this file onto the robot, then on the robot shell:
@@ -34,9 +34,14 @@ CONFIG below). Env vars win over CONFIG:
 PREREQUISITE: the plate column you aspirate from (default 9) must already CONTAIN
 liquid — run the dilution first, or hand-fill that column with dye/water.
 
-WHY apiLevel 2.15: <=2.15 runs via opentrons_execute over SSH; >=2.16 requires the
-App/deck-config. This protocol uses only a full 8-channel pickup (no partial nozzle),
-so 2.15 is sufficient and keeps it terminal-runnable.
+WHY apiLevel 2.13: apiLevel >= 2.14 runs through the Protocol Engine, which requires a
+"deck configuration" (list of available slots). The Opentrons App / HTTP API supply that;
+bare `opentrons_execute` does NOT, so >= 2.14 fails over SSH with
+`AreaNotInDeckConfigurationError: <slot> not provided by deck configuration`.
+apiLevel <= 2.13 uses the LEGACY executor (no engine, no deck config), so it runs cleanly
+via `opentrons_execute` over SSH. This matches printing.py / printing_demo_protocol.py
+(both 2.13), the repo's known-good SSH-run protocols. Only a full 8-channel pickup is used
+(no partial nozzle / configure_nozzle_layout), so 2.13 is sufficient.
 """
 
 import os
@@ -53,7 +58,7 @@ metadata = {
         "Print-only diagnostic: grab 8 tips, aspirate a plate column, print onto the "
         "paper at a chosen column, return tips. Knobs via env vars or CONFIG."
     ),
-    "apiLevel": "2.15",  # <=2.15 so it runs via opentrons_execute over SSH (no App)
+    "apiLevel": "2.13",  # 2.13 = legacy executor (no deck config) -> runs via opentrons_execute/SSH
 }
 
 # ── Defaults (override per run with the PRINT_* env vars above) ───────────────────
