@@ -66,7 +66,7 @@ pipette:
 sources:
   water_vial: A1            # vial well holding water
   food_coloring_vial: A2    # dye stock: same row as water, second rack column
-  vial_aspirate_height_mm: 4.0   # above vial bottom; absolute model Z = 5 + 4 = 9 mm
+  vial_aspirate_height_mm: 2.0   # above vial bottom; absolute model Z = 5 + 2 = 7 mm (53 mm into 55 mm vial)
 
 # ── Dilution series ──────────────────────────────────────────────────────────────
 dilution:
