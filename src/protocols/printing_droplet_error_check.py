@@ -40,6 +40,8 @@ so 2.15 is sufficient and keeps it terminal-runnable.
 """
 
 import os
+import subprocess
+from datetime import datetime
 
 from opentrons import protocol_api
 from opentrons.types import Point
@@ -80,6 +82,13 @@ CONFIG = {
         "expected_plate_well_count": 96,
         "pipette_max_volume_ul": 300.0,
     },
+    # ── Camera: a per-run subfolder is appended at runtime (see _run_id) ──────────
+    "camera": {
+        "enabled": True,
+        "robot_image_dir": "/data/vision/droplet_error_check",
+        "robot_api_url": "http://localhost:31950/camera/picture",
+        "capture_timeout_s": 5,
+    },
 }
 
 
@@ -100,6 +109,46 @@ def _env_bool(name: str, default) -> bool:
     if v in (None, ""):
         return bool(default)
     return v.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _run_id() -> str:
+    """Per-run identifier: PRINT_RUN_ID if the host set one (so it can pull the exact
+    folder), otherwise a local timestamp. Used to give every run its own image folder."""
+    return os.getenv("PRINT_RUN_ID") or datetime.now().strftime("run_%Y%m%d_%H%M%S")
+
+
+def _capture_image(protocol, run_dir: str, filename: str) -> None:
+    """Capture a JPEG from the OT-2 camera into run_dir/filename. No-op while simulating."""
+    cam = CONFIG["camera"]
+    if not cam.get("enabled", True):
+        return
+    if protocol.is_simulating():
+        protocol.comment(f"[SIMULATION] Mock photo -> {run_dir}/{filename}")
+        return
+    import shutil
+    api_url   = cam.get("robot_api_url", "http://localhost:31950/camera/picture")
+    timeout_s = int(cam.get("capture_timeout_s", 5))
+    try:
+        os.makedirs(run_dir, exist_ok=True)
+    except Exception as exc:
+        protocol.comment(f"Warning: could not create {run_dir}: {exc}")
+    if shutil.which("curl") is None:
+        protocol.comment(f"Warning: 'curl' not found on robot; cannot capture {filename}.")
+        return
+    out_path = os.path.join(run_dir, filename)
+    cmd = ["curl", "-s", "-X", "POST", "-H", "opentrons-version: *",
+           "--max-time", str(timeout_s), api_url, "--output", out_path]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if os.path.exists(out_path):
+            sz = os.path.getsize(out_path)
+            protocol.comment(f"Captured {filename} ({sz} bytes) -> {out_path}.")
+            if sz < 1000:
+                protocol.comment(f"Warning: {filename} suspiciously small ({sz} bytes).")
+        else:
+            protocol.comment(f"Warning: {filename} not created (camera capture failed).")
+    except Exception as exc:
+        protocol.comment(f"Warning: camera capture error for {filename}: {exc}")
 
 
 def _preflight(protocol, lw, pipette, source_col, paper_start_column, num_replicates,
@@ -201,10 +250,14 @@ def run(protocol: protocol_api.ProtocolContext):
     src_anchor   = f"{plate_rows[0]}{source_col}"
     paper_anchor = f"{plate_rows[0]}{paper_start_column}"
 
+    run_id  = _run_id()
+    run_dir = f"{CONFIG['camera']['robot_image_dir']}/{run_id}"
+
     _preflight(protocol, lw, pipette, source_col, paper_start_column, num_replicates,
                droplet_volume, air_gap)
 
     protocol.comment("=== Droplet Print Error Check Started ===")
+    protocol.comment(f"Run ID: {run_id}  ·  images -> {run_dir}")
     protocol.comment(
         f"Knobs: paper_column={paper_start_column}, replicates={num_replicates}, "
         f"droplet={droplet_volume:g} uL, dispense_z={dispense_z:g} mm, "
@@ -224,6 +277,10 @@ def run(protocol: protocol_api.ProtocolContext):
 
     pipette.pick_up_tip(lw["tiprack"][print_tip])
     protocol.comment(f"Picked up 8 tips from tiprack column {print_col} (anchor {print_tip}).")
+
+    # BEFORE image: blank paper, tips loaded, prior to the first droplet.
+    protocol.comment("Capturing BEFORE-print image (blank paper).")
+    _capture_image(protocol, run_dir, "print_before.jpg")
 
     paper_well = lw["paper"][paper_anchor]
     spacing = pr["replicate_spacing_mm"]
@@ -255,6 +312,10 @@ def run(protocol: protocol_api.ProtocolContext):
         if do_blow_out:
             pipette.blow_out(dest)
 
+    # AFTER image: the finished print, before returning the tips.
+    protocol.comment("Capturing AFTER-print image (finished droplets).")
+    _capture_image(protocol, run_dir, "print_after.jpg")
+
     if pipette.has_tip:
         pipette.return_tip() if return_tips else pipette.drop_tip()
     protocol.comment(
@@ -262,4 +323,5 @@ def run(protocol: protocol_api.ProtocolContext):
         f"{num_replicates} replicate(s) printed at paper columns "
         f"{paper_start_column}..{paper_start_column + num_replicates - 1}."
     )
+    protocol.comment(f"Images for this run are in {run_dir} (print_before.jpg, print_after.jpg).")
     protocol.comment("=== Droplet Print Error Check Completed ===")
