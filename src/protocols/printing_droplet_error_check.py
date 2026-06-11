@@ -2,46 +2,28 @@
 """
 OT-2 Protocol: 8-Channel Droplet Print Error Check (standalone diagnostic)
 =========================================================================
-Minimal print-ONLY protocol to debug intermittent droplet misses (e.g. one of the
-8 channels not depositing on one replicate). It:
-  1. picks up 8 tips from one tiprack column,
+Print-ONLY diagnostic to debug intermittent droplet misses (one of the 8 channels not
+depositing on a replicate). It:
+  1. picks up 8 tips from a tiprack column,
   2. aspirates a small droplet from a 96-well plate column (default 9, wells A..H),
-  3. prints it onto the paper sheet at a chosen paper column,
-  4. optionally repeats as replicates sweeping right,
-  5. returns the 8 tips to the box.
+  3. snaps a BEFORE image of the blank paper,
+  4. prints onto the paper at a chosen column (optionally several replicates),
+  5. snaps an AFTER image,
+  6. returns the 8 tips.
 
-No dilution, no vials, no camera — just the print step, isolated.
+RUN VIA THE HTTP API runner: scripts/run_droplet_error_check.py — the SAME transport as
+run_vial_print_robot.py (port 31950). The runner uploads this file, sets the knobs as
+runtime parameters, plays the run, then SCP-pulls the per-run image folder to the laptop.
 
-RUN FROM THE TERMINAL via opentrons_execute over SSH (apiLevel 2.13 -> no Opentrons
-App / deck configuration needed):
+WHY apiLevel 2.28 + HTTP API: >= 2.14 runs through the Protocol Engine, which needs a
+deck configuration. The App / HTTP API supply it; bare `opentrons_execute` does NOT
+(that path fails with AreaNotInDeckConfigurationError). Runtime parameters need >= 2.18.
 
-    # copy this file onto the robot, then on the robot shell:
-    opentrons_execute printing_droplet_error_check.py
+PREREQUISITE: the plate column you aspirate from (default 9) must already CONTAIN liquid.
 
-Set the knobs WITHOUT editing the file using environment variables (or just edit
-CONFIG below). Env vars win over CONFIG:
-
-    PRINT_PAPER_COLUMN=5 PRINT_REPLICATES=3 opentrons_execute printing_droplet_error_check.py
-
-  PRINT_PAPER_COLUMN  paper column to print on (1 = far left)
-  PRINT_REPLICATES    how many prints (each = 8 droplets), sweeping right
-  PRINT_DROPLET_UL    volume per droplet per channel
-  PRINT_DISPENSE_Z    tip height above paper-proxy well bottom (lower = closer)
-  PRINT_AIR_GAP_UL    anti-drip air below the droplet (0 disables)
-  PRINT_BLOW_OUT      1/0 — blow out at the paper after each dispense
-  PRINT_DRY_RUN       1/0 — load + pre-flight + comments only, no liquid
-
-PREREQUISITE: the plate column you aspirate from (default 9) must already CONTAIN
-liquid — run the dilution first, or hand-fill that column with dye/water.
-
-WHY apiLevel 2.13: apiLevel >= 2.14 runs through the Protocol Engine, which requires a
-"deck configuration" (list of available slots). The Opentrons App / HTTP API supply that;
-bare `opentrons_execute` does NOT, so >= 2.14 fails over SSH with
-`AreaNotInDeckConfigurationError: <slot> not provided by deck configuration`.
-apiLevel <= 2.13 uses the LEGACY executor (no engine, no deck config), so it runs cleanly
-via `opentrons_execute` over SSH. This matches printing.py / printing_demo_protocol.py
-(both 2.13), the repo's known-good SSH-run protocols. Only a full 8-channel pickup is used
-(no partial nozzle / configure_nozzle_layout), so 2.13 is sufficient.
+RUNTIME PARAMETERS (set per run by the runner or in the App):
+  dry_run · run_id · paper_start_column · num_replicates · droplet_volume_ul ·
+  dispense_z_mm · air_gap_ul · blow_out
 """
 
 import os
@@ -55,13 +37,13 @@ metadata = {
     "protocolName": "8-Channel Droplet Print Error Check",
     "author": "Antigravity AI Agent",
     "description": (
-        "Print-only diagnostic: grab 8 tips, aspirate a plate column, print onto the "
-        "paper at a chosen column, return tips. Knobs via env vars or CONFIG."
+        "Print-only diagnostic: grab 8 tips, aspirate a plate column, photograph + print "
+        "onto the paper at a chosen column, return tips. Knobs are runtime parameters."
     ),
-    "apiLevel": "2.13",  # 2.13 = legacy executor (no deck config) -> runs via opentrons_execute/SSH
+    "apiLevel": "2.28",  # 2.28: engine path; deck config from App/HTTP API (NOT opentrons_execute)
 }
 
-# ── Defaults (override per run with the PRINT_* env vars above) ───────────────────
+# ── Defaults (runtime parameters below override these per run) ────────────────────
 CONFIG = {
     "deck": {
         "plate":   {"slot": 4, "load_name": "corning_96_wellplate_360ul_custom",
@@ -87,39 +69,58 @@ CONFIG = {
         "expected_plate_well_count": 96,
         "pipette_max_volume_ul": 300.0,
     },
-    # ── Camera: a per-run subfolder is appended at runtime (see _run_id) ──────────
     "camera": {
         "enabled": True,
-        "robot_image_dir": "/data/vision/droplet_error_check",
+        "robot_image_dir": "/data/vision/droplet_error_check",   # per-run subfolder added at runtime
         "robot_api_url": "http://localhost:31950/camera/picture",
         "capture_timeout_s": 5,
     },
 }
 
 
-# ── Env-var knob readers (terminal overrides; fall back to CONFIG) ────────────────
+def add_parameters(parameters: protocol_api.ParameterContext):
+    pr = CONFIG["print"]
+    parameters.add_bool(
+        variable_name="dry_run", display_name="Dry run (no liquid)",
+        description="Load + pre-flight + comments only; no liquid motion or images.",
+        default=False)
+    parameters.add_int(
+        variable_name="run_tag", display_name="Run tag",
+        description="Numeric tag for this run's image folder (host passes a timestamp). 0 = auto.",
+        default=0, minimum=0, maximum=4102444800)
+    parameters.add_int(
+        variable_name="paper_start_column", display_name="Paper column",
+        description="Paper column to print on (1 = far left).",
+        default=int(pr["paper_start_column"]), minimum=1, maximum=12)
+    parameters.add_int(
+        variable_name="num_replicates", display_name="Replicates",
+        description="How many prints (each = 8 droplets), sweeping right.",
+        default=int(pr["num_replicates"]), minimum=1, maximum=12)
+    parameters.add_float(
+        variable_name="droplet_volume_ul", display_name="Droplet volume uL",
+        description="Volume dispensed per droplet per channel.",
+        default=float(pr["droplet_volume_ul"]), minimum=1.0, maximum=300.0)
+    parameters.add_float(
+        variable_name="dispense_z_mm", display_name="Dispense height mm",
+        description="Tip height above paper-proxy well bottom. Lower = closer to paper.",
+        default=float(pr["dispense_z_mm"]), minimum=0.0, maximum=30.0)
+    parameters.add_float(
+        variable_name="air_gap_ul", display_name="Air gap uL",
+        description="Anti-drip air pulled below the droplet. 0 disables it.",
+        default=float(pr["air_gap_ul"]), minimum=0.0, maximum=50.0)
+    parameters.add_bool(
+        variable_name="blow_out", display_name="Blow out",
+        description="Blow out at the paper after each dispense.",
+        default=bool(pr["blow_out"]))
 
-def _env_int(name: str, default) -> int:
-    v = os.getenv(name)
-    return int(v) if v not in (None, "") else int(default)
 
-
-def _env_float(name: str, default) -> float:
-    v = os.getenv(name)
-    return float(v) if v not in (None, "") else float(default)
-
-
-def _env_bool(name: str, default) -> bool:
-    v = os.getenv(name)
-    if v in (None, ""):
-        return bool(default)
-    return v.strip().lower() in ("1", "true", "yes", "on")
-
-
-def _run_id() -> str:
-    """Per-run identifier: PRINT_RUN_ID if the host set one (so it can pull the exact
-    folder), otherwise a local timestamp. Used to give every run its own image folder."""
-    return os.getenv("PRINT_RUN_ID") or datetime.now().strftime("run_%Y%m%d_%H%M%S")
+def _resolve_run_id(params) -> str:
+    """Image-folder name. The host passes a numeric run_tag (a unix timestamp) so it can
+    pull the exact folder; 0 -> a local timestamp for manual App runs."""
+    tag = int(getattr(params, "run_tag", 0) or 0)
+    if tag > 0:
+        return f"run_{tag}"
+    return datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 
 def _capture_image(protocol, run_dir: str, filename: str) -> None:
@@ -191,8 +192,6 @@ def _preflight(protocol, lw, pipette, source_col, paper_start_column, num_replic
             f"{num_replicates} replicate(s) reaches column {last} > {n_paper_cols}."
         )
 
-    if num_replicates < 1:
-        errors.append(f"num_replicates {num_replicates} must be >= 1.")
     if droplet_volume <= 0:
         errors.append(f"droplet volume {droplet_volume} must be > 0.")
     if droplet_volume + air_gap > pipette.max_volume:
@@ -219,6 +218,7 @@ def _preflight(protocol, lw, pipette, source_col, paper_start_column, num_replic
 
 
 def run(protocol: protocol_api.ProtocolContext):
+    params = protocol.params
     deck = CONFIG["deck"]
     pr   = CONFIG["print"]
     return_tips = pr["return_tips"]
@@ -238,15 +238,17 @@ def run(protocol: protocol_api.ProtocolContext):
         CONFIG["pipette"]["name"], CONFIG["pipette"]["mount"], tip_racks=[lw["tiprack"]]
     )
 
-    # ── Resolve knobs: env var overrides CONFIG ───────────────────────────────────
+    # ── Resolve knobs from runtime parameters ─────────────────────────────────────
     source_col         = str(pr["source_column"])
-    paper_start_column = _env_int("PRINT_PAPER_COLUMN", pr["paper_start_column"])
-    num_replicates     = _env_int("PRINT_REPLICATES", pr["num_replicates"])
-    droplet_volume     = _env_float("PRINT_DROPLET_UL", pr["droplet_volume_ul"])
-    dispense_z         = _env_float("PRINT_DISPENSE_Z", pr["dispense_z_mm"])
-    air_gap            = _env_float("PRINT_AIR_GAP_UL", pr["air_gap_ul"])
-    do_blow_out        = _env_bool("PRINT_BLOW_OUT", pr["blow_out"])
-    dry_run            = _env_bool("PRINT_DRY_RUN", False)
+    paper_start_column = int(params.paper_start_column)
+    num_replicates     = int(params.num_replicates)
+    droplet_volume     = float(params.droplet_volume_ul)
+    dispense_z         = float(params.dispense_z_mm)
+    air_gap            = float(params.air_gap_ul)
+    do_blow_out        = bool(params.blow_out)
+    dry_run            = bool(params.dry_run)
+    run_id             = _resolve_run_id(params)
+    run_dir            = f"{CONFIG['camera']['robot_image_dir']}/{run_id}"
 
     plate_rows   = list(lw["plate"].rows_by_name().keys())
     tiprack_rows = list(lw["tiprack"].rows_by_name().keys())
@@ -254,9 +256,6 @@ def run(protocol: protocol_api.ProtocolContext):
     print_tip    = f"{tiprack_rows[0]}{print_col}"
     src_anchor   = f"{plate_rows[0]}{source_col}"
     paper_anchor = f"{plate_rows[0]}{paper_start_column}"
-
-    run_id  = _run_id()
-    run_dir = f"{CONFIG['camera']['robot_image_dir']}/{run_id}"
 
     _preflight(protocol, lw, pipette, source_col, paper_start_column, num_replicates,
                droplet_volume, air_gap)
@@ -296,8 +295,7 @@ def run(protocol: protocol_api.ProtocolContext):
             f"plate column {source_col}."
         )
         pipette.aspirate(droplet_volume, lw["plate"][src_anchor])
-        # Anti-drip air gap: pull air in AFTER the liquid so it sits at the tip opening
-        # and holds the droplet in during the move to the paper.
+        # Anti-drip air gap: pull air in AFTER the liquid so it sits at the tip opening.
         if air_gap > 0:
             pipette.air_gap(air_gap)
             protocol.comment(f"Pulled {air_gap:g} uL air gap below the droplet (anti-drip).")

@@ -2,60 +2,133 @@
 """
 scripts/run_droplet_error_check.py
 ==================================
-Terminal runner for src/protocols/printing_droplet_error_check.py (apiLevel 2.15).
+Terminal runner for src/protocols/printing_droplet_error_check.py.
 
-It does the whole loop from the lab laptop in one command:
-  1. picks a unique RUN ID (timestamp, plus an optional --label),
-  2. scp's the protocol onto the robot,
-  3. runs it over SSH with `opentrons_execute`, passing the run ID + debug knobs as
-     PRINT_* env vars (the protocol captures print_before.jpg / print_after.jpg into a
-     per-run folder on the robot),
-  4. scp's that run folder back to  vision_runs/droplet_error_check/<run_id>/  here.
+Built on the SAME HTTP-API pattern as scripts/run_vial_print_robot.py (port 31950),
+which is the reliable transport for engine-era protocols (the robot server supplies the
+deck configuration, so no AreaNotInDeckConfigurationError). The only addition is a final
+SCP step to pull this run's before/after images back to the laptop.
 
   python scripts/run_droplet_error_check.py --robot-ip 169.254.46.57 --live --paper-column 1 --replicates 3
   python scripts/run_droplet_error_check.py --robot-ip 169.254.46.57 --live --paper-column 5 \
       --dispense-z 1.0 --droplet-ul 25 --air-gap-ul 0 --label lowgap
   python scripts/run_droplet_error_check.py --robot-ip 169.254.46.57            # dry run (no liquid/images)
 
-Live runs (--live) capture print_before.jpg / print_after.jpg on the robot and pull them back
-to vision_runs/droplet_error_check/<run_id>/. Default (no --live) is a dry motion check.
-
-Requires SSH/SCP access to the robot (the lab laptop's key), same as scripts/sync_robot.py.
-This file only orchestrates ssh/scp; the liquid handling lives in the protocol.
+Image pull uses the OT-2 key (ROBOT_SSH_KEY_PATH / ~/.ssh/id_rsa_opentrons); the run
+itself uses the HTTP API and needs no SSH.
 """
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
+import requests
 
 if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.config import Config
 
-REPO            = Path(__file__).resolve().parent.parent
-LOCAL_PROTOCOL  = REPO / "src" / "protocols" / "printing_droplet_error_check.py"
-REMOTE_PROTOCOL = "/data/printing_droplet_error_check.py"
+REPO = Path(__file__).resolve().parent.parent
+DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "printing_droplet_error_check.py"
 # Must match CONFIG["camera"]["robot_image_dir"] in the protocol.
 REMOTE_VISION_BASE = "/data/vision/droplet_error_check"
 LOCAL_VISION_BASE  = REPO / "vision_runs" / "droplet_error_check"
+DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
+HEADERS = {"opentrons-version": "*"}
+TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 
+
+# ── HTTP API helpers (templated from run_vial_print_robot.py) ─────────────────────
+
+def _api_url(robot_ip: str, path: str) -> str:
+    return f"http://{robot_ip}:31950{path}"
+
+
+def _request(method: str, robot_ip: str, path: str, **kwargs: Any) -> dict[str, Any]:
+    response = requests.request(method, _api_url(robot_ip, path), headers=HEADERS, timeout=30, **kwargs)
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {"raw": response.text}
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"{method} {path} failed with HTTP {response.status_code}:\n{json.dumps(payload, indent=2)}"
+        )
+    return payload
+
+
+def _upload_protocol(robot_ip: str, protocol_path: Path) -> str:
+    print(f"\n[upload] {protocol_path}")
+    with protocol_path.open("rb") as handle:
+        response = requests.post(
+            _api_url(robot_ip, "/protocols"),
+            headers=HEADERS,
+            files={"files": (protocol_path.name, handle, "text/x-python")},
+            timeout=120,
+        )
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {"raw": response.text}
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Protocol upload failed with HTTP {response.status_code}:\n{json.dumps(payload, indent=2)}"
+        )
+    protocol_id = payload.get("data", {}).get("id")
+    if not protocol_id:
+        raise RuntimeError(f"Protocol upload response did not include data.id:\n{json.dumps(payload, indent=2)}")
+    print(f"Protocol ID: {protocol_id}")
+    return protocol_id
+
+
+def _create_run(robot_ip: str, protocol_id: str, rtp: dict[str, Any]) -> str:
+    body = {"data": {"protocolId": protocol_id, "runTimeParameterValues": rtp}}
+    print("\n[create run]")
+    print(json.dumps(rtp, indent=2))
+    payload = _request("POST", robot_ip, "/runs", json=body)
+    run_id = payload.get("data", {}).get("id")
+    if not run_id:
+        raise RuntimeError(f"Create-run response did not include data.id:\n{json.dumps(payload, indent=2)}")
+    print(f"Run ID (server): {run_id}")
+    return run_id
+
+
+def _play_run(robot_ip: str, run_id: str) -> None:
+    print("\n[play]")
+    _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
+
+
+def _monitor(robot_ip: str, run_id: str, poll_s: float) -> str:
+    print("\n[monitor]")
+    last = None
+    while True:
+        data = _request("GET", robot_ip, f"/runs/{run_id}").get("data", {})
+        status = str(data.get("status", "unknown"))
+        if status != last:
+            print(f"status={status}")
+            last = status
+        if status in TERMINAL_STATUSES:
+            return status
+        time.sleep(poll_s)
+
+
+# ── SSH/SCP helpers — used ONLY to pull images (the run uses the HTTP API) ─────────
 
 def _ssh_user_host(robot_ip: str) -> str:
     user = getattr(Config, "ROBOT_SSH_USER", "root") or "root"
     return f"{user}@{robot_ip}"
 
 
-# The OT-2's dedicated key. The robot rejects the default ~/.ssh/id_rsa (that caused the
-# passphrase prompt + 'Permission denied (publickey)'); it accepts id_rsa_opentrons.
-DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
-
-
 def _resolve_ssh_key(cli_key: str | None) -> str:
-    """Pick the SSH key: --ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons."""
+    """--ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons (NOT the bare id_rsa)."""
     for candidate in (cli_key, getattr(Config, "ROBOT_SSH_KEY_PATH", ""), str(DEFAULT_SSH_KEY)):
         key = str(candidate or "").strip()
         if key:
@@ -63,111 +136,95 @@ def _resolve_ssh_key(cli_key: str | None) -> str:
     return str(DEFAULT_SSH_KEY)
 
 
-def _ssh_opts(cli_key: str | None) -> list[str]:
-    """SSH/SCP options matching the repo's camera tooling (test_ot2_camera_capture.py):
-    use the dedicated robot key, batch mode (fail fast instead of prompting for a
-    password), and skip the host-key prompt. Pair with `scp -O` (OT-2 dropbear needs it).
-    """
+def _pull_images(robot_ip: str, cli_key: str | None, run_tag: int, local_name: str) -> None:
     key = _resolve_ssh_key(cli_key)
+    remote_dir = f"{REMOTE_VISION_BASE}/run_{run_tag}"
     if not Path(key).exists():
-        raise SystemExit(
-            f"ERROR: SSH key not found at {key}.\n"
-            "Pass --ssh-key <path>, or set ROBOT_SSH_KEY_PATH in .env, or place the key at "
-            f"{DEFAULT_SSH_KEY}. (Manual check: ssh root@<ip> -i {DEFAULT_SSH_KEY})"
-        )
-    return ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+        print(f"\nWARNING: SSH key {key} not found; skipping image pull. "
+              f"Images remain on the robot at {remote_dir}.")
+        return
+    opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
             "-o", "StrictHostKeyChecking=no", "-i", key]
-
-
-def _run(cmd: list[str], label: str) -> None:
-    print(f"\n[{label}] {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
-
-
-def _build_env_prefix(run_id: str, args) -> str:
-    """PRINT_* assignments for the remote shell. Only include knobs the user set."""
-    env = [f"PRINT_RUN_ID={run_id}"]
-    if args.paper_column is not None:
-        env.append(f"PRINT_PAPER_COLUMN={args.paper_column}")
-    if args.replicates is not None:
-        env.append(f"PRINT_REPLICATES={args.replicates}")
-    if args.droplet_ul is not None:
-        env.append(f"PRINT_DROPLET_UL={args.droplet_ul}")
-    if args.dispense_z is not None:
-        env.append(f"PRINT_DISPENSE_Z={args.dispense_z}")
-    if args.air_gap_ul is not None:
-        env.append(f"PRINT_AIR_GAP_UL={args.air_gap_ul}")
-    if args.blow_out:
-        env.append("PRINT_BLOW_OUT=1")
-    if not args.live:
-        env.append("PRINT_DRY_RUN=1")
-    return " ".join(env)
+    LOCAL_VISION_BASE.mkdir(parents=True, exist_ok=True)
+    dest = LOCAL_VISION_BASE / local_name   # readable local name; created by scp
+    cmd = ["scp", "-O", "-r", *opts, f"{_ssh_user_host(robot_ip)}:{remote_dir}", str(dest)]
+    print(f"\n[pull images] {' '.join(cmd)}")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError:
+        print(f"WARNING: could not pull {remote_dir}. The camera may have failed to capture; "
+              f"check the run log above for 'Captured'/'Warning' lines.")
+        return
+    imgs = sorted(p.name for p in dest.glob("*.jpg")) if dest.exists() else []
+    print(f"Images saved to: {dest}")
+    print(f"  {', '.join(imgs) if imgs else '(no .jpg found — check camera on the robot)'}")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Deploy, run (via opentrons_execute over SSH), and pull the images "
-                    "for the droplet print error-check protocol.")
+        description="Upload + run the droplet print error-check protocol via the OT-2 HTTP API, "
+                    "then pull this run's before/after images.")
     ap.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
-    ap.add_argument("--ssh-key", default=None,
-                    help="SSH private key. Default: .env ROBOT_SSH_KEY_PATH, else ~/.ssh/id_rsa_opentrons.")
-    ap.add_argument("--label", default="", help="Optional suffix added to the run-id folder name.")
+    ap.add_argument("--protocol", default=str(DEFAULT_PROTOCOL), help="Protocol file to upload.")
+    ap.add_argument("--live", action="store_true", help="Run liquid motion + images. Default is a dry run.")
+    ap.add_argument("--label", default="", help="Optional suffix on the image-folder run-id.")
     ap.add_argument("--paper-column", type=int, help="Paper column to print on (1 = far left).")
     ap.add_argument("--replicates", type=int, help="Number of prints (each = 8 droplets).")
     ap.add_argument("--droplet-ul", type=float, help="Volume per droplet per channel.")
     ap.add_argument("--dispense-z", type=float, help="Tip height above the paper-proxy well bottom (mm).")
     ap.add_argument("--air-gap-ul", type=float, help="Anti-drip air gap (uL); 0 disables.")
     ap.add_argument("--blow-out", action="store_true", help="Blow out at the paper after each dispense.")
-    ap.add_argument("--live", action="store_true",
-                    help="Run liquid motion and capture images. Default is a dry run (no liquid/images).")
-    # Accepted no-ops so the usual `--live --skip-build [--skip-validate]` command works.
-    # This protocol is self-contained (no build/validate step), so these do nothing here.
-    ap.add_argument("--skip-build", action="store_true",
-                    help="No-op (this protocol has no build step). Accepted for command consistency.")
-    ap.add_argument("--skip-validate", action="store_true",
-                    help="No-op (this protocol has no validate step). Accepted for command consistency.")
+    ap.add_argument("--ssh-key", default=None, help="SSH key for the image pull. Default: id_rsa_opentrons.")
+    ap.add_argument("--no-start", action="store_true", help="Upload + create the run, but do not press play.")
+    ap.add_argument("--poll-seconds", type=float, default=5.0, help="Status polling interval.")
+    # No-ops for command consistency with the other runners (this protocol has no build step).
+    ap.add_argument("--skip-build", action="store_true", help="No-op (no build step).")
+    ap.add_argument("--skip-validate", action="store_true", help="No-op (no validate step).")
     args = ap.parse_args()
 
-    robot_ip  = args.robot_ip
-    user_host = _ssh_user_host(robot_ip)
-    ssh_opts  = _ssh_opts(args.ssh_key)   # id_rsa_opentrons by default; never the bare id_rsa
+    robot_ip = args.robot_ip
+    os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
-    if not LOCAL_PROTOCOL.exists():
-        print(f"ERROR: protocol not found: {LOCAL_PROTOCOL}")
-        return 1
+    protocol_path = Path(args.protocol).resolve()
+    if not protocol_path.exists():
+        raise FileNotFoundError(f"Protocol not found: {protocol_path}")
 
-    stamp  = datetime.now().strftime("run_%Y%m%d_%H%M%S")
-    run_id = f"{stamp}_{args.label}" if args.label else stamp
-    remote_run_dir = f"{REMOTE_VISION_BASE}/{run_id}"
-    local_dest     = LOCAL_VISION_BASE / run_id
+    dry_run = not args.live
+    run_tag = int(time.time())   # numeric tag the protocol uses to name its robot-side image folder
+    stamp = datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    image_run_id = f"{stamp}_{args.label}" if args.label else stamp   # readable LOCAL folder name
 
-    print("=== Droplet Print Error-Check Runner ===")
-    print(f"Robot   : {user_host}")
-    print(f"Run ID  : {run_id}")
-    print(f"Mode    : {'LIVE LIQUID RUN' if args.live else 'DRY RUN (no liquid/images)'}")
-    print("Deck    : slot 4 plate (column 9 must hold liquid), slot 5 paper, slot 9 tips.")
+    # Only send the knobs the user actually set; the rest use the protocol defaults.
+    rtp: dict[str, Any] = {"dry_run": dry_run, "run_tag": run_tag}
+    if args.paper_column is not None: rtp["paper_start_column"] = args.paper_column
+    if args.replicates is not None:   rtp["num_replicates"] = args.replicates
+    if args.droplet_ul is not None:   rtp["droplet_volume_ul"] = args.droplet_ul
+    if args.dispense_z is not None:   rtp["dispense_z_mm"] = args.dispense_z
+    if args.air_gap_ul is not None:   rtp["air_gap_ul"] = args.air_gap_ul
+    if args.blow_out:                 rtp["blow_out"] = True
 
-    # 1. Deploy the protocol.
-    _run(["scp", "-O", *ssh_opts, str(LOCAL_PROTOCOL), f"{user_host}:{REMOTE_PROTOCOL}"], "deploy")
+    print("\n=== Droplet Print Error-Check Runner (HTTP API) ===")
+    print(f"Robot      : {robot_ip}")
+    print(f"Protocol   : {protocol_path}")
+    print(f"Mode       : {'LIVE LIQUID RUN' if args.live else 'DRY RUN (no liquid/images)'}")
+    print(f"Image run  : {image_run_id}")
+    print("Deck       : slot 4 plate (column 9 must hold liquid), slot 5 paper, slot 9 tips.")
 
-    # 2. Run it over SSH with the run-id + knobs as env vars.
-    remote_cmd = f"{_build_env_prefix(run_id, args)} opentrons_execute {REMOTE_PROTOCOL}"
-    _run(["ssh", *ssh_opts, user_host, remote_cmd], "run")
+    protocol_id = _upload_protocol(robot_ip, protocol_path)
+    server_run_id = _create_run(robot_ip, protocol_id, rtp)
 
-    # 3. Pull the per-run image folder back into vision_runs/droplet_error_check/<run_id>/.
-    LOCAL_VISION_BASE.mkdir(parents=True, exist_ok=True)
-    try:
-        _run(["scp", "-O", "-r", *ssh_opts,
-              f"{user_host}:{remote_run_dir}", str(LOCAL_VISION_BASE)], "pull images")
-    except subprocess.CalledProcessError:
-        print(f"\nWARNING: could not pull {remote_run_dir}. The run may have had the camera "
-              f"disabled or failed to capture. Check the run log above.")
-        return 1
+    if args.no_start:
+        print(f"\nCreated run but did not start it. Server run id: {server_run_id}")
+        return 0
 
-    imgs = sorted(p.name for p in local_dest.glob("*.jpg")) if local_dest.exists() else []
-    print(f"\nDone. Images saved to: {local_dest}")
-    print(f"  {', '.join(imgs) if imgs else '(no .jpg files found — check camera on the robot)'}")
-    return 0
+    _play_run(robot_ip, server_run_id)
+    status = _monitor(robot_ip, server_run_id, args.poll_seconds)
+    print(f"\nRun finished with status: {status}")
+
+    if status == "succeeded" and args.live:
+        _pull_images(robot_ip, args.ssh_key, run_tag, image_run_id)
+
+    return 0 if status == "succeeded" else 1
 
 
 if __name__ == "__main__":

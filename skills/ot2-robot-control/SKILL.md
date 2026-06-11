@@ -43,6 +43,14 @@ Resolved in [`src/core/config.py`](../../src/core/config.py) as
 > scripts and tooling must pass this key explicitly via `-i $ROBOT_SSH_KEY_PATH`
 > (set `ROBOT_SSH_KEY_PATH` in `.env` to this path).
 
+## Building a new runner? Use the template
+
+Every "run X on the robot" script is built the same way (HTTP API, port 31950 — the
+transport that supplies the deck config and just works). Copy
+[`scripts/run_robot_template.py`](../../scripts/run_robot_template.py) and follow
+[`RUNNER_TEMPLATE.md`](RUNNER_TEMPLATE.md) / [`docs/robot_runner_template_guide.md`](../../docs/robot_runner_template_guide.md).
+Proven examples: `run_vial_print_robot.py`, `run_droplet_error_check.py`.
+
 ## Step 0 — Always check connectivity first
 
 ```bash
