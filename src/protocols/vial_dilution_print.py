@@ -113,6 +113,7 @@ CONFIG = {
         # X/Y/Z offset per replicate. z: 0.0 = flat paper (no vertical stacking).
         "replicate_spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0},
         "print_block_column": 1,       # full 8-tip pickup from tiprack column 1
+        "air_gap_ul": 10.0,            # anti-drip air pulled in below the droplet before travel
         "blow_out": False,
         "touch_tip": False,
     },
@@ -424,9 +425,11 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
         if stock > pipette.max_volume:
             errors.append(
                 f"{well} ({fold}x): stock {stock} uL > pipette max {pipette.max_volume} uL.")
-    if pr["droplet_volume_ul"] > pipette.max_volume:
+    droplet_plus_air = pr["droplet_volume_ul"] + float(pr.get("air_gap_ul", 0.0))
+    if droplet_plus_air > pipette.max_volume:
         errors.append(
-            f"droplet {pr['droplet_volume_ul']} uL > pipette max {pipette.max_volume} uL.")
+            f"droplet {pr['droplet_volume_ul']} uL + air gap {pr.get('air_gap_ul', 0.0)} uL "
+            f"= {droplet_plus_air} uL > pipette max {pipette.max_volume} uL.")
     if dil["mix_volume_ul"] > pipette.max_volume:
         errors.append(
             f"mix volume {dil['mix_volume_ul']} uL > pipette max {pipette.max_volume} uL.")
@@ -876,9 +879,11 @@ def run(protocol: protocol_api.ProtocolContext):
         paper_well = lw["paper"][paper_anchor]
         spacing = pr["replicate_spacing_mm"]
 
+        air_gap = float(pr.get("air_gap_ul", 0.0))
         protocol.comment(
             f"Paper print: starting at paper column {paper_start_column} (1 = far left); "
-            f"{pr['num_replicates']} replicate(s) sweeping right by {spacing['x']} mm each."
+            f"{pr['num_replicates']} replicate(s) sweeping right by {spacing['x']} mm each"
+            + (f"; {air_gap:g} uL anti-drip air gap." if air_gap > 0 else ".")
         )
 
         for rep in range(int(pr["num_replicates"])):
@@ -887,6 +892,11 @@ def run(protocol: protocol_api.ProtocolContext):
                 f"{pr['source_column']}; 8-channel paper replicate {rep + 1}."
             )
             pipette.aspirate(pr["droplet_volume_ul"], lw["plate"][src_anchor])
+            # Anti-drip air gap: pull air in AFTER the liquid so it sits at the tip
+            # opening and holds the droplet in during the move to the paper.
+            if air_gap > 0:
+                pipette.air_gap(air_gap)
+                protocol.comment(f"Pulled {air_gap:g} uL air gap below the droplet (anti-drip).")
             dest = paper_well.bottom(pr["dispense_z_mm"]).move(
                 Point(
                     x=rep * spacing["x"],
@@ -900,7 +910,8 @@ def run(protocol: protocol_api.ProtocolContext):
                 f"~{paper_start_column + rep}, replicate {rep + 1}, "
                 f"z={pr['dispense_z_mm']} mm."
             )
-            pipette.dispense(pr["droplet_volume_ul"], dest)
+            # Dispense the droplet AND the air gap (air exits first, then the liquid).
+            pipette.dispense(pr["droplet_volume_ul"] + air_gap, dest)
             if pr.get("blow_out"):
                 pipette.blow_out(dest)
             if pr.get("touch_tip"):

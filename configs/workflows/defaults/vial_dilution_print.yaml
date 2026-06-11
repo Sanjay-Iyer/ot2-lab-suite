@@ -125,6 +125,12 @@ printing:
   # changes or if the paper is raised (e.g. on a mat).
   dispense_z_mm: 3.0
 
+  # Anti-drip air gap (µL): air pulled in BELOW the droplet right after aspirating,
+  # so it sits at the tip opening and holds the liquid in during the move to the
+  # paper. Dispensed together with the droplet. 0 disables it. Raise if you still
+  # see dripping; keep droplet_volume_ul + air_gap_ul <= 300 (pipette max).
+  air_gap_ul: 10.0
+
   # X/Y/Z offset (mm) between successive replicate columns on the paper.
   # z: 0.0 is correct for a flat paper surface; set non-zero only if replicates
   # are stacked vertically (unusual).
