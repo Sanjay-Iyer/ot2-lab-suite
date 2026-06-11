@@ -57,7 +57,7 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 | `printing.source_column` | which plate column to print | "9" |
 | `printing.droplet_volume_ul` | droplet size | 15 |
 | `printing.num_replicates` | **how many times** to print the column on the paper | 4 |
-| `printing.paper_start_well` / `.dispense_z_mm` | where/how-high droplets land | A9 / 3 mm |
+| `printing.paper_start_column` / `.dispense_z_mm` | which paper column to start on (1 = far left; override per-run with the `print_start_column` App flag) / how high droplets land | 1 / 3 mm |
 | `printing.replicate_spacing_mm` | x/y gap between replicate columns | 9 / 0 |
 | `printing.single_tip_columns` | tiprack columns for one-at-a-time print tips | [1] |
 | `printing.blow_out` / `.touch_tip` | extra dispense actions | false / false |

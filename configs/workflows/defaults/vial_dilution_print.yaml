@@ -39,9 +39,9 @@ deck:
     # A flat sheet of paper on the deck. Modelled as a 96-well plate SOLELY for
     # coordinate anchoring — the OT-2 needs a labware object to compute X/Y/Z
     # dispense positions. No liquid is loaded into this "plate"; the robot uses
-    # well A1 (paper_start_well) as the spatial reference for droplet placement.
-    # dispense_z_mm (in the printing block) controls the actual tip height above
-    # the paper surface relative to the bottom of that reference well.
+    # the column chosen by printing.paper_start_column as the spatial reference for
+    # droplet placement. dispense_z_mm (in the printing block) controls the actual
+    # tip height above the paper surface relative to the bottom of that reference well.
     slot: 5
     load_name: corning_96_wellplate_360ul_custom
     namespace: custom_beta
@@ -109,14 +109,20 @@ printing:
   enabled: true
   source_column: "9"        # plate column to print (defaults to the dilution column)
   droplet_volume_ul: 15.0
-  num_replicates: 1         # one 8-droplet print
-  paper_start_well: A9      # where the top droplet lands on the paper reference
+  num_replicates: 3         # 3 prints of 8 droplets each = 24 droplets total (lines 9mm apart)
 
-  # Height above the bottom of the paper-proxy well (paper_start_well).
-  # For corning_96_wellplate_360ul_custom the well bottom sits ~5 mm above the
-  # deck surface. dispense_z_mm=3.0 therefore places the tip ~8 mm above the deck,
-  # i.e. roughly 3 mm above the actual paper sheet. Adjust if the paper reference
-  # labware changes or if the paper is raised (e.g. on a mat).
+  # Leftmost paper column the print starts on. 1 = far-left edge of the sheet, and
+  # the print is INDEPENDENT of source_column (where the liquid is drawn from).
+  # Override per run in the Opentrons App via the "Paper start column" parameter —
+  # e.g. set 5 to resume past columns already printed on the same sheet. The
+  # pre-flight gate aborts if start_column + num_replicates runs off the sheet.
+  paper_start_column: 1
+
+  # Height above the bottom of the paper-proxy well.
+  # For corning_96_wellplate_360ul_custom the well bottom sits ~3.55 mm above the
+  # deck surface, so dispense_z_mm=3.0 places the tip ~6.5 mm above the deck, i.e.
+  # roughly 3 mm above the actual paper sheet. Adjust if the paper reference labware
+  # changes or if the paper is raised (e.g. on a mat).
   dispense_z_mm: 3.0
 
   # X/Y/Z offset (mm) between successive replicate columns on the paper.

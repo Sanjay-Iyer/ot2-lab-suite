@@ -48,117 +48,73 @@ metadata = {
 }
 
 # ── Runtime-parameter DEFAULTS (operator overrides in the App per run) ──────────
-DEFAULT_DRY_RUN     = False   # load + pre-flight + comments only (no liquid motion)
-DEFAULT_DO_DILUTION = True    # run the dilution phase
-DEFAULT_DO_PRINT    = True    # run the 8-channel print phase
+DEFAULT_DRY_RUN     = False
+DEFAULT_DO_DILUTION = True
+DEFAULT_DO_PRINT    = True
 
 # ════════════════════════════════════════════════════════════════════════════════
-# >>> CONFIG START >>>   (the builder replaces everything up to "<<< CONFIG END")
-# ════════════════════════════════════════════════════════════════════════════════
-CONFIG = {
-    # ── Deck: slot + labware identity for each position ──────────────────────────
-    "deck": {
-        "tuberack": {"slot": 7, "load_name": "tuberack_3dprint_20ml_8vials_v2",
-                     "namespace": "custom_beta", "version": 1},
-        "plate":    {"slot": 4, "load_name": "corning_96_wellplate_360ul_custom",
-                     "namespace": "custom_beta", "version": 1},
-        # Paper is modelled as a 96-well plate for coordinate anchoring only.
-        # dispense_z_mm controls the actual tip height above the paper surface.
-        "paper":    {"slot": 5, "load_name": "corning_96_wellplate_360ul_custom",
-                     "namespace": "custom_beta", "version": 1},
-        "tiprack":  {"slot": 9, "load_name": "opentrons_96_tiprack_300ul"},
-    },
-
-    # ── Pipette (FIXED hardware: 8-channel p300 on the right mount) ───────────────
-    "pipette": {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
-
-    # ── Liquid sources: which VIAL in the rack holds what ────────────────────────
-    "sources": {
-        "water_vial": "A1",
-        "food_coloring_vial": "A2",
-        "vial_aspirate_height_mm": 3.0,  # above vial bottom; absolute model Z = 5 + 3 = 8 mm
-    },
-
-    # ── Dilution series ──────────────────────────────────────────────────────────
-    "dilution": {
-        "enabled": True,
-        "destination_column": "9",     # which plate column holds the series (A..H of it)
-        "total_volume_ul": 200.0,      # volume in every well (<= 360 well, <= 300 tip)
-        # Fold factors. mode = explicit | geometric | linear | log
-        "factors": {
-            "mode": "explicit",
-            "explicit": [1, 2, 5, 10, 20, 30, 40, 50],
-            "step_factor": 2,
-            "start": 1, "end": 50, "count": 8,
-        },
-        "mix_reps": 3,
-        "mix_volume_ul": 120.0,
-        # One setup tip only. With single_start=A1, an H-row tip makes the idle
-        # nozzles hang off the front edge of the tiprack during pickup.
-        "setup_tip": "H12",
-        "single_tip_columns": [12],    # legacy alias; not used by the one-tip setup
-    },
-
-    # ── Printing ─────────────────────────────────────────────────────────────────
-    "printing": {
-        "enabled": True,
-        "source_column": "9",          # plate column to print (8 wells, one per channel)
-        "droplet_volume_ul": 15.0,
-        "num_replicates": 1,           # one 8-channel print of the column
-        "paper_start_column": 1,       # leftmost paper column to start printing on (1 = far left)
-        # Height above the bottom of the paper-proxy well. For the custom Corning
-        # plate the well bottom is ~5 mm above the deck; 3.0 mm above that places the
-        # tip roughly 3 mm above the paper surface. Adjust if the reference plate changes.
-        "dispense_z_mm": 3.0,
-        # X/Y/Z offset per replicate. z: 0.0 = flat paper (no vertical stacking).
-        "replicate_spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0},
-        "print_block_column": 1,       # full 8-tip pickup from tiprack column 1
-        "blow_out": False,
-        "touch_tip": False,
-    },
-
-    # ── Tips: return to the box (True) or drop to trash (False) ──────────────────
-    "tips": {"return_tips": True},
-
-    # ── Camera / CV capture timing ───────────────────────────────────────────────
-    "camera": {
-        "enabled": True,
-        "capture_before": True,
-        "capture_after": True,
-        # Row LETTERS only — destination_column is appended at runtime.
-        # e.g. "C" + "1" -> "C1". Changing destination_column auto-shifts captures.
-        "capture_mid_rows": ["C", "E", "H"],
-        "robot_image_dir": "/data/vision/vial_dilution_print",
-        "robot_api_url": "http://localhost:31950/camera/picture",
-        "capture_timeout_s": 5,
-    },
-
-    # ── Flow rates (uL/s); null/None = Opentrons default ─────────────────────────
-    "flow_rates": {"aspirate": None, "dispense": None, "mix": None},
-
-    # ── Computer-vision expectations (used HOST-side by verify_print_droplets) ────
-    "cv": {
-        "expected_droplets": 8,
-        "min_circularity_ok": 0.6,
-        "detection": {"threshold_method": "otsu", "min_area": 250, "invert": True},
-    },
-
-    # ── Safety / pre-flight expectations ─────────────────────────────────────────
-    "safety": {
-        "expected_tuberack_load_name": "tuberack_3dprint_20ml_8vials_v2",
-        "expected_well_count": 8,
-        "expected_diameter_mm": 28.0,
-        "expected_depth_mm": 55.0,
-        "expected_row_spacing_mm": 34.0,
-        "expected_col_spacing_mm": 31.0,
-        "geometry_tolerance_mm": 0.5,
-        "pipette_min_accurate_ul": 20.0,
-        "expected_plate_well_count": 96,
-        "tiprack_rows_per_column": 8,
-        "pipette_max_volume_ul": 300.0,
-    },
-}
-# ════════════════════════════════════════════════════════════════════════════════
+# >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
+CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
+                          'load_name': 'tuberack_3dprint_20ml_8vials_v2',
+                          'namespace': 'custom_beta',
+                          'version': 1},
+            'plate': { 'slot': 4,
+                       'load_name': 'corning_96_wellplate_360ul_custom',
+                       'namespace': 'custom_beta',
+                       'version': 1},
+            'paper': { 'slot': 5,
+                       'load_name': 'corning_96_wellplate_360ul_custom',
+                       'namespace': 'custom_beta',
+                       'version': 1},
+            'tiprack': {'slot': 9, 'load_name': 'opentrons_96_tiprack_300ul'}},
+  'pipette': {'name': 'p300_multi_gen2', 'mount': 'right', 'single_start': 'A1'},
+  'sources': {'water_vial': 'A1', 'food_coloring_vial': 'A2', 'vial_aspirate_height_mm': 2.0},
+  'dilution': { 'enabled': True,
+                'destination_column': '9',
+                'total_volume_ul': 200.0,
+                'factors': { 'mode': 'explicit',
+                             'explicit': [1, 2, 5, 10, 20, 30, 40, 50],
+                             'step_factor': 2,
+                             'start': 1,
+                             'end': 50,
+                             'count': 8},
+                'mix_reps': 3,
+                'mix_volume_ul': 120.0,
+                'setup_tip': 'H12',
+                'single_tip_columns': [12]},
+  'printing': { 'enabled': True,
+                'source_column': '9',
+                'droplet_volume_ul': 15.0,
+                'num_replicates': 3,
+                'paper_start_well': 'A9',
+                'dispense_z_mm': 3.0,
+                'replicate_spacing_mm': {'x': 9.0, 'y': 0.0, 'z': 0.0},
+                'print_block_column': 1,
+                'blow_out': False,
+                'touch_tip': False},
+  'tips': {'return_tips': True},
+  'camera': { 'enabled': True,
+              'capture_before': True,
+              'capture_after': True,
+              'capture_mid_rows': ['C', 'E', 'H'],
+              'robot_image_dir': '/data/vision/vial_dilution_print',
+              'robot_api_url': 'http://localhost:31950/camera/picture',
+              'capture_timeout_s': 5},
+  'flow_rates': {'aspirate': None, 'dispense': None, 'mix': None},
+  'cv': { 'expected_droplets': 8,
+          'min_circularity_ok': 0.6,
+          'detection': {'threshold_method': 'otsu', 'min_area': 250, 'invert': True}},
+  'safety': { 'expected_tuberack_load_name': 'tuberack_3dprint_20ml_8vials_v2',
+              'expected_well_count': 8,
+              'expected_diameter_mm': 28.0,
+              'expected_depth_mm': 55.0,
+              'expected_row_spacing_mm': 34.0,
+              'expected_col_spacing_mm': 31.0,
+              'geometry_tolerance_mm': 0.5,
+              'pipette_min_accurate_ul': 20.0,
+              'expected_plate_well_count': 96,
+              'tiprack_rows_per_column': 8,
+              'pipette_max_volume_ul': 300.0}}
 # <<< CONFIG END <<<
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -176,11 +132,6 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         variable_name="do_print", display_name="Run print phase",
         description="Pick up 8 tips and print the plate column onto paper once.",
         default=DEFAULT_DO_PRINT)
-    parameters.add_int(
-        variable_name="print_start_column", display_name="Paper start column",
-        description="Leftmost paper column to start on (1=far left); raise to skip already-printed columns.",
-        default=int(CONFIG["printing"].get("paper_start_column", 1)),
-        minimum=1, maximum=12)
 
 
 # ── Config resolvers ─────────────────────────────────────────────────────────────
@@ -275,28 +226,13 @@ def resolve_print_tip(printing_cfg: dict, plate_rows: list) -> str:
     return f"{plate_rows[0]}{int(printing_cfg['print_block_column'])}"
 
 
-def resolve_paper_start_column(printing_cfg: dict, runtime_start) -> int:
-    """Leftmost paper column to print on.
-
-    Precedence: runtime parameter (operator flag in the App) > config
-    paper_start_column > 1 (far-left default). Always starts at the left edge unless
-    explicitly told otherwise, decoupled from where the liquid is drawn.
-    """
-    if runtime_start is not None:
-        return int(runtime_start)
-    return int(printing_cfg.get("paper_start_column", 1))
-
-
-def resolve_print_wells(printing_cfg: dict, n: int, plate_rows: list,
-                        paper_start_column: int) -> tuple[list, list]:
-    """Return source plate wells and paper reference wells for 8-channel printing.
-
-    Source wells come from source_column (where the liquid is). Paper wells use
-    paper_start_column (where droplets land) — independent of the source column, so
-    the print always starts at the chosen paper column (default 1 = far left).
-    """
-    src_col   = str(printing_cfg["source_column"])
-    paper_col = int(paper_start_column)
+def resolve_print_wells(printing_cfg: dict, n: int, plate_rows: list) -> tuple[list, list]:
+    """Return source plate wells and paper reference wells for 8-channel printing."""
+    src_col = str(printing_cfg["source_column"])
+    paper_start = str(printing_cfg["paper_start_well"])
+    paper_col = "".join(ch for ch in paper_start if ch.isdigit())
+    if not paper_col:
+        raise ValueError(f"paper_start_well must include a column number, got {paper_start!r}.")
     rows = plate_rows[:n]
     return ([f"{row}{src_col}" for row in rows], [f"{row}{paper_col}" for row in rows])
 
@@ -311,14 +247,13 @@ def dilution_volumes(total: float, fold: float) -> tuple:
 # ── Pre-flight ───────────────────────────────────────────────────────────────────
 
 def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
-               plate_rows: list, tiprack_rows: list, paper_start_column: int):
+               plate_rows: list, tiprack_rows: list):
     """Validate config + loaded-labware geometry BEFORE any motion. Raise to abort.
 
     Parameters
     ----------
-    plate_rows         : row labels derived from lw["plate"] (e.g. ['A'..'H'])
-    tiprack_rows       : row labels derived from lw["tiprack"] (e.g. ['A'..'H'])
-    paper_start_column : resolved leftmost paper column the print starts on
+    plate_rows   : row labels derived from lw["plate"] (e.g. ['A'..'H'])
+    tiprack_rows : row labels derived from lw["tiprack"] (e.g. ['A'..'H'])
     """
     errors = []
     deck   = CONFIG["deck"]
@@ -449,21 +384,6 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
             f"got {setup_tip}."
         )
 
-    # ── Paper print start column + replicate sweep must fit on the sheet ───────────
-    n_paper_cols = len(lw["paper"].columns())
-    if not (1 <= paper_start_column <= n_paper_cols):
-        errors.append(
-            f"print start column {paper_start_column} is out of range (1..{n_paper_cols})."
-        )
-    else:
-        last_col = paper_start_column + int(pr["num_replicates"]) - 1
-        if last_col > n_paper_cols:
-            errors.append(
-                f"print sweep runs off the paper: start column {paper_start_column} + "
-                f"{pr['num_replicates']} replicate(s) reaches column {last_col} > "
-                f"{n_paper_cols}. Lower printing.num_replicates or the start column."
-            )
-
     # ── Camera: validate capture_mid_rows entries against actual plate rows ───────
     dest_col = str(dil["destination_column"])
     for row_letter in cam.get("capture_mid_rows", []):
@@ -575,9 +495,7 @@ def _legacy_run_single_tip_print(protocol: protocol_api.ProtocolContext):
     dil_wells   = resolve_dilution_wells(dil, len(factors), _plate_rows)
     setup_tip   = resolve_setup_tip(dil, pr, CONFIG["pipette"], _tiprack_rows)
     print_tip   = resolve_print_tip(pr, _plate_rows)
-    _paper_start_column = resolve_paper_start_column(pr, None)
-    print_src_wells, print_paper_wells = resolve_print_wells(
-        pr, len(dil_wells), _plate_rows, _paper_start_column)
+    print_src_wells, print_paper_wells = resolve_print_wells(pr, len(dil_wells), _plate_rows)
     total = dil["total_volume_ul"]
 
     # Build mid-well capture set: row letter + destination column.
@@ -587,7 +505,7 @@ def _legacy_run_single_tip_print(protocol: protocol_api.ProtocolContext):
 
     # ── 4. PRE-FLIGHT ─────────────────────────────────────────────────────────────
     _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
-               _plate_rows, _tiprack_rows, _paper_start_column)
+               _plate_rows, _tiprack_rows)
 
     protocol.comment("=== Vial Dilution -> Paper Print Demo Started ===")
     protocol.comment(
@@ -751,16 +669,12 @@ def run(protocol: protocol_api.ProtocolContext):
     dil_wells = resolve_dilution_wells(dil, len(factors), plate_rows)
     setup_tip = resolve_setup_tip(dil, pr, CONFIG["pipette"], tiprack_rows)
     print_tip = resolve_print_tip(pr, plate_rows)
-    paper_start_column = resolve_paper_start_column(
-        pr, getattr(params, "print_start_column", None))
-    print_src_wells, print_paper_wells = resolve_print_wells(
-        pr, len(dil_wells), plate_rows, paper_start_column)
+    print_src_wells, print_paper_wells = resolve_print_wells(pr, len(dil_wells), plate_rows)
     total = dil["total_volume_ul"]
     dest_col = str(dil["destination_column"])
     mid_wells_set = {f"{row}{dest_col}" for row in cam.get("capture_mid_rows", [])}
 
-    _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
-               plate_rows, tiprack_rows, paper_start_column)
+    _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip, plate_rows, tiprack_rows)
 
     protocol.comment("=== Vial Dilution -> Paper Print Demo Started ===")
     protocol.comment(
@@ -876,11 +790,6 @@ def run(protocol: protocol_api.ProtocolContext):
         paper_well = lw["paper"][paper_anchor]
         spacing = pr["replicate_spacing_mm"]
 
-        protocol.comment(
-            f"Paper print: starting at paper column {paper_start_column} (1 = far left); "
-            f"{pr['num_replicates']} replicate(s) sweeping right by {spacing['x']} mm each."
-        )
-
         for rep in range(int(pr["num_replicates"])):
             protocol.comment(
                 f"Aspirating {pr['droplet_volume_ul']} uL from plate column "
@@ -896,8 +805,7 @@ def run(protocol: protocol_api.ProtocolContext):
             )
             protocol.comment(
                 f"Printing 8 droplets onto paper (slot {deck['paper']['slot']}) "
-                f"from plate column {pr['source_column']} -> paper column "
-                f"~{paper_start_column + rep}, replicate {rep + 1}, "
+                f"from plate column {pr['source_column']}, replicate {rep + 1}, "
                 f"z={pr['dispense_z_mm']} mm."
             )
             pipette.dispense(pr["droplet_volume_ul"], dest)

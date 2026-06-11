@@ -73,7 +73,7 @@ uses a 96-well plate purely as a coordinate anchor (no liquid loaded).
 | `source_column` | str | plate column | Plate column printed one well at a time. | Valid plate column; usually equals `dilution.destination_column`. |
 | `droplet_volume_ul` | float | µL | Volume dispensed per single-tip droplet per replicate. | `> 0` and `≤ 300`; keep small (default `15.0`) to preserve the air headspace. |
 | `num_replicates` | int | prints | How many times the column is printed across the paper. | `≥ 1`; ensure `(n−1)·spacing` stays on the paper. Default `4`. |
-| `paper_start_well` | str | well | Paper-proxy well used as the spatial origin for the droplet row. | A valid plate well; default `A9`. |
+| `paper_start_column` | int | paper column | Leftmost paper column the print starts on (independent of `source_column`). Overridable per run via the `print_start_column` App parameter. | `1`–`12`; `start + num_replicates − 1` must stay on the sheet. Default `1` (far left). |
 | `dispense_z_mm` | float | mm | Tip height **above the paper-proxy well bottom**. The tip never touches paper. | `> 0`; default `3.0` (≈3 mm above the sheet given the ~5 mm well bottom). Lower cautiously; raise if paper is on a mat. |
 | `single_tip_columns` | list[int] | tiprack columns | Source columns for one-at-a-time print tips. | Each `1`–`12`; must not overlap dilution `single_tip_columns`; must supply `≥ len(factors)` tips total. Default `[1]`. |
 | `print_block_column` | int | tiprack column | Legacy alias kept for older tooling; no 8-tip block is picked up. | Default `1`. |
