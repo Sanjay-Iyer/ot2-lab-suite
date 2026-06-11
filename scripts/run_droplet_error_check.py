@@ -49,24 +49,32 @@ def _ssh_user_host(robot_ip: str) -> str:
     return f"{user}@{robot_ip}"
 
 
-def _ssh_opts() -> list[str]:
-    """SSH/SCP options matching the repo's camera tooling (test_ot2_camera_capture.py):
-    use the dedicated robot key from .env (ROBOT_SSH_KEY_PATH), batch mode (fail fast
-    instead of prompting for a password), and skip the host-key prompt.
+# The OT-2's dedicated key. The robot rejects the default ~/.ssh/id_rsa (that caused the
+# passphrase prompt + 'Permission denied (publickey)'); it accepts id_rsa_opentrons.
+DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
 
-    Without -i <key>, ssh falls back to ~/.ssh/id_rsa, which the robot does NOT accept
-    (that is what caused the passphrase prompt + 'Permission denied (publickey)').
+
+def _resolve_ssh_key(cli_key: str | None) -> str:
+    """Pick the SSH key: --ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons."""
+    for candidate in (cli_key, getattr(Config, "ROBOT_SSH_KEY_PATH", ""), str(DEFAULT_SSH_KEY)):
+        key = str(candidate or "").strip()
+        if key:
+            return key
+    return str(DEFAULT_SSH_KEY)
+
+
+def _ssh_opts(cli_key: str | None) -> list[str]:
+    """SSH/SCP options matching the repo's camera tooling (test_ot2_camera_capture.py):
+    use the dedicated robot key, batch mode (fail fast instead of prompting for a
+    password), and skip the host-key prompt. Pair with `scp -O` (OT-2 dropbear needs it).
     """
-    key = str(getattr(Config, "ROBOT_SSH_KEY_PATH", "") or "").strip()
-    if not key:
-        raise SystemExit(
-            "ERROR: ROBOT_SSH_KEY_PATH is not set in .env.\n"
-            "This runner uses SSH/SCP with the OT-2's dedicated key (same as "
-            "scripts/test_ot2_camera_capture.py). Set ROBOT_SSH_KEY_PATH=<path to the "
-            "OT-2 private key> in .env and retry."
-        )
+    key = _resolve_ssh_key(cli_key)
     if not Path(key).exists():
-        raise SystemExit(f"ERROR: SSH key not found at {key} (from .env ROBOT_SSH_KEY_PATH).")
+        raise SystemExit(
+            f"ERROR: SSH key not found at {key}.\n"
+            "Pass --ssh-key <path>, or set ROBOT_SSH_KEY_PATH in .env, or place the key at "
+            f"{DEFAULT_SSH_KEY}. (Manual check: ssh root@<ip> -i {DEFAULT_SSH_KEY})"
+        )
     return ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
             "-o", "StrictHostKeyChecking=no", "-i", key]
 
@@ -101,6 +109,8 @@ def main() -> int:
         description="Deploy, run (via opentrons_execute over SSH), and pull the images "
                     "for the droplet print error-check protocol.")
     ap.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
+    ap.add_argument("--ssh-key", default=None,
+                    help="SSH private key. Default: .env ROBOT_SSH_KEY_PATH, else ~/.ssh/id_rsa_opentrons.")
     ap.add_argument("--label", default="", help="Optional suffix added to the run-id folder name.")
     ap.add_argument("--paper-column", type=int, help="Paper column to print on (1 = far left).")
     ap.add_argument("--replicates", type=int, help="Number of prints (each = 8 droplets).")
@@ -120,7 +130,7 @@ def main() -> int:
 
     robot_ip  = args.robot_ip
     user_host = _ssh_user_host(robot_ip)
-    ssh_opts  = _ssh_opts()   # dedicated robot key from .env; fails clearly if unset
+    ssh_opts  = _ssh_opts(args.ssh_key)   # id_rsa_opentrons by default; never the bare id_rsa
 
     if not LOCAL_PROTOCOL.exists():
         print(f"ERROR: protocol not found: {LOCAL_PROTOCOL}")

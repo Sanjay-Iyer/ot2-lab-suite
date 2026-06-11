@@ -33,6 +33,16 @@ Resolved in [`src/core/config.py`](../../src/core/config.py) as
 `Config.ROBOT_IP`, `Config.ROBOT_SSH_USER`, `Config.ROBOT_SSH_KEY_PATH`,
 `Config.REMOTE_USER_STORAGE`.
 
+> ✅ **Verified manual connect (key: `id_rsa_opentrons`).** This is the exact command
+> the operator uses; it connects with **no password prompt**:
+> ```powershell
+> ssh root@169.254.46.57 -i C:\Users\iyersn\.ssh\id_rsa_opentrons
+> ```
+> Always use `id_rsa_opentrons` (NOT the default `~/.ssh/id_rsa`, which the robot
+> rejects with `Permission denied (publickey)` and triggers a passphrase prompt). All
+> scripts and tooling must pass this key explicitly via `-i $ROBOT_SSH_KEY_PATH`
+> (set `ROBOT_SSH_KEY_PATH` in `.env` to this path).
+
 ## Step 0 — Always check connectivity first
 
 ```bash

@@ -31,6 +31,17 @@ Look for your **Ethernet adapter** section. You should see an IP like `169.254.x
 
 The OT-2 authenticates over SSH using a private key (not a password). You need this key on your laptop.
 
+> ✅ **The key in use is `id_rsa_opentrons`.** The verified manual command that connects
+> with **no password prompt** is:
+> ```powershell
+> ssh root@169.254.46.57 -i C:\Users\iyersn\.ssh\id_rsa_opentrons
+> ```
+> Set `.env` → `ROBOT_SSH_KEY_PATH=C:\Users\iyersn\.ssh\id_rsa_opentrons`. Do **not** rely on
+> the default `~/.ssh/id_rsa` — the robot rejects it (`Permission denied (publickey)`) and it
+> prompts for a passphrase. Every `ssh`/`scp` must pass this key with `-i` (and `scp -O`).
+> The examples below use a generic `keys\ot2_automation_key` placeholder; substitute
+> `id_rsa_opentrons` (or whatever `ROBOT_SSH_KEY_PATH` points to).
+
 ### 2a. Check If You Already Have a Key
 ```powershell
 dir C:\code\opentrons_home\ot2-lab-suite\keys\
