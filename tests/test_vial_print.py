@@ -315,14 +315,13 @@ class TestTipLayoutInvariants:
         single_cols = [int(c) for c in dil["single_tip_columns"]]
         rows_per_col = int(safety.get("tiprack_rows_per_column", 8))
 
-        factors   = _resolve_factors(dil["factors"])
-        n_needed  = 1 + len(factors)   # 1 water tip + 1 per dilution well
+        n_needed  = 1   # single setup tip used for all dilution transfers
         n_avail   = rows_per_col * len([c for c in single_cols if c != print_col])
         assert n_avail >= n_needed, (
             f"single_tip_columns {single_cols} (excluding print col {print_col}) provide "
             f"{n_avail} tips ({rows_per_col} rows × "
             f"{len([c for c in single_cols if c != print_col])} cols); "
-            f"need {n_needed} (1 water + {len(factors)} per-well stock tips)")
+            f"need at least {n_needed} setup tip")
 
     def test_capture_mid_rows_are_valid(self, consts, plate_data):
         """camera.capture_mid_rows entries must all be valid row letters for the plate.

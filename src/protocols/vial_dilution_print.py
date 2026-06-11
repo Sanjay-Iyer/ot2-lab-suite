@@ -788,38 +788,52 @@ def run(protocol: protocol_api.ProtocolContext):
             pipette.aspirate(stock, fc_vial_aspirate)
             pipette.dispense(stock, lw["plate"][well_name])
 
-        for well_name, fold in zip(dil_wells, factors):
-            stock, water_vol = dilution_volumes(total, fold)
-            well_fill = stock + water_vol
-            mix_vol = min(dil["mix_volume_ul"], well_fill, float(pipette.max_volume))
-            protocol.comment(f"Mixing {well_name} ({dil['mix_reps']} x {mix_vol} uL).")
-            if dil["mix_reps"] > 0 and mix_vol > 0:
-                pipette.mix(dil["mix_reps"], mix_vol, lw["plate"][well_name])
-            if well_name in mid_wells_set:
-                _capture_image(protocol, f"plate_dilution_{well_name}.jpg")
-
         _return_or_drop()
         protocol.comment(
-            f"One-tip setup done; {'returned' if return_tips else 'dropped'} tip {setup_tip}."
+            f"One-tip setup transfers done; {'returned' if return_tips else 'dropped'} tip {setup_tip}."
         )
-        protocol.comment(f"Dilution series complete in plate column {dil['destination_column']}.")
-        _capture_image(protocol, "plate_after_dilution.jpg")
 
-    if params.do_print and pr["enabled"]:
-        _return_or_drop()
+        # Switch nozzle layout to ALL for 8-channel dilution mixing
         pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
-        protocol.comment("Nozzle layout: ALL for 8-channel paper print.")
-
-        src_anchor = print_src_wells[0]
-        paper_anchor = print_paper_wells[0]
-        paper_well = lw["paper"][paper_anchor]
-        spacing = pr["replicate_spacing_mm"]
+        protocol.comment("Nozzle layout: ALL for 8-channel dilution mixing.")
 
         pipette.pick_up_tip(lw["tiprack"][print_tip])
         protocol.comment(
             f"8-channel print: picked tips from column {pr['print_block_column']} "
             f"starting at {print_tip}."
         )
+
+        src_anchor = print_src_wells[0]
+        mix_vol = min(dil["mix_volume_ul"], total, float(pipette.max_volume))
+        protocol.comment(f"Mixing plate column {dil['destination_column']} (8 channels) ({dil['mix_reps']} x {mix_vol} uL).")
+        if dil["mix_reps"] > 0 and mix_vol > 0:
+            pipette.mix(dil["mix_reps"], mix_vol, lw["plate"][src_anchor])
+
+        protocol.comment(f"Dilution series complete in plate column {dil['destination_column']}.")
+        _capture_image(protocol, "plate_after_dilution.jpg")
+
+        if not (params.do_print and pr["enabled"]):
+            _return_or_drop()
+            protocol.comment(
+                f"Returned 8-channel print tips from column {pr['print_block_column']} (none disposed)."
+            )
+
+    if params.do_print and pr["enabled"]:
+        if not pipette.has_tip:
+            pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
+            protocol.comment("Nozzle layout: ALL for 8-channel paper print.")
+
+            pipette.pick_up_tip(lw["tiprack"][print_tip])
+            protocol.comment(
+                f"8-channel print: picked tips from column {pr['print_block_column']} "
+                f"starting at {print_tip}."
+            )
+
+        src_anchor = print_src_wells[0]
+        paper_anchor = print_paper_wells[0]
+        paper_well = lw["paper"][paper_anchor]
+        spacing = pr["replicate_spacing_mm"]
+
         for rep in range(int(pr["num_replicates"])):
             protocol.comment(
                 f"Aspirating {pr['droplet_volume_ul']} uL from plate column "
