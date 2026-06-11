@@ -1,0 +1,82 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# 96-Well Plate -> 20 mL Waste Vial Disposal — configuration
+# ══════════════════════════════════════════════════════════════════════════════
+# Empties wells of a 96-well plate into ONE 20 mL vial in the 3D-printed rack,
+# one well at a time, with a SINGLE pipette tip used for the whole job.
+#
+# Edit this file, then build a robot-ready protocol with the YAML embedded:
+#
+#   conda activate ai
+#   python scripts/build_plate_waste_disposal.py
+#
+# The builder embeds this YAML into a generated copy of
+# src/protocols/plate_waste_disposal.py and simulates it.
+#
+# Every top-level block below (except `run_modes`) becomes the protocol's CONFIG
+# dict. Anything marked HARDWARE is fixed by the physical setup — change with care.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Deck: which slot + labware sits where ────────────────────────────────────────
+# SINGLE-NOZZLE RULE: only ONE nozzle of the 8-channel head is used; the other 7
+# idle nozzles stick out ~63 mm in a line. Keep the rack, tip rack and plate in the
+# MIDDLE rows (4-5-6 / 7-8-9), out of the front (1-2-3) and back (10-11-12) rows, or
+# the idle nozzles fall outside robot bounds. Layout: rack=7, plate=4, tips=9.
+deck:
+  tuberack:
+    slot: 7
+    load_name: tuberack_3dprint_20ml_8vials_v2
+    namespace: custom_beta
+    version: 1
+  plate:
+    slot: 4
+    load_name: corning_96_wellplate_360ul_custom
+    namespace: custom_beta
+    version: 1
+  tiprack:
+    slot: 9
+    load_name: opentrons_96_tiprack_300ul
+
+# ── Pipette (HARDWARE: 8-channel p300 on the right mount — do not change) ─────────
+pipette:
+  name: p300_multi_gen2
+  mount: right
+  single_start: A1            # active nozzle in single-tip mode (back nozzle). Makes the
+                              # 7 idle nozzles hang FORWARD over short/empty slots.
+
+# ── Waste disposal plan ──────────────────────────────────────────────────────────
+waste:
+  # Which 96-well plate column to empty, and which rows of it.
+  source_column: "9"                       # default: column 9
+  source_rows: [A, B, C, D, E, F, G, H]    # rows of that column to empty (top -> bottom)
+
+  # Destination: ONE vial in the 3D-printed rack that collects all the waste.
+  waste_vial: A4                           # A1..A4 / B1..B4 in the v2 rack
+
+  volume_ul: 200.0                         # max fill removed from EACH well (<= 300 µL tip)
+
+  # One tip for the entire job. With single_start=A1 the setup tip MUST be in row H
+  # so only one nozzle engages during pickup (idle nozzles hang off the rack edge).
+  setup_tip: H12
+
+  # Heights (mm). Aspirate low in the plate well to pull (almost) all liquid; dispense
+  # high in the vial so the tip stays well above any accumulated waste.
+  plate_aspirate_height_mm: 0.8            # above plate-well bottom
+  waste_dispense_height_mm: 45.0           # above vial bottom (vial is 55 mm deep)
+
+  blow_out: true                           # blow out into the vial after each dispense
+  return_tips: true                        # true = return the tip to the box; false = trash it
+
+# ── Safety / pre-flight expectations (validated before any motion) ───────────────
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_rack_well_count: 8
+  expected_vial_depth_mm: 55.0
+  expected_plate_well_count: 96
+  pipette_max_volume_ul: 300.0
+  tiprack_rows_per_column: 8
+  geometry_tolerance_mm: 0.5
+
+# ── Run-mode defaults (operator can override per run in the Opentrons App) ────────
+# Not part of CONFIG; the builder writes these into the DEFAULT_* flags.
+run_modes:
+  dry_run: false              # true = load + pre-flight + comments only, no liquid motion
