@@ -49,6 +49,28 @@ def _ssh_user_host(robot_ip: str) -> str:
     return f"{user}@{robot_ip}"
 
 
+def _ssh_opts() -> list[str]:
+    """SSH/SCP options matching the repo's camera tooling (test_ot2_camera_capture.py):
+    use the dedicated robot key from .env (ROBOT_SSH_KEY_PATH), batch mode (fail fast
+    instead of prompting for a password), and skip the host-key prompt.
+
+    Without -i <key>, ssh falls back to ~/.ssh/id_rsa, which the robot does NOT accept
+    (that is what caused the passphrase prompt + 'Permission denied (publickey)').
+    """
+    key = str(getattr(Config, "ROBOT_SSH_KEY_PATH", "") or "").strip()
+    if not key:
+        raise SystemExit(
+            "ERROR: ROBOT_SSH_KEY_PATH is not set in .env.\n"
+            "This runner uses SSH/SCP with the OT-2's dedicated key (same as "
+            "scripts/test_ot2_camera_capture.py). Set ROBOT_SSH_KEY_PATH=<path to the "
+            "OT-2 private key> in .env and retry."
+        )
+    if not Path(key).exists():
+        raise SystemExit(f"ERROR: SSH key not found at {key} (from .env ROBOT_SSH_KEY_PATH).")
+    return ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+            "-o", "StrictHostKeyChecking=no", "-i", key]
+
+
 def _run(cmd: list[str], label: str) -> None:
     print(f"\n[{label}] {' '.join(cmd)}")
     subprocess.run(cmd, check=True)
@@ -88,10 +110,17 @@ def main() -> int:
     ap.add_argument("--blow-out", action="store_true", help="Blow out at the paper after each dispense.")
     ap.add_argument("--live", action="store_true",
                     help="Run liquid motion and capture images. Default is a dry run (no liquid/images).")
+    # Accepted no-ops so the usual `--live --skip-build [--skip-validate]` command works.
+    # This protocol is self-contained (no build/validate step), so these do nothing here.
+    ap.add_argument("--skip-build", action="store_true",
+                    help="No-op (this protocol has no build step). Accepted for command consistency.")
+    ap.add_argument("--skip-validate", action="store_true",
+                    help="No-op (this protocol has no validate step). Accepted for command consistency.")
     args = ap.parse_args()
 
     robot_ip  = args.robot_ip
     user_host = _ssh_user_host(robot_ip)
+    ssh_opts  = _ssh_opts()   # dedicated robot key from .env; fails clearly if unset
 
     if not LOCAL_PROTOCOL.exists():
         print(f"ERROR: protocol not found: {LOCAL_PROTOCOL}")
@@ -109,16 +138,17 @@ def main() -> int:
     print("Deck    : slot 4 plate (column 9 must hold liquid), slot 5 paper, slot 9 tips.")
 
     # 1. Deploy the protocol.
-    _run(["scp", str(LOCAL_PROTOCOL), f"{user_host}:{REMOTE_PROTOCOL}"], "deploy")
+    _run(["scp", "-O", *ssh_opts, str(LOCAL_PROTOCOL), f"{user_host}:{REMOTE_PROTOCOL}"], "deploy")
 
     # 2. Run it over SSH with the run-id + knobs as env vars.
     remote_cmd = f"{_build_env_prefix(run_id, args)} opentrons_execute {REMOTE_PROTOCOL}"
-    _run(["ssh", user_host, remote_cmd], "run")
+    _run(["ssh", *ssh_opts, user_host, remote_cmd], "run")
 
     # 3. Pull the per-run image folder back into vision_runs/droplet_error_check/<run_id>/.
     LOCAL_VISION_BASE.mkdir(parents=True, exist_ok=True)
     try:
-        _run(["scp", "-r", f"{user_host}:{remote_run_dir}", str(LOCAL_VISION_BASE)], "pull images")
+        _run(["scp", "-O", "-r", *ssh_opts,
+              f"{user_host}:{remote_run_dir}", str(LOCAL_VISION_BASE)], "pull images")
     except subprocess.CalledProcessError:
         print(f"\nWARNING: could not pull {remote_run_dir}. The run may have had the camera "
               f"disabled or failed to capture. Check the run log above.")
