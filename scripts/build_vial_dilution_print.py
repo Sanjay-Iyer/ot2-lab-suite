@@ -212,6 +212,11 @@ def validate(cfg: dict) -> list:
         air_gap = -1.0
         errors.append(f"printing.air_gap_ul must be numeric, got {pr.get('air_gap_ul')!r}")
     try:
+        air_gap_height = float(pr.get("air_gap_height_mm", 10.0))
+    except (TypeError, ValueError):
+        air_gap_height = -1.0
+        errors.append(f"printing.air_gap_height_mm must be numeric, got {pr.get('air_gap_height_mm')!r}")
+    try:
         dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
     except (TypeError, ValueError):
         dwell_s = -1.0
@@ -231,6 +236,8 @@ def validate(cfg: dict) -> list:
         errors.append(f"printing.droplet_volume_ul must be > 0, got {droplet_volume}")
     if air_gap < 0:
         errors.append(f"printing.air_gap_ul must be >= 0, got {air_gap}")
+    if air_gap_height < 0:
+        errors.append(f"printing.air_gap_height_mm must be >= 0, got {air_gap_height}")
     if dwell_s < 0:
         errors.append(f"printing.post_dispense_delay_s must be >= 0, got {dwell_s}")
     if move_speed is not None and move_speed <= 0:

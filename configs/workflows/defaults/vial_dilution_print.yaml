@@ -131,6 +131,11 @@ printing:
   # see dripping; keep droplet_volume_ul + air_gap_ul <= 300 (pipette max).
   air_gap_ul: 5.0
 
+  # How far ABOVE the well top to lift the tip BEFORE pulling the air gap, so the tip
+  # is clear of the liquid and captures AIR, not more liquid. Applied as air_gap()'s
+  # `height`. Raise this if you still see liquid drawn during the air-gap step.
+  air_gap_height_mm: 20.0
+
   # Hold the tips at the print location after dispensing/blow-out so the droplet can
   # detach onto the paper before the robot moves away.
   post_dispense_delay_s: 0.5
