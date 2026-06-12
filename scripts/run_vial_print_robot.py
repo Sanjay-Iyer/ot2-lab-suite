@@ -87,15 +87,21 @@ def _create_run(
     dry_run: bool,
     do_dilution: bool,
     do_print: bool,
+    paper_start_column: int | None = None,
 ) -> str:
+    run_time_parameter_values: dict[str, Any] = {
+        "dry_run": dry_run,
+        "do_dilution": do_dilution,
+        "do_print": do_print,
+    }
+    # Only forward the paper start column when explicitly overridden on the CLI;
+    # otherwise the protocol uses the value baked in from the workflow YAML at build.
+    if paper_start_column is not None:
+        run_time_parameter_values["print_start_column"] = paper_start_column
     body = {
         "data": {
             "protocolId": protocol_id,
-            "runTimeParameterValues": {
-                "dry_run": dry_run,
-                "do_dilution": do_dilution,
-                "do_print": do_print,
-            },
+            "runTimeParameterValues": run_time_parameter_values,
         }
     }
     print("\n[create run]")
@@ -142,6 +148,10 @@ def main() -> int:
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
     parser.add_argument("--no-dilution", action="store_true", help="Skip dilution phase.")
     parser.add_argument("--no-print", action="store_true", help="Skip print phase.")
+    parser.add_argument(
+        "--paper-start-column", type=int, default=None, metavar="N",
+        help="Override the leftmost paper column to print on (1-12). Default: the "
+             "value baked into the generated protocol from the workflow YAML.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
     parser.add_argument("--skip-validate", action="store_true", help="Do not run scripts/validate_vial_print.py first.")
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
@@ -169,6 +179,8 @@ def main() -> int:
     print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
     print(f"Dilution  : {do_dilution}")
     print(f"Print     : {do_print}")
+    if args.paper_start_column is not None:
+        print(f"Paper col : {args.paper_start_column} (CLI override)")
     print("\nDeck must be: slot 7 vial rack (A1 water, A2 dye), slot 4 plate, slot 5 paper, slot 9 tips.")
     print("Tip plan  : one setup tip H12 for vial/plate setup, then 8 print tips from column 1.")
 
@@ -179,6 +191,7 @@ def main() -> int:
         dry_run=dry_run,
         do_dilution=do_dilution,
         do_print=do_print,
+        paper_start_column=args.paper_start_column,
     )
 
     if args.no_start:

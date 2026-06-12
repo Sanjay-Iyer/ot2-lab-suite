@@ -108,7 +108,7 @@ dilution:
 printing:
   enabled: true
   source_column: "9"        # plate column to print (defaults to the dilution column)
-  droplet_volume_ul: 30.0
+  droplet_volume_ul: 20.0
   num_replicates: 3         # 3 prints of 8 droplets each = 24 droplets total (lines 9mm apart)
 
   # Leftmost paper column the print starts on. 1 = far-left edge of the sheet, and
