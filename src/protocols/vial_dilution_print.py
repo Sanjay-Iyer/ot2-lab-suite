@@ -103,18 +103,20 @@ CONFIG = {
     "printing": {
         "enabled": True,
         "source_column": "9",          # plate column to print (8 wells, one per channel)
-        "droplet_volume_ul": 15.0,
-        "num_replicates": 1,           # one 8-channel print of the column
+        "droplet_volume_ul": 30.0,
+        "num_replicates": 3,           # triplicate 8-channel prints of the column
         "paper_start_column": 1,       # leftmost paper column to start printing on (1 = far left)
         # Height above the bottom of the paper-proxy well. For the custom Corning
-        # plate the well bottom is ~5 mm above the deck; 3.0 mm above that places the
-        # tip roughly 3 mm above the paper surface. Adjust if the reference plate changes.
-        "dispense_z_mm": 3.0,
+        # plate the well bottom is close to the paper reference plane; 1.0 mm keeps
+        # the tips close enough for droplet transfer without scraping the paper.
+        "dispense_z_mm": 1.0,
         # X/Y/Z offset per replicate. z: 0.0 = flat paper (no vertical stacking).
         "replicate_spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0},
         "print_block_column": 1,       # full 8-tip pickup from tiprack column 1
-        "air_gap_ul": 10.0,            # anti-drip air pulled in below the droplet before travel
-        "blow_out": False,
+        "air_gap_ul": 5.0,             # anti-drip air pulled in below the droplet before travel
+        "post_dispense_delay_s": 0.5,  # dwell at the paper so the droplet detaches
+        "move_speed_mm_per_s": 50.0,   # smooth travel to the print location; None = default
+        "blow_out": True,
         "touch_tip": False,
     },
 
@@ -135,7 +137,7 @@ CONFIG = {
     },
 
     # ── Flow rates (uL/s); null/None = Opentrons default ─────────────────────────
-    "flow_rates": {"aspirate": None, "dispense": None, "mix": None},
+    "flow_rates": {"aspirate": 20.0, "dispense": 80.0, "mix": None},
 
     # ── Computer-vision expectations (used HOST-side by verify_print_droplets) ────
     "cv": {
@@ -425,10 +427,22 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
         if stock > pipette.max_volume:
             errors.append(
                 f"{well} ({fold}x): stock {stock} uL > pipette max {pipette.max_volume} uL.")
-    droplet_plus_air = pr["droplet_volume_ul"] + float(pr.get("air_gap_ul", 0.0))
+    droplet_volume = float(pr["droplet_volume_ul"])
+    air_gap = float(pr.get("air_gap_ul", 0.0))
+    dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
+    move_speed = pr.get("move_speed_mm_per_s")
+    if droplet_volume <= 0:
+        errors.append(f"droplet_volume_ul must be > 0, got {droplet_volume}.")
+    if air_gap < 0:
+        errors.append(f"air_gap_ul must be >= 0, got {air_gap}.")
+    if dwell_s < 0:
+        errors.append(f"post_dispense_delay_s must be >= 0, got {dwell_s}.")
+    if move_speed is not None and float(move_speed) <= 0:
+        errors.append(f"move_speed_mm_per_s must be > 0 or null, got {move_speed}.")
+    droplet_plus_air = droplet_volume + air_gap
     if droplet_plus_air > pipette.max_volume:
         errors.append(
-            f"droplet {pr['droplet_volume_ul']} uL + air gap {pr.get('air_gap_ul', 0.0)} uL "
+            f"droplet {droplet_volume} uL + air gap {air_gap} uL "
             f"= {droplet_plus_air} uL > pipette max {pipette.max_volume} uL.")
     if dil["mix_volume_ul"] > pipette.max_volume:
         errors.append(
@@ -491,6 +505,12 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
                 f"WARNING: {well} ({fold}x) stock {stock} uL is below the p300 "
                 f"~{min_ok:.0f} uL accurate minimum (visual demo only)."
             )
+    droplet_volume = float(pr["droplet_volume_ul"])
+    if 0 < droplet_volume < min_ok:
+        protocol.comment(
+            f"WARNING: print droplet {droplet_volume:g} uL is below the p300 "
+            f"~{min_ok:.0f} uL accurate minimum; start around 30 uL for food-coloring prints."
+        )
 
 
 def _capture_image(protocol, filename: str) -> None:
@@ -880,10 +900,15 @@ def run(protocol: protocol_api.ProtocolContext):
         spacing = pr["replicate_spacing_mm"]
 
         air_gap = float(pr.get("air_gap_ul", 0.0))
+        dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
+        move_speed = pr.get("move_speed_mm_per_s")
+        move_speed = float(move_speed) if move_speed is not None else None
         protocol.comment(
             f"Paper print: starting at paper column {paper_start_column} (1 = far left); "
             f"{pr['num_replicates']} replicate(s) sweeping right by {spacing['x']} mm each"
-            + (f"; {air_gap:g} uL anti-drip air gap." if air_gap > 0 else ".")
+            + (f"; {air_gap:g} uL anti-drip air gap" if air_gap > 0 else "")
+            + (f"; move speed {move_speed:g} mm/s" if move_speed else "")
+            + (f"; dwell {dwell_s:g} s." if dwell_s > 0 else ".")
         )
 
         for rep in range(int(pr["num_replicates"])):
@@ -911,9 +936,16 @@ def run(protocol: protocol_api.ProtocolContext):
                 f"z={pr['dispense_z_mm']} mm."
             )
             # Dispense the droplet AND the air gap (air exits first, then the liquid).
-            pipette.dispense(pr["droplet_volume_ul"] + air_gap, dest)
+            dispense_volume = pr["droplet_volume_ul"] + air_gap
+            if move_speed and move_speed > 0:
+                pipette.move_to(dest, speed=move_speed)
+                pipette.dispense(dispense_volume)
+            else:
+                pipette.dispense(dispense_volume, dest)
             if pr.get("blow_out"):
                 pipette.blow_out(dest)
+            if dwell_s > 0:
+                protocol.delay(seconds=dwell_s)
             if pr.get("touch_tip"):
                 pipette.touch_tip()
         _return_or_drop()

@@ -55,17 +55,19 @@ one-off you can also edit the `CONFIG` dict directly at the top of
 | `dilution.mix_reps` / `.mix_volume_ul` | mixing after each dilution | 3 / 120 |
 | `dilution.single_tip_columns` | tiprack columns the single tips come from | [12, 11] |
 | `printing.source_column` | which plate column to print | "9" |
-| `printing.droplet_volume_ul` | droplet size | 15 |
-| `printing.num_replicates` | **how many times** to print the column on the paper | 4 |
-| `printing.paper_start_column` / `.dispense_z_mm` | which paper column to start on (1 = far left; override per-run with the `print_start_column` App flag) / how high droplets land | 1 / 3 mm |
+| `printing.droplet_volume_ul` | droplet size | 30 |
+| `printing.num_replicates` | **how many times** to print the column on the paper | 3 |
+| `printing.paper_start_column` / `.dispense_z_mm` | which paper column to start on (1 = far left; override per-run with the `print_start_column` App flag) / how high droplets land | 1 / 1 mm |
 | `printing.replicate_spacing_mm` | x/y gap between replicate columns | 9 / 0 |
 | `printing.single_tip_columns` | tiprack columns for one-at-a-time print tips | [1] |
-| `printing.blow_out` / `.touch_tip` | extra dispense actions | false / false |
+| `printing.air_gap_ul` / `.post_dispense_delay_s` | anti-drip air gap / dwell at paper after dispense | 5 / 0.5 |
+| `printing.move_speed_mm_per_s` | movement speed to the print location; `null` uses default | 50 |
+| `printing.blow_out` / `.touch_tip` | extra dispense actions | true / false |
 | `tips.return_tips` | **return to box (true)** vs trash (false) | true |
 | `camera.enabled` / `capture_before` / `capture_after` | CV snapshot toggles | true |
 | `camera.capture_mid_rows` | **which middle rows** get a snapshot (dest column appended at runtime) | [C, E, H] |
 | `camera.robot_image_dir` | where the robot saves JPEGs | /data/vision/vial_dilution_print |
-| `flow_rates.aspirate` / `.dispense` / `.mix` | µL/s (null = default) | null |
+| `flow_rates.aspirate` / `.dispense` / `.mix` | uL/s (null = default) | 20 / 80 / null |
 | `cv.expected_droplets` / `.min_circularity_ok` / `.detection` | host-side CV check (pass `--expect`) | 8 / 0.6 / otsu |
 | `safety.expected_*` / `.geometry_tolerance_mm` | pre-flight geometry cross-check of the rack | v2 geometry |
 | `run_modes.dry_run` / `.do_dilution` / `.do_print` | run-mode flags (also App Runtime Parameters) | false/true/true |
@@ -167,11 +169,11 @@ tips: {return_tips: false}
      used tip. Each tip is **returned** to the box.
    - **CV: middle** — a snapshot after wells C9, E9, H9 (`plate_dilution_*.jpg`) plus
      `plate_after_dilution.jpg`.
-4. **Print (single nozzle, `SINGLE` start `A1`)** — picks up **one tip at a time**
-   from tip column 1, aspirates 15 µL from each source well in plate column 9, and
-   dispenses onto the matching paper row. Each source well is printed for each of the
-   4 replicates. Tips **returned**.
-   - **CV: print** — `paper_print_single_tip.jpg`.
+4. **Print (8-channel, `ALL`)** — uses tip column 1, aspirates 30 uL per channel
+   from plate column 9, takes a 5 uL air gap, and prints triplicate 8-droplet columns
+   starting at paper column 1. The protocol blows out at the paper, dwells 0.5 s, and
+   returns the tips.
+   - **CV: print** — `paper_print_8_channel.jpg`.
 5. **CV: after** — `after_deck.jpg`, `after_plate.jpg`.
 
 > ⚠️ **Accuracy caveat.** The 20×–50× stock volumes (4–10 µL) are **below the p300's
@@ -261,7 +263,7 @@ trends light→dark down the column).
 - **Idle-nozzle / vial clearance** in single-nozzle mode — verify by eye with the
   e-stop in hand on the first run (the tall 60 mm vials are the hazard).
 - **Sub-minimum volumes** (20×–50×) print imprecise colours — expected (see caveat).
-- **Paper height** — `printing.dispense_z_mm` (3 mm above the paper-reference well bottom)
+- **Paper height** — `printing.dispense_z_mm` (1 mm above the paper-reference well bottom)
   assumes paper laid flat; adjust if the paper sits high/low.
 - **API 2.28 support** on the robot (see above).
 

@@ -354,6 +354,22 @@ class TestTipLayoutInvariants:
             "replicate_spacing_mm must include 'z: 0.0' for flat paper "
             "(non-zero z enables vertical replicate offsets in future).")
 
+    def test_print_release_controls_are_valid(self, consts):
+        """Paper print tuning knobs must be present and physically sane."""
+        pr = consts["CONFIG"]["printing"]
+        safety = consts["CONFIG"].get("safety", {})
+        pip_max = float(safety.get("pipette_max_volume_ul", P300_MAX_UL))
+        droplet = float(pr["droplet_volume_ul"])
+        air_gap = float(pr.get("air_gap_ul", 0.0))
+        dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
+        move_speed = pr.get("move_speed_mm_per_s")
+
+        assert droplet > 0
+        assert air_gap >= 0
+        assert droplet + air_gap <= pip_max
+        assert dwell_s >= 0
+        assert move_speed is None or float(move_speed) > 0
+
 
 # ── Protocol source validation ─────────────────────────────────────────────────────
 

@@ -152,8 +152,8 @@ def _apply_params(
             v = max(0.1, min(v, MAX_DROPLET_UL))
         if v > 50:
             warnings.append(
-                f"droplet_volume_ul {v} is large; small droplets (~15 uL) preserve "
-                f"the tip air headspace and reduce splatter.")
+                f"droplet_volume_ul {v} is large; start around 30 uL for reliable "
+                f"P300 GEN2 release, then increase only if the paper tolerates it.")
         cfg["printing"]["droplet_volume_ul"] = v
 
     # 3. Number of replicates (how many times the column is printed across paper).
@@ -193,12 +193,20 @@ def _soft_validate(cfg: dict) -> list:
             problems.append(f"fold {f} must be > 0")
         elif total and round(total / f, 2) > MAX_DROPLET_UL:
             problems.append(f"fold {f}: stock {round(total/f,2)} uL > pipette max {MAX_DROPLET_UL}")
-    # tip feasibility: need >= 1 + n single tips across the listed columns
+    # tip feasibility: current workflow uses one setup tip for all vial transfers.
     reserved = int(pr.get("print_block_column", 1))
-    single = [int(c) for c in dil.get("single_tip_columns", []) if int(c) != reserved]
-    n_tips = 8 * len(single)
-    if factors and n_tips < 1 + n:
-        problems.append(f"single_tip_columns supply {n_tips} tips; need {1 + n}")
+    setup_tip = str(dil.get("setup_tip", "")).upper()
+    if setup_tip:
+        setup_col_s = "".join(ch for ch in setup_tip if ch.isdigit())
+        if not setup_col_s:
+            problems.append(f"dilution.setup_tip {setup_tip!r} must include a column number")
+        elif int(setup_col_s) == reserved:
+            problems.append(f"dilution.setup_tip {setup_tip} overlaps print_block_column {reserved}")
+    else:
+        single = [int(c) for c in dil.get("single_tip_columns", []) if int(c) != reserved]
+        n_tips = 8 * len(single)
+        if factors and n_tips < 1:
+            problems.append("single_tip_columns must supply at least one setup tip")
     if reserved in [int(c) for c in dil.get("single_tip_columns", [])]:
         problems.append(
             f"printing.print_block_column {reserved} overlaps single_tip_columns")
@@ -219,6 +227,8 @@ def _summary(cfg: dict) -> str:
         f"  Droplet volume : {pr.get('droplet_volume_ul')} uL/channel\n"
         f"  Replicates     : {pr.get('num_replicates')} (x-spacing "
         f"{pr.get('replicate_spacing_mm', {}).get('x')} mm)\n"
+        f"  Print release  : air gap {pr.get('air_gap_ul')} uL, z {pr.get('dispense_z_mm')} mm, "
+        f"blow_out={pr.get('blow_out')}, dwell={pr.get('post_dispense_delay_s')} s\n"
         f"  Droplets/print : {len(factors)}  (CV expects {cfg.get('cv', {}).get('expected_droplets')})\n"
         f"  Return tips    : {cfg.get('tips', {}).get('return_tips')}\n"
         f"  Run modes      : dry_run={rm.get('dry_run')} do_dilution={rm.get('do_dilution')} "

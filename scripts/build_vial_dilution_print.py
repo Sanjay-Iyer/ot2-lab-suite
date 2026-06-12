@@ -202,6 +202,44 @@ def validate(cfg: dict) -> list:
     dil = cfg["dilution"]
     pr  = cfg["printing"]
     try:
+        droplet_volume = float(pr.get("droplet_volume_ul", 0))
+    except (TypeError, ValueError):
+        droplet_volume = 0.0
+        errors.append(f"printing.droplet_volume_ul must be numeric, got {pr.get('droplet_volume_ul')!r}")
+    try:
+        air_gap = float(pr.get("air_gap_ul", 0.0))
+    except (TypeError, ValueError):
+        air_gap = -1.0
+        errors.append(f"printing.air_gap_ul must be numeric, got {pr.get('air_gap_ul')!r}")
+    try:
+        dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        dwell_s = -1.0
+        errors.append(
+            f"printing.post_dispense_delay_s must be numeric, got "
+            f"{pr.get('post_dispense_delay_s')!r}")
+    move_speed = pr.get("move_speed_mm_per_s")
+    if move_speed is not None:
+        try:
+            move_speed = float(move_speed)
+        except (TypeError, ValueError):
+            errors.append(
+                f"printing.move_speed_mm_per_s must be numeric or null, got "
+                f"{pr.get('move_speed_mm_per_s')!r}")
+            move_speed = 0.0
+    if droplet_volume <= 0:
+        errors.append(f"printing.droplet_volume_ul must be > 0, got {droplet_volume}")
+    if air_gap < 0:
+        errors.append(f"printing.air_gap_ul must be >= 0, got {air_gap}")
+    if dwell_s < 0:
+        errors.append(f"printing.post_dispense_delay_s must be >= 0, got {dwell_s}")
+    if move_speed is not None and move_speed <= 0:
+        errors.append(f"printing.move_speed_mm_per_s must be > 0 or null, got {move_speed}")
+    if droplet_volume + max(air_gap, 0.0) > pip_max:
+        errors.append(
+            f"printing droplet {droplet_volume} uL + air gap {air_gap} uL exceeds "
+            f"pipette max {pip_max} uL")
+    try:
         factors = _resolve_factors(dil)
     except (ValueError, KeyError) as e:
         errors.append(f"dilution.factors: {e}")

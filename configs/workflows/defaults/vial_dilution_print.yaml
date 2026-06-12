@@ -108,7 +108,7 @@ dilution:
 printing:
   enabled: true
   source_column: "9"        # plate column to print (defaults to the dilution column)
-  droplet_volume_ul: 15.0
+  droplet_volume_ul: 30.0
   num_replicates: 3         # 3 prints of 8 droplets each = 24 droplets total (lines 9mm apart)
 
   # Leftmost paper column the print starts on. 1 = far-left edge of the sheet, and
@@ -116,20 +116,28 @@ printing:
   # Override per run in the Opentrons App via the "Paper start column" parameter —
   # e.g. set 5 to resume past columns already printed on the same sheet. The
   # pre-flight gate aborts if start_column + num_replicates runs off the sheet.
-  paper_start_column: 5
+  paper_start_column: 1
 
   # Height above the bottom of the paper-proxy well.
   # For corning_96_wellplate_360ul_custom the well bottom sits ~3.55 mm above the
-  # deck surface, so dispense_z_mm=3.0 places the tip ~6.5 mm above the deck, i.e.
-  # roughly 3 mm above the actual paper sheet. Adjust if the paper reference labware
+  # deck surface, so dispense_z_mm=1.0 places the tip close to the actual paper
+  # surface. Adjust if the paper reference labware
   # changes or if the paper is raised (e.g. on a mat).
-  dispense_z_mm: 3.0
+  dispense_z_mm: 1.0
 
   # Anti-drip air gap (µL): air pulled in BELOW the droplet right after aspirating,
   # so it sits at the tip opening and holds the liquid in during the move to the
   # paper. Dispensed together with the droplet. 0 disables it. Raise if you still
   # see dripping; keep droplet_volume_ul + air_gap_ul <= 300 (pipette max).
-  air_gap_ul: 10.0
+  air_gap_ul: 5.0
+
+  # Hold the tips at the print location after dispensing/blow-out so the droplet can
+  # detach onto the paper before the robot moves away.
+  post_dispense_delay_s: 0.5
+
+  # Smooth XY travel to the paper. Too fast can shake liquid out; too slow leaves
+  # the tips hanging longer. Set null to use Opentrons default movement speed.
+  move_speed_mm_per_s: 50.0
 
   # X/Y/Z offset (mm) between successive replicate columns on the paper.
   # z: 0.0 is correct for a flat paper surface; set non-zero only if replicates
@@ -140,8 +148,8 @@ printing:
     z: 0.0
 
   print_block_column: 1     # full 8-tip pickup from tiprack column 1
-  blow_out: false           # blow out after each dispense
-  touch_tip: false          # touch tip after each dispense
+  blow_out: true            # blow out at the print location after each dispense
+  touch_tip: false          # keep false initially; enable only if paper contact is safe
 
 # ── Tips: keep your requirement to RETURN tips (true) vs trash them (false) ───────
 tips:
@@ -166,8 +174,8 @@ camera:
 
 # ── Flow rates (uL/s); null = Opentrons default ──────────────────────────────────
 flow_rates:
-  aspirate: null
-  dispense: null
+  aspirate: 20.0
+  dispense: 80.0
   mix: null                 # informational only — OT-2 API has no separate mix rate
 
 # ── Computer-vision expectations (used HOST-side by verify_print_droplets.py) ─────

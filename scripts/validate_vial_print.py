@@ -127,25 +127,22 @@ def _build_cases(workflow_cfg: dict) -> list:
         factors = [1.0, 50.0]   # degenerate fallback — validate() would have caught this
 
     top_fold = int(factors[0])   if factors[0] == int(factors[0])   else factors[0]
-    bot_fold = int(factors[-1])  if factors[-1] == int(factors[-1]) else factors[-1]
 
-    # Row letters for top and bottom dilution wells, derived from factor count
+    # First dilution well, derived from the configured destination column.
     top_row = "A"
-    bot_row = chr(ord("A") + len(factors) - 1)   # 8 factors -> 'H'
     top_well = f"{top_row}{col}"
-    bot_well = f"{bot_row}{col}"
 
     return [
         # name, flags, bad_labware, expect_ok, must_contain, must_not_contain
         ("full_run",
          dict(dry=False, dilution=True, print=True), False, True,
-         ["Pre-flight validation passed",
-          "One-tip setup: picked tip",
-          f"Diluting well {top_well} to {top_fold:g}x",
-          f"Diluting well {bot_well} to {bot_fold:g}x",
-          "Nozzle layout: ALL for 8-channel dilution mixing",
-          "8-channel print: picked tips from column",
-          "Printing 8 droplets onto paper",
+          ["Pre-flight validation passed",
+           "One-tip setup: picked tip",
+           f"Diluting well {top_well} to {top_fold:g}x",
+           "One-tip setup transfers done",
+           "Nozzle layout: ALL for 8-channel dilution mixing",
+           "8-channel print: picked tips from column",
+           "Printing 8 droplets onto paper",
           "Returned 8-channel print tips", "Demo Completed ==="],
          ["PRE-FLIGHT VALIDATION FAILED", "Completed (dry run)"]),
 
