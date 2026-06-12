@@ -954,6 +954,21 @@ def run(protocol: protocol_api.ProtocolContext):
                 protocol.delay(seconds=dwell_s)
             if pr.get("touch_tip"):
                 pipette.touch_tip()
+            # blow_out() leaves the plunger PAST its aspirate-ready position
+            # (ready_to_aspirate=False). Without intervention, the NEXT replicate's
+            # aspirate makes the engine auto-"prepare to aspirate" AT the plate well —
+            # an extra plunger pull right over the liquid. That is the "double suck" seen
+            # on replicates 2+ but never on replicate 1 (whose freshly picked-up tip is
+            # already prepared). Reset the plunger HERE, lifted in dry air over the paper
+            # (clear of both the plate liquid and the just-printed droplet), so each
+            # replicate's plate aspirate is a single clean motion identical to the first.
+            if pr.get("blow_out") and rep < int(pr["num_replicates"]) - 1:
+                pipette.move_to(paper_well.top(air_gap_height))
+                pipette.prepare_to_aspirate()
+                protocol.comment(
+                    "Reset plunger in air over paper (prepare_to_aspirate) so the next "
+                    "replicate aspirates cleanly — no double-suck at the plate."
+                )
         _return_or_drop()
 
         _capture_image(protocol, "paper_print_8_channel.jpg")
