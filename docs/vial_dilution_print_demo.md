@@ -252,9 +252,11 @@ trends light→dark down the column).
    python scripts\run_vial_print_robot.py --live
    ```
 
-4. **Pull images & run CV:** retrieve `/data/vision/vial_dilution_print/*.jpg` (see
-   [computer_vision.md](computer_vision.md) for `scp -O`), then run the CV check on
-   one printed replicate, e.g.
+4. **Pull images & run CV:** `scripts/run_vial_print_robot.py` automatically pulls
+   `/data/vision/vial_dilution_print` back to
+   `vision_runs/vial_dilution_print/run_YYYYMMDD_HHMMSS/` after a live started run
+   (disable with `--no-pull-images`). Then run the CV check on one printed
+   replicate, e.g.
    `python vision_tests/scripts/verify_print_droplets.py --image <paper_print_01.jpg> --expect 8`.
 
 ### Real-robot watch-outs (simulation cannot catch these)

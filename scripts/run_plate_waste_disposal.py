@@ -142,7 +142,11 @@ def main() -> int:
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
-    parser.add_argument("--source-columns", help="Plate column(s) to empty, e.g. '9' or '9,11'. Overrides the protocol default.")
+    parser.add_argument(
+        "--source-columns",
+        help="Plate column(s) to empty. Accepts a single column 1-12, '9,11', or 'all' "
+             "(must match an App dropdown value; for other combos edit the YAML). "
+             "Overrides the protocol default.")
     parser.add_argument("--waste-vial", help="Waste vial in the 20 mL rack, e.g. A4. Overrides the protocol default.")
     parser.add_argument("--poll-seconds", type=float, default=5.0, help="Status polling interval.")
     args = parser.parse_args()

@@ -85,14 +85,18 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
 _RACK_VIAL_WELLS = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"]
 
 
-def _config_source_columns() -> list:
-    """Plate columns from CONFIG, accepting the new list or the legacy single key."""
-    waste = CONFIG["waste"]
-    cols = waste.get("source_columns")
+def _columns_from_cfg(waste_cfg: dict) -> list:
+    """Plate columns from a waste config block: new list key, else legacy single key."""
+    cols = waste_cfg.get("source_columns")
     if cols is None:
-        single = waste.get("source_column")
+        single = waste_cfg.get("source_column")
         cols = [single] if single is not None else []
     return [str(c).strip() for c in cols if str(c).strip()]
+
+
+def _config_source_columns() -> list:
+    """Plate columns from the global CONFIG (used for the App parameter default)."""
+    return _columns_from_cfg(CONFIG["waste"])
 
 
 def _default_source_columns_str() -> str:
@@ -188,7 +192,7 @@ def resolve_source_columns(waste_cfg: dict, runtime_columns=None,
     """
     raw = runtime_columns
     if raw is None or (isinstance(raw, str) and not raw.strip()):
-        raw = _config_source_columns()
+        raw = _columns_from_cfg(waste_cfg)
     if isinstance(raw, str):
         tokens = [t for t in re.split(r"[,\s]+", raw.strip()) if t]
     else:

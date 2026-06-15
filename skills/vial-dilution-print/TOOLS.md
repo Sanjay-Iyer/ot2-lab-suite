@@ -200,6 +200,11 @@ Anything else (fold strengths, total volume, mix reps, columns, slots) goes thro
 runs the builder, records a PASS in `simulations.json`), `validate_vial_print_matrix`
 (runs the matrix with `--config`), `verify_print_droplets_mock`. Robot deploy/execute
 are reused unchanged from `src/agents/tools.py` (lab laptop only, behind `RUN ROBOT`).
+For live vial-print runs, `scripts/run_vial_print_robot.py` pulls robot-side camera
+images from `/data/vision/vial_dilution_print` into
+`vision_runs/vial_dilution_print/run_YYYYMMDD_HHMMSS/` automatically after the run
+reaches a terminal status. Use `--no-pull-images` only when you explicitly want to
+leave images on the robot.
 
 The agent **edits the YAML, never the generated file**, and never touches the
 committed default — each run leaves a timestamped user YAML for traceability.
