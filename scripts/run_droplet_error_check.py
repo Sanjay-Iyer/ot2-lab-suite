@@ -35,6 +35,7 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.config import Config
+from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "printing_droplet_error_check.py"
@@ -136,12 +137,20 @@ def _resolve_ssh_key(cli_key: str | None) -> str:
     return str(DEFAULT_SSH_KEY)
 
 
-def _pull_images(robot_ip: str, cli_key: str | None, run_tag: int, local_name: str) -> None:
+def _pull_images(
+    robot_ip: str,
+    cli_key: str | None,
+    run_tag: int,
+    local_name: str,
+    run_log: RobotRunLog | None = None,
+) -> None:
     key = _resolve_ssh_key(cli_key)
     remote_dir = f"{REMOTE_VISION_BASE}/run_{run_tag}"
     if not Path(key).exists():
         print(f"\nWARNING: SSH key {key} not found; skipping image pull. "
               f"Images remain on the robot at {remote_dir}.")
+        if run_log:
+            run_log.event("image_pull_skipped", reason="ssh_key_missing", remote_dir=remote_dir, ssh_key=key)
         return
     opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
             "-o", "StrictHostKeyChecking=no", "-i", key]
@@ -149,13 +158,19 @@ def _pull_images(robot_ip: str, cli_key: str | None, run_tag: int, local_name: s
     dest = LOCAL_VISION_BASE / local_name   # readable local name; created by scp
     cmd = ["scp", "-O", "-r", *opts, f"{_ssh_user_host(robot_ip)}:{remote_dir}", str(dest)]
     print(f"\n[pull images] {' '.join(cmd)}")
+    if run_log:
+        run_log.event("image_pull_started", remote_dir=remote_dir, local_dest=repo_relative(dest))
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError:
         print(f"WARNING: could not pull {remote_dir}. The camera may have failed to capture; "
               f"check the run log above for 'Captured'/'Warning' lines.")
+        if run_log:
+            run_log.event("image_pull_failed", remote_dir=remote_dir, local_dest=repo_relative(dest))
         return
     imgs = sorted(p.name for p in dest.glob("*.jpg")) if dest.exists() else []
+    if run_log:
+        run_log.event("image_pull_finished", local_dest=repo_relative(dest), image_count=len(imgs), images=imgs)
     print(f"Images saved to: {dest}")
     print(f"  {', '.join(imgs) if imgs else '(no .jpg found — check camera on the robot)'}")
 
@@ -181,12 +196,15 @@ def main() -> int:
     ap.add_argument("--skip-build", action="store_true", help="No-op (no build step).")
     ap.add_argument("--skip-validate", action="store_true", help="No-op (no validate step).")
     args = ap.parse_args()
+    run_log = RobotRunLog(Path(__file__).name)
+    print(f"Run log    : {run_log.path}")
 
     robot_ip = args.robot_ip
     os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
     protocol_path = Path(args.protocol).resolve()
     if not protocol_path.exists():
+        run_log.finish("error", exit_code=1, error=f"Protocol not found: {protocol_path}")
         raise FileNotFoundError(f"Protocol not found: {protocol_path}")
 
     dry_run = not args.live
@@ -202,6 +220,16 @@ def main() -> int:
     if args.dispense_z is not None:   rtp["dispense_z_mm"] = args.dispense_z
     if args.air_gap_ul is not None:   rtp["air_gap_ul"] = args.air_gap_ul
     if args.blow_out:                 rtp["blow_out"] = True
+    run_log.update(
+        robot_ip=robot_ip,
+        protocol_path=repo_relative(protocol_path),
+        live=args.live,
+        no_start=args.no_start,
+        image_run_id=image_run_id,
+        robot_image_dir=f"{REMOTE_VISION_BASE}/run_{run_tag}",
+        local_image_base=repo_relative(LOCAL_VISION_BASE),
+        run_time_parameter_values=rtp,
+    )
 
     print("\n=== Droplet Print Error-Check Runner (HTTP API) ===")
     print(f"Robot      : {robot_ip}")
@@ -210,21 +238,35 @@ def main() -> int:
     print(f"Image run  : {image_run_id}")
     print("Deck       : slot 4 plate (column 9 must hold liquid), slot 5 paper, slot 9 tips.")
 
-    protocol_id = _upload_protocol(robot_ip, protocol_path)
-    server_run_id = _create_run(robot_ip, protocol_id, rtp)
+    try:
+        protocol_id = _upload_protocol(robot_ip, protocol_path)
+        run_log.event("protocol_uploaded", protocol_id=protocol_id)
+        server_run_id = _create_run(robot_ip, protocol_id, rtp)
+        run_log.event("run_created", protocol_id=protocol_id, run_id=server_run_id)
+    except Exception as exc:
+        run_log.finish("error", exit_code=1, error=str(exc))
+        raise
 
     if args.no_start:
         print(f"\nCreated run but did not start it. Server run id: {server_run_id}")
+        run_log.finish("created_not_started", exit_code=0)
         return 0
 
-    _play_run(robot_ip, server_run_id)
-    status = _monitor(robot_ip, server_run_id, args.poll_seconds)
+    try:
+        _play_run(robot_ip, server_run_id)
+        run_log.event("run_started", run_id=server_run_id)
+        status = _monitor(robot_ip, server_run_id, args.poll_seconds)
+    except Exception as exc:
+        run_log.finish("error", exit_code=1, error=str(exc))
+        raise
     print(f"\nRun finished with status: {status}")
 
     if status == "succeeded" and args.live:
-        _pull_images(robot_ip, args.ssh_key, run_tag, image_run_id)
+        _pull_images(robot_ip, args.ssh_key, run_tag, image_run_id, run_log)
 
-    return 0 if status == "succeeded" else 1
+    exit_code = 0 if status == "succeeded" else 1
+    run_log.finish(status, exit_code=exit_code)
+    return exit_code
 
 
 if __name__ == "__main__":

@@ -60,9 +60,11 @@ def test_num_dilutions_slices_canonical_folds_and_syncs_cv(default_cfg, default_
 
 def test_droplet_volume_and_replicates_map_to_yaml_keys(default_cfg, default_folds):
     cfg, _ = vpt._apply_params(default_cfg, droplet_volume_ul=22.0, num_replicates=3,
+                               paper_start_column=4,
                                default_folds=default_folds)
     assert cfg["printing"]["droplet_volume_ul"] == 22.0
     assert cfg["printing"]["num_replicates"] == 3
+    assert cfg["printing"]["paper_start_column"] == 4
 
 
 def test_num_dilutions_above_max_is_clamped_with_warning(default_cfg, default_folds):
@@ -103,8 +105,13 @@ def test_soft_validate_flags_tip_block_overlap(default_cfg, default_folds):
 
 
 def test_parse_request_extracts_three_knobs():
-    knobs = parse_request("set up 5 dilutions, 20 uL droplets, 3 replicates")
-    assert knobs == {"num_dilutions": 5, "droplet_volume_ul": 20.0, "num_replicates": 3}
+    knobs = parse_request("set up 5 dilutions, 20 uL droplets, 3 replicates, paper column 1")
+    assert knobs == {
+        "num_dilutions": 5,
+        "droplet_volume_ul": 20.0,
+        "num_replicates": 3,
+        "paper_start_column": 1,
+    }
 
 
 def test_parse_request_handles_micro_sign_and_no_unit():

@@ -51,6 +51,15 @@ python -c "import langgraph; import langchain_google_genai; print('OK')"
 
 ## Step 3 — Start the AI Agent
 
+**Recommended for the current vial dilution -> paper print workflow:**
+```bash
+python -m src.agents.vial_print_agent
+```
+
+This dedicated agent builds and validates the vial-print protocol, then launches
+the real run through `scripts/run_vial_print_robot.py` and the OT-2 HTTP API after
+you reply exactly `RUN ROBOT`.
+
 **Standard mode (Gemini LLM, no rate limiting):**
 ```bash
 python -m src.agents.main

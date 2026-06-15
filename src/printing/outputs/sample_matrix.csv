@@ -1,7 +1,0 @@
-sample_id,concentration_level,dilution_factor,final_concentration_ugml,size_variant,source_dilution_slot,source_dilution_well,source_size_pool_slot,destination_slot,destination_well,volume_ul,final_description
-S001,stock,1,100.0,small,7,A1,4,7,A1,200.0,stock conc. + small NS
-S002,stock,1,100.0,large,7,A1,6,7,A2,200.0,stock conc. + large NS
-S003,10x,10,10.0,small,7,A2,4,7,A3,200.0,10x conc. + small NS
-S004,10x,10,10.0,large,7,A2,6,7,A4,200.0,10x conc. + large NS
-S005,100x,100,1.0,small,7,A3,4,7,A5,200.0,100x conc. + small NS
-S006,100x,100,1.0,large,7,A3,6,7,A6,200.0,100x conc. + large NS

@@ -65,7 +65,9 @@ pipette:
 # ── Liquid sources: which VIAL in the rack (slot 7) holds what ───────────────────
 sources:
   water_vial: A1            # vial well holding water
-  food_coloring_vial: A2    # dye stock: same row as water, second rack column
+  blue_dye_vial: A2         # blue dye stock: same row as water, second rack column
+  orange_dye_vial: A3       # orange dye stock: same row as water, third rack column
+  food_coloring_vial: A2    # legacy alias for blue dye stock
   vial_aspirate_height_mm: 2.0   # above vial bottom; absolute model Z = 5 + 2 = 7 mm (53 mm into 55 mm vial)
 
 # ── Dilution series ──────────────────────────────────────────────────────────────
@@ -100,8 +102,28 @@ dilution:
   # source column changes, which is safe but may affect tip usage symmetry.
   #
   # Need >= (1 + number_of_dilution_wells) tips across all listed columns.
-  setup_tip: H12             # one setup tip only; active A1 nozzle picks an H-row tip
+  water_setup_tip: H12       # water-only setup tip; active A1 nozzle picks an H-row tip
+  setup_tip: H12             # legacy fallback for single-color configs
   single_tip_columns: [12]   # legacy fallback; setup_tip is the real setting
+
+# Prep both 8-step series, then print orange first (paper columns 1-3) and
+# blue second (paper columns 4-6). Each dye has its own setup tip and 8-tip
+# print block to avoid carrying color between vials, plate columns, or paper.
+color_series:
+  - name: orange
+    dye_vial: A3
+    destination_column: "11"
+    setup_tip: H11
+    print_block_column: 1
+    paper_start_column: 1
+    num_replicates: 3
+  - name: blue
+    dye_vial: A2
+    destination_column: "9"
+    setup_tip: H10
+    print_block_column: 2
+    paper_start_column: 4
+    num_replicates: 3
 
 # ── Printing ─────────────────────────────────────────────────────────────────────
 # A single-nozzle print of one plate column = one physical tip active at a time.

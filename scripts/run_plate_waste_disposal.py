@@ -28,6 +28,7 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(repo))
 
 from src.core.config import Config
+from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -137,36 +138,58 @@ def main() -> int:
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
     parser.add_argument("--poll-seconds", type=float, default=5.0, help="Status polling interval.")
     args = parser.parse_args()
+    run_log = RobotRunLog(Path(__file__).name)
+    print(f"Run log   : {run_log.path}")
 
-    robot_ip = args.robot_ip
-    os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+    try:
+        robot_ip = args.robot_ip
+        os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
-    protocol_path = Path(args.protocol).resolve()
-    if not args.skip_build:
-        _run_local_step([sys.executable, "scripts/build_plate_waste_disposal.py"], "build + simulate")
-    if not protocol_path.exists():
-        raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
+        protocol_path = Path(args.protocol).resolve()
+        if not args.skip_build:
+            run_log.event("local_step", label="build + simulate")
+            _run_local_step([sys.executable, "scripts/build_plate_waste_disposal.py"], "build + simulate")
+        if not protocol_path.exists():
+            raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 
-    dry_run = not args.live
+        dry_run = not args.live
+        rtp = {"dry_run": dry_run}
+        run_log.update(
+            robot_ip=robot_ip,
+            protocol_path=repo_relative(protocol_path),
+            live=args.live,
+            no_start=args.no_start,
+            skip_build=args.skip_build,
+            run_time_parameter_values=rtp,
+        )
 
-    print("\n=== Plate -> Waste Vial Disposal Robot Runner ===")
-    print(f"Robot     : {robot_ip}")
-    print(f"Protocol  : {protocol_path}")
-    print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
-    print("\nDeck must be: slot 7 vial rack (waste vial seated), slot 4 plate, slot 9 tips.")
-    print("Tip plan  : one setup tip H12 for the whole job (single nozzle).")
+        print("\n=== Plate -> Waste Vial Disposal Robot Runner ===")
+        print(f"Robot     : {robot_ip}")
+        print(f"Protocol  : {protocol_path}")
+        print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
+        print("\nDeck must be: slot 7 vial rack (waste vial seated), slot 4 plate, slot 9 tips.")
+        print("Tip plan  : one setup tip H12 for the whole job (single nozzle).")
 
-    protocol_id = _upload_protocol(robot_ip, protocol_path)
-    run_id = _create_run(robot_ip, protocol_id, dry_run=dry_run)
+        protocol_id = _upload_protocol(robot_ip, protocol_path)
+        run_log.event("protocol_uploaded", protocol_id=protocol_id)
+        run_id = _create_run(robot_ip, protocol_id, dry_run=dry_run)
+        run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 
-    if args.no_start:
-        print(f"\nCreated run but did not start it. Run ID: {run_id}")
-        return 0
+        if args.no_start:
+            print(f"\nCreated run but did not start it. Run ID: {run_id}")
+            run_log.finish("created_not_started", exit_code=0)
+            return 0
 
-    _play_run(robot_ip, run_id)
-    status = _monitor(robot_ip, run_id, args.poll_seconds)
-    print(f"\nRun finished with status: {status}")
-    return 0 if status == "succeeded" else 1
+        _play_run(robot_ip, run_id)
+        run_log.event("run_started", run_id=run_id)
+        status = _monitor(robot_ip, run_id, args.poll_seconds)
+        print(f"\nRun finished with status: {status}")
+        exit_code = 0 if status == "succeeded" else 1
+        run_log.finish(status, exit_code=exit_code)
+        return exit_code
+    except Exception as exc:
+        run_log.finish("error", exit_code=1, error=str(exc))
+        raise
 
 
 if __name__ == "__main__":

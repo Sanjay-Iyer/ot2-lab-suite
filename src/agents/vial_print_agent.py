@@ -6,7 +6,8 @@ Conversational AI driver for the flagship **vial-dilution-print** demo
 
 Talk to it in plain English to set the number of dilutions, droplet volume, and
 replicates, then it builds, validates, and CV-checks a robot-ready protocol — and,
-on the lab laptop only, deploys and runs it behind a RUN ROBOT confirmation gate.
+on the lab laptop only, runs it through the OT-2 HTTP API behind a RUN ROBOT
+confirmation gate.
 
 Run (from the conda `ai` env, repo root):
 
@@ -66,10 +67,11 @@ SYSTEM_PROMPT = (
     "build an 8-step (configurable) dilution series down one column of a 96-well "
     "plate, then pick up an 8-tip block and 'print' that column onto paper as "
     "simultaneous droplets. Tips are RETURNED, not trashed.\n\n"
-    "THE THREE KNOBS the user adjusts (map them with update_vial_print_params):\n"
+    "THE FOUR KNOBS the user adjusts (map them with update_vial_print_params):\n"
     "  - number of dilutions (1-8): dilution wells = simultaneous droplets per print.\n"
     "  - droplet volume (uL): liquid dispensed per channel per replicate.\n"
     "  - number of replicates (>=1): how many times the column prints across paper.\n"
+    "  - paper start column (1-12): first paper column used for printing.\n"
     "For anything else (fold strengths, total volume, mix reps, columns) use "
     "update_vial_print_params(advanced_updates=...).\n\n"
     "MANDATORY PIPELINE ORDER — never skip or reorder:\n"
@@ -84,13 +86,16 @@ SYSTEM_PROMPT = (
     "  A. Steps 4-6 must all have passed for the current protocol.\n"
     "  B. get_robot_hardware_status() to confirm the attached pipette matches "
     "     (expected p300_multi_gen2 on the right mount).\n"
-    "  C. check_robot_connection().\n"
+    "  C. check_robot_http_api() to verify the robot server HTTP API is online.\n"
     "  D. Present a PRE-RUN SUMMARY: protocol path + SHA256, robot IP, deck layout "
-    "     (tuberack slot 1, plate 2, paper 3, tiprack 6), pipette, number of "
-    "     dilutions, droplets per print, and replicates.\n"
+    "     (vial rack slot 7, plate slot 4, paper slot 5, tips slot 9), pipette, "
+    "     number of dilutions, droplets per print, replicates, droplet volume, "
+    "     air gap, tip height, blow out, and paper start column.\n"
     "  E. MANDATORY: ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
-    "  F. Only after 'RUN ROBOT': deploy_protocol_to_robot() then "
-    "     execute_protocol_on_robot().\n\n"
+    "  F. Only after 'RUN ROBOT': call run_vial_print_robot_http("
+    "confirmation='RUN ROBOT', live=True). This uses scripts/run_vial_print_robot.py "
+    "and the OT-2 HTTP API; do not use deploy_protocol_to_robot() or "
+    "execute_protocol_on_robot() for this workflow.\n\n"
     "SAFETY — non-negotiable:\n"
     "  - The robot handles GLASS vials. Never weaken the geometry pre-flight check, "
     "    widen tolerances, or switch to fallback labware to make something 'work'.\n"
@@ -113,6 +118,9 @@ def parse_request(text: str) -> dict:
     m = re.search(r"(\d+)\s*replicate", t)
     if m:
         out["num_replicates"] = int(m.group(1))
+    m = re.search(r"(?:paper\s*)?(?:start\s*)?column\s*(\d+)", t)
+    if m:
+        out["paper_start_column"] = int(m.group(1))
     # droplet volume: a number directly followed by a microlitre unit.
     m = re.search(r"(\d+(?:\.\d+)?)\s*(?:u\s*l|µl|ul|microlit\w*)\b", t)
     if m:
@@ -157,7 +165,7 @@ def run_scripted(request: str) -> int:
         return 1
 
     print("\n=== ALL OFFLINE GATES PASSED ===")
-    print("Deploy + execute is lab-laptop only (run the live agent there, say RUN ROBOT).")
+    print("HTTP robot launch is lab-laptop only (run the live agent there, say RUN ROBOT).")
     return 0
 
 
@@ -168,18 +176,18 @@ def create_vial_print_agent(use_mock: bool = False):
     offline path never needs them."""
     from langgraph.prebuilt import create_react_agent
     from src.core.config import Config
-    from src.agents.tools import (
-        check_robot_connection,
-        get_robot_hardware_status,
-        deploy_protocol_to_robot,
-        execute_protocol_on_robot,
+    from src.agents.tools import get_robot_hardware_status
+    from src.agents.robot_http_tools import (
+        check_robot_http_api,
+        list_robot_http_protocols,
+        run_vial_print_robot_http,
     )
 
     robot_tools = [
+        list_robot_http_protocols,
         get_robot_hardware_status,
-        check_robot_connection,
-        deploy_protocol_to_robot,
-        execute_protocol_on_robot,
+        check_robot_http_api,
+        run_vial_print_robot_http,
     ]
     llm = Config.get_llm(temperature=0)
     return create_react_agent(model=llm, tools=CONFIG_TOOLS + robot_tools, prompt=SYSTEM_PROMPT)

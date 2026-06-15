@@ -105,6 +105,7 @@ def _apply_params(
     num_dilutions: Optional[int] = None,
     droplet_volume_ul: Optional[float] = None,
     num_replicates: Optional[int] = None,
+    paper_start_column: Optional[int] = None,
     advanced_updates: Optional[dict] = None,
     default_folds: Optional[list] = None,
 ) -> Tuple[dict, list]:
@@ -164,7 +165,15 @@ def _apply_params(
             r = 1
         cfg["printing"]["num_replicates"] = r
 
-    # 4. Free-form nested overrides (any documented YAML key).
+    # 4. Paper start column.
+    if paper_start_column is not None:
+        col = int(paper_start_column)
+        if not (1 <= col <= 12):
+            warnings.append(f"paper_start_column {col} out of range; clamped to [1, 12].")
+            col = max(1, min(col, 12))
+        cfg["printing"]["paper_start_column"] = col
+
+    # 5. Free-form nested overrides (any documented YAML key).
     if advanced_updates:
         cfg = merge_user_updates(cfg, advanced_updates)
         # Re-sync the CV count if the caller changed the factor block directly.
@@ -225,7 +234,8 @@ def _summary(cfg: dict) -> str:
         f"(folds: {folds})\n"
         f"  Total / well   : {dil.get('total_volume_ul')} uL, mix {dil.get('mix_reps')}x\n"
         f"  Droplet volume : {pr.get('droplet_volume_ul')} uL/channel\n"
-        f"  Replicates     : {pr.get('num_replicates')} (x-spacing "
+        f"  Replicates     : {pr.get('num_replicates')} starting at paper column "
+        f"{pr.get('paper_start_column')} (x-spacing "
         f"{pr.get('replicate_spacing_mm', {}).get('x')} mm)\n"
         f"  Print release  : air gap {pr.get('air_gap_ul')} uL, z {pr.get('dispense_z_mm')} mm, "
         f"blow_out={pr.get('blow_out')}, dwell={pr.get('post_dispense_delay_s')} s\n"
@@ -302,6 +312,7 @@ def update_vial_print_params(
     num_dilutions: Optional[int] = None,
     droplet_volume_ul: Optional[float] = None,
     num_replicates: Optional[int] = None,
+    paper_start_column: Optional[int] = None,
     advanced_updates: Optional[dict] = None,
 ) -> str:
     """Adjust the demo's parameters from natural language.
@@ -312,6 +323,7 @@ def update_vial_print_params(
             expected-droplet count in sync.
         droplet_volume_ul: Volume dispensed per channel per replicate (uL).
         num_replicates: How many times the column is printed across the paper (>=1).
+        paper_start_column: Leftmost paper column for the first replicate (1-12).
         advanced_updates: Optional nested dict for any other documented YAML key,
             e.g. {"dilution": {"total_volume_ul": 180}} or
             {"dilution": {"factors": {"explicit": [1, 3, 9, 27]}}}.
@@ -322,11 +334,17 @@ def update_vial_print_params(
     global _WORKING
     if _WORKING is None:
         return "Error: no config loaded. Call load_vial_print_defaults first."
-    if all(x is None for x in (num_dilutions, droplet_volume_ul, num_replicates, advanced_updates)):
+    if all(x is None for x in (
+        num_dilutions,
+        droplet_volume_ul,
+        num_replicates,
+        paper_start_column,
+        advanced_updates,
+    )):
         return "No changes requested. Current config:\n\n" + _summary(_WORKING)
     cfg, warnings = _apply_params(
         _WORKING, num_dilutions, droplet_volume_ul, num_replicates,
-        advanced_updates, default_folds=_DEFAULT_FOLDS)
+        paper_start_column, advanced_updates, default_folds=_DEFAULT_FOLDS)
     _WORKING = cfg
     out = ["Config updated.\n", _summary(cfg)]
     soft = _soft_validate(cfg)

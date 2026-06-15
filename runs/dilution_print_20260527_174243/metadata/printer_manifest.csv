@@ -1,4 +1,0 @@
-source_well,target_label,x_mm,y_mm,volume_ul,concentration
-C1,dilution_1,5.0,5.0,10.0,Diluted
-C2,dilution_2,10.0,10.0,10.0,Diluted
-C3,dilution_3,15.0,15.0,10.0,Diluted

@@ -24,6 +24,7 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(repo))
 
 from src.core.config import Config
+from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -157,51 +158,81 @@ def main() -> int:
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
     parser.add_argument("--poll-seconds", type=float, default=5.0, help="Status polling interval.")
     args = parser.parse_args()
+    run_log = RobotRunLog(Path(__file__).name)
+    print(f"Run log   : {run_log.path}")
 
-    robot_ip = args.robot_ip
-    os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+    try:
+        robot_ip = args.robot_ip
+        os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
-    protocol_path = Path(args.protocol).resolve()
-    if not args.skip_build:
-        _run_local_step([sys.executable, "scripts/build_vial_dilution_print.py"], "build + simulate")
-    if not args.skip_validate:
-        _run_local_step([sys.executable, "scripts/validate_vial_print.py"], "validate matrix")
-    if not protocol_path.exists():
-        raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
+        protocol_path = Path(args.protocol).resolve()
+        if not args.skip_build:
+            run_log.event("local_step", label="build + simulate")
+            _run_local_step([sys.executable, "scripts/build_vial_dilution_print.py"], "build + simulate")
+        if not args.skip_validate:
+            run_log.event("local_step", label="validate matrix")
+            _run_local_step([sys.executable, "scripts/validate_vial_print.py"], "validate matrix")
+        if not protocol_path.exists():
+            raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 
-    dry_run = not args.live
-    do_dilution = not args.no_dilution
-    do_print = not args.no_print
+        dry_run = not args.live
+        do_dilution = not args.no_dilution
+        do_print = not args.no_print
+        rtp: dict[str, Any] = {
+            "dry_run": dry_run,
+            "do_dilution": do_dilution,
+            "do_print": do_print,
+        }
+        if args.paper_start_column is not None:
+            rtp["print_start_column"] = args.paper_start_column
+        run_log.update(
+            robot_ip=robot_ip,
+            protocol_path=repo_relative(protocol_path),
+            live=args.live,
+            no_start=args.no_start,
+            skip_build=args.skip_build,
+            skip_validate=args.skip_validate,
+            run_time_parameter_values=rtp,
+        )
 
-    print("\n=== Vial Dilution Print Robot Runner ===")
-    print(f"Robot     : {robot_ip}")
-    print(f"Protocol  : {protocol_path}")
-    print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
-    print(f"Dilution  : {do_dilution}")
-    print(f"Print     : {do_print}")
-    if args.paper_start_column is not None:
-        print(f"Paper col : {args.paper_start_column} (CLI override)")
-    print("\nDeck must be: slot 7 vial rack (A1 water, A2 dye), slot 4 plate, slot 5 paper, slot 9 tips.")
-    print("Tip plan  : one setup tip H12 for vial/plate setup, then 8 print tips from column 1.")
+        print("\n=== Vial Dilution Print Robot Runner ===")
+        print(f"Robot     : {robot_ip}")
+        print(f"Protocol  : {protocol_path}")
+        print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
+        print(f"Dilution  : {do_dilution}")
+        print(f"Print     : {do_print}")
+        if args.paper_start_column is not None:
+            print(f"Paper col : {args.paper_start_column} (CLI override)")
+        print("\nDeck must be: slot 7 vial rack (A1 water, A2 blue dye, A3 orange dye), slot 4 plate, slot 5 paper, slot 9 tips.")
+        print("Tip plan  : setup tips H12 water, H11 orange, H10 blue; 8-channel print tips from columns 1 orange and 2 blue.")
 
-    protocol_id = _upload_protocol(robot_ip, protocol_path)
-    run_id = _create_run(
-        robot_ip,
-        protocol_id,
-        dry_run=dry_run,
-        do_dilution=do_dilution,
-        do_print=do_print,
-        paper_start_column=args.paper_start_column,
-    )
+        protocol_id = _upload_protocol(robot_ip, protocol_path)
+        run_log.event("protocol_uploaded", protocol_id=protocol_id)
+        run_id = _create_run(
+            robot_ip,
+            protocol_id,
+            dry_run=dry_run,
+            do_dilution=do_dilution,
+            do_print=do_print,
+            paper_start_column=args.paper_start_column,
+        )
+        run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 
-    if args.no_start:
-        print(f"\nCreated run but did not start it. Run ID: {run_id}")
-        return 0
+        if args.no_start:
+            print(f"\nCreated run but did not start it. Run ID: {run_id}")
+            run_log.finish("created_not_started", exit_code=0)
+            return 0
 
-    _play_run(robot_ip, run_id)
-    status = _monitor(robot_ip, run_id, args.poll_seconds)
-    print(f"\nRun finished with status: {status}")
-    return 0 if status == "succeeded" else 1
+        _play_run(robot_ip, run_id)
+        run_log.event("run_started", run_id=run_id)
+        status = _monitor(robot_ip, run_id, args.poll_seconds)
+        print(f"\nRun finished with status: {status}")
+        exit_code = 0 if status == "succeeded" else 1
+        run_log.finish(status, exit_code=exit_code)
+        return exit_code
+    except Exception as exc:
+        run_log.finish("error", exit_code=1, error=str(exc))
+        raise
 
 
 if __name__ == "__main__":
