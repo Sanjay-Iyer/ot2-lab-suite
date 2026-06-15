@@ -21,6 +21,16 @@ load_dotenv(env_path)
 from src.core.config import Config
 
 api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    project = Config.get_google_cloud_project()
+    if project:
+        print(
+            "GOOGLE_API_KEY is not set. Vertex AI / gcloud ADC appears configured "
+            f"for project '{project}'. This helper only lists Gemini API-key models."
+        )
+        sys.exit(0)
+    print("GOOGLE_API_KEY is not set, and no GOOGLE_CLOUD_PROJECT was found.")
+    sys.exit(1)
 
 # 2. Ask Google's API for the list of available models
 print("Fetching available models from Google...\n")

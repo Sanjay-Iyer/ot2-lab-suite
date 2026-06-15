@@ -20,6 +20,36 @@ class TestConfiguration:
         """Test that GEMINI_MODEL can be overridden."""
         assert os.getenv("GEMINI_MODEL", "gemini-1.5-flash") == "gemini-test-model"
 
+    @patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT": "vertex-project"}, clear=True)
+    def test_google_cloud_project_from_env(self):
+        """Test that Vertex AI project ID is read from environment."""
+        assert Config.get_google_cloud_project() == "vertex-project"
+
+    @patch.dict(os.environ, {"GCP_PROJECT_ID": "gcp-project"}, clear=True)
+    def test_google_cloud_project_alias_from_env(self):
+        """Test fallback aliases for Vertex AI project ID."""
+        assert Config.get_google_cloud_project() == "gcp-project"
+
+    @patch.dict(os.environ, {"LLM_PROVIDER": "api-key", "GOOGLE_API_KEY": "test-key"}, clear=True)
+    def test_api_key_provider_allowed_for_llm(self):
+        """Test explicit API-key provider is recognized for simulation testing."""
+        assert Config.get_llm_provider() == "api-key"
+
+    @patch.dict(os.environ, {"LLM_PROVIDER": "api-key", "GOOGLE_API_KEY": "test-key"}, clear=True)
+    def test_api_key_provider_refused_for_live_robot_tools(self):
+        """Test API-key auth is blocked for live robot agent interactions."""
+        assert "REFUSED" in Config.live_robot_llm_auth_error()
+
+    @patch.dict(os.environ, {
+        "LLM_PROVIDER": "vertexai",
+        "GOOGLE_CLOUD_PROJECT": "robot-project",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+    }, clear=True)
+    def test_vertex_provider_allowed_for_live_robot_tools(self):
+        """Test Vertex AI / gcloud ADC auth is allowed for live robot agent interactions."""
+        assert Config.get_llm_provider() == "vertexai"
+        assert Config.live_robot_llm_auth_error() == ""
+
     @patch.dict(os.environ, {"NO_PROXY": "custom_proxy"}, clear=True)
     def test_no_proxy_read_correctly(self):
         """Test NO_PROXY reads correctly from environment."""

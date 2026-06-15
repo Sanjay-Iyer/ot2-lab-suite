@@ -72,7 +72,7 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
                'blue_dye_vial': 'A2',
                'orange_dye_vial': 'A3',
                'food_coloring_vial': 'A2',
-               'vial_aspirate_height_mm': 2.0},
+               'vial_aspirate_height_mm': 4.0},
   'dilution': { 'enabled': True,
                 'destination_column': '9',
                 'total_volume_ul': 200.0,
@@ -936,7 +936,7 @@ def run(protocol: protocol_api.ProtocolContext):
         _capture_image(protocol, "before_plate.jpg")
 
     water_vial = lw["tuberack"][CONFIG["sources"]["water_vial"]]
-    vial_aspirate_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 3.0))
+    vial_aspirate_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 4.0))
     water_vial_aspirate = water_vial.bottom(vial_aspirate_height)
     dye_vial_aspirates = {
         series["name"]: lw["tuberack"][series["dye_vial"]].bottom(vial_aspirate_height)

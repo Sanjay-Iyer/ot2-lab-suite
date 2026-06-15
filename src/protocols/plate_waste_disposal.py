@@ -22,9 +22,13 @@ WHY apiLevel 2.28 / HOW TO RUN
     Opentrons App or the HTTP API (provides the deck config). Bare opentrons_execute
     over SSH fails with AreaNotInDeckConfigurationError — that is expected, not a bug.
 
-RUN-MODE FLAG (App Runtime Parameter; DEFAULT_* mirrors it for simulation):
-  dry_run
+RUN-MODE FLAGS (App Runtime Parameters; DEFAULT_* / CONFIG mirror them for simulation):
+  dry_run         - load + pre-flight + comments only, no liquid motion
+  source_columns  - which plate column(s) to empty, e.g. "9" or "9,11"
+  waste_vial      - which 20 mL rack vial collects the waste, e.g. A4
 """
+
+import re
 
 from opentrons import protocol_api
 from opentrons.protocol_api import SINGLE
@@ -60,7 +64,7 @@ CONFIG = {
 
     # ── Waste disposal plan ──────────────────────────────────────────────────────
     "waste": {
-        "source_column": "9",                                  # plate column to empty
+        "source_columns": ["9"],                               # plate column(s) to empty
         "source_rows": ["A", "B", "C", "D", "E", "F", "G", "H"],
         "waste_vial": "A4",                                    # destination vial in the rack
         "volume_ul": 200.0,                                    # removed from each well
@@ -87,11 +91,80 @@ CONFIG = {
 # ════════════════════════════════════════════════════════════════════════════════
 
 
+# Fixed v2 rack vials (2 rows A/B x 4 columns). Used ONLY to populate the App
+# "Waste vial" dropdown — add_parameters runs before labware loads, so the well
+# names can't be derived from the rack here. Pre-flight still validates the chosen
+# vial against the actually-loaded rack, so a mismatch aborts cleanly.
+_RACK_VIAL_WELLS = ["A1", "A2", "A3", "A4", "B1", "B2", "B3", "B4"]
+
+
+def _columns_from_cfg(waste_cfg: dict) -> list:
+    """Plate columns from a waste config block: new list key, else legacy single key."""
+    cols = waste_cfg.get("source_columns")
+    if cols is None:
+        single = waste_cfg.get("source_column")
+        cols = [single] if single is not None else []
+    return [str(c).strip() for c in cols if str(c).strip()]
+
+
+def _config_source_columns() -> list:
+    """Plate columns from the global CONFIG (used for the App parameter default)."""
+    return _columns_from_cfg(CONFIG["waste"])
+
+
+def _default_source_columns_str() -> str:
+    return ",".join(_config_source_columns()) or "9"
+
+
+def _source_columns_choices() -> list:
+    """Dropdown options for the App. Opentrons str params must be choice-constrained,
+    so we offer each single column 1-12 plus the common combos. Arbitrary subsets
+    (e.g. "5,7") are still possible via waste.source_columns in the YAML config.
+    """
+    default = _default_source_columns_str()
+    choices, seen = [], set()
+
+    def _add(value: str, label: str) -> None:
+        if value not in seen:
+            choices.append({"display_name": label, "value": value})
+            seen.add(value)
+
+    for c in range(1, 13):
+        _add(str(c), f"Column {c}")
+    _add("9,11", "Cols 9 & 11 (both dyes)")
+    _add("all", "All columns (1-12)")
+    if default not in seen:                        # keep a custom config default selectable
+        _add(default, default)
+    return choices
+
+
+def _default_waste_vial() -> str:
+    return str(CONFIG["waste"]["waste_vial"]).upper()
+
+
+def _waste_vial_choices() -> list:
+    default = _default_waste_vial()
+    wells = list(_RACK_VIAL_WELLS)
+    if default not in wells:                       # honor a config vial outside the grid
+        wells.append(default)
+    return [{"display_name": w, "value": w} for w in wells]
+
+
 def add_parameters(parameters: protocol_api.ParameterContext):
     parameters.add_bool(
         variable_name="dry_run", display_name="Dry run (no liquid)",
         description="Load labware, run pre-flight and comments only - no liquid motion.",
         default=DEFAULT_DRY_RUN)
+    parameters.add_str(
+        variable_name="source_columns", display_name="Plate columns to empty",
+        description="Which 96-well plate column(s) to empty into the waste vial.",
+        choices=_source_columns_choices(),
+        default=_default_source_columns_str())
+    parameters.add_str(
+        variable_name="waste_vial", display_name="Waste vial",
+        description="Vial in the 20 mL rack that collects all the waste.",
+        choices=_waste_vial_choices(),
+        default=_default_waste_vial())
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────────
@@ -120,9 +193,60 @@ def _edge_pickup_row(single_start: str, tiprack_rows: list) -> str:
     )
 
 
-def resolve_source_wells(waste_cfg: dict, plate_rows: list) -> list:
-    """Ordered plate wells to empty = source_rows x source_column, in row order."""
-    col = str(waste_cfg["source_column"])
+def resolve_source_columns(waste_cfg: dict, runtime_columns=None,
+                           plate_columns=None) -> list:
+    """Ordered, de-duplicated list of plate column labels to empty.
+
+    Precedence: runtime parameter (operator flag in the App / runner) > config
+    source_columns > legacy config source_column. Accepts either a list or a
+    comma/whitespace-separated string (e.g. "9", "9,11", "9 11"). The literal token
+    "all" expands to every plate column. When plate_columns is provided, each
+    requested column is validated against the loaded plate.
+    """
+    raw = runtime_columns
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        raw = _columns_from_cfg(waste_cfg)
+    if isinstance(raw, str):
+        tokens = [t for t in re.split(r"[,\s]+", raw.strip()) if t]
+    else:
+        tokens = [str(t).strip() for t in raw if str(t).strip()]
+    columns = []
+    for tok in tokens:
+        if tok.lower() == "all":
+            if not plate_columns:
+                raise ValueError("'all' columns requested but plate column list is unavailable.")
+            for col in plate_columns:
+                if col not in columns:
+                    columns.append(col)
+            continue
+        if not tok.isdigit():
+            raise ValueError(
+                f"Invalid plate column {tok!r}: columns must be positive integers or "
+                "'all' (e.g. '9', '9,11', 'all')."
+            )
+        col = str(int(tok))
+        if plate_columns is not None and col not in plate_columns:
+            errors = ", ".join(plate_columns)
+            raise ValueError(f"Column {col!r} is not a valid plate column (available: {errors}).")
+        if col not in columns:
+            columns.append(col)
+    if not columns:
+        raise ValueError(
+            "No plate columns selected — set waste.source_columns or the "
+            "'Plate columns to empty' flag."
+        )
+    return columns
+
+
+def resolve_waste_vial(waste_cfg: dict, runtime_vial=None) -> str:
+    """Destination waste vial. Runtime flag overrides config; existence checked in pre-flight."""
+    vial = runtime_vial if (runtime_vial is not None and str(runtime_vial).strip()) \
+        else waste_cfg["waste_vial"]
+    return str(vial).upper()
+
+
+def resolve_source_wells(waste_cfg: dict, columns: list, plate_rows: list) -> list:
+    """Ordered plate wells to empty = source_rows x each column, column by column."""
     rows = [str(r).upper() for r in waste_cfg["source_rows"]]
     for r in rows:
         if r not in plate_rows:
@@ -130,12 +254,12 @@ def resolve_source_wells(waste_cfg: dict, plate_rows: list) -> list:
                 f"waste.source_rows entry {r!r} is not a valid plate row "
                 f"(valid rows: {plate_rows})."
             )
-    return [f"{r}{col}" for r in rows]
+    return [f"{r}{col}" for col in columns for r in rows]
 
 
 # ── Pre-flight ───────────────────────────────────────────────────────────────────
 
-def _preflight(protocol, lw, pipette, source_wells, setup_tip,
+def _preflight(protocol, lw, pipette, source_wells, setup_tip, waste_vial_name,
                plate_rows: list, tiprack_rows: list):
     """Validate config + loaded-labware geometry BEFORE any motion. Raise to abort."""
     errors = []
@@ -163,7 +287,7 @@ def _preflight(protocol, lw, pipette, source_wells, setup_tip,
         )
 
     # ── Waste vial exists in the rack ─────────────────────────────────────────────
-    waste_vial_name = str(waste["waste_vial"]).upper()
+    waste_vial_name = str(waste_vial_name).upper()
     rack_well_names = set(tuberack.wells_by_name().keys())
     if waste_vial_name not in rack_well_names:
         errors.append(
@@ -272,21 +396,29 @@ def run(protocol: protocol_api.ProtocolContext):
         CONFIG["pipette"]["name"], CONFIG["pipette"]["mount"], tip_racks=[lw["tiprack"]]
     )
 
-    plate_rows   = list(lw["plate"].rows_by_name().keys())
-    tiprack_rows = list(lw["tiprack"].rows_by_name().keys())
-    source_wells = resolve_source_wells(waste, plate_rows)
+    plate_rows    = list(lw["plate"].rows_by_name().keys())
+    plate_columns = list(lw["plate"].columns_by_name().keys())
+    tiprack_rows  = list(lw["tiprack"].rows_by_name().keys())
+    columns      = resolve_source_columns(
+        waste, getattr(params, "source_columns", None), plate_columns)
+    source_wells = resolve_source_wells(waste, columns, plate_rows)
     setup_tip    = str(waste["setup_tip"]).upper()
-    waste_vial_name = str(waste["waste_vial"]).upper()
+    waste_vial_name = resolve_waste_vial(waste, getattr(params, "waste_vial", None))
     volume = float(waste["volume_ul"])
 
-    _preflight(protocol, lw, pipette, source_wells, setup_tip, plate_rows, tiprack_rows)
+    _preflight(protocol, lw, pipette, source_wells, setup_tip, waste_vial_name,
+               plate_rows, tiprack_rows)
 
     protocol.comment("=== Plate -> Waste Vial Disposal Started ===")
-    protocol.comment(f"Flags: dry_run={params.dry_run}")
     protocol.comment(
-        f"Plan: empty {volume:g} uL from plate wells "
-        f"[{', '.join(source_wells)}] -> waste vial {waste_vial_name} "
-        f"(rack slot {deck['tuberack']['slot']}), one well at a time, single tip {setup_tip}."
+        f"Flags: dry_run={params.dry_run}, "
+        f"source_columns={','.join(columns)}, waste_vial={waste_vial_name}"
+    )
+    protocol.comment(
+        f"Plan: empty {volume:g} uL from plate column(s) {','.join(columns)} "
+        f"({len(source_wells)} well(s): [{', '.join(source_wells)}]) -> waste vial "
+        f"{waste_vial_name} (rack slot {deck['tuberack']['slot']}), one well at a time, "
+        f"single tip {setup_tip}."
     )
 
     if params.dry_run:

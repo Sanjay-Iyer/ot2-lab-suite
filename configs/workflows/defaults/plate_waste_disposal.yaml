@@ -45,11 +45,14 @@ pipette:
 
 # ── Waste disposal plan ──────────────────────────────────────────────────────────
 waste:
-  # Which 96-well plate column to empty, and which rows of it.
-  source_column: "9"                       # default: column 9
-  source_rows: [A, B, C, D, E, F, G, H]    # rows of that column to empty (top -> bottom)
+  # Which 96-well plate column(s) to empty, and which rows of each. Operators can
+  # override per run with the "Plate columns to empty" flag (App) or
+  # --source-columns (runner), e.g. "9" or "9,11".
+  source_columns: ["9"]                    # one or more columns, e.g. ["9"] or ["9", "11"]
+  source_rows: [A, B, C, D, E, F, G, H]    # rows of each column to empty (top -> bottom)
 
   # Destination: ONE vial in the 3D-printed rack that collects all the waste.
+  # Override per run with the "Waste vial" flag (App) or --waste-vial (runner).
   waste_vial: A4                           # A1..A4 / B1..B4 in the v2 rack
 
   volume_ul: 200.0                         # max fill removed from EACH well (<= 300 µL tip)

@@ -22,6 +22,11 @@ Deploy and run workflows on the **physical OT-2** over SSH/SCP.
 
 ## Connection settings (from `.env`)
 
+For LLM-backed real robot work, the real laptop must use Vertex AI / gcloud ADC:
+set `LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`, and
+`GOOGLE_CLOUD_LOCATION`. `GOOGLE_API_KEY` is allowed only for simulation-laptop
+agent testing and must not be used for live OT-2 agent interactions.
+
 | Variable | Meaning | Typical value |
 |----------|---------|---------------|
 | `ROBOT_IP` | OT-2 link-local IP | `169.254.46.57` |

@@ -64,6 +64,10 @@ def list_robot_http_protocols() -> str:
 @tool
 def check_robot_http_api(robot_ip: Optional[str] = None) -> str:
     """Check that the OT-2 robot server HTTP API is reachable on port 31950."""
+    auth_error = Config.live_robot_llm_auth_error()
+    if auth_error:
+        return auth_error
+
     ip = _robot_ip(robot_ip)
     if ip in ("", "127.0.0.1", "localhost"):
         return f"HTTP API check FAILED: robot_ip is {ip!r}; set ROBOT_IP or pass --robot-ip."
@@ -103,6 +107,10 @@ def run_vial_print_robot_http(
     """
     if confirmation != "RUN ROBOT":
         return "REFUSED: confirmation must be exactly RUN ROBOT."
+
+    auth_error = Config.live_robot_llm_auth_error()
+    if auth_error:
+        return auth_error
 
     ip = _robot_ip(robot_ip)
     if ip in ("", "127.0.0.1", "localhost"):

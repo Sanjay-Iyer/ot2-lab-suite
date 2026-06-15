@@ -68,7 +68,7 @@ sources:
   blue_dye_vial: A2         # blue dye stock: same row as water, second rack column
   orange_dye_vial: A3       # orange dye stock: same row as water, third rack column
   food_coloring_vial: A2    # legacy alias for blue dye stock
-  vial_aspirate_height_mm: 2.0   # above vial bottom; absolute model Z = 5 + 2 = 7 mm (53 mm into 55 mm vial)
+  vial_aspirate_height_mm: 4.0   # above vial bottom; absolute model Z = 5 + 4 = 9 mm (51 mm into 55 mm vial)
 
 # ── Dilution series ──────────────────────────────────────────────────────────────
 dilution:

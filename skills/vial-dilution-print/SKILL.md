@@ -55,6 +55,12 @@ this exact pipeline from natural language — adjust the number of dilutions, dr
 volume, and replicates by talking to it. It **wraps** the CLI tools (it does not
 bypass any gate) and edits a *user* YAML copy, never the committed default.
 
+LLM auth follows the laptop role. On the simulation laptop, the agent may use the
+regular Gemini API-key path (`LLM_PROVIDER=api-key`, `GOOGLE_API_KEY`) for testing.
+On the real robot laptop, live OT-2 agent interactions must use Vertex AI / gcloud
+ADC (`LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`);
+do not use `GOOGLE_API_KEY` for live robot runs.
+
 ```bash
 python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
 python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets"   # offline, no API key

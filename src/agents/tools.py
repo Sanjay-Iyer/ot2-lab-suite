@@ -233,6 +233,10 @@ def get_robot_hardware_status() -> str:
     Queries the physical OT-2 robot via SSH to find exactly which pipettes are attached.
     Checks multiple possible system paths to ensure compatibility with different firmware versions.
     """
+    auth_error = Config.live_robot_llm_auth_error()
+    if auth_error:
+        return auth_error
+
     robot_ip = Config.ROBOT_IP
     key_path = Config.ROBOT_SSH_KEY_PATH
     ssh_user = Config.ROBOT_SSH_USER
@@ -283,6 +287,10 @@ def check_robot_connection() -> str:
     Verifies ROBOT_IP connectivity and SSH access (non-interactive BatchMode).
     Checks for 'opentrons_execute' availability on the instrument.
     """
+    auth_error = Config.live_robot_llm_auth_error()
+    if auth_error:
+        return auth_error
+
     robot_ip = Config.ROBOT_IP
     if robot_ip in ["127.0.0.1", "localhost"]:
         return f"Error: ROBOT_IP is set to {robot_ip}. Physical robot IP required in .env."
@@ -319,6 +327,10 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
     Stages and SCPs the protocol and configs to a unique run folder on the robot.
     Returns the remote run directory path.
     """
+    auth_error = Config.live_robot_llm_auth_error()
+    if auth_error:
+        return auth_error
+
     local_protocol_path = Path(protocol_path)
     if not local_protocol_path.exists():
         return f"Error: Protocol not found: {protocol_path}"
@@ -384,6 +396,10 @@ def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> 
     VERIFIES that the protocol_hash matches a passing simulation.
     If no simulation record is found, it will attempt to simulate locally first.
     """
+    auth_error = Config.live_robot_llm_auth_error()
+    if auth_error:
+        return auth_error
+
     # 1. Hash verification & Auto-Simulation
     records = _load_simulation_records()
     if protocol_hash not in records:

@@ -2,7 +2,7 @@
 
 > **This SOP is for the lab laptop only.** The lab laptop has:
 > - The real OT-2 connected via USB/Ethernet (IP `169.254.46.57`)
-> - A live `.env` with `GOOGLE_API_KEY`, `ROBOT_IP`, and `ROBOT_SSH_KEY_PATH`
+> - A live `.env` with Vertex AI / gcloud ADC auth, plus `ROBOT_IP` and `ROBOT_SSH_KEY_PATH`
 > - The SSH private key that authenticates to the robot
 >
 > The dev/code laptop cannot connect to the robot. Do not attempt to run `deploy_protocol_to_robot` or `execute_protocol_on_robot` from the dev laptop.
@@ -11,7 +11,7 @@
 
 ## Prerequisites (one-time setup — already done on lab laptop)
 
-- [ ] Conda environment `ai` exists with all dependencies installed
+- [ ] Conda environment `llm` exists with all dependencies installed
 - [ ] `.env` file is present in project root with real credentials
 - [ ] SSH key path in `.env` matches actual key location on this machine
 - [ ] OT-2 is powered on and network-connected to this laptop
@@ -39,12 +39,12 @@ All commands in this SOP must be run from the project root.
 ## Step 2 — Activate the Conda Environment
 
 ```bash
-conda activate ai
+conda activate llm
 ```
 
 Verify:
 ```bash
-python -c "import langgraph; import langchain_google_genai; print('OK')"
+python -c "import langgraph; import langchain_google_genai; import langchain_google_vertexai; print('OK')"
 ```
 
 ---
@@ -197,12 +197,14 @@ Type natural language. The agent handles all tool calls internally.
 - Open `.env` and confirm `ROBOT_SSH_KEY_PATH=` has a real path (not blank)
 - On the lab laptop the key is typically at `~/.ssh/ot2_ssh_key` or `keys/ot2_ssh_key`
 
-### "GOOGLE_API_KEY" or Gemini errors
-- Check `.env` has a valid `GOOGLE_API_KEY`
+### Gemini / Vertex AI credential errors
+- On the real robot laptop, use Vertex AI / gcloud ADC only: set `LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`
+- `GOOGLE_API_KEY` is only for simulation-laptop agent testing and will be refused by live robot tools
+- Confirm ADC is available with: `gcloud auth application-default login`
 - If getting 429 errors, restart with `--rate-limit` flag
 
 ### "opentrons.simulate not found"
-- You're not in the `ai` conda environment: `conda activate ai`
+- You're not in the `llm` conda environment: `conda activate llm`
 
 ### "SIMULATION FAILED"
 - The generated protocol has an error. Read the error output carefully.

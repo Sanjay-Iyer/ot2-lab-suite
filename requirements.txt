@@ -10,6 +10,7 @@ pyyaml
 # --- AI & LangChain ---
 langchain>=0.1.0
 langchain-google-genai>=1.0.0
+langchain-google-vertexai>=1.0.0
 langchain-community
 google-generativeai
 python-dotenv

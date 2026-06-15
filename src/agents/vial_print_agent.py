@@ -9,9 +9,10 @@ replicates, then it builds, validates, and CV-checks a robot-ready protocol — 
 on the lab laptop only, runs it through the OT-2 HTTP API behind a RUN ROBOT
 confirmation gate.
 
-Run (from the conda `ai` env, repo root):
+Run (from the repo root; use conda `llm` on the real robot laptop, `ai` on the
+simulation laptop):
 
-    # Live conversational agent (needs GOOGLE_API_KEY in .env)
+    # Conversational agent (simulation may use GOOGLE_API_KEY; live robot uses Vertex AI / gcloud ADC)
     python -m src.agents.vial_print_agent
     python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
 
@@ -83,16 +84,19 @@ SYSTEM_PROMPT = (
     "  5. validate_vial_print_matrix() — MUST report 'ALL CASES PASSED'.\n"
     "  6. verify_print_droplets_mock() — MUST report 'CV PASS'.\n\n"
     "PHYSICAL EXECUTION (lab laptop only — STRICT):\n"
-    "  A. Steps 4-6 must all have passed for the current protocol.\n"
-    "  B. get_robot_hardware_status() to confirm the attached pipette matches "
+    "  A. The live robot laptop must use Vertex AI / gcloud ADC auth "
+    "     (LLM_PROVIDER=vertexai and GOOGLE_CLOUD_PROJECT in .env). "
+    "     GOOGLE_API_KEY is only allowed for simulation-laptop testing.\n"
+    "  B. Steps 4-6 must all have passed for the current protocol.\n"
+    "  C. get_robot_hardware_status() to confirm the attached pipette matches "
     "     (expected p300_multi_gen2 on the right mount).\n"
-    "  C. check_robot_http_api() to verify the robot server HTTP API is online.\n"
-    "  D. Present a PRE-RUN SUMMARY: protocol path + SHA256, robot IP, deck layout "
+    "  D. check_robot_http_api() to verify the robot server HTTP API is online.\n"
+    "  E. Present a PRE-RUN SUMMARY: protocol path + SHA256, robot IP, deck layout "
     "     (vial rack slot 7, plate slot 4, paper slot 5, tips slot 9), pipette, "
     "     number of dilutions, droplets per print, replicates, droplet volume, "
     "     air gap, tip height, blow out, and paper start column.\n"
-    "  E. MANDATORY: ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
-    "  F. Only after 'RUN ROBOT': call run_vial_print_robot_http("
+    "  F. MANDATORY: ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
+    "  G. Only after 'RUN ROBOT': call run_vial_print_robot_http("
     "confirmation='RUN ROBOT', live=True). This uses scripts/run_vial_print_robot.py "
     "and the OT-2 HTTP API; do not use deploy_protocol_to_robot() or "
     "execute_protocol_on_robot() for this workflow.\n\n"

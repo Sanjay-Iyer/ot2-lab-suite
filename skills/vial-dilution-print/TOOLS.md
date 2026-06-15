@@ -173,7 +173,9 @@ natural language. It wraps the three tools above — it does **not** replace the
 every safety gate still fires.
 
 ```bash
-# Live agent (needs GOOGLE_API_KEY in .env)
+# Live/simulation agent:
+# - simulation laptop: LLM_PROVIDER=api-key + GOOGLE_API_KEY is allowed for testing
+# - real robot laptop: LLM_PROVIDER=vertexai + GOOGLE_CLOUD_PROJECT is required
 python -m src.agents.vial_print_agent
 python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
 

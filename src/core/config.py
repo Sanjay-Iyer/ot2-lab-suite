@@ -34,6 +34,11 @@ class Config:
     # ─── AI Models ────────────────────
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
     GEMINI_BASE_URL = os.getenv("GEMINI_BASE_URL", "").strip()
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip().lower()
+    GOOGLE_CLOUD_LOCATION = os.getenv(
+        "GOOGLE_CLOUD_LOCATION",
+        os.getenv("GOOGLE_CLOUD_REGION", "us-central1"),
+    ).strip()
 
     if GEMINI_BASE_URL:
         _parsed = urlparse(GEMINI_BASE_URL)
@@ -50,14 +55,89 @@ class Config:
     os.environ["OT_API_CONFIG_DIR"] = OT_API_CONFIG_DIR
 
     @staticmethod
-    def get_llm(temperature: float = 0, max_retries: int = 5):
-        """Factory method to get a resilient Gemini model instance."""
+    def _first_env(*names: str) -> str:
+        """Return the first non-empty environment variable from a list."""
+        for name in names:
+            value = os.getenv(name, "").strip()
+            if value:
+                return value
+        return ""
+
+    @staticmethod
+    def get_google_cloud_project() -> str:
+        """Project ID for Vertex AI / Google Cloud ADC auth."""
+        return Config._first_env(
+            "GOOGLE_CLOUD_PROJECT",
+            "GOOGLE_PROJECT_ID",
+            "GCP_PROJECT_ID",
+            "VERTEXAI_PROJECT",
+        )
+
+    @staticmethod
+    def get_llm_provider() -> str:
+        """Return the effective LLM auth provider: vertexai or api-key."""
+        provider = os.getenv("LLM_PROVIDER", Config.LLM_PROVIDER).strip().lower()
+        if provider in {"vertex", "vertexai", "gcloud", "google-cloud"}:
+            return "vertexai"
+        if provider in {"api-key", "google-api-key", "gemini-api", "genai"}:
+            return "api-key"
+        if not provider and not os.getenv("GOOGLE_API_KEY") and Config.get_google_cloud_project():
+            return "vertexai"
+        return "api-key"
+
+    @staticmethod
+    def live_robot_llm_auth_error() -> str:
+        """Return an error if the current LLM auth is not allowed for live robot tools."""
+        if Config.get_llm_provider() == "vertexai" and Config.get_google_cloud_project():
+            return ""
+        return (
+            "REFUSED: live OT-2 agent interactions require Vertex AI / gcloud ADC auth. "
+            "GOOGLE_API_KEY is allowed only for simulation-laptop testing. On the real "
+            "robot laptop, set LLM_PROVIDER=vertexai, GOOGLE_CLOUD_PROJECT, and "
+            "GOOGLE_CLOUD_LOCATION in .env."
+        )
+
+    @staticmethod
+    def _get_vertex_llm(temperature: float, max_retries: int):
+        """Create a Gemini chat model through Vertex AI and ADC."""
+        project = Config.get_google_cloud_project()
+        if not project:
+            raise ValueError(
+                "Vertex AI LLM selected, but no Google Cloud project was found. "
+                "Set GOOGLE_CLOUD_PROJECT in .env."
+            )
+
+        try:
+            from langchain_google_vertexai import ChatVertexAI
+        except ImportError as exc:
+            raise ImportError(
+                "Vertex AI LLM selected, but langchain-google-vertexai is not installed. "
+                "Run: pip install langchain-google-vertexai"
+            ) from exc
+
+        kwargs = {
+            "project": project,
+            "location": Config.GOOGLE_CLOUD_LOCATION,
+            "temperature": temperature,
+            "max_retries": max_retries,
+        }
+        try:
+            return ChatVertexAI(model=Config.GEMINI_MODEL, **kwargs)
+        except TypeError:
+            return ChatVertexAI(model_name=Config.GEMINI_MODEL, **kwargs)
+
+    @staticmethod
+    def _get_api_key_llm(temperature: float, max_retries: int):
+        """Create a Gemini chat model through the Gemini API key path."""
         from langchain_google_genai import ChatGoogleGenerativeAI
-        
+
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY not found in environment variables.")
-            
+            raise ValueError(
+                "No LLM credentials found. Set GOOGLE_API_KEY for the Gemini API, "
+                "or set LLM_PROVIDER=vertexai and GOOGLE_CLOUD_PROJECT for Google Cloud ADC."
+            )
+
         kwargs = {
             "model": Config.GEMINI_MODEL,
             "google_api_key": api_key,
@@ -71,3 +151,12 @@ class Config:
             kwargs["client_options"] = ClientOptions(api_endpoint=base_url)
 
         return ChatGoogleGenerativeAI(**kwargs)
+
+    @staticmethod
+    def get_llm(temperature: float = 0, max_retries: int = 5):
+        """Factory method to get a resilient Gemini model instance."""
+        provider = Config.get_llm_provider()
+        if provider == "vertexai":
+            return Config._get_vertex_llm(temperature, max_retries)
+
+        return Config._get_api_key_llm(temperature, max_retries)

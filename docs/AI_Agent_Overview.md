@@ -15,7 +15,7 @@ This repo implements a **LangChain + LangGraph ReAct agent** that acts as a conv
 - Simulate protocols locally before any physical run
 - Deploy and execute protocols on the live robot via SSH
 
-**LLM backend:** Google Gemini (`gemini-2.5-flash-lite` or configured model via `GEMINI_MODEL` in `.env`)
+**LLM backend:** Google Gemini (`gemini-2.5-flash` or configured model via `GEMINI_MODEL` in `.env`)
 **Framework:** LangChain tools + LangGraph `create_react_agent`
 
 ---
@@ -33,7 +33,7 @@ committed default), builds, validates, and CV-checks, then — on the lab laptop
 deploys and runs behind the `RUN ROBOT` gate.
 
 ```bash
-# Live (needs GOOGLE_API_KEY)
+# Live on real robot laptop (requires Vertex AI / gcloud ADC)
 python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
 # Offline, no LLM/API key — runs load→update→build→validate→CV directly
 python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
@@ -190,9 +190,14 @@ ROBOT_IP=169.254.46.57          # OT-2 link-local IP
 ROBOT_SSH_USER=root             # SSH user (always root on OT-2)
 ROBOT_SSH_KEY_PATH=/path/to/ot2_ssh_key   # Private key for passwordless SSH
 
-# LLM
-GOOGLE_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash-lite        # Or any supported Gemini model
+# LLM auth by laptop role:
+# Simulation laptop testing may use LLM_PROVIDER=api-key + GOOGLE_API_KEY.
+# Real robot laptop live interactions must use Vertex AI / gcloud ADC.
+LLM_PROVIDER=vertexai
+GOOGLE_API_KEY=                         # Simulation laptop testing only
+GOOGLE_CLOUD_PROJECT=your-project-id    # Required for Vertex AI / gcloud ADC
+GOOGLE_CLOUD_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.5-flash           # Or any supported Gemini model
 
 # Optional
 GEMINI_BASE_URL=                # Leave blank unless using a proxy

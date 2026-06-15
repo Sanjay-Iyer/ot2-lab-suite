@@ -9,6 +9,12 @@ real liquid-handling waste removal.
   python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57            # dry run
   python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57 --live     # real run
   python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57 --live --skip-build
+
+Select which plate columns to empty and which rack vial collects the waste
+(otherwise the protocol's config defaults apply):
+
+  python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57 --live \
+      --source-columns 9,11 --waste-vial A4
 """
 from __future__ import annotations
 
@@ -85,11 +91,11 @@ def _upload_protocol(robot_ip: str, protocol_path: Path) -> str:
     return protocol_id
 
 
-def _create_run(robot_ip: str, protocol_id: str, *, dry_run: bool) -> str:
+def _create_run(robot_ip: str, protocol_id: str, *, run_time_parameter_values: dict) -> str:
     body = {
         "data": {
             "protocolId": protocol_id,
-            "runTimeParameterValues": {"dry_run": dry_run},
+            "runTimeParameterValues": run_time_parameter_values,
         }
     }
     print("\n[create run]")
@@ -136,6 +142,8 @@ def main() -> int:
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
+    parser.add_argument("--source-columns", help="Plate column(s) to empty, e.g. '9' or '9,11'. Overrides the protocol default.")
+    parser.add_argument("--waste-vial", help="Waste vial in the 20 mL rack, e.g. A4. Overrides the protocol default.")
     parser.add_argument("--poll-seconds", type=float, default=5.0, help="Status polling interval.")
     args = parser.parse_args()
     run_log = RobotRunLog(Path(__file__).name)
@@ -153,7 +161,11 @@ def main() -> int:
             raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 
         dry_run = not args.live
-        rtp = {"dry_run": dry_run}
+        rtp: dict[str, Any] = {"dry_run": dry_run}
+        if args.source_columns:
+            rtp["source_columns"] = args.source_columns
+        if args.waste_vial:
+            rtp["waste_vial"] = args.waste_vial
         run_log.update(
             robot_ip=robot_ip,
             protocol_path=repo_relative(protocol_path),
@@ -167,12 +179,14 @@ def main() -> int:
         print(f"Robot     : {robot_ip}")
         print(f"Protocol  : {protocol_path}")
         print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
+        print(f"Columns   : {args.source_columns or '(protocol default)'}")
+        print(f"Waste vial: {args.waste_vial or '(protocol default)'}")
         print("\nDeck must be: slot 7 vial rack (waste vial seated), slot 4 plate, slot 9 tips.")
         print("Tip plan  : one setup tip H12 for the whole job (single nozzle).")
 
         protocol_id = _upload_protocol(robot_ip, protocol_path)
         run_log.event("protocol_uploaded", protocol_id=protocol_id)
-        run_id = _create_run(robot_ip, protocol_id, dry_run=dry_run)
+        run_id = _create_run(robot_ip, protocol_id, run_time_parameter_values=rtp)
         run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 
         if args.no_start:

@@ -50,7 +50,7 @@ The agent has access to the following high-level capabilities:
 
 ### Environment Variables
 Ensure the following are set in your `.env`:
-* `GOOGLE_API_KEY`: Required for Gemini reasoning.
+* `GOOGLE_API_KEY`: Allowed for simulation-laptop Gemini testing. Live robot laptop agent runs use Vertex AI / gcloud ADC (`LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`).
 * `ROBOT_IP`: Set to `169.254.46.57` for wired USB connection.
 
 ### Simulation Failures

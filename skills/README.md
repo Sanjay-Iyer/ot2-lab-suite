@@ -8,7 +8,10 @@ area, with the exact commands, file paths, and safety gates needed to perform it
 > `opentrons_execute`) are written for the **lab laptop** — the machine with the
 > real OT-2 connection, the live `.env`, and the SSH private key. The dev/code
 > laptop cannot reach the robot; on it, only the config/generate/simulate steps
-> work. See [project_dev_setup](../../../.claude memory) for the two-machine split.
+> work. LLM-backed testing on the simulation laptop may use
+> `LLM_PROVIDER=api-key` + `GOOGLE_API_KEY`; live robot laptop agent runs must use
+> Vertex AI / gcloud ADC with `LLM_PROVIDER=vertexai` and `GOOGLE_CLOUD_PROJECT`.
+> See [project_dev_setup](../../../.claude memory) for the two-machine split.
 
 ## Skills
 
