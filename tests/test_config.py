@@ -65,6 +65,7 @@ class TestConfiguration:
         assert "Gemini model: gemini-test-model" in summary
         assert "Google Cloud project: robot-project" in summary
         assert "Google Cloud location: us-central1" in summary
+        assert "Vertex API transport: rest" in summary
         assert "gcloud ADC / Vertex AI" in summary
         assert "GOOGLE_API_KEY" not in summary
 
@@ -89,8 +90,18 @@ class TestConfiguration:
         assert llm.kwargs["model"] == "gemini-test-model"
         assert llm.kwargs["project"] == "robot-project"
         assert llm.kwargs["location"] == "us-central1"
+        assert llm.kwargs["api_transport"] == "rest"
         assert llm.kwargs["temperature"] == 0.25
         assert llm.kwargs["max_retries"] == 2
+
+    @patch.dict(os.environ, {
+        "LLM_PROVIDER": "vertexai",
+        "GOOGLE_CLOUD_PROJECT": "robot-project",
+        "GOOGLE_VERTEX_API_TRANSPORT": "grpc",
+    }, clear=True)
+    def test_vertex_transport_can_be_overridden(self):
+        """Test that Vertex transport can still be overridden when needed."""
+        assert Config.get_vertex_api_transport() == "grpc"
 
     @patch.dict(os.environ, {"NO_PROXY": "custom_proxy"}, clear=True)
     def test_no_proxy_read_correctly(self):

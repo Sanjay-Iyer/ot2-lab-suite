@@ -90,6 +90,18 @@ class Config:
         return os.getenv("GEMINI_MODEL", Config.GEMINI_MODEL).strip() or "gemini-1.5-flash"
 
     @staticmethod
+    def get_vertex_api_transport() -> str:
+        """Transport for Vertex AI calls; REST avoids flaky Windows gRPC DNS."""
+        transport = Config._first_env(
+            "GOOGLE_VERTEX_API_TRANSPORT",
+            "VERTEXAI_API_TRANSPORT",
+            "GOOGLE_CLOUD_API_TRANSPORT",
+        ).lower()
+        if transport in {"grpc", "rest"}:
+            return transport
+        return "rest"
+
+    @staticmethod
     def get_llm_provider() -> str:
         """Return the effective LLM auth provider: vertexai or api-key."""
         provider = os.getenv("LLM_PROVIDER", Config.LLM_PROVIDER).strip().lower()
@@ -114,6 +126,7 @@ class Config:
             lines.extend([
                 f"Google Cloud project: {project}",
                 f"Google Cloud location: {Config.get_google_cloud_location()}",
+                f"Vertex API transport: {Config.get_vertex_api_transport()}",
                 "Auth method: gcloud ADC / Vertex AI",
             ])
         else:
@@ -158,11 +171,19 @@ class Config:
             "location": Config.get_google_cloud_location(),
             "temperature": temperature,
             "max_retries": max_retries,
+            "api_transport": Config.get_vertex_api_transport(),
         }
-        try:
-            return ChatVertexAI(model=Config.get_gemini_model(), **kwargs)
-        except TypeError:
-            return ChatVertexAI(model_name=Config.get_gemini_model(), **kwargs)
+        model = Config.get_gemini_model()
+        for model_key in ("model", "model_name"):
+            try:
+                return ChatVertexAI(**{model_key: model}, **kwargs)
+            except TypeError as exc:
+                if "api_transport" in str(exc):
+                    kwargs.pop("api_transport", None)
+                    return ChatVertexAI(**{model_key: model}, **kwargs)
+                if model_key == "model_name":
+                    raise
+        raise RuntimeError("Unable to initialize ChatVertexAI.")
 
     @staticmethod
     def _get_api_key_llm(temperature: float, max_retries: int):

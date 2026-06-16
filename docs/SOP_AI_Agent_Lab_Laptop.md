@@ -64,6 +64,7 @@ gcloud config set project YOUR_PROJECT_ID
 $env:LLM_PROVIDER = "vertexai"
 $env:GOOGLE_CLOUD_PROJECT = "YOUR_PROJECT_ID"
 $env:GOOGLE_CLOUD_LOCATION = "us-central1"
+$env:GOOGLE_VERTEX_API_TRANSPORT = "rest"
 $env:GEMINI_MODEL = "gemini-2.5-flash"
 
 python -m src.agents.check_llm_auth
@@ -73,6 +74,7 @@ python -m src.agents.vial_print_agent --simulation-only "Use the default orange 
 Expected startup lines include:
 ```text
 LLM provider: vertexai
+Vertex API transport: rest
 Auth method: gcloud ADC / Vertex AI
 Mode: simulation-only (robot tools unavailable)
 ```
@@ -83,6 +85,7 @@ setting `$env:` variables each terminal session:
 LLM_PROVIDER=vertexai
 GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
 GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_VERTEX_API_TRANSPORT=rest
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
