@@ -15,6 +15,7 @@ No live LLM and no robot connection. Two tiers:
 """
 from __future__ import annotations
 
+import copy
 import sys
 from pathlib import Path
 
@@ -155,6 +156,35 @@ def test_color_plate_column_knobs_update_named_series(default_cfg, default_folds
 
     assert by_name["orange"]["destination_column"] == "12"
     assert by_name["blue"]["destination_column"] == "8"
+
+
+def test_save_and_load_vial_print_template(default_cfg, default_folds):
+    name = "pytest_orange12_blue8_template"
+    path = vpt.TEMPLATE_DIR / f"{name}.yaml"
+    cfg, _ = vpt._apply_params(
+        default_cfg,
+        orange_plate_column=12,
+        blue_plate_column=8,
+        default_folds=default_folds,
+    )
+    try:
+        if path.exists():
+            path.unlink()
+        vpt._WORKING = copy.deepcopy(cfg)
+        save_out = vpt.save_vial_print_template.invoke({"name": name})
+        assert "Template saved" in save_out
+        assert path.exists()
+
+        vpt._WORKING = None
+        load_out = vpt.load_vial_print_template.invoke({"name": name})
+        assert "Template loaded" in load_out
+        loaded = {item["name"]: item for item in vpt.get_working_config()["color_series"]}
+        assert loaded["orange"]["destination_column"] == "12"
+        assert loaded["blue"]["destination_column"] == "8"
+    finally:
+        vpt._WORKING = None
+        if path.exists():
+            path.unlink()
 
 
 def test_simulation_only_agent_toolset_excludes_robot_tools():

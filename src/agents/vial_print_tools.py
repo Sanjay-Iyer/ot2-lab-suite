@@ -29,6 +29,7 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -41,6 +42,7 @@ from langchain.tools import tool
 from src.utils.paths import (
     PROJECT_ROOT,
     DEFAULT_WORKFLOW_CONFIG_DIR,
+    TEMPLATE_WORKFLOW_CONFIG_DIR,
     USER_WORKFLOW_CONFIG_DIR,
     GENERATED_PROTOCOL_DIR,
     SIMULATION_RECORDS_PATH,
@@ -51,6 +53,7 @@ from src.utils.hashing import hash_file
 # ── Pipeline locations ────────────────────────────────────────────────────────────
 WORKFLOW_NAME    = "vial_dilution_print"
 DEFAULT_YAML     = DEFAULT_WORKFLOW_CONFIG_DIR / f"{WORKFLOW_NAME}.yaml"
+TEMPLATE_DIR     = TEMPLATE_WORKFLOW_CONFIG_DIR / WORKFLOW_NAME
 BUILD_SCRIPT     = PROJECT_ROOT / "scripts" / "build_vial_dilution_print.py"
 VALIDATE_SCRIPT  = PROJECT_ROOT / "scripts" / "validate_vial_print.py"
 CV_SCRIPT        = PROJECT_ROOT / "vision_tests" / "scripts" / "verify_print_droplets.py"
@@ -67,6 +70,7 @@ _WORKING: Optional[dict] = None        # full YAML incl. run_modes
 _DEFAULT_FOLDS: list = []              # canonical explicit fold list, captured on load
 _LAST_USER_YAML: Optional[Path] = None
 _LAST_SHA: Optional[str] = None
+_TEMPLATE_NAME_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -329,6 +333,42 @@ def _write_user_yaml(cfg: dict) -> Path:
     return path
 
 
+def _template_slug(name: str) -> str:
+    slug = _TEMPLATE_NAME_RE.sub("_", (name or "").strip()).strip("._-").lower()
+    if not slug:
+        raise ValueError("template name must include at least one letter or number")
+    if not slug.endswith((".yaml", ".yml")):
+        slug += ".yaml"
+    return slug
+
+
+def _template_path(name: str) -> Path:
+    slug = _template_slug(name)
+    path = (TEMPLATE_DIR / slug).resolve()
+    root = TEMPLATE_DIR.resolve()
+    if root not in path.parents and path != root:
+        raise ValueError(f"template path escaped template directory: {name!r}")
+    return path
+
+
+def _load_yaml(path: Path) -> dict:
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
+def _template_brief(path: Path) -> str:
+    try:
+        cfg = _load_yaml(path)
+    except Exception as exc:
+        return f"- {path.name}: unreadable ({exc})"
+    series = "; ".join(_series_summary_line(item) for item in _resolve_series(cfg))
+    factors = _resolve_factors(cfg.get("dilution", {}).get("factors", {}))
+    pr = cfg.get("printing", {})
+    return (
+        f"- {path.name}: {len(factors)} dilution(s), "
+        f"{pr.get('droplet_volume_ul')} uL droplets, {series}"
+    )
+
+
 def _record_pass(protocol_path: Path, sha256: str, output: str) -> None:
     """Write a PASS record to simulations.json (same schema/path that
     execute_protocol_on_robot in src/agents/tools.py reads from), so the robot
@@ -384,6 +424,96 @@ def load_vial_print_defaults() -> str:
     _LAST_USER_YAML = None
     _LAST_SHA = None
     return "Defaults loaded.\n\n" + _summary(cfg)
+
+
+@tool
+def list_vial_print_templates() -> str:
+    """List reusable vial-dilution-print YAML templates.
+
+    Templates live under configs/workflows/templates/vial_dilution_print/.
+    Unlike timestamped run YAMLs in configs/workflows/user/, templates are meant
+    to be named, reusable, and optionally committed to Git.
+    """
+    TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+    templates = sorted(TEMPLATE_DIR.glob("*.y*ml"))
+    if not templates:
+        return (
+            "No reusable vial-print templates found.\n"
+            f"Template directory: {TEMPLATE_DIR.relative_to(PROJECT_ROOT)}\n"
+            "Use save_vial_print_template after loading or editing a plan."
+        )
+    lines = [
+        "Reusable vial-print templates:",
+        f"Directory: {TEMPLATE_DIR.relative_to(PROJECT_ROOT)}",
+    ]
+    lines.extend(_template_brief(path) for path in templates)
+    return "\n".join(lines)
+
+
+@tool
+def save_vial_print_template(name: str, overwrite: bool = False) -> str:
+    """Save the current working vial-print config as a reusable named YAML template.
+
+    Args:
+        name: Human-friendly template name. It is converted to a safe .yaml file
+            name, e.g. "orange12_blue9" -> orange12_blue9.yaml.
+        overwrite: Set true to replace an existing template of the same name.
+
+    This saves the current in-memory working config. It does not edit the
+    committed default YAML and does not run the robot.
+    """
+    if _WORKING is None:
+        return "Error: no config loaded. Call load_vial_print_defaults or load_vial_print_template first."
+    try:
+        path = _template_path(name)
+    except ValueError as exc:
+        return f"Error: {exc}"
+    if path.exists() and not overwrite:
+        return (
+            f"Template already exists: {path.relative_to(PROJECT_ROOT)}\n"
+            "Call save_vial_print_template with overwrite=true or choose a new name."
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.dump(_WORKING, sort_keys=False), encoding="utf-8")
+    return (
+        f"Template saved: {path.relative_to(PROJECT_ROOT)}\n\n"
+        + _summary(_WORKING)
+    )
+
+
+@tool
+def load_vial_print_template(name: str) -> str:
+    """Load a reusable named vial-print YAML template into the working session.
+
+    Args:
+        name: Template file name or stem from
+            configs/workflows/templates/vial_dilution_print/.
+
+    The loaded template becomes the current working config for later edits,
+    build, simulation, validation, and mock CV.
+    """
+    global _WORKING, _DEFAULT_FOLDS, _LAST_USER_YAML, _LAST_SHA
+    try:
+        path = _template_path(name)
+    except ValueError as exc:
+        return f"Error: {exc}"
+    if not path.exists():
+        return (
+            f"Template not found: {path.relative_to(PROJECT_ROOT)}\n\n"
+            + list_vial_print_templates.invoke({})
+        )
+    try:
+        cfg = _load_yaml(path)
+    except OSError as exc:
+        return f"Error loading template {path.relative_to(PROJECT_ROOT)}: {exc}"
+    _WORKING = cfg
+    _DEFAULT_FOLDS = _resolve_factors(cfg.get("dilution", {}).get("factors", {}))
+    _LAST_USER_YAML = None
+    _LAST_SHA = None
+    return (
+        f"Template loaded: {path.relative_to(PROJECT_ROOT)}\n\n"
+        + _summary(cfg)
+    )
 
 
 @tool

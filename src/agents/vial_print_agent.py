@@ -49,6 +49,9 @@ ensure_project_dirs()
 
 from src.agents.vial_print_tools import (
     load_vial_print_defaults,
+    list_vial_print_templates,
+    save_vial_print_template,
+    load_vial_print_template,
     update_vial_print_params,
     preview_dilution_plan,
     show_vial_print_config,
@@ -60,6 +63,9 @@ from src.agents.vial_print_tools import (
 # Config-stage tools (safe on any machine).
 CONFIG_TOOLS = [
     load_vial_print_defaults,
+    list_vial_print_templates,
+    save_vial_print_template,
+    load_vial_print_template,
     update_vial_print_params,
     preview_dilution_plan,
     show_vial_print_config,
@@ -90,6 +96,14 @@ SYSTEM_PROMPT = (
     "update_vial_print_params(advanced_updates=...). Never tell the user the "
     "workflow is single-color or single-column unless show_vial_print_config() "
     "proves color_series is absent.\n\n"
+    "REUSABLE TEMPLATES:\n"
+    "  - Temporary per-run YAMLs are written under configs/workflows/user/ and are "
+    "    ignored by Git.\n"
+    "  - Reusable named YAML templates live under "
+    "    configs/workflows/templates/vial_dilution_print/.\n"
+    "  - Use list_vial_print_templates(), save_vial_print_template(name), and "
+    "    load_vial_print_template(name) when the user wants to reuse or organize "
+    "    prior plans.\n\n"
     "MANDATORY PIPELINE ORDER — never skip or reorder:\n"
     "  1. load_vial_print_defaults() first.\n"
     "  2. update_vial_print_params(...) for the user's requested changes.\n"
