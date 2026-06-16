@@ -28,10 +28,14 @@ Flags:
 from __future__ import annotations
 
 import os
+import platform
 import re
 import sys
+import traceback
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 from src.utils.paths import AGENT_LOG_DIR, ensure_project_dirs
 
@@ -122,6 +126,8 @@ SIMULATION_ONLY_PROMPT = (
 )
 
 _SCHEMA_WARNING_FRAGMENT = "Key 'additionalProperties' is not supported in schema, ignoring"
+_MAX_REPL_HISTORY_MESSAGES = 16
+_ERROR_LOG_FILE = AGENT_LOG_DIR / "vial_print_errors.log"
 
 
 class _SchemaWarningFilter:
@@ -154,6 +160,157 @@ def _suppress_schema_warning():
         return
     with redirect_stdout(_SchemaWarningFilter(sys.stdout)), redirect_stderr(_SchemaWarningFilter(sys.stderr)):
         yield
+
+
+def _message_text(message: Any) -> str:
+    """Extract plain text from a LangChain message or provider content block."""
+    content = getattr(message, "content", message)
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                text = item.get("text") or item.get("content")
+                if isinstance(text, str):
+                    parts.append(text)
+        return "".join(parts).strip()
+    return str(content).strip()
+
+
+def _message_role(message: Any) -> str | None:
+    """Normalize a message role to the tuple format expected by LangChain."""
+    role = getattr(message, "type", None) or getattr(message, "role", None)
+    if role == "human":
+        return "user"
+    if role == "ai":
+        return "assistant"
+    if role in {"user", "assistant"}:
+        return role
+    return None
+
+
+def _sanitize_chat_history(history: list[Any]) -> list[tuple[str, str]]:
+    """Keep only non-empty user/assistant text turns for the next REPL call.
+
+    Vertex rejects content entries that serialize with no parts. LangGraph tool
+    turns can include empty AI messages, tool messages, or provider-specific
+    blocks, so the interactive loop stores a clean transcript between turns.
+    """
+    clean: list[tuple[str, str]] = []
+    for message in history:
+        if isinstance(message, tuple) and len(message) >= 2:
+            role = str(message[0])
+            text = _message_text(message[1])
+        else:
+            role = _message_role(message)
+            text = _message_text(message)
+        if role not in {"user", "assistant"} or not text:
+            continue
+        clean.append((role, text))
+    return clean[-_MAX_REPL_HISTORY_MESSAGES:]
+
+
+def _agent_error_message(exc: Exception) -> str:
+    """Human-readable error for provider hiccups without a Python traceback."""
+    text = str(exc)
+    if "must include at least one parts field" in text:
+        return (
+            "The Vertex AI request was rejected because the conversation history "
+            "contained an empty message. I kept the robot stopped; restart the "
+            "agent or retry the last prompt after pulling the history-sanitizing fix."
+        )
+    if "Remote end closed connection" in text or "Connection aborted" in text:
+        return (
+            "The Vertex AI connection was closed before a response came back. "
+            "The robot was not started. Retry the prompt, preferably with "
+            "--rate-limit if you are doing a long demo."
+        )
+    return (
+        "The LLM call failed before the agent could continue. The robot was not "
+        "started. Retry the prompt or restart the agent if the connection looks stale."
+    )
+
+
+def _log_block(path: Path, title: str, lines: list[str]) -> None:
+    """Append a readable block to an agent log file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().isoformat(timespec="seconds")
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(f"\n[{stamp}] {title}\n")
+        for line in lines:
+            f.write(f"{line}\n")
+        f.write("=" * 80 + "\n")
+
+
+def _history_debug(history: list[tuple[str, str]], max_chars: int = 600) -> list[str]:
+    """Compact transcript preview for error triage."""
+    lines = []
+    for idx, (role, text) in enumerate(history[-6:], start=max(1, len(history) - 5)):
+        one_line = " ".join(text.split())
+        if len(one_line) > max_chars:
+            one_line = one_line[:max_chars] + "...[truncated]"
+        lines.append(f"history[{idx}] {role}: {one_line}")
+    return lines
+
+
+def _log_session_start(log_file: Path, *, auth_summary: str, rate_limited: bool,
+                       simulation_only: bool) -> None:
+    _log_block(log_file, "SESSION START", [
+        f"host={platform.node()}",
+        f"python={sys.executable}",
+        f"cwd={os.getcwd()}",
+        f"mode={'simulation-only' if simulation_only else 'robot-capable'}",
+        f"rate_limited={rate_limited}",
+        "auth_summary:",
+        auth_summary,
+    ])
+
+
+def _log_turn_start(log_file: Path, *, user_input: str,
+                    candidate_history: list[tuple[str, str]]) -> None:
+    _log_block(log_file, "TURN START", [
+        f"user_input={user_input}",
+        f"history_messages={len(candidate_history)}",
+        *_history_debug(candidate_history),
+    ])
+
+
+def _log_turn_success(log_file: Path, *, clean: str,
+                      chat_history: list[tuple[str, str]], result: Any) -> None:
+    _log_block(log_file, "TURN SUCCESS", [
+        f"history_messages={len(chat_history)}",
+        f"agent_text={clean}",
+        f"full_debug_trace={result}",
+    ])
+
+
+def _log_agent_error(log_file: Path, *, user_input: str, clean_error: str,
+                     exc: Exception, candidate_history: list[tuple[str, str]],
+                     auth_summary: str, simulation_only: bool) -> None:
+    lines = [
+        f"user_input={user_input}",
+        f"mode={'simulation-only' if simulation_only else 'robot-capable'}",
+        f"history_messages={len(candidate_history)}",
+        f"exception_type={type(exc).__name__}",
+        f"exception={exc!r}",
+        f"user_facing_error={clean_error}",
+        "auth_summary:",
+        auth_summary,
+        "recent_history:",
+        *_history_debug(candidate_history),
+        "traceback:",
+        traceback.format_exc(),
+    ]
+    _log_block(log_file, "TURN ERROR", lines)
+    _log_block(_ERROR_LOG_FILE, "VIAL PRINT AGENT ERROR", [
+        f"session_log={log_file}",
+        *lines,
+    ])
 
 
 # ── Deterministic offline path (no LLM) ───────────────────────────────────────────
@@ -268,12 +425,20 @@ def _repl(initial_input: str | None, rate_limited: bool, simulation_only: bool) 
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = AGENT_LOG_DIR / f"vial_print_session_{timestamp}.log"
+    auth_summary = Config.describe_llm_auth()
     print("--- Vial-Print AI Agent (Gemini) ---")
-    print(Config.describe_llm_auth())
+    print(auth_summary)
     if simulation_only:
         print("Mode: simulation-only (robot tools unavailable)")
     print(f"Logging to: {log_file}")
+    print(f"Error log: {_ERROR_LOG_FILE}")
     print("Try: 'set up 5 dilutions, 20 uL droplets, 3 replicates' then 'build and validate'.")
+    _log_session_start(
+        log_file,
+        auth_summary=auth_summary,
+        rate_limited=rate_limited,
+        simulation_only=simulation_only,
+    )
 
     while True:
         try:
@@ -283,23 +448,48 @@ def _repl(initial_input: str | None, rate_limited: bool, simulation_only: bool) 
             break
         if user_input.lower() in ("exit", "quit", "q"):
             break
+        if not user_input.strip():
+            continue
 
-        chat_history.append(("user", user_input))
-        with _suppress_schema_warning():
-            result = rate_guard.invoke_with_limit(executor, {"messages": chat_history})
+        candidate_history = _sanitize_chat_history(chat_history + [("user", user_input)])
+        _log_turn_start(
+            log_file,
+            user_input=user_input,
+            candidate_history=candidate_history,
+        )
+        try:
+            with _suppress_schema_warning():
+                result = rate_guard.invoke_with_limit(executor, {"messages": candidate_history})
+        except Exception as exc:
+            clean_error = _agent_error_message(exc)
+            print(f"\n[AGENT ERROR]: {clean_error}")
+            _log_agent_error(
+                log_file,
+                user_input=user_input,
+                clean_error=clean_error,
+                exc=exc,
+                candidate_history=candidate_history,
+                auth_summary=auth_summary,
+                simulation_only=simulation_only,
+            )
+            chat_history = _sanitize_chat_history(chat_history)
+            continue
+
         final_msg = result["messages"][-1]
-        chat_history.append(final_msg)
-
-        if isinstance(final_msg.content, list):
-            clean = "".join(p.get("text", "") for p in final_msg.content if isinstance(p, dict))
-        else:
-            clean = final_msg.content
+        clean = _message_text(final_msg)
+        if not clean:
+            clean = (
+                "The tool call completed, but the model returned no final text. "
+                "Please ask me to summarize the last result."
+            )
+        chat_history = _sanitize_chat_history(candidate_history + [("assistant", clean)])
         print(f"\n[AGENT]: {clean}")
-
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"\n[{datetime.now().strftime('%H:%M:%S')}] USER: {user_input}\n")
-            f.write(f"[{datetime.now().strftime('%H:%M:%S')}] AGENT: {clean}\n")
-            f.write(f"--- FULL DEBUG TRACE ---\n{result}\n" + "=" * 50 + "\n")
+        _log_turn_success(
+            log_file,
+            clean=clean,
+            chat_history=chat_history,
+            result=result,
+        )
 
 
 def main() -> int:

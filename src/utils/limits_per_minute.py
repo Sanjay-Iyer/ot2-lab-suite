@@ -61,7 +61,7 @@ class RateLimitGuard:
             self.after_call()
             return response
         except Exception as e:
-            print(f"[RATE LIMIT GUARD] Call failed: {e}")
+            print(f"[LLM CALL] Failed after rate-limit guard: {e}")
             raise e
 
 if __name__ == "__main__":

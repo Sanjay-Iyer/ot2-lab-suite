@@ -26,7 +26,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.agents import vial_print_tools as vpt
-from src.agents.vial_print_agent import get_vial_print_tools, parse_request
+from src.agents.vial_print_agent import (
+    get_vial_print_tools,
+    parse_request,
+    _log_block,
+    _message_text,
+    _sanitize_chat_history,
+)
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────────
@@ -138,6 +144,47 @@ def test_parse_request_extracts_three_knobs():
 def test_parse_request_handles_micro_sign_and_no_unit():
     assert parse_request("7 dilutions").get("num_dilutions") == 7
     assert parse_request("15µl droplet").get("droplet_volume_ul") == 15.0
+
+
+def test_message_text_extracts_provider_text_blocks():
+    content = [{"type": "text", "text": "hello"}, {"content": " world"}]
+    assert _message_text(content) == "hello world"
+
+
+def test_sanitize_chat_history_drops_empty_and_non_chat_messages():
+    class FakeMessage:
+        def __init__(self, role, content):
+            self.type = role
+            self.content = content
+
+    history = [
+        ("user", "Show the plan"),
+        ("assistant", ""),
+        FakeMessage("tool", "internal result"),
+        FakeMessage("ai", [{"type": "text", "text": "Plan ready"}]),
+        ("user", "   "),
+    ]
+
+    assert _sanitize_chat_history(history) == [
+        ("user", "Show the plan"),
+        ("assistant", "Plan ready"),
+    ]
+
+
+def test_log_block_appends_readable_log():
+    path = REPO_ROOT / "robot_data" / "data" / "logs" / "agents" / "test_log_block.log"
+    try:
+        if path.exists():
+            path.unlink()
+        _log_block(path, "TEST BLOCK", ["alpha", "beta"])
+
+        text = path.read_text(encoding="utf-8")
+        assert "TEST BLOCK" in text
+        assert "alpha" in text
+        assert "beta" in text
+    finally:
+        if path.exists():
+            path.unlink()
 
 
 # ════════════════════════════════════════════════════════════════════════════════
