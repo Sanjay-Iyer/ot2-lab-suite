@@ -35,6 +35,8 @@ deploys and runs behind the `RUN ROBOT` gate.
 ```bash
 # Live on real robot laptop (requires Vertex AI / gcloud ADC)
 python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+# Vertex/gcloud LLM test with simulation only; robot tools unavailable
+python -m src.agents.vial_print_agent --simulation-only "build and validate the default orange and blue workflow"
 # Offline, no LLM/API key — runs load→update→build→validate→CV directly
 python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
 ```

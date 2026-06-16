@@ -119,6 +119,7 @@ def _build_cases(workflow_cfg: dict) -> list:
     """Build the CASES list from the workflow YAML so that changing destination_column
     or the factor list never silently breaks the validator."""
     dil     = workflow_cfg.get("dilution", {})
+    pr      = workflow_cfg.get("printing", {})
     col     = str(dil.get("destination_column", "1"))
     fc      = dil.get("factors", {})
     factors = _resolve_factors(fc)
@@ -128,9 +129,37 @@ def _build_cases(workflow_cfg: dict) -> list:
 
     top_fold = int(factors[0])   if factors[0] == int(factors[0])   else factors[0]
 
-    # First dilution well, derived from the configured destination column.
+    color_series = [
+        item for item in workflow_cfg.get("color_series", [])
+        if item.get("enabled", True)
+    ]
+    if not color_series:
+        color_series = [{
+            "name": "dye",
+            "destination_column": col,
+            "setup_tip": dil.get("setup_tip", ""),
+            "print_block_column": pr.get("print_block_column", 1),
+            "paper_start_column": pr.get("paper_start_column", 1),
+            "num_replicates": pr.get("num_replicates", 1),
+        }]
+
     top_row = "A"
-    top_well = f"{top_row}{col}"
+    top_wells = [
+        f"{top_row}{series.get('destination_column', col)}"
+        for series in color_series
+    ]
+    stock_setup_done = [
+        f"{str(series.get('name', 'dye')).lower()} stock transfers done"
+        for series in color_series
+    ]
+    series_columns = [
+        f"{str(series.get('name', 'dye')).lower()}={series.get('destination_column', col)}"
+        for series in color_series
+    ]
+    series_prints = [
+        f"from {str(series.get('name', 'dye')).lower()} plate column {series.get('destination_column', col)}"
+        for series in color_series
+    ]
 
     return [
         # name, flags, bad_labware, expect_ok, must_contain, must_not_contain
@@ -138,12 +167,15 @@ def _build_cases(workflow_cfg: dict) -> list:
          dict(dry=False, dilution=True, print=True), False, True,
           ["Pre-flight validation passed",
            "One-tip setup: picked tip",
-           f"Diluting well {top_well} to {top_fold:g}x",
-           "One-tip setup transfers done",
+           "Water setup transfers done",
+           *[f"Diluting well {well} to {top_fold:g}x" for well in top_wells],
+           *stock_setup_done,
            "Nozzle layout: ALL for 8-channel dilution mixing",
            "8-channel print: picked tips from column",
            "Printing 8 droplets onto paper",
-          "Returned 8-channel print tips", "Demo Completed ==="],
+           *series_prints,
+           "Returned 8-channel print tips",
+           "Demo Completed ==="],
          ["PRE-FLIGHT VALIDATION FAILED", "Completed (dry run)"]),
 
         ("dry_run",
@@ -154,11 +186,15 @@ def _build_cases(workflow_cfg: dict) -> list:
         ("dilution_only",
          dict(dry=False, dilution=True, print=False), False, True,
          ["One-tip setup: picked tip",
-          f"Diluting well {top_well} to {top_fold:g}x",
+          "Water setup transfers done",
+          *[f"Diluting well {well} to {top_fold:g}x" for well in top_wells],
+          *stock_setup_done,
           "Nozzle layout: ALL for 8-channel dilution mixing",
           "8-channel print: picked tips from column",
           "Returned 8-channel print tips",
-          "Dilution series complete", "Demo Completed ==="],
+          "Dilution series complete",
+          *series_columns,
+          "Demo Completed ==="],
          ["Printing 8 droplets onto paper"]),
 
         ("print_only",

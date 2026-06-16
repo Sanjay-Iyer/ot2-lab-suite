@@ -26,7 +26,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.agents import vial_print_tools as vpt
-from src.agents.vial_print_agent import parse_request
+from src.agents.vial_print_agent import get_vial_print_tools, parse_request
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────────
@@ -92,6 +92,27 @@ def test_apply_params_does_not_mutate_input(default_cfg, default_folds):
 
 def test_default_config_passes_soft_validation(default_cfg):
     assert vpt._soft_validate(default_cfg) == []
+
+
+def test_default_config_prints_orange_and_blue_series(default_cfg):
+    """The flagship default uses two independent dye series: orange, then blue."""
+    series = default_cfg.get("color_series", [])
+    assert [item["name"] for item in series] == ["orange", "blue"]
+    assert series[0]["dye_vial"] == default_cfg["sources"]["orange_dye_vial"]
+    assert series[1]["dye_vial"] == default_cfg["sources"]["blue_dye_vial"]
+    assert series[0]["destination_column"] != series[1]["destination_column"]
+    assert series[0]["print_block_column"] != series[1]["print_block_column"]
+    assert series[0]["paper_start_column"] < series[1]["paper_start_column"]
+
+
+def test_simulation_only_agent_toolset_excludes_robot_tools():
+    names = {tool.name for tool in get_vial_print_tools(simulation_only=True)}
+    assert "build_vial_print_protocol" in names
+    assert "validate_vial_print_matrix" in names
+    assert "verify_print_droplets_mock" in names
+    assert "get_robot_hardware_status" not in names
+    assert "check_robot_http_api" not in names
+    assert "run_vial_print_robot_http" not in names
 
 
 def test_soft_validate_flags_tip_block_overlap(default_cfg, default_folds):

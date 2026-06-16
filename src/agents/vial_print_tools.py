@@ -279,7 +279,13 @@ def _record_pass(protocol_path: Path, sha256: str, output: str) -> None:
 def _run(cmd: list) -> subprocess.CompletedProcess:
     """Run a pipeline script in the current interpreter from the repo root."""
     return subprocess.run(
-        cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True)
+        cmd,
+        cwd=str(PROJECT_ROOT),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════════

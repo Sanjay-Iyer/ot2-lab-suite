@@ -47,6 +47,45 @@ Verify:
 python -c "import langgraph; import langchain_google_genai; import langchain_google_vertexai; print('OK')"
 ```
 
+## Step 2.5 - Simulation-Only Vertex/gcloud Check
+
+Use this when you want to test the real laptop's gcloud/Vertex AI auth path while
+staying fully disconnected from OT-2 motion. This does not require the robot HTTP
+API, SSH, or instrumentation to be reachable.
+
+PowerShell:
+```powershell
+cd C:\path\to\ot2-lab-suite
+conda activate llm
+
+gcloud auth application-default login
+gcloud config set project YOUR_PROJECT_ID
+
+$env:LLM_PROVIDER = "vertexai"
+$env:GOOGLE_CLOUD_PROJECT = "YOUR_PROJECT_ID"
+$env:GOOGLE_CLOUD_LOCATION = "us-central1"
+$env:GEMINI_MODEL = "gemini-2.5-flash"
+
+python -m src.agents.check_llm_auth
+python -m src.agents.vial_print_agent --simulation-only "Use the default orange and blue vial-dilution-print workflow. Build the protocol, run simulation, run validation, and run mock CV only. Do not check robot hardware, do not call HTTP robot tools, and do not run live."
+```
+
+Expected startup lines include:
+```text
+LLM provider: vertexai
+Auth method: gcloud ADC / Vertex AI
+Mode: simulation-only (robot tools unavailable)
+```
+
+For persistent configuration, put these values in the repo `.env` instead of
+setting `$env:` variables each terminal session:
+```text
+LLM_PROVIDER=vertexai
+GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+GOOGLE_CLOUD_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.5-flash
+```
+
 ---
 
 ## Step 3 — Start the AI Agent

@@ -74,6 +74,22 @@ class Config:
         )
 
     @staticmethod
+    def get_google_cloud_location() -> str:
+        """Vertex AI region/location for Google Cloud ADC auth."""
+        return (
+            os.getenv(
+                "GOOGLE_CLOUD_LOCATION",
+                os.getenv("GOOGLE_CLOUD_REGION", Config.GOOGLE_CLOUD_LOCATION),
+            ).strip()
+            or "us-central1"
+        )
+
+    @staticmethod
+    def get_gemini_model() -> str:
+        """Gemini model name from the current environment."""
+        return os.getenv("GEMINI_MODEL", Config.GEMINI_MODEL).strip() or "gemini-1.5-flash"
+
+    @staticmethod
     def get_llm_provider() -> str:
         """Return the effective LLM auth provider: vertexai or api-key."""
         provider = os.getenv("LLM_PROVIDER", Config.LLM_PROVIDER).strip().lower()
@@ -84,6 +100,28 @@ class Config:
         if not provider and not os.getenv("GOOGLE_API_KEY") and Config.get_google_cloud_project():
             return "vertexai"
         return "api-key"
+
+    @staticmethod
+    def describe_llm_auth() -> str:
+        """Human-readable LLM auth summary with no secrets."""
+        provider = Config.get_llm_provider()
+        lines = [
+            f"LLM provider: {provider}",
+            f"Gemini model: {Config.get_gemini_model()}",
+        ]
+        if provider == "vertexai":
+            project = Config.get_google_cloud_project() or "(missing)"
+            lines.extend([
+                f"Google Cloud project: {project}",
+                f"Google Cloud location: {Config.get_google_cloud_location()}",
+                "Auth method: gcloud ADC / Vertex AI",
+            ])
+        else:
+            lines.append(
+                "Auth method: GOOGLE_API_KEY "
+                f"({'set' if os.getenv('GOOGLE_API_KEY') else 'missing'})"
+            )
+        return "\n".join(lines)
 
     @staticmethod
     def live_robot_llm_auth_error() -> str:
@@ -117,14 +155,14 @@ class Config:
 
         kwargs = {
             "project": project,
-            "location": Config.GOOGLE_CLOUD_LOCATION,
+            "location": Config.get_google_cloud_location(),
             "temperature": temperature,
             "max_retries": max_retries,
         }
         try:
-            return ChatVertexAI(model=Config.GEMINI_MODEL, **kwargs)
+            return ChatVertexAI(model=Config.get_gemini_model(), **kwargs)
         except TypeError:
-            return ChatVertexAI(model_name=Config.GEMINI_MODEL, **kwargs)
+            return ChatVertexAI(model_name=Config.get_gemini_model(), **kwargs)
 
     @staticmethod
     def _get_api_key_llm(temperature: float, max_retries: int):
@@ -139,7 +177,7 @@ class Config:
             )
 
         kwargs = {
-            "model": Config.GEMINI_MODEL,
+            "model": Config.get_gemini_model(),
             "google_api_key": api_key,
             "temperature": temperature,
             "max_retries": max_retries,

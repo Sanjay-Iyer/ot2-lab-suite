@@ -15,12 +15,14 @@ simulation laptop):
     # Conversational agent (simulation may use GOOGLE_API_KEY; live robot uses Vertex AI / gcloud ADC)
     python -m src.agents.vial_print_agent
     python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+    python -m src.agents.vial_print_agent --simulation-only "build and validate the default orange and blue workflow"
 
     # Deterministic offline pipeline — no LLM / API key (build -> validate -> CV)
     python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
 
 Flags:
     --no-llm / --mock   Run the tool pipeline directly from a parsed request (no LLM).
+    --simulation-only   LLM-driven build/validate/CV with robot tools unavailable.
     --rate-limit        Enable the 60 s rolling-window guard (Gemini free tier).
 """
 from __future__ import annotations
@@ -109,6 +111,14 @@ SYSTEM_PROMPT = (
     "  - Trust tool outputs over your own assumptions about parameter values.\n"
 )
 
+SIMULATION_ONLY_PROMPT = (
+    "\n\nSIMULATION-ONLY MODE:\n"
+    "  - The current session is for build, simulation, validation, and mock CV only.\n"
+    "  - Do not attempt robot hardware checks, HTTP API checks, uploads, or live runs.\n"
+    "  - Finish after build_vial_print_protocol(), validate_vial_print_matrix(), "
+    "and verify_print_droplets_mock() pass.\n"
+)
+
 
 # ── Deterministic offline path (no LLM) ───────────────────────────────────────────
 
@@ -176,11 +186,11 @@ def run_scripted(request: str) -> int:
 
 # ── Live conversational agent (Gemini) ────────────────────────────────────────────
 
-def create_vial_print_agent(use_mock: bool = False):
-    """Build the LangGraph ReAct agent. Robot tools are imported lazily so the
-    offline path never needs them."""
-    from langgraph.prebuilt import create_react_agent
-    from src.core.config import Config
+def get_vial_print_tools(simulation_only: bool = False):
+    """Return the tool set for the current vial-print agent mode."""
+    if simulation_only:
+        return list(CONFIG_TOOLS)
+
     from src.agents.tools import get_robot_hardware_status
     from src.agents.robot_http_tools import (
         check_robot_http_api,
@@ -194,20 +204,38 @@ def create_vial_print_agent(use_mock: bool = False):
         check_robot_http_api,
         run_vial_print_robot_http,
     ]
+    return list(CONFIG_TOOLS) + robot_tools
+
+
+def create_vial_print_agent(use_mock: bool = False, simulation_only: bool = False):
+    """Build the LangGraph ReAct agent. Robot tools are imported lazily so the
+    offline path never needs them."""
+    from langgraph.prebuilt import create_react_agent
+    from src.core.config import Config
+
     llm = Config.get_llm(temperature=0)
-    return create_react_agent(model=llm, tools=CONFIG_TOOLS + robot_tools, prompt=SYSTEM_PROMPT)
+    prompt = SYSTEM_PROMPT + (SIMULATION_ONLY_PROMPT if simulation_only else "")
+    return create_react_agent(
+        model=llm,
+        tools=get_vial_print_tools(simulation_only=simulation_only),
+        prompt=prompt,
+    )
 
 
-def _repl(initial_input: str | None, rate_limited: bool) -> None:
+def _repl(initial_input: str | None, rate_limited: bool, simulation_only: bool) -> None:
+    from src.core.config import Config
     from src.utils.limits_per_minute import RateLimitGuard
 
     rate_guard = RateLimitGuard(enabled=rate_limited)
-    executor = create_vial_print_agent()
+    executor = create_vial_print_agent(simulation_only=simulation_only)
     chat_history: list = []
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = AGENT_LOG_DIR / f"vial_print_session_{timestamp}.log"
     print("--- Vial-Print AI Agent (Gemini) ---")
+    print(Config.describe_llm_auth())
+    if simulation_only:
+        print("Mode: simulation-only (robot tools unavailable)")
     print(f"Logging to: {log_file}")
     print("Try: 'set up 5 dilutions, 20 uL droplets, 3 replicates' then 'build and validate'.")
 
@@ -241,13 +269,17 @@ def main() -> int:
     argv = sys.argv[1:]
     no_llm = ("--no-llm" in argv) or ("--mock" in argv)
     rate_limited = "--rate-limit" in argv
-    args = [a for a in argv if a not in ("--no-llm", "--mock", "--rate-limit")]
+    simulation_only = "--simulation-only" in argv
+    args = [
+        a for a in argv
+        if a not in ("--no-llm", "--mock", "--rate-limit", "--simulation-only")
+    ]
     request = " ".join(args) if args else None
 
     if no_llm:
         return run_scripted(request or "")
 
-    _repl(request, rate_limited)
+    _repl(request, rate_limited, simulation_only)
     return 0
 
 
