@@ -27,8 +27,10 @@ Flags:
 """
 from __future__ import annotations
 
+import os
 import re
 import sys
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime
 
 from src.utils.paths import AGENT_LOG_DIR, ensure_project_dirs
@@ -118,6 +120,40 @@ SIMULATION_ONLY_PROMPT = (
     "  - Finish after build_vial_print_protocol(), validate_vial_print_matrix(), "
     "and verify_print_droplets_mock() pass.\n"
 )
+
+_SCHEMA_WARNING_FRAGMENT = "Key 'additionalProperties' is not supported in schema, ignoring"
+
+
+class _SchemaWarningFilter:
+    """Forward stream writes except for Vertex's noisy tool-schema warning."""
+
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+        self._buffer = ""
+
+    def write(self, text: str) -> int:
+        self._buffer += text
+        while "\n" in self._buffer:
+            line, self._buffer = self._buffer.split("\n", 1)
+            if _SCHEMA_WARNING_FRAGMENT not in line:
+                self._wrapped.write(line + "\n")
+        return len(text)
+
+    def flush(self) -> None:
+        if self._buffer and _SCHEMA_WARNING_FRAGMENT not in self._buffer:
+            self._wrapped.write(self._buffer)
+        self._buffer = ""
+        self._wrapped.flush()
+
+
+@contextmanager
+def _suppress_schema_warning():
+    """Silence Vertex schema noise unless explicitly disabled for debugging."""
+    if os.getenv("OT2_SHOW_SCHEMA_WARNINGS", "").strip().lower() in {"1", "true", "yes"}:
+        yield
+        return
+    with redirect_stdout(_SchemaWarningFilter(sys.stdout)), redirect_stderr(_SchemaWarningFilter(sys.stderr)):
+        yield
 
 
 # ── Deterministic offline path (no LLM) ───────────────────────────────────────────
@@ -249,7 +285,8 @@ def _repl(initial_input: str | None, rate_limited: bool, simulation_only: bool) 
             break
 
         chat_history.append(("user", user_input))
-        result = rate_guard.invoke_with_limit(executor, {"messages": chat_history})
+        with _suppress_schema_warning():
+            result = rate_guard.invoke_with_limit(executor, {"messages": chat_history})
         final_msg = result["messages"][-1]
         chat_history.append(final_msg)
 
