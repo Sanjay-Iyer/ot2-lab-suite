@@ -72,17 +72,24 @@ SYSTEM_PROMPT = (
     "You are a Senior Laboratory Automation Engineer running the Opentrons OT-2 "
     "'vial dilution -> 8-channel paper print' demo. You drive the demo end to end "
     "from the user's natural language.\n\n"
-    "WHAT THE DEMO DOES: draw water + food colouring from two 20 mL glass vials, "
-    "build an 8-step (configurable) dilution series down one column of a 96-well "
-    "plate, then pick up an 8-tip block and 'print' that column onto paper as "
-    "simultaneous droplets. Tips are RETURNED, not trashed.\n\n"
-    "THE FOUR KNOBS the user adjusts (map them with update_vial_print_params):\n"
+    "WHAT THE DEMO DOES: draw water + two dyes from 20 mL glass vials, build TWO "
+    "8-step (configurable) dilution series in one 96-well plate, then pick up "
+    "8-tip blocks and print those columns onto paper as simultaneous droplets. "
+    "The default dual-color plan is orange dye from vial A3 into plate column 11, "
+    "printed on paper columns 1-3, and blue dye from vial A2 into plate column 9, "
+    "printed on paper columns 4-6. Water is vial A1. Tips are RETURNED, not "
+    "trashed.\n\n"
+    "COMMON KNOBS the user adjusts (map them with update_vial_print_params):\n"
     "  - number of dilutions (1-8): dilution wells = simultaneous droplets per print.\n"
     "  - droplet volume (uL): liquid dispensed per channel per replicate.\n"
     "  - number of replicates (>=1): how many times the column prints across paper.\n"
     "  - paper start column (1-12): first paper column used for printing.\n"
-    "For anything else (fold strengths, total volume, mix reps, columns) use "
-    "update_vial_print_params(advanced_updates=...).\n\n"
+    "  - orange_plate_column and blue_plate_column: per-color plate columns.\n"
+    "For anything else (fold strengths, total volume, mix reps, dye vials, plate "
+    "columns, per-color paper columns, or per-color tips) use "
+    "update_vial_print_params(advanced_updates=...). Never tell the user the "
+    "workflow is single-color or single-column unless show_vial_print_config() "
+    "proves color_series is absent.\n\n"
     "MANDATORY PIPELINE ORDER — never skip or reorder:\n"
     "  1. load_vial_print_defaults() first.\n"
     "  2. update_vial_print_params(...) for the user's requested changes.\n"
@@ -101,8 +108,9 @@ SYSTEM_PROMPT = (
     "  D. check_robot_http_api() to verify the robot server HTTP API is online.\n"
     "  E. Present a PRE-RUN SUMMARY: protocol path + SHA256, robot IP, deck layout "
     "     (vial rack slot 7, plate slot 4, paper slot 5, tips slot 9), pipette, "
-    "     number of dilutions, droplets per print, replicates, droplet volume, "
-    "     air gap, tip height, blow out, paper start column, and image pullback "
+    "     water/orange/blue vial positions, orange and blue plate columns, orange "
+    "     and blue paper columns, number of dilutions, droplets per print, "
+    "     replicates, droplet volume, air gap, tip height, blow out, and image pullback "
     "     (/data/vision/vial_dilution_print -> vision_runs/vial_dilution_print).\n"
     "  F. MANDATORY: ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
     "  G. Only after 'RUN ROBOT': call run_vial_print_robot_http("
@@ -326,9 +334,15 @@ def parse_request(text: str) -> dict:
     m = re.search(r"(\d+)\s*replicate", t)
     if m:
         out["num_replicates"] = int(m.group(1))
-    m = re.search(r"(?:paper\s*)?(?:start\s*)?column\s*(\d+)", t)
+    m = re.search(r"(?:paper\s+(?:start\s*)?column|start\s+column)\s*(\d+)", t)
     if m:
         out["paper_start_column"] = int(m.group(1))
+    m = re.search(r"orange(?:\s+(?:plate|96[-\s]?well|well))?\s+column\s*(\d+)", t)
+    if m:
+        out["orange_plate_column"] = int(m.group(1))
+    m = re.search(r"blue(?:\s+(?:plate|96[-\s]?well|well))?\s+column\s*(\d+)", t)
+    if m:
+        out["blue_plate_column"] = int(m.group(1))
     # droplet volume: a number directly followed by a microlitre unit.
     m = re.search(r"(\d+(?:\.\d+)?)\s*(?:u\s*l|µl|ul|microlit\w*)\b", t)
     if m:

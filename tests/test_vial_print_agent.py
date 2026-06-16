@@ -111,6 +111,52 @@ def test_default_config_prints_orange_and_blue_series(default_cfg):
     assert series[0]["paper_start_column"] < series[1]["paper_start_column"]
 
 
+def test_agent_summary_exposes_dual_color_series(default_cfg):
+    summary = vpt._summary(default_cfg)
+
+    assert "orange vial A3 -> plate column 11" in summary
+    assert "blue vial A2 -> plate column 9" in summary
+    assert "paper columns 1-3" in summary
+    assert "paper columns 4-6" in summary
+
+
+def test_preview_dilution_plan_exposes_dual_color_wells(default_cfg):
+    vpt._WORKING = default_cfg
+    try:
+        plan = vpt.preview_dilution_plan.invoke({})
+    finally:
+        vpt._WORKING = None
+
+    assert "orange series: dye vial A3 -> plate column 11" in plan
+    assert "blue series: dye vial A2 -> plate column 9" in plan
+    assert "A11: 1x" in plan
+    assert "A9: 1x" in plan
+
+
+def test_replicate_knob_updates_each_color_series(default_cfg, default_folds):
+    cfg, _ = vpt._apply_params(
+        default_cfg,
+        num_replicates=2,
+        default_folds=default_folds,
+    )
+
+    assert cfg["printing"]["num_replicates"] == 2
+    assert [item["num_replicates"] for item in cfg["color_series"]] == [2, 2]
+
+
+def test_color_plate_column_knobs_update_named_series(default_cfg, default_folds):
+    cfg, _ = vpt._apply_params(
+        default_cfg,
+        orange_plate_column=12,
+        blue_plate_column=8,
+        default_folds=default_folds,
+    )
+    by_name = {item["name"]: item for item in cfg["color_series"]}
+
+    assert by_name["orange"]["destination_column"] == "12"
+    assert by_name["blue"]["destination_column"] == "8"
+
+
 def test_simulation_only_agent_toolset_excludes_robot_tools():
     names = {tool.name for tool in get_vial_print_tools(simulation_only=True)}
     assert "build_vial_print_protocol" in names
@@ -132,12 +178,26 @@ def test_soft_validate_flags_tip_block_overlap(default_cfg, default_folds):
 
 
 def test_parse_request_extracts_three_knobs():
-    knobs = parse_request("set up 5 dilutions, 20 uL droplets, 3 replicates, paper column 1")
+    knobs = parse_request(
+        "set up 5 dilutions, 20 uL droplets, 3 replicates, paper column 1, "
+        "orange column 12, blue column 9"
+    )
     assert knobs == {
         "num_dilutions": 5,
         "droplet_volume_ul": 20.0,
         "num_replicates": 3,
         "paper_start_column": 1,
+        "orange_plate_column": 12,
+        "blue_plate_column": 9,
+    }
+
+
+def test_parse_request_does_not_treat_color_column_as_paper_column():
+    knobs = parse_request("use orange column 12 and blue column 9")
+
+    assert knobs == {
+        "orange_plate_column": 12,
+        "blue_plate_column": 9,
     }
 
 

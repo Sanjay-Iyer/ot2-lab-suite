@@ -106,6 +106,8 @@ def _apply_params(
     droplet_volume_ul: Optional[float] = None,
     num_replicates: Optional[int] = None,
     paper_start_column: Optional[int] = None,
+    orange_plate_column: Optional[int] = None,
+    blue_plate_column: Optional[int] = None,
     advanced_updates: Optional[dict] = None,
     default_folds: Optional[list] = None,
 ) -> Tuple[dict, list]:
@@ -164,6 +166,8 @@ def _apply_params(
             warnings.append(f"num_replicates {r} < 1; set to 1.")
             r = 1
         cfg["printing"]["num_replicates"] = r
+        for series in cfg.get("color_series", []) or []:
+            series["num_replicates"] = r
 
     # 4. Paper start column.
     if paper_start_column is not None:
@@ -173,13 +177,71 @@ def _apply_params(
             col = max(1, min(col, 12))
         cfg["printing"]["paper_start_column"] = col
 
-    # 5. Free-form nested overrides (any documented YAML key).
+    # 5. Per-color plate columns for the dual-color workflow.
+    requested_color_columns = {
+        "orange": orange_plate_column,
+        "blue": blue_plate_column,
+    }
+    for color, requested_col in requested_color_columns.items():
+        if requested_col is None:
+            continue
+        col = int(requested_col)
+        if not (1 <= col <= 12):
+            warnings.append(f"{color}_plate_column {col} out of range; clamped to [1, 12].")
+            col = max(1, min(col, 12))
+        matched = False
+        for series in cfg.get("color_series", []) or []:
+            if str(series.get("name", "")).lower() == color:
+                series["destination_column"] = str(col)
+                matched = True
+                break
+        if not matched:
+            warnings.append(
+                f"could not find {color!r} in color_series; plate column was not changed."
+            )
+
+    # 6. Free-form nested overrides (any documented YAML key).
     if advanced_updates:
         cfg = merge_user_updates(cfg, advanced_updates)
         # Re-sync the CV count if the caller changed the factor block directly.
         cfg.setdefault("cv", {})["expected_droplets"] = _num_dilutions(cfg)
 
     return cfg, warnings
+
+
+def _paper_columns(start_column, num_replicates) -> str:
+    start = int(start_column)
+    reps = int(num_replicates)
+    end = start + reps - 1
+    return str(start) if reps == 1 else f"{start}-{end}"
+
+
+def _resolve_series(cfg: dict) -> list[dict]:
+    """Return explicit color series, or a legacy single-series fallback."""
+    pr = cfg.get("printing", {})
+    series = copy.deepcopy(cfg.get("color_series") or [])
+    if series:
+        return series
+    sources = cfg.get("sources", {})
+    return [{
+        "name": "single",
+        "dye_vial": sources.get("food_coloring_vial", sources.get("blue_dye_vial", "A2")),
+        "destination_column": pr.get("source_column", cfg.get("dilution", {}).get("destination_column", "9")),
+        "setup_tip": cfg.get("dilution", {}).get("setup_tip", "H12"),
+        "print_block_column": pr.get("print_block_column", 1),
+        "paper_start_column": pr.get("paper_start_column", 1),
+        "num_replicates": pr.get("num_replicates", 1),
+    }]
+
+
+def _series_summary_line(series: dict) -> str:
+    return (
+        f"{series.get('name')} vial {series.get('dye_vial')} -> plate column "
+        f"{series.get('destination_column')} -> paper columns "
+        f"{_paper_columns(series.get('paper_start_column', 1), series.get('num_replicates', 1))}; "
+        f"stock tip {series.get('setup_tip')}, print block column "
+        f"{series.get('print_block_column')}"
+    )
 
 
 def _soft_validate(cfg: dict) -> list:
@@ -225,17 +287,28 @@ def _soft_validate(cfg: dict) -> list:
 def _summary(cfg: dict) -> str:
     dil = cfg.get("dilution", {})
     pr  = cfg.get("printing", {})
+    deck = cfg.get("deck", {})
+    sources = cfg.get("sources", {})
+    series = _resolve_series(cfg)
     factors = _resolve_factors(dil.get("factors", {}))
     folds = ", ".join(f"{f:g}x" for f in factors)
     rm = cfg.get("run_modes", {})
+    series_lines = "\n".join(f"    - {_series_summary_line(item)}" for item in series)
+    reps_summary = ", ".join(
+        f"{item.get('name')}={item.get('num_replicates')}" for item in series
+    )
     return (
         "Vial-dilution-print working config\n"
-        f"  Dilutions      : {len(factors)} wells in plate column {dil.get('destination_column')} "
-        f"(folds: {folds})\n"
+        f"  Deck           : vial rack slot {deck.get('tuberack', {}).get('slot')}, "
+        f"plate slot {deck.get('plate', {}).get('slot')}, paper slot "
+        f"{deck.get('paper', {}).get('slot')}, tips slot {deck.get('tiprack', {}).get('slot')}\n"
+        f"  Vials          : water {sources.get('water_vial')}, "
+        f"orange {sources.get('orange_dye_vial')}, blue {sources.get('blue_dye_vial')}\n"
+        f"  Dilutions      : {len(factors)} wells per color series (folds: {folds})\n"
+        f"  Color series   :\n{series_lines}\n"
         f"  Total / well   : {dil.get('total_volume_ul')} uL, mix {dil.get('mix_reps')}x\n"
         f"  Droplet volume : {pr.get('droplet_volume_ul')} uL/channel\n"
-        f"  Replicates     : {pr.get('num_replicates')} starting at paper column "
-        f"{pr.get('paper_start_column')} (x-spacing "
+        f"  Replicates     : {reps_summary} (x-spacing "
         f"{pr.get('replicate_spacing_mm', {}).get('x')} mm)\n"
         f"  Print release  : air gap {pr.get('air_gap_ul')} uL, z {pr.get('dispense_z_mm')} mm, "
         f"blow_out={pr.get('blow_out')}, dwell={pr.get('post_dispense_delay_s')} s\n"
@@ -319,6 +392,8 @@ def update_vial_print_params(
     droplet_volume_ul: Optional[float] = None,
     num_replicates: Optional[int] = None,
     paper_start_column: Optional[int] = None,
+    orange_plate_column: Optional[int] = None,
+    blue_plate_column: Optional[int] = None,
     advanced_updates: Optional[dict] = None,
 ) -> str:
     """Adjust the demo's parameters from natural language.
@@ -330,6 +405,8 @@ def update_vial_print_params(
         droplet_volume_ul: Volume dispensed per channel per replicate (uL).
         num_replicates: How many times the column is printed across the paper (>=1).
         paper_start_column: Leftmost paper column for the first replicate (1-12).
+        orange_plate_column: 96-well plate column for the orange dilution series (1-12).
+        blue_plate_column: 96-well plate column for the blue dilution series (1-12).
         advanced_updates: Optional nested dict for any other documented YAML key,
             e.g. {"dilution": {"total_volume_ul": 180}} or
             {"dilution": {"factors": {"explicit": [1, 3, 9, 27]}}}.
@@ -345,12 +422,15 @@ def update_vial_print_params(
         droplet_volume_ul,
         num_replicates,
         paper_start_column,
+        orange_plate_column,
+        blue_plate_column,
         advanced_updates,
     )):
         return "No changes requested. Current config:\n\n" + _summary(_WORKING)
     cfg, warnings = _apply_params(
         _WORKING, num_dilutions, droplet_volume_ul, num_replicates,
-        paper_start_column, advanced_updates, default_folds=_DEFAULT_FOLDS)
+        paper_start_column, orange_plate_column, blue_plate_column,
+        advanced_updates, default_folds=_DEFAULT_FOLDS)
     _WORKING = cfg
     out = ["Config updated.\n", _summary(cfg)]
     soft = _soft_validate(cfg)
@@ -373,15 +453,28 @@ def preview_dilution_plan() -> str:
         return "Error: no config loaded. Call load_vial_print_defaults first."
     dil = _WORKING.get("dilution", {})
     total = float(dil.get("total_volume_ul", 0) or 0)
-    col = dil.get("destination_column", "1")
     factors = _resolve_factors(dil.get("factors", {}))
-    lines = [f"Dilution plan (column {col}, {total:g} uL/well):"]
-    for i, f in enumerate(factors):
-        row = chr(ord("A") + i)
-        stock = round(total / f, 2) if f else 0.0
-        water = round(total - stock, 2)
-        flag = "  (below ~20 uL accurate min)" if 0 < stock < 20 else ""
-        lines.append(f"  {row}{col}: {f:g}x  stock={stock:g} uL  water={water:g} uL{flag}")
+    series = _resolve_series(_WORKING)
+    water_vial = _WORKING.get("sources", {}).get("water_vial")
+    lines = [
+        f"Dilution plan ({total:g} uL/well, water vial {water_vial}; folds shared by each color):"
+    ]
+    for item in series:
+        col = item.get("destination_column", dil.get("destination_column", "1"))
+        lines.append(
+            f"  {item.get('name')} series: dye vial {item.get('dye_vial')} -> "
+            f"plate column {col}; paper columns "
+            f"{_paper_columns(item.get('paper_start_column', 1), item.get('num_replicates', 1))}"
+        )
+        for i, f in enumerate(factors):
+            row = chr(ord("A") + i)
+            stock = round(total / f, 2) if f else 0.0
+            water = round(total - stock, 2)
+            flag = "  (below ~20 uL accurate min)" if 0 < stock < 20 else ""
+            lines.append(
+                f"    {row}{col}: {f:g}x  {item.get('name')} stock={stock:g} uL  "
+                f"water={water:g} uL{flag}"
+            )
     return "\n".join(lines)
 
 

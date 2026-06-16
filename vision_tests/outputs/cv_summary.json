@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-06-16T18:58:43.406195+00:00",
+  "generated_utc": "2026-06-16T19:20:49.759058+00:00",
   "workflow_yaml": "C:\\code\\opentrons_home\\ot2-lab-suite\\configs\\workflows\\defaults\\vial_dilution_print.yaml",
   "dest_column": "9",
   "fold_order": [
@@ -12,18 +12,18 @@
     40,
     50
   ],
-  "expected_count": 4,
+  "expected_count": 5,
   "overall_status": "PASS",
   "images_analyzed": 1,
   "per_image": [
     {
       "image": "paper_print.jpg",
-      "expected_count": 4,
-      "found_count": 4,
+      "expected_count": 5,
+      "found_count": 5,
       "count_pass": true,
       "shape_pass": true,
       "min_circularity": 0.867,
-      "mean_circularity": 0.899,
+      "mean_circularity": 0.897,
       "gradient_detected": true,
       "status": "PASS"
     }
