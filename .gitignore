@@ -27,3 +27,12 @@ src/agents/logs/**
 src/printing/outputs/
 src/protocols/generated/*_run_*.py
 !src/protocols/generated/*_latest.py
+
+# Image captures — keep raw photos out of git history
+*.jpg
+*.jpeg
+*.png
+
+*.png
+
+*.jpg

@@ -1,0 +1,93 @@
+# Grid-aware printed-droplet quality analysis.
+#
+# Every coordinate is normalized as [x / image_width, y / image_height].  The
+# OT-2 profile is calibrated to the fixed built-in camera view with the paper in
+# deck slot 5.  Re-run calibration if the camera or paper placement changes.
+
+profiles:
+  ot2_fixed:
+    source: ot2_builtin
+    rows: 8
+    columns: 6
+    # Calibrated from the 2026-07-14 fixed-camera images of the same
+    # 3-blue-column + 3-orange-column paper used for the phone reference.
+    grid:
+      # In the fixed OT-2 view, dilution strength runs top-to-bottom and the
+      # six replicate/color columns run left-to-right. At 640 x 480 this is
+      # approximately origin=(270,190), row step=(0,4), column step=(8,0).
+      origin: [0.42188, 0.39583]
+      row_step: [0.0, 0.00833]
+      column_step: [0.01250, 0.0]
+    # OT-2 droplets are only a few pixels wide, so a smaller contrast threshold
+    # is required.  Shape/ring reliability gates still prevent overclaiming.
+    presence_threshold: 0.55
+
+  phone_blue_orange_frame_1_reference:
+    source: phone_blue_orange
+    rows: 8
+    columns: 6
+    grid:
+      # Frame 1 is shifted about one column to the right relative to frames 2
+      # and 3 because the phone was handheld.
+      origin: [0.42317, 0.41667]
+      row_step: [0.0, 0.04902]
+      column_step: [0.06510, 0.0]
+    presence_threshold: 1.35
+
+  phone_blue_orange_frames_2_3_reference:
+    source: phone_blue_orange
+    rows: 8
+    columns: 6
+    grid:
+      origin: [0.35807, 0.41667]
+      row_step: [0.0, 0.04902]
+      column_step: [0.06510, 0.0]
+    presence_threshold: 1.35
+
+  phone_purple_pink_reference:
+    source: phone_purple_pink
+    rows: 8
+    columns: 6
+    grid:
+      # Calibrated to 200-pixel row spacing; rows 4-8 align with the five
+      # visible ring/spot rows and row 8 is centered on the darkest print.
+      origin: [0.40690, 0.26961]
+      row_step: [0.0, 0.04902]
+      column_step: [0.06510, 0.0]
+    presence_threshold: 1.35
+    # Row 1 overlaps the broad wet-paper boundary in this reference photo.
+    # It cannot be distinguished reliably from that background artifact.
+    unassessable_rows: [1]
+    # C1R2 contains a local orange paper/background cast but no auditable dot.
+    unassessable_positions: [[2, 1]]
+
+benchmarks:
+  ot2_after_deck_blue_orange_6x8:
+    series: ot2_blue_orange_6x8
+    profile: ot2_fixed
+    image: vision_tests/raw/test/OT-2/after_deck.jpg
+
+  ot2_after_plate_blue_orange_6x8:
+    series: ot2_blue_orange_6x8
+    profile: ot2_fixed
+    image: vision_tests/raw/test/OT-2/after_plate.jpg
+
+  phone_blue_orange_frame_1_6x8:
+    series: phone_blue_orange_6x8
+    profile: phone_blue_orange_frame_1_reference
+    image: vision_tests/raw/test/camera/blue_orange/PXL_20260616_194303424.jpg
+
+  phone_blue_orange_frame_2_6x8:
+    series: phone_blue_orange_6x8
+    profile: phone_blue_orange_frames_2_3_reference
+    image: vision_tests/raw/test/camera/blue_orange/PXL_20260616_194304780.jpg
+
+  phone_blue_orange_frame_3_6x8:
+    series: phone_blue_orange_6x8
+    profile: phone_blue_orange_frames_2_3_reference
+    image: vision_tests/raw/test/camera/blue_orange/PXL_20260616_194305768.jpg
+
+  phone_purple_pink_6x8:
+    series: phone_purple_pink_6x8
+    profile: phone_purple_pink_reference
+    image: vision_tests/raw/test/camera/gold/PXL_20260618_171036344.jpg

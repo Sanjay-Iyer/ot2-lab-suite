@@ -1,0 +1,63 @@
+# Direct comparison of the same 6-column x 8-row blue/orange print.
+#
+# The OT-2 fixed-camera images contain only a few pixels per droplet. The phone
+# images are close-ups of the same paper and support morphology measurements.
+
+profiles:
+  ot2_fixed_blue_orange:
+    source: ot2_builtin
+    rows: 8
+    columns: 6
+    grid:
+      # Calibrated at 640 x 480: origin=(270,190), row step=(0,4),
+      # column step=(8,0).
+      origin: [0.42188, 0.39583]
+      row_step: [0.0, 0.00833]
+      column_step: [0.01250, 0.0]
+    presence_threshold: 0.55
+
+  phone_blue_orange_frame_1:
+    source: phone_closeup
+    rows: 8
+    columns: 6
+    grid:
+      origin: [0.42317, 0.41667]
+      row_step: [0.0, 0.04902]
+      column_step: [0.06510, 0.0]
+    presence_threshold: 1.35
+
+  phone_blue_orange_frames_2_3:
+    source: phone_closeup
+    rows: 8
+    columns: 6
+    grid:
+      origin: [0.35807, 0.41667]
+      row_step: [0.0, 0.04902]
+      column_step: [0.06510, 0.0]
+    presence_threshold: 1.35
+
+benchmarks:
+  ot2_after_deck:
+    series: ot2_blue_orange_6x8
+    profile: ot2_fixed_blue_orange
+    image: vision_tests/raw/test/OT-2/after_deck.jpg
+
+  ot2_after_plate:
+    series: ot2_blue_orange_6x8
+    profile: ot2_fixed_blue_orange
+    image: vision_tests/raw/test/OT-2/after_plate.jpg
+
+  phone_blue_orange_frame_1:
+    series: phone_blue_orange_6x8
+    profile: phone_blue_orange_frame_1
+    image: vision_tests/raw/test/camera/blue_orange/PXL_20260616_194303424.jpg
+
+  phone_blue_orange_frame_2:
+    series: phone_blue_orange_6x8
+    profile: phone_blue_orange_frames_2_3
+    image: vision_tests/raw/test/camera/blue_orange/PXL_20260616_194304780.jpg
+
+  phone_blue_orange_frame_3:
+    series: phone_blue_orange_6x8
+    profile: phone_blue_orange_frames_2_3
+    image: vision_tests/raw/test/camera/blue_orange/PXL_20260616_194305768.jpg
