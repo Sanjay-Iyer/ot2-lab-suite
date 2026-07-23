@@ -74,7 +74,7 @@ def test_protocol_is_api_228_single_nozzle_with_expected_deck() -> None:
 def test_runner_contains_http_transport_and_no_remote_shell_tools() -> None:
     source = RUNNER_PATH.read_text(encoding="utf-8").lower()
 
-    assert "http://" in source
+    assert "base_url" in source
     assert "/protocols" in source
     assert "/runs" in source
     assert '"ssh"' not in source

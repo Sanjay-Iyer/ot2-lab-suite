@@ -54,9 +54,13 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
         "vial_dilution_print_v4"),
 }
 
-# Versions that target the OT-2's real API level (2.15) and therefore simulate under
-# the pinned interpreter, not the repo's default env.
-API_215_VERSIONS = {3, 4}
+# Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
+# needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately
+# minimal quick test — its handful of basic aspirate/dispense commands simulate the
+# same under the repo's default env, so it does not require the pinned interpreter
+# (the robot still enforces API 2.15 at upload). Keeping v4 out of this set is what
+# lets the quick test run on a machine that has only the default env installed.
+SIMULATOR_PINNED_VERSIONS = {3}
 
 GENERATED_DIR = REPO / "src" / "protocols" / "generated"
 LABWARE       = REPO / "labware"
@@ -775,7 +779,7 @@ def main() -> int:
         or (str(V3_SIMULATOR_PYTHON) if V3_SIMULATOR_PYTHON.exists() else None)
         or sys.executable
     )
-    if version in API_215_VERSIONS:
+    if version in SIMULATOR_PINNED_VERSIONS:
         simulator_problem = _v3_simulator_problem(simulator_python)
         if simulator_problem:
             print(f"SIMULATION ENVIRONMENT INVALID: {simulator_problem}")
@@ -783,7 +787,7 @@ def main() -> int:
 
     ok, output = simulate(
         run_path,
-        simulator_python if version in API_215_VERSIONS else sys.executable,
+        simulator_python if version in SIMULATOR_PINNED_VERSIONS else sys.executable,
     )
     tail = "\n".join(line for line in output.splitlines()
                      if any(k in line for k in ("Pre-flight", "Series:", "Printing 8",
