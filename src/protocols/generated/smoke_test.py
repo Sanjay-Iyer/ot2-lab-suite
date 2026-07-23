@@ -22,6 +22,7 @@ PIPETTE_MOUNT = "left"
 DRY_AIR_VOLUME_UL = 5.0
 SAFE_PLATE_Z_MM = 2.0
 SAFE_PAPER_Z_MM = 10.0
+COMPARISON_DWELL_SECONDS = 5.0
 
 
 def run(protocol: protocol_api.ProtocolContext) -> None:
@@ -62,6 +63,10 @@ def run(protocol: protocol_api.ProtocolContext) -> None:
     p20.aspirate(DRY_AIR_VOLUME_UL, plate_target)
     p20.dispense(DRY_AIR_VOLUME_UL / 2, plate_target)
     p20.move_to(paper_target)
+    protocol.comment(
+        "P20 comparison position: slot 5 A1, pausing for visual alignment check."
+    )
+    protocol.delay(seconds=COMPARISON_DWELL_SECONDS)
     p20.dispense(DRY_AIR_VOLUME_UL / 2, paper_target)
 
     p20.return_tip()

@@ -7,12 +7,16 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parent.parent
-RUNNER_PATH = REPO / "scripts" / "run_smoke_test.py"
-PROTOCOL_PATH = REPO / "src" / "protocols" / "generated" / "smoke_test.py"
+RUNNER_PATH = REPO / "scripts" / "run_p300_smoke_test.py"
+PROTOCOL_PATH = (
+    REPO / "src" / "protocols" / "generated" / "p300_smoke_test.py"
+)
 
 
 def _load_runner():
-    spec = importlib.util.spec_from_file_location("run_smoke_test", RUNNER_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "run_p300_smoke_test", RUNNER_PATH
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -33,19 +37,21 @@ def _protocol_constants() -> dict[str, object]:
     return values
 
 
-def test_protocol_is_api_215_p20_only_with_expected_deck() -> None:
+def test_protocol_is_api_215_p300_only_with_expected_deck() -> None:
     values = _protocol_constants()
     source = PROTOCOL_PATH.read_text(encoding="utf-8").lower()
 
     assert values["metadata"]["apiLevel"] == "2.15"
-    assert values["PIPETTE_NAME"] == "p20_single_gen2"
-    assert values["PIPETTE_MOUNT"] == "left"
-    assert values["TIPRACK_SLOT"] == "9"
+    assert values["PIPETTE_NAME"] == "p300_multi_gen2"
+    assert values["PIPETTE_MOUNT"] == "right"
+    assert values["TIPRACK_LOAD_NAME"] == "opentrons_96_tiprack_300ul"
+    assert values["TIPRACK_SLOT"] == "8"
     assert values["PLATE_SLOT"] == "4"
     assert values["PAPER_SLOT"] == "5"
-    assert values["DRY_AIR_VOLUME_UL"] == 5.0
+    assert values["DRY_AIR_VOLUME_UL"] == 30.0
     assert values["COMPARISON_DWELL_SECONDS"] == 5.0
-    assert "p300" not in source
+    assert "p20" not in source
+    assert "configure_nozzle_layout" not in source
 
 
 def test_default_invocation_only_simulates(monkeypatch) -> None:
@@ -60,7 +66,7 @@ def test_default_invocation_only_simulates(monkeypatch) -> None:
         return subprocess.CompletedProcess(
             command,
             0,
-            stdout="P20 dry-motion smoke test complete\n",
+            stdout="P300 dry-motion smoke test complete\n",
             stderr="",
         )
 
@@ -77,7 +83,12 @@ def test_execute_flag_is_required_for_http_path(monkeypatch) -> None:
     called: dict[str, object] = {}
 
     def fake_execute(robot_ip, protocol_path, labware_path, poll_seconds):
-        called["execute"] = (robot_ip, protocol_path, labware_path, poll_seconds)
+        called["execute"] = (
+            robot_ip,
+            protocol_path,
+            labware_path,
+            poll_seconds,
+        )
         return 0
 
     def fail_simulate(*args, **kwargs):
