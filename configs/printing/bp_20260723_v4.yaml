@@ -19,7 +19,9 @@ run_modes:
 
 deck:
   tuberack:    {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
-  paper:       {slot: 5, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  # Flat paper surface: the well bottom IS the paper plane (~6 mm above deck), so
+  # print.z_mm below is a true standoff above the paper, not a proxy well offset.
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
   tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
 
 pipette: {name: p20_single_gen2, mount: left}
@@ -31,7 +33,7 @@ print:
   volume_ul: 5.0             # <= 20 (P20 capacity)
   paper_column: 1            # which paper column to dab
   rows: [A, B, C, D]         # one spot per row; shorten for an even quicker check
-  z_mm: 1.0                  # tip height above the paper surface
+  z_mm: 1.5                  # true standoff ABOVE the paper surface (well bottom = paper plane)
   blow_out: true
   post_dispense_delay_s: 0.3
   tip: A1                    # single reused P20 tip (slot-9 rack)

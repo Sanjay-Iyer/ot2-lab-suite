@@ -11,7 +11,7 @@
 schema_version: "1.0"
 # Robot Hardware Metadata
 robot:
-  ip_address: "169.254.46.57"
+  ip_address: null
   local_data_path: "/home/sanjay/opentrons_home/OT-2_instrument/OT-2/data"
 
 

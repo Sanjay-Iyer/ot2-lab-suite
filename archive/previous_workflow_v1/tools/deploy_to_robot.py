@@ -109,7 +109,7 @@ def main():
     remote_path = "/var/lib/jupyter/notebooks/"
     
     # Resolve IP: CLI Arg > Config File > Default
-    robot_ip = args.robot_ip or robot_cfg.get("ip_address") or "169.254.46.57"
+    robot_ip = args.robot_ip or robot_cfg.get("ip_address") or os.environ.get("OT2_ROBOT_HOST", "")
     
     if args.execute:
         print(f"--- Automated Execution Mode ---")

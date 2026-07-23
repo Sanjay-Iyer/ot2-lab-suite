@@ -20,7 +20,7 @@ pipette:
   mount: right
   tip_rack_slot: 11
 robot:
-  ip_address: 169.254.46.57
+  ip_address: null
   local_data_path: /home/sanjay/opentrons_home/OT-2_instrument/OT-2/data
 schema_version: '2.0'
 test_parameters:

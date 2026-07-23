@@ -25,7 +25,7 @@ HISTORY_DIR.mkdir(exist_ok=True)
 st.sidebar.header("🔌 Robot Connection")
 
 # Try to get default IP from a config file if available
-default_ip = "169.254.46.57"
+default_ip = os.environ.get("OT2_ROBOT_HOST", "")
 robot_ip = st.sidebar.text_input("Robot IP Address", value=default_ip)
 
 # 2. File Selection & Summaries

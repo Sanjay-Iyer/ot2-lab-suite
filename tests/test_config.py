@@ -6,16 +6,16 @@ from unittest.mock import patch
 from src.core.config import Config
 
 class TestConfiguration:
-    @patch.dict(os.environ, {"ROBOT_IP": "10.0.0.5"}, clear=True)
-    def test_robot_ip_from_env(self):
-        """Test that ROBOT_IP is correctly loaded from environment."""
+    @patch.dict(os.environ, {"OT2_ROBOT_HOST": "robot.local"}, clear=True)
+    def test_robot_host_from_env(self):
+        """Test that the explicit robot-host override is loaded from environment."""
         # Reload or instantiate behavior check
         # Since Config is a class with class variables loaded at import,
         # we have to test the dynamic loading if it was dynamic, but since it's 
         # class-level, we can test os.getenv logic directly.
         # However, Config class variables are evaluated at import time.
         # So we manually trigger the evaluation or test the env var logic.
-        assert os.getenv("ROBOT_IP") == "10.0.0.5"
+        assert os.getenv("OT2_ROBOT_HOST") == "robot.local"
 
     @patch.dict(os.environ, {"GEMINI_MODEL": "gemini-test-model"}, clear=True)
     def test_gemini_model_override(self):
@@ -116,7 +116,7 @@ class TestConfiguration:
             "LLM_PROVIDER": "vertexai",
             "GOOGLE_CLOUD_PROJECT": "robot-project",
             "GOOGLE_CLOUD_LOCATION": "us-central1",
-            "ROBOT_IP": "169.254.46.57",
+            "OT2_ROBOT_HOST": "169.254.46.57",
         }
         with patch.dict(os.environ, env, clear=True), patch.object(Config, 'ROBOT_SSH_KEY_PATH', ''):
             result = check_robot_connection.invoke({})

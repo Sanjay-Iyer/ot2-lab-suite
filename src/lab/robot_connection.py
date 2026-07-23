@@ -27,6 +27,8 @@ import yaml
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = REPO / "configs" / "robot.yaml"
 HEADERS = {"opentrons-version": "*"}
+_HTTP_SESSION = requests.Session()
+_HTTP_SESSION.trust_env = False  # link-local robot traffic must never use a proxy
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _MAC_RE = re.compile(
     r"\b[0-9a-fA-F]{2}(?:[:-][0-9a-fA-F]{2}){5}\b"
@@ -91,7 +93,7 @@ def health(host: str | None = None, timeout: float = 2.0) -> dict:
     selected = host or resolve_host()
     url = f"{base_url(selected)}/health"
     try:
-        response = requests.get(
+        response = _HTTP_SESSION.get(
             url,
             headers=HEADERS,
             timeout=(timeout, timeout),
@@ -197,7 +199,11 @@ def _zeroconf_candidates(timeout: float) -> tuple[list[str], str]:
                 type_, name, timeout=max(100, int(timeout * 1000))
             )
             if info:
-                addresses.update(info.parsed_scoped_addresses())
+                for address in info.parsed_scoped_addresses():
+                    try:
+                        addresses.add(str(ipaddress.IPv4Address(address)))
+                    except ipaddress.AddressValueError:
+                        continue
 
         def update_service(self, zc: Any, type_: str, name: str) -> None:
             self.add_service(zc, type_, name)
@@ -232,7 +238,11 @@ def discover_robot(
     seen: set[str] = set()
 
     def try_candidate(candidate: str, method: str) -> dict | None:
-        if not candidate or candidate in seen:
+        if not candidate:
+            attempts.append(f"{method}: no candidate")
+            return None
+        if candidate in seen:
+            attempts.append(f"{method}: {candidate} -> already tried")
             return None
         seen.add(candidate)
         try:

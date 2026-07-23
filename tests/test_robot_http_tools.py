@@ -116,7 +116,7 @@ def test_vial_print_http_builds_expected_runner_command(monkeypatch, workspace_t
     assert out.startswith("Vial-print HTTP robot run SUCCESS")
     assert cmd[0] == sys.executable
     assert str(entry.runner_script) in cmd
-    assert "--robot-ip" in cmd and "169.254.46.57" in cmd
+    assert "--robot-host" in cmd and "169.254.46.57" in cmd
     assert "--protocol" in cmd and str(entry.protocol_path) in cmd
     assert "--live" in cmd
     assert "--skip-build" in cmd

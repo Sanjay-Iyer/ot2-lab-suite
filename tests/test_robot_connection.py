@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import socket
+import subprocess
 
 import pytest
 
@@ -220,16 +221,58 @@ def test_api_capability_mismatch_is_formatted_as_hard_error() -> None:
     assert "[HARD ERROR]" in output
 
 
+def test_check_mode_runs_all_nine_diagnostic_steps(monkeypatch) -> None:
+    monkeypatch.setattr(connection, "load_robot_config", lambda path: ROBOT)
+    monkeypatch.setattr(connection, "_ethernet_up", lambda: (True, "Connected"))
+    monkeypatch.setattr(
+        connection,
+        "_local_link_local_addresses",
+        lambda: (["169.254.10.20"], "fixture"),
+    )
+    monkeypatch.setattr(
+        connection,
+        "_resolved_ipv4",
+        lambda host: "169.254.252.252",
+    )
+    monkeypatch.setattr(connection, "_run_text", lambda *args, **kwargs: (0, "ok"))
+    monkeypatch.setattr(
+        connection,
+        "arp_entries",
+        lambda: ([("169.254.252.252", "b8:27:eb:e5:a1:75")], "fixture"),
+    )
+    monkeypatch.setattr(
+        connection,
+        "_tcp_open",
+        lambda host, port, timeout: (True, f"{host}:{port} open"),
+    )
+    monkeypatch.setattr(
+        connection,
+        "verify_host",
+        lambda host, timeout, config: ("169.254.252.252", HEALTH),
+    )
+
+    steps = connection.run_diagnostics()
+    assert len(steps) == 9
+    assert all(step.passed for step in steps)
+
+
 def test_no_hardcoded_link_local_addresses_outside_authorized_fixtures() -> None:
     root = Path(__file__).resolve().parent.parent
     allowed = {
         (root / "configs" / "robot.yaml").resolve(),
     }
     offenders: list[str] = []
-    for path in root.rglob("*"):
+    tracked = subprocess.run(
+        ["git", "ls-files"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for relative in tracked:
+        path = root / relative
         if (
             not path.is_file()
-            or ".git" in path.parts
             or "tests" in path.parts
             or "logs" in path.parts
             or path.resolve() in allowed

@@ -92,5 +92,5 @@
       "description": "Main tip rack for 8-channel pipette"
     }
   ],
-  "robot_ip": "169.254.46.57"
+  "robot_ip": null
 }
