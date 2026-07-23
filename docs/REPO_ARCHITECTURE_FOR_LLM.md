@@ -346,7 +346,7 @@ Current guarded SSH/SCP code uses:
 Conceptually, the manual low-API sequence is:
 
 ```powershell
-$IP = "169.254.46.57"
+$IP = python scripts\find_robot.py --quiet
 $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $REMOTE = "/var/lib/opentrons/user_storage/ot2_runs"
 $OPTS = @(

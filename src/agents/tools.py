@@ -17,6 +17,7 @@ from src.utils.paths import (
     ensure_project_dirs
 )
 from src.core.config import Config
+from src.lab.robot_connection import resolve_host
 from src.core.workflows.registry import WORKFLOWS
 from src.core.config_loader import (
     load_default_config, 
@@ -238,12 +239,15 @@ def get_robot_hardware_status() -> str:
     if auth_error:
         return auth_error
 
-    robot_ip = Config.ROBOT_IP
+    try:
+        robot_ip = resolve_host()
+    except RuntimeError as exc:
+        return f"Hardware check FAILED: {exc}"
     key_path = Config.ROBOT_SSH_KEY_PATH
     if not key_path:
         return "Error: ROBOT_SSH_KEY_PATH is missing. Cannot check hardware."
 
-    settings = OT2SSHSettings.from_config(Config)
+    settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
     
     # Common paths for instrument storage on OT-2
     paths = [
@@ -286,22 +290,23 @@ def get_robot_hardware_status() -> str:
 @tool
 def check_robot_connection() -> str:
     """
-    Verifies ROBOT_IP connectivity and SSH access (non-interactive BatchMode).
+    Verifies centralized robot-host connectivity and SSH access (BatchMode).
     Checks for 'opentrons_execute' availability on the instrument.
     """
     auth_error = Config.live_robot_llm_auth_error()
     if auth_error:
         return auth_error
 
-    robot_ip = Config.ROBOT_IP
-    if robot_ip in ["127.0.0.1", "localhost"]:
-        return f"Error: ROBOT_IP is set to {robot_ip}. Physical robot IP required in .env."
+    try:
+        robot_ip = resolve_host()
+    except RuntimeError as exc:
+        return f"Error: {exc}"
 
     key_path = Config.ROBOT_SSH_KEY_PATH
     if not key_path:
         return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
-    settings = OT2SSHSettings.from_config(Config)
+    settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
     
     try:
         # 1. Test SSH + path existence
@@ -348,6 +353,7 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
     local_staging_dir.mkdir(parents=True, exist_ok=True)
     
     try:
+        robot_ip = resolve_host()
         # 1. Stage files
         shutil.copy2(local_protocol_path, local_staging_dir)
         if config_paths:
@@ -361,7 +367,7 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
             "protocol": local_protocol_path.name,
             "protocol_hash": sha256,
             "timestamp": datetime.now().isoformat(),
-            "robot_ip": Config.ROBOT_IP
+            "robot_host": robot_ip
         }
         local_manifest_path = local_staging_dir / "manifest.json"
         with open(local_manifest_path, "w") as f:
@@ -369,7 +375,6 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
             
         # 3. SCP to robot
         from pathlib import PurePosixPath
-        robot_ip = Config.ROBOT_IP
         key_path = Config.ROBOT_SSH_KEY_PATH
         if not key_path:
             return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
@@ -379,7 +384,7 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
         remote_run_dir = remote_base_dir / run_id
         
         # Ensure remote base exists
-        settings = OT2SSHSettings.from_config(Config)
+        settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
         subprocess.run(
             settings.ssh_command(
                 f"mkdir -p {remote_base_dir}",
@@ -436,12 +441,15 @@ def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> 
     
     # 2. SSH Execution
     from pathlib import PurePosixPath
-    robot_ip = Config.ROBOT_IP
+    try:
+        robot_ip = resolve_host()
+    except RuntimeError as exc:
+        return f"Error: {exc}"
     key_path = Config.ROBOT_SSH_KEY_PATH
     if not key_path:
         return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
-    settings = OT2SSHSettings.from_config(Config)
+    settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
     
     # Ensure the remote_protocol_path is treated as a POSIX path
     remote_path_obj = PurePosixPath(remote_protocol_path)

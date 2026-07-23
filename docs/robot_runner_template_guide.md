@@ -84,10 +84,10 @@ You only customize **`main()`**: the protocol path, the runtime parameters, and 
 
 ```powershell
 # dry run first (no liquid):
-python scripts\run_<your_protocol>.py --robot-ip 169.254.46.57
+python scripts\run_<your_protocol>.py
 
 # real run:
-python scripts\run_<your_protocol>.py --robot-ip 169.254.46.57 --live --my-column 5
+python scripts\run_<your_protocol>.py --live --my-column 5
 ```
 
 ---
@@ -104,7 +104,7 @@ successful run, and use the **OT-2 key** — not the default `~/.ssh/id_rsa`:
 See `_pull_images()` in [`run_droplet_error_check.py`](../scripts/run_droplet_error_check.py)
 for the exact, working block. (Manual check the key works:
 `ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa -i
-C:\Users\<you>\.ssh\id_rsa_opentrons root@169.254.46.57`.)
+C:\Users\<you>\.ssh\id_rsa_opentrons root@OT2CEP20220929R02.local`.)
 
 ---
 

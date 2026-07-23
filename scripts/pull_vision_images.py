@@ -8,11 +8,11 @@ local folder so each pull is preserved (the robot overwrites same-named files ea
 Standalone — run it any time AFTER a robot run to grab that run's images.
 
   # default: pull the vial-print images
-  python scripts/pull_vision_images.py --robot-ip 169.254.46.57
+  python scripts/pull_vision_images.py
 
   # any other vision folder on the robot
-  python scripts/pull_vision_images.py --robot-ip 169.254.46.57 --remote-dir /data/vision/droplet_error_check
-  python scripts/pull_vision_images.py --robot-ip 169.254.46.57 --label run3
+  python scripts/pull_vision_images.py --remote-dir /data/vision/droplet_error_check
+  python scripts/pull_vision_images.py --label run3
 
 Uses the OT-2 key (--ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons),
 BatchMode (no password prompt), and `scp -O` (required by the OT-2's SSH server).
@@ -29,6 +29,11 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 from src.utils.ot2_ssh import OT2SSHSettings
 
@@ -49,7 +54,7 @@ def _resolve_ssh_key(cli_key: str | None) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Pull a robot vision/image folder to the laptop.")
-    ap.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
+    add_robot_host_arguments(ap)
     ap.add_argument("--remote-dir", default=DEFAULT_REMOTE_DIR,
                     help=f"Robot folder to pull. Default: {DEFAULT_REMOTE_DIR}")
     ap.add_argument("--dest", default=None,
@@ -59,10 +64,12 @@ def main() -> int:
     args = ap.parse_args()
     run_log = RobotRunLog(Path(__file__).name)
     print(f"Run log    : {run_log.path}")
+    robot_host = resolve_host(args.robot_host)
+    print(connection_summary(robot_host))
 
     key = _resolve_ssh_key(args.ssh_key)
     run_log.update(
-        robot_ip=args.robot_ip,
+        robot_ip=robot_host,
         remote_dir=args.remote_dir.rstrip("/"),
         ssh_key=key,
     )
@@ -81,7 +88,7 @@ def main() -> int:
 
     settings = OT2SSHSettings.from_config(
         Config,
-        robot_ip=args.robot_ip,
+        robot_ip=robot_host,
         identity_file=key,
     )
     cmd = settings.scp_command(

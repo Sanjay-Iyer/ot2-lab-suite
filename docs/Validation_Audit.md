@@ -61,5 +61,5 @@ python -m scripts.check_connectivity
 *   **AST-Level CI Hygiene:**
     *   `tests/test_dependency_hygiene.py` was introduced to scan the AST of the `src/agents/` directory, serving as an automated gatekeeper against regression into legacy `langchain` paradigms.
 *   **Configuration Drift Elimination:**
-    *   Hardcoded fallback parameters (e.g., `169.254.46.57` inside `dilution_planner`) were eliminated in favor of a centralized pipeline routing through `src.core.config.Config`.
+    *   Hardcoded robot-address fallbacks were eliminated in favor of `configs/robot.yaml` and `src.lab.robot_connection`.
     *   `.env.template` was fully remodeled to safely mock variables, define example paths, and encourage up-to-date models (`gemini-2.5-flash-lite`) without compromising application integrity.

@@ -44,13 +44,21 @@ import re
 import subprocess
 import sys
 import tempfile
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 import yaml
 
 REPO      = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    connection_summary,
+    refresh_robot_config,
+    resolve_host,
+)
+
 LABWARE   = REPO / "labware"
 
 # Target the generated (deployed) artifact; fall back to the base template. Each
@@ -180,14 +188,8 @@ def _protocol_api_level(source: str) -> tuple[int, int] | None:
     return None
 
 
-def _fetch_robot_max_api(robot_ip: str) -> tuple[int, int]:
-    url = f"http://{robot_ip}:31950/health"
-    request = urllib.request.Request(url, headers={"opentrons-version": "*"})
-    try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"could not fetch robot health from {url}: {exc}") from exc
+def _fetch_robot_max_api(robot_host: str) -> tuple[int, int]:
+    payload = refresh_robot_config(robot_host)
     raw = payload.get("maximum_protocol_api_version")
     if not (
         isinstance(raw, list)
@@ -622,10 +624,7 @@ def main() -> int:
         "--protocol-version", type=int, default=None, choices=sorted(_VERSION_FILES),
         help="Which generated protocol to validate. Default: the config's "
              "'protocol_version' key, else 1.")
-    ap.add_argument(
-        "--robot-ip", default=os.environ.get("ROBOT_IP"),
-        help="Robot IP used to fetch /health for v3 API compatibility validation.",
-    )
+    add_robot_host_arguments(ap)
     ap.add_argument(
         "--simulator-python",
         default=None,
@@ -683,14 +682,10 @@ def main() -> int:
             for problem in static_problems:
                 print(f"  - {problem}")
             return 1
-        if not args.robot_ip:
-            print(
-                "V3 ROBOT API VALIDATION FAILED: --robot-ip (or ROBOT_IP) is "
-                "required so maximum_protocol_api_version can be fetched from /health."
-            )
-            return 1
         try:
-            robot_max = _fetch_robot_max_api(args.robot_ip)
+            robot_host = resolve_host(args.robot_host)
+            print(connection_summary(robot_host))
+            robot_max = _fetch_robot_max_api(robot_host)
         except RuntimeError as exc:
             print(f"V3 ROBOT API VALIDATION FAILED: {exc}")
             return 1

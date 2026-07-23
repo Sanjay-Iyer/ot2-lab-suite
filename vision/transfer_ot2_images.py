@@ -27,6 +27,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.utils.ot2_ssh import OT2SSHSettings
+from src.lab.robot_connection import add_robot_host_arguments, connection_summary
 from vision.config import load_vision_config
 
 
@@ -53,7 +54,7 @@ def build_scp_command(
     Returns a list like::
 
         ["scp", "-O", "-i", key, "-r",
-         "root@169.254.46.57:/data/vision/*",
+         "root@OT2CEP20220929R02.local:/data/vision/*",
          "vision/raw"]
 
     .. important::
@@ -165,6 +166,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Transfer images from the Opentrons OT-2 to the local machine.",
     )
+    add_robot_host_arguments(parser)
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -185,7 +187,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    cfg = load_vision_config(validate_identity=not args.dry_run)
+    cfg = load_vision_config(
+        validate_identity=not args.dry_run,
+        robot_host=args.robot_host,
+    )
+    print(connection_summary(cfg["robot"]["host"]))
 
     # Resolve local dir for summary display
     if args.local_dir:

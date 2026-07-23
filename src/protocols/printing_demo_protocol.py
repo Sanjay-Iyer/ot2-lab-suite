@@ -36,6 +36,16 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    connection_summary,
+    resolve_host,
+)
+
 # ── Conditional imports (host has these; robot may not) ───────────────
 try:
     from pydantic import BaseModel, Field, field_validator, model_validator
@@ -1345,13 +1355,8 @@ def host_run(args: Any) -> None:
     image_manifest_data: List[Dict[str, Any]] = []
 
     # ── 7. Execute: mock or real robot ───────────────────────────────
-    try:
-        from src.core.config import Config as RobotConfig  # host-only project import
-        robot_ip = args.robot_ip or config_dict.get("robot_ip") or RobotConfig.ROBOT_IP
-    except ImportError:
-        robot_ip = args.robot_ip or config_dict.get("robot_ip")
-
-    is_mock = args.mock or (not robot_ip) or (robot_ip in ("127.0.0.1", "localhost"))
+    robot_ip = None if args.mock else resolve_host(args.robot_host)
+    is_mock = args.mock
     run_ok = True
     start_time = datetime.utcnow().isoformat() + "Z"
 
@@ -1381,6 +1386,7 @@ def host_run(args: Any) -> None:
                 })
     else:
         # ── Real robot run ─────────────────────────────────────────
+        logger.info(connection_summary(robot_ip))
         logger.info(f"Connecting to physical OT-2 robot: {robot_ip}")
 
         try:
@@ -1572,7 +1578,7 @@ def host_run(args: Any) -> None:
         "demo_name": config_dict["demo_mode"],
         "start_utc_timestamp": start_time,
         "end_utc_timestamp": end_time,
-        "robot_ip": config_dict.get("robot_ip") or (None if is_mock else robot_ip),
+        "robot_host": None if is_mock else robot_ip,
         "plate_map_ascii": ascii_map,
         "plate_map_roles": plate_map_dict,
         "config_parameters": config_dict,
@@ -1676,12 +1682,7 @@ if __name__ == "__main__":
         default=None,
         help="Override output runs directory.",
     )
-    parser.add_argument(
-        "--robot-ip",
-        type=str,
-        default=None,
-        help="IP address of the physical OT-2 robot.",
-    )
+    add_robot_host_arguments(parser)
     parser.add_argument(
         "--ssh-key",
         type=str,

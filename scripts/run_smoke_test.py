@@ -15,6 +15,17 @@ from typing import Any, Sequence
 
 import requests
 
+if __name__ == "__main__" and not __package__:
+    repo = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(repo))
+
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
+
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "smoke_test.py"
@@ -35,7 +46,7 @@ _SIMULATION_SUCCESS_TEXT = "P20 dry-motion smoke test complete"
 
 
 def _api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def _request_json(
@@ -186,7 +197,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Explicitly upload and run physical dry motion through the OT-2 HTTP API.",
     )
-    parser.add_argument("--robot-ip", default="169.254.46.57")
+    add_robot_host_arguments(parser)
     parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL))
     parser.add_argument("--labware", default=str(DEFAULT_LABWARE))
     parser.add_argument("--poll-seconds", type=float, default=2.0)
@@ -203,8 +214,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise FileNotFoundError(f"Custom labware definition not found: {labware_path}")
 
     if args.execute:
+        robot_host = resolve_host(args.robot_host)
+        print(connection_summary(robot_host))
         return execute_protocol(
-            args.robot_ip,
+            robot_host,
             protocol_path,
             labware_path,
             args.poll_seconds,

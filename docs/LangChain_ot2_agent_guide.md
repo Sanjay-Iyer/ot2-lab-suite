@@ -51,7 +51,7 @@ The agent has access to the following high-level capabilities:
 ### Environment Variables
 Ensure the following are set in your `.env`:
 * `GOOGLE_API_KEY`: Allowed for simulation-laptop Gemini testing. Live robot laptop agent runs use Vertex AI / gcloud ADC (`LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`).
-* `ROBOT_IP`: Set to `169.254.46.57` for wired USB connection.
+* `OT2_ROBOT_HOST`: Optional override; normally `configs/robot.yaml` and mDNS are used.
 
 ### Simulation Failures
 If the agent fails to recover from a simulation error, check the `robot_data/data/logs/` directory for the raw execution trace. This usually indicates a physical collision or labware misconfiguration that requires manual intervention.

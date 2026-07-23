@@ -39,7 +39,12 @@ import requests
 if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
 
 REPO = Path(__file__).resolve().parent.parent
 # >>> CUSTOMIZE <<< the protocol file this runner uploads.
@@ -51,7 +56,7 @@ TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 # ── HTTP API helpers (copy verbatim — these rarely change) ────────────────────────
 
 def _api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def _request(method: str, robot_ip: str, path: str, **kwargs: Any) -> dict[str, Any]:
@@ -124,7 +129,7 @@ def _monitor(robot_ip: str, run_id: str, poll_s: float) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Upload + run a protocol via the OT-2 HTTP API.")
-    ap.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
+    add_robot_host_arguments(ap)
     ap.add_argument("--protocol", default=str(DEFAULT_PROTOCOL), help="Protocol file to upload.")
     ap.add_argument("--live", action="store_true", help="Run liquid motion. Default is a dry run.")
     ap.add_argument("--no-start", action="store_true", help="Upload + create the run, but do not play.")
@@ -133,7 +138,7 @@ def main() -> int:
     # ap.add_argument("--my-column", type=int, help="...")
     args = ap.parse_args()
 
-    robot_ip = args.robot_ip
+    robot_ip = resolve_host(args.robot_host)
     os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
     protocol_path = Path(args.protocol).resolve()
@@ -147,7 +152,7 @@ def main() -> int:
     # if args.my_column is not None: rtp["my_column"] = args.my_column
 
     print("\n=== Robot Runner (HTTP API) ===")
-    print(f"Robot    : {robot_ip}")
+    print(connection_summary(robot_ip))
     print(f"Protocol : {protocol_path}")
     print(f"Mode     : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
     # >>> CUSTOMIZE <<< print the required deck layout here.

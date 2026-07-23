@@ -29,7 +29,7 @@ agent testing and must not be used for live OT-2 agent interactions.
 
 | Variable | Meaning | Typical value |
 |----------|---------|---------------|
-| `ROBOT_IP` | OT-2 link-local IP | `169.254.46.57` |
+| `OT2_ROBOT_HOST` | Optional robot host override | `OT2CEP20220929R02.local` |
 | `ROBOT_SSH_USER` | SSH user (always root on OT-2) | `root` |
 | `ROBOT_SSH_KEY_PATH` | Path to the private key | `C:\Users\<you>\.ssh\id_rsa_opentrons` |
 | `ROBOT_SSH_IDENTITIES_ONLY` | Use only the configured key | `true` |
@@ -45,7 +45,7 @@ Resolved in [`src/core/config.py`](../../src/core/config.py) as
 > the operator uses; it connects with **no password prompt**:
 > ```powershell
 > ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
->   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@169.254.46.57
+>   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@OT2CEP20220929R02.local
 > ```
 > Always use `id_rsa_opentrons` (NOT the default `~/.ssh/id_rsa`, which the robot
 > rejects with `Permission denied (publickey)` and triggers a passphrase prompt). All
@@ -74,10 +74,10 @@ Quick manual checks:
 
 ```powershell
 # Is the robot reachable?
-ping 169.254.46.57
+python scripts\find_robot.py --check
 
 # Does passwordless SSH work? (BatchMode = no interactive prompts)
-python scripts\check_ot2_ssh.py --robot-ip 169.254.46.57 `
+python scripts\check_ot2_ssh.py `
   --identity-file "$env:ROBOT_SSH_KEY_PATH" --legacy-rsa
 ```
 
@@ -125,7 +125,7 @@ All commands use **non-interactive BatchMode** SSH with the key. Remote paths ar
 
 ```powershell
 # Set once for the session (PowerShell)
-$IP  = "169.254.46.57"
+$IP  = python scripts\find_robot.py --quiet
 $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $REMOTE = "/var/lib/opentrons/user_storage/ot2_runs"
 $OPTS = @(

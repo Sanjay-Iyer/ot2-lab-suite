@@ -12,6 +12,11 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.ot2_ssh import (
     LEGACY_RSA_OPTION,
     MissingIdentityFileError,
@@ -56,7 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Test OT-2 SSH authentication without robot motion or remote file changes."
     )
-    parser.add_argument("--robot-ip", default=Config.ROBOT_IP, help="OT-2 IP address.")
+    add_robot_host_arguments(parser)
     parser.add_argument("--user", default=Config.ROBOT_SSH_USER, help="OT-2 SSH user.")
     parser.add_argument(
         "--identity-file",
@@ -83,9 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    robot_host = resolve_host(args.robot_host)
+    print(connection_summary(robot_host))
     settings = OT2SSHSettings.from_config(
         Config,
-        robot_ip=args.robot_ip,
+        robot_ip=robot_host,
         user=args.user,
         identity_file=args.identity_file,
     ).with_overrides(legacy_rsa=args.legacy_rsa)

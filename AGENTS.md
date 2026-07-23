@@ -19,11 +19,12 @@ Before running OT-2 commands, identify the laptop role.
 - On the real robot laptop, set `LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION` in `.env`.
 - Live OT-2 runs are allowed only on the real robot laptop.
 - Before any live run, require explicit user confirmation that the robot is physically ready and that the command should run live.
-- The OT-2 robot IP for live runs is `169.254.46.57`.
+- Resolve the OT-2 through `configs/robot.yaml`; run
+  `python scripts/find_robot.py --check` when discovery fails.
 - For the vial dilution print workflow, the real-laptop live command is:
 
 ```powershell
-python scripts\run_vial_print_robot.py --robot-ip 169.254.46.57 --live --skip-build --skip-validate
+python scripts\run_vial_print_robot.py --live --skip-build --skip-validate
 ```
 
 - Only use `--skip-build --skip-validate` when `src/protocols/generated/vial_dilution_print_latest.py` has already been rebuilt, reviewed, committed, pushed, and pulled onto the real robot laptop.

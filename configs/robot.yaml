@@ -1,0 +1,21 @@
+# Human-maintained robot identity and connection defaults.
+# scripts/find_robot.py only rewrites the discovered and capabilities blocks.
+robot:
+  name: OT2CEP20220929R02
+  serial: OT2CEP20220929R02
+  mdns_host: OT2CEP20220929R02.local
+  http_port: 31950
+  ssh_port: 22
+  mac_oui_allowlist:
+    - "b8:27:eb"
+
+discovered:
+  ip: 169.254.252.252
+  method: mdns
+  discovered_at: "2026-07-23T15:12:04-04:00"
+
+capabilities:
+  robot_software: "7.0.2"
+  system_version: "v1.15.1"
+  max_protocol_api_version: "2.15"
+  min_protocol_api_version: "2.0"

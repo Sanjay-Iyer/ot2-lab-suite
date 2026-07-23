@@ -188,7 +188,7 @@ All runtime configuration lives in `.env` at the project root (lab laptop only):
 
 ```bash
 # Robot
-ROBOT_IP=169.254.46.57          # OT-2 link-local IP
+OT2_ROBOT_HOST=OT2CEP20220929R02.local  # optional CLI/environment override
 ROBOT_SSH_USER=root             # SSH user (always root on OT-2)
 ROBOT_SSH_KEY_PATH=/path/to/ot2_ssh_key   # Private key for passwordless SSH
 ROBOT_SSH_IDENTITIES_ONLY=true  # Use only the configured key

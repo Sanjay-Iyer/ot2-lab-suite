@@ -98,8 +98,13 @@ class OT2SSHSettings:
         identity_file: str | Path | None = None,
     ) -> "OT2SSHSettings":
         """Build settings from ``src.core.config.Config``-style attributes."""
+        resolved_host = str(robot_ip or "").strip()
+        if not resolved_host:
+            from src.lab.robot_connection import resolve_host
+
+            resolved_host = resolve_host()
         return cls(
-            robot_ip=str(robot_ip or getattr(config, "ROBOT_IP", "")).strip(),
+            robot_ip=resolved_host,
             user=str(user or getattr(config, "ROBOT_SSH_USER", "root") or "root").strip(),
             identity_file=(
                 identity_file
@@ -257,4 +262,3 @@ class OT2SSHSettings:
         )
         command.extend([*source_args, str(destination)])
         return command
-

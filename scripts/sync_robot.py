@@ -9,20 +9,26 @@ if __name__ == "__main__" and not __package__:
     sys.exit(1)
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.ot2_ssh import MissingIdentityFileError, OT2SSHSettings
 
-def sync_from_robot():
-    robot_ip = Config.ROBOT_IP
+def sync_from_robot(robot_host=None):
+    robot_ip = resolve_host(robot_host)
     local_dest = Config.ROBOT_DATA
     robot_src = "/var/lib/opentrons" # Base dir for configs and logs
     
-    print(f"--- Syncing FROM OT-2 ({robot_ip}) ---")
+    print(connection_summary(robot_ip))
+    print("--- Syncing FROM OT-2 ---")
     print(f"Destination: {local_dest}")
     
     # Run scp command to pull data
     # We pull config and logs
     targets = ["config.json", "labware", "pipettes", "logs"]
-    settings = OT2SSHSettings.from_config(Config)
+    settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
     
     for target in targets:
         print(f"Syncing {target}...")
@@ -43,4 +49,9 @@ def sync_from_robot():
     print("Sync complete.")
 
 if __name__ == "__main__":
-    sync_from_robot()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Sync config and logs from the OT-2.")
+    add_robot_host_arguments(parser)
+    args = parser.parse_args()
+    sync_from_robot(args.robot_host)

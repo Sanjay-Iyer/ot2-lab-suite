@@ -26,6 +26,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.utils.ot2_ssh import OT2SSHSettings
+from src.lab.robot_connection import add_robot_host_arguments, connection_summary
 from vision.config import load_vision_config
 
 
@@ -86,7 +87,7 @@ def build_ssh_command(
     Returns a list like::
 
         ["ssh", "-o", "BatchMode=yes", ..., "-i", key,
-         "root@169.254.46.57", "<remote_command>"]
+         "root@OT2CEP20220929R02.local", "<remote_command>"]
     """
     return OT2SSHSettings.from_mapping(cfg["robot"]).ssh_command(
         remote_command,
@@ -174,6 +175,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Capture images on the Opentrons OT-2 robot.",
     )
+    add_robot_host_arguments(parser)
     parser.add_argument(
         "--count",
         type=int,
@@ -194,7 +196,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    cfg = load_vision_config(validate_identity=not args.dry_run)
+    cfg = load_vision_config(
+        validate_identity=not args.dry_run,
+        robot_host=args.robot_host,
+    )
+    print(connection_summary(cfg["robot"]["host"]))
     count = args.count if args.count is not None else cfg["capture"]["default_count"]
     delay = args.delay if args.delay is not None else cfg["capture"]["default_delay_seconds"]
 

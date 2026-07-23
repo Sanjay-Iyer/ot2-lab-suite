@@ -38,7 +38,7 @@ All connection and workflow settings are in one file — nothing is hardcoded in
 
 ```yaml
 robot:
-  ip: 169.254.46.57          # Your OT-2's USB/Ethernet IP
+  host: OT2CEP20220929R02.local  # Stable robot mDNS name
   user: root                  # OT-2 SSH user (always root)
   host_env_var: ROBOT_IP
   ssh_user_env_var: ROBOT_SSH_USER

@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 from src.core.config import Config
+from src.lab.robot_connection import connection_summary, resolve_host
 from src.utils.ot2_ssh import OT2SSHSettings
 
 def mask_secret(secret: str) -> str:
@@ -37,11 +38,16 @@ def main():
     no_proxy = os.getenv('NO_PROXY', '(not set)')
     print(f"NO_PROXY: {no_proxy}")
     
-    robot_ip = Config.ROBOT_IP
+    try:
+        robot_ip = resolve_host()
+        print(connection_summary(robot_ip))
+    except RuntimeError as exc:
+        robot_ip = ""
+        print(f"ROBOT HOST DISCOVERY FAILED: {exc}")
     if robot_ip and robot_ip not in no_proxy.split(','):
-        print("WARNING: ROBOT_IP is not in NO_PROXY. Local robot traffic might be routed to a proxy and fail.")
+        print("WARNING: Robot host is not in NO_PROXY. Local robot traffic might be routed to a proxy and fail.")
     
-    print(f"ROBOT_IP: {Config.ROBOT_IP}")
+    print(f"ROBOT_HOST: {robot_ip or '(unresolved)'}")
     print(f"ROBOT_SSH_USER: {Config.ROBOT_SSH_USER}")
     print(f"ROBOT_SSH_IDENTITIES_ONLY: {Config.ROBOT_SSH_IDENTITIES_ONLY}")
     print(f"ROBOT_SSH_LEGACY_RSA: {Config.ROBOT_SSH_LEGACY_RSA}")
@@ -107,9 +113,8 @@ def main():
 
     # --- SECTION 4: OT-2 IP/Socket Reachability ---
     print("\n--- 4. OT-2 IP/Socket Reachability ---")
-    robot_ip = Config.ROBOT_IP
     if robot_ip in ["127.0.0.1", "localhost", ""]:
-        print("FAIL: Physical robot IP not configured properly.")
+        print("FAIL: Physical robot host could not be resolved.")
     else:
         try:
             # Try connecting to SSH port to see if host is reachable
@@ -131,7 +136,7 @@ def main():
     elif not Path(key_path_val).exists():
         print(f"FAIL: Configured SSH key path does not exist.")
     else:
-        settings = OT2SSHSettings.from_config(Config)
+        settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
         cmd = settings.ssh_command(
             "echo 'SSH Connection Successful'",
             connect_timeout=30,
@@ -147,7 +152,7 @@ def main():
                 print("\nTroubleshooting Commands:")
                 legacy = " --legacy-rsa" if settings.legacy_rsa else " --no-legacy-rsa"
                 print(
-                    f"  python scripts/check_ot2_ssh.py --robot-ip {robot_ip} "
+                    f"  python scripts/check_ot2_ssh.py --robot-host {robot_ip} "
                     f"--identity-file \"{key_path_val}\"{legacy}"
                 )
         except Exception as e:

@@ -12,7 +12,7 @@ not change the user's global OpenSSH configuration.
 Set these machine-local values in `.env` on the real robot laptop:
 
 ```env
-ROBOT_IP=169.254.46.57
+OT2_ROBOT_HOST=OT2CEP20220929R02.local
 ROBOT_SSH_USER=root
 ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
 ROBOT_SSH_IDENTITIES_ONLY=true
@@ -35,7 +35,7 @@ does not modify robot files:
 
 ```powershell
 python scripts\check_ot2_ssh.py `
-  --robot-ip 169.254.46.57 `
+  --robot-host OT2CEP20220929R02.local `
   --identity-file "$env:USERPROFILE\.ssh\id_rsa_opentrons" `
   --legacy-rsa
 ```
@@ -51,7 +51,7 @@ ssh `
   -o IdentitiesOnly=yes `
   -o PubkeyAcceptedAlgorithms=+ssh-rsa `
   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" `
-  root@169.254.46.57
+  root@OT2CEP20220929R02.local
 ```
 
 For non-interactive commands, also add `-o BatchMode=yes`. For SCP, use the
@@ -65,7 +65,7 @@ an operator may choose this narrowly scoped user configuration:
 
 ```text
 Host ot2
-    HostName 169.254.46.57
+    HostName OT2CEP20220929R02.local
     User root
     IdentityFile ~/.ssh/id_rsa_opentrons
     IdentitiesOnly yes
@@ -91,14 +91,14 @@ is harmless. First verify the connected robot identity and serial number:
 ```powershell
 curl.exe `
   -H "opentrons-version: *" `
-  http://169.254.46.57:31950/health
+  http://OT2CEP20220929R02.local:31950/health
 ```
 
 After independently confirming the expected robot, remove only its stale host
 entry:
 
 ```powershell
-ssh-keygen -R 169.254.46.57 `
+ssh-keygen -R OT2CEP20220929R02.local `
   -f "$env:USERPROFILE\.ssh\known_hosts"
 ```
 

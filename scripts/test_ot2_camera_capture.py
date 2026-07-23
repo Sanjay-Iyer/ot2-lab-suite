@@ -24,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from vision.config import load_vision_config
 from PIL import Image
+from src.lab.robot_connection import add_robot_host_arguments, connection_summary
 from src.utils.ot2_ssh import OT2SSHSettings
 
 def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
@@ -33,7 +34,7 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
 
     # 1. Load vision configuration
     try:
-        cfg = load_vision_config()
+        cfg = load_vision_config(robot_host=robot_ip)
         print("[OK] Vision configuration loaded successfully.")
     except Exception as e:
         if mock:
@@ -55,6 +56,8 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
             return 1
 
     ip = robot_ip if robot_ip else cfg["robot"]["host"]
+    if not mock:
+        print(connection_summary(ip))
     user = cfg["robot"]["username"]
     key = Path(cfg["robot"]["ssh_key_path"]) if not mock else Path(cfg["robot"]["ssh_key_path"])
     remote_dir = cfg["remote"]["vision_dir"]
@@ -167,7 +170,7 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test OT-2 camera capture and transfer diagnostics.")
     parser.add_argument("--mock", action="store_true", help="Run a mock capture test locally.")
-    parser.add_argument("--robot-ip", type=str, default=None, help="IP of physical robot to override config.")
+    add_robot_host_arguments(parser)
     args = parser.parse_args()
 
-    sys.exit(run_diagnostics(mock=args.mock, robot_ip=args.robot_ip))
+    sys.exit(run_diagnostics(mock=args.mock, robot_ip=args.robot_host))

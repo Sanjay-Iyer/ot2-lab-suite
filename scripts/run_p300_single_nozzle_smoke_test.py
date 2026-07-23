@@ -17,6 +17,16 @@ import requests
 
 
 REPO = Path(__file__).resolve().parent.parent
+if __name__ == "__main__" and not __package__:
+    sys.path.insert(0, str(REPO))
+
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
+
 DEFAULT_PROTOCOL = (
     REPO
     / "src"
@@ -45,7 +55,7 @@ _SIMULATION_SUCCESS_TEXT = "P300 single-nozzle dry-motion smoke test complete"
 
 
 def _api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def _request_json(
@@ -222,7 +232,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Explicitly upload and run physical motion through HTTP.",
     )
-    parser.add_argument("--robot-ip", default="169.254.46.57")
+    add_robot_host_arguments(parser)
     parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL))
     parser.add_argument(
         "--labware",
@@ -250,8 +260,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
 
     if args.execute:
+        robot_host = resolve_host(args.robot_host)
+        print(connection_summary(robot_host))
         return execute_protocol(
-            args.robot_ip,
+            robot_host,
             protocol_path,
             labware_paths,
             args.poll_seconds,

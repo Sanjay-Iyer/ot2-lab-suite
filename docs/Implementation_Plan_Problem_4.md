@@ -4,14 +4,14 @@
 - **Current Versions:** `langgraph (1.1.10)`, `langgraph-prebuilt (1.0.13)`, `langchain (1.2.18)`, `langchain-google-genai (4.2.2)`.
 - **Deprecations/Imports:** The codebase currently uses `from langgraph.prebuilt import create_react_agent`. Based on the installed `langgraph` v1.1.10, this is the **correct, modern, and supported** method for creating tool-calling agents. I will *not* downgrade this to `langchain.agents.create_agent` per the guardrail, as that would be a regression.
 - **Hardcoded Configuration Drift:** 
-  - `src/printing/tools/config.py` contains a hardcoded fallback: `robot_ip: str = "169.254.46.57"`.
+  - `src/printing/tools/config.py` contained a hardcoded link-local fallback.
   - `src/core/config.py` defaults to `gemini-1.5-flash` instead of the newer `gemini-2.5-flash-lite`.
 
 ## 2. Proposed Changes
 
 ### Configuration Hardening
 #### [MODIFY] `src/printing/tools/config.py`
-- Remove the hardcoded `169.254.46.57` IP string. 
+- Remove the hardcoded robot IP string.
 - Refactor to pull from `os.getenv("ROBOT_IP")` or delegate entirely to `src.core.config.Config.ROBOT_IP` to centralize the network definition.
 
 #### [MODIFY] `src/core/config.py`

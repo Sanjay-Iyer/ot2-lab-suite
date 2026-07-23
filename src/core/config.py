@@ -15,7 +15,7 @@ if os.getenv("HTTPS_PROXY"):
     os.environ["HTTPS_PROXY"] = os.getenv("HTTPS_PROXY")
 
 _no_proxy_default = "localhost,127.0.0.1"
-_configured_robot_ip = os.getenv("ROBOT_IP", "127.0.0.1")
+_configured_robot_ip = os.getenv("OT2_ROBOT_HOST", "")
 _no_proxy_combined = os.getenv("NO_PROXY", f"{_no_proxy_default},{_configured_robot_ip}")
 if _no_proxy_combined:
     os.environ["NO_PROXY"] = _no_proxy_combined
@@ -28,7 +28,9 @@ class Config:
     REMOTE_USER_STORAGE = os.getenv("ROBOT_REMOTE_RUN_DIR", "/var/lib/opentrons/user_storage/ot2_runs")
     
     # ─── Robot Connection ─────────────
-    ROBOT_IP = os.getenv("ROBOT_IP", "127.0.0.1")
+    # Deprecated compatibility attribute. Robot-facing code must call
+    # src.lab.robot_connection.resolve_host(), whose source of truth is robot.yaml.
+    ROBOT_IP = os.getenv("OT2_ROBOT_HOST", "")
     ROBOT_SSH_USER = os.getenv("ROBOT_SSH_USER", "root")
     ROBOT_SSH_KEY_PATH = os.getenv("ROBOT_SSH_KEY_PATH", "")
     ROBOT_SSH_IDENTITIES_ONLY = parse_bool(

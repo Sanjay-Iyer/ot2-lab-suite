@@ -6,14 +6,14 @@ Uses the robot HTTP API (not opentrons_execute), which is required for this
 apiLevel 2.28 protocol. By default it creates a DRY RUN. Pass --live to run the
 real liquid-handling waste removal.
 
-  python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57            # dry run
-  python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57 --live     # real run
-  python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57 --live --skip-build
+  python scripts/run_plate_waste_disposal.py                   # dry run
+  python scripts/run_plate_waste_disposal.py --live            # real run
+  python scripts/run_plate_waste_disposal.py --live --skip-build
 
 Select which plate columns to empty and which rack vial collects the waste
 (otherwise the protocol's config defaults apply):
 
-  python scripts/run_plate_waste_disposal.py --robot-ip 169.254.46.57 --live \
+  python scripts/run_plate_waste_disposal.py --live \
       --source-columns 9,11 --waste-vial A4
 """
 from __future__ import annotations
@@ -34,6 +34,12 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(repo))
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 
@@ -44,7 +50,7 @@ TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 
 
 def _api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def _request(method: str, robot_ip: str, path: str, **kwargs: Any) -> dict[str, Any]:
@@ -137,7 +143,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Upload and run the plate -> waste vial disposal protocol via the OT-2 HTTP API."
     )
-    parser.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
+    add_robot_host_arguments(parser)
     parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL), help="Generated protocol file to upload.")
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
@@ -154,8 +160,9 @@ def main() -> int:
     print(f"Run log   : {run_log.path}")
 
     try:
-        robot_ip = args.robot_ip
+        robot_ip = resolve_host(args.robot_host)
         os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+        print(connection_summary(robot_ip))
 
         protocol_path = Path(args.protocol).resolve()
         if not args.skip_build:

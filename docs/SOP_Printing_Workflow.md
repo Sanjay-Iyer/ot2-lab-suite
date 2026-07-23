@@ -13,8 +13,8 @@ This document provides the standard operating procedure for running the **Nanopa
 
 ### Robot Connectivity
 - Connect the OT-2 via Ethernet.
-- Ensure the `.env` file contains the correct `ROBOT_IP=169.254.46.57`.
-- Verify you can ping the robot: `ping 169.254.46.57`.
+- Ensure `configs/robot.yaml` contains the correct robot identity.
+- Verify discovery: `python scripts/find_robot.py --check`.
 
 ---
 

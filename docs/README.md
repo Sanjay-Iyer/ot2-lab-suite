@@ -37,7 +37,7 @@ All system parameters are managed in **`src/core/config.py`**.
 To connect to your robot, create a `.env` file in the project root:
 
 ```bash
-ROBOT_IP=169.254.46.57
+OT2_ROBOT_HOST=OT2CEP20220929R02.local
 ROBOT_SSH_USER=root
 ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
 ROBOT_SSH_IDENTITIES_ONLY=true

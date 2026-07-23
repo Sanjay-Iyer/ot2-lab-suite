@@ -1,7 +1,7 @@
 # SOP — AI Agent on Lab Laptop (Live OT-2)
 
 > **This SOP is for the lab laptop only.** The lab laptop has:
-> - The real OT-2 connected via USB/Ethernet (IP `169.254.46.57`)
+> - The real OT-2 connected via USB/Ethernet and identified by `configs/robot.yaml`
 > - A live `.env` with Vertex AI / gcloud ADC auth, plus `ROBOT_IP` and `ROBOT_SSH_KEY_PATH`
 > - The SSH private key that authenticates to the robot
 >
@@ -15,12 +15,12 @@
 - [ ] `.env` file is present in project root with real credentials
 - [ ] SSH key path in `.env` matches actual key location on this machine
 - [ ] OT-2 is powered on and network-connected to this laptop
-- [ ] You can ping `169.254.46.57` from terminal
+- [ ] `python scripts/find_robot.py --check` passes
 
 Verify with:
 ```bash
-ping 169.254.46.57
-python scripts/check_ot2_ssh.py --robot-ip 169.254.46.57 --identity-file <key_path> --legacy-rsa
+python scripts/find_robot.py --check
+python scripts/check_ot2_ssh.py --identity-file <key_path> --legacy-rsa
 ```
 
 ---
@@ -149,7 +149,7 @@ Type natural language. The agent handles all tool calls internally.
 [AGENT]: PRE-RUN SUMMARY
   Protocol: generated_dilution.py
   SHA256: abc12345...
-  Robot IP: 169.254.46.57
+  Robot host: OT2CEP20220929R02.local
   Deck: Slot 1 = opentrons_96_tiprack_300ul, Slot 2 = corning_96_wellplate_360ul_flat
   Pipette: p300_single_gen2 on LEFT (matches config)
   Estimated transfers: 16
@@ -230,9 +230,9 @@ Type natural language. The agent handles all tool calls internally.
 
 ## Troubleshooting
 
-### "SSH unreachable at 169.254.46.57"
+### "SSH unreachable at the discovered robot host"
 - Verify the OT-2 is on and the USB/Ethernet cable is connected
-- Run: `ping 169.254.46.57`
+- Run: `python scripts/find_robot.py --check`
 - Check `ROBOT_SSH_KEY_PATH` in `.env` points to the actual key file
 - Set `ROBOT_SSH_IDENTITIES_ONLY=true` and `ROBOT_SSH_LEGACY_RSA=true` for the older OT-2 server
 - Run `python scripts/check_ot2_ssh.py --legacy-rsa` for a motion-free authentication diagnosis

@@ -35,7 +35,7 @@ The OT-2 authenticates over SSH using a private key (not a password). You need t
 > with **no password prompt** is:
 > ```powershell
 > ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
->   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@169.254.46.57
+>   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@OT2CEP20220929R02.local
 > ```
 > Set `.env` → `ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons`. Do **not** rely on
 > the default `~/.ssh/id_rsa` — the robot rejects it (`Permission denied (publickey)`) and it
@@ -83,7 +83,7 @@ $Body = @{ key = $PublicKey } | ConvertTo-Json -Compress
 
 $Response = Invoke-RestMethod `
   -Method Post `
-  -Uri "http://169.254.46.57:31950/server/ssh_keys" `
+  -Uri "http://OT2CEP20220929R02.local:31950/server/ssh_keys" `
   -Headers @{ "opentrons-version" = "*" } `
   -ContentType "application/json" `
   -Body $Body
@@ -104,7 +104,7 @@ upload the private-key file.
 Open `.env` in the project root and ensure these lines are set:
 ```env
 # OT-2 Robot
-ROBOT_IP=169.254.46.57
+OT2_ROBOT_HOST=OT2CEP20220929R02.local
 ROBOT_SSH_USER=root
 ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
 ROBOT_SSH_IDENTITIES_ONLY=true
@@ -148,10 +148,10 @@ $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $OPTS = @("-o", "IdentitiesOnly=yes", "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa", "-i", $KEY)
 
 # Create a run folder on the robot
-ssh @OPTS root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/my_run"
+ssh @OPTS root@OT2CEP20220929R02.local "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/my_run"
 
 # Copy the generated protocol to the robot
-scp -O @OPTS src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/my_run/
+scp -O @OPTS src\protocols\generated\generated_printing.py root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/my_run/
 ```
 
 ### 5b. Deploy Custom Labware (only if your protocol uses it)
@@ -175,7 +175,7 @@ do **not** manage this path.)
 
 ### 5c. Execute the Protocol
 ```powershell
-ssh @OPTS root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/my_run/generated_printing.py"
+ssh @OPTS root@OT2CEP20220929R02.local "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/my_run/generated_printing.py"
 ```
 
 > ⚠️ **The robot will start moving immediately.** Make sure the deck is loaded correctly and you are watching the instrument.

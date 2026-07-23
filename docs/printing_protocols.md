@@ -63,14 +63,14 @@ scp -O `
     -o PubkeyAcceptedAlgorithms=+ssh-rsa `
     -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" `
     .\src\protocols\generated\protocol_96.py `
-    root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/protocol_96.py
+    root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/protocol_96.py
 ```
 
 ### Robot-side verification
 
 ```powershell
 ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
-  -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@169.254.46.57 `
+  -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@OT2CEP20220929R02.local `
   "grep -n 'opentrons_96_wellplate\|custom_beta\|usascientific\|load_labware\|dry_position_check\|bottom' `
    /var/lib/opentrons/user_storage/ot2_runs/protocol_96.py"
 ```

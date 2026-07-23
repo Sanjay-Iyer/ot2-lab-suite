@@ -75,7 +75,7 @@ Before running Phase 3 or 4, confirm **every item** on this list:
 - [ ] **Phase 2 passed** — AI agent reported `SIMULATION PASSED`
 - [ ] **OT-2 is powered on** and the status light is solid blue
 - [ ] **Ethernet cable** is connected between your laptop and the OT-2
-- [ ] **Robot IP is set** in `.env`: `ROBOT_IP=169.254.46.57`
+- [ ] **Robot discovery passes**: `python scripts/find_robot.py --check`
 - [ ] **SSH private key exists** on disk at the path you configured
 - [ ] **SSH key path is set** in `.env`: `ROBOT_SSH_KEY_PATH=<path to your private key>`
 - [ ] **Connectivity check passes** — run this and confirm SSH is reachable:
@@ -93,7 +93,7 @@ If you generated a protocol and want to manually send it to the physical OT-2 an
 
 **Ensure your Robot config is set in `.env`:**
 ```env
-ROBOT_IP=169.254.46.57
+OT2_ROBOT_HOST=OT2CEP20220929R02.local
 ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
 ROBOT_SSH_IDENTITIES_ONLY=true
 ROBOT_SSH_LEGACY_RSA=true
@@ -110,15 +110,15 @@ $OPTS = @("-o", "IdentitiesOnly=yes", "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
 *(Replace `run_123` with a unique folder name, and `generated_printing.py` with your actual file).*
 ```powershell
 # Create a folder on the robot
-ssh @OPTS root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
+ssh @OPTS root@OT2CEP20220929R02.local "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
 
 # Copy the file to the robot (-O forces legacy SCP protocol; the OT-2 lacks sftp-server)
-scp -O @OPTS src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
+scp -O @OPTS src\protocols\generated\generated_printing.py root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/run_123/
 ```
 
 **Step C: Execute via SSH**
 ```powershell
-ssh @OPTS root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/run_123/generated_printing.py"
+ssh @OPTS root@OT2CEP20220929R02.local "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/run_123/generated_printing.py"
 ```
 
 ---

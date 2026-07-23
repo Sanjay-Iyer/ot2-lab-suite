@@ -110,7 +110,7 @@ Verified-good layout for the vial-dilution-print demo: vial rack **slot 7**, pla
 
 - **`ROBOT_IP` defaults to `127.0.0.1`** if absent from `.env` — every SSH/deploy
   then silently targets localhost and "fails to connect." Set the real link-local
-  IP explicitly: `ROBOT_IP=169.254.46.57` (it can change when the robot reconnects;
+  Host override explicitly: `OT2_ROBOT_HOST=OT2CEP20220929R02.local` (the link-local IP can change when the robot reconnects;
   re-check in the App → Network or `ping`).
 - SSH: user `root`, key `C:\Users\<you>\.ssh\id_rsa_opentrons`,
   `IdentitiesOnly=yes`, **BatchMode**, and

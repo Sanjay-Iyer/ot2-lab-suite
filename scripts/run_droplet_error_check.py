@@ -9,10 +9,10 @@ which is the reliable transport for engine-era protocols (the robot server suppl
 deck configuration, so no AreaNotInDeckConfigurationError). The only addition is a final
 SCP step to pull this run's before/after images back to the laptop.
 
-  python scripts/run_droplet_error_check.py --robot-ip 169.254.46.57 --live --paper-column 1 --replicates 3
-  python scripts/run_droplet_error_check.py --robot-ip 169.254.46.57 --live --paper-column 5 \
+  python scripts/run_droplet_error_check.py --live --paper-column 1 --replicates 3
+  python scripts/run_droplet_error_check.py --live --paper-column 5 \
       --dispense-z 1.0 --droplet-ul 25 --air-gap-ul 0 --label lowgap
-  python scripts/run_droplet_error_check.py --robot-ip 169.254.46.57            # dry run (no liquid/images)
+  python scripts/run_droplet_error_check.py  # dry run (no liquid/images)
 
 Image pull uses the OT-2 key (ROBOT_SSH_KEY_PATH / ~/.ssh/id_rsa_opentrons); the run
 itself uses the HTTP API and needs no SSH.
@@ -35,6 +35,12 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 from src.utils.ot2_ssh import OT2SSHSettings
 
@@ -51,7 +57,7 @@ TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 # ── HTTP API helpers (templated from run_vial_print_robot.py) ─────────────────────
 
 def _api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def _request(method: str, robot_ip: str, path: str, **kwargs: Any) -> dict[str, Any]:
@@ -184,7 +190,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="Upload + run the droplet print error-check protocol via the OT-2 HTTP API, "
                     "then pull this run's before/after images.")
-    ap.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
+    add_robot_host_arguments(ap)
     ap.add_argument("--protocol", default=str(DEFAULT_PROTOCOL), help="Protocol file to upload.")
     ap.add_argument("--live", action="store_true", help="Run liquid motion + images. Default is a dry run.")
     ap.add_argument("--label", default="", help="Optional suffix on the image-folder run-id.")
@@ -204,8 +210,9 @@ def main() -> int:
     run_log = RobotRunLog(Path(__file__).name)
     print(f"Run log    : {run_log.path}")
 
-    robot_ip = args.robot_ip
+    robot_ip = resolve_host(args.robot_host)
     os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+    print(connection_summary(robot_ip))
 
     protocol_path = Path(args.protocol).resolve()
     if not protocol_path.exists():

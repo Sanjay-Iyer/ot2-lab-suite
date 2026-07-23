@@ -42,6 +42,10 @@ from vision.config import load_vision_config  # noqa: E402
 from vision.transfer_images import transfer_images  # noqa: E402
 from vision.image_inventory import build_inventory  # noqa: E402
 from vision.validate_images import validate_run_folder  # noqa: E402
+from src.lab.robot_connection import (  # noqa: E402
+    add_robot_host_arguments,
+    connection_summary,
+)
 
 
 # ─── Logging setup ──────────────────────────────────────────────
@@ -84,6 +88,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Pull image files from an Opentrons OT-2 robot.",
     )
+    add_robot_host_arguments(parser)
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -118,7 +123,8 @@ def main() -> None:
 
     # ── 1. Load configuration ────────────────────────────────────
     try:
-        cfg = load_vision_config()
+        cfg = load_vision_config(robot_host=args.robot_host)
+        print(connection_summary(cfg["robot"]["host"]))
     except (FileNotFoundError, ValueError) as exc:
         print(f"\n[FATAL] Configuration error:\n  {exc}", file=sys.stderr)
         sys.exit(1)

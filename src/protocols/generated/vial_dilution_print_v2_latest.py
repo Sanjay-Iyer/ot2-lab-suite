@@ -128,6 +128,11 @@ CONFIG = { 'deck': { 'tuberack': { 'load_name': 'tuberack_3dprint_20ml_8vials_v2
                 'water_setup_tip': 'H12',
                 'setup_tip': 'H12',
                 'single_tip_columns': [12],
+                'max_transfer_ul': 20.0,
+                'dead_volume_ul': 30.0,
+                'stock_tip_policy': 'single',
+                'water_dispense_from_top_mm': -2.0,
+                'stock_dispense_from_top_mm': -1.0,
                 'small_volume': { 'enabled': True,
                                   'pipette': 'p20_single_gen2',
                                   'threshold_ul': 20,
@@ -252,7 +257,8 @@ CONFIG = { 'deck': { 'tuberack': { 'load_name': 'tuberack_3dprint_20ml_8vials_v2
               'pipette_min_accurate_ul': 20.0,
               'expected_plate_well_count': 96,
               'tiprack_rows_per_column': 8,
-              'pipette_max_volume_ul': 300.0}}
+              'pipette_max_volume_ul': 300.0},
+  'protocol_version': 2}
 # <<< CONFIG END <<<
 # ════════════════════════════════════════════════════════════════════════════════
 

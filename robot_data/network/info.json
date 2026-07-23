@@ -1,6 +1,6 @@
 {
   "connection_type": "Wired USB",
-  "ip_address": "169.254.46.57",
+  "address_source": "configs/robot.yaml",
   "subnet_mask": "255.255.0.0",
   "mac_address": "B8:27:EB:E5:A1:75"
 }

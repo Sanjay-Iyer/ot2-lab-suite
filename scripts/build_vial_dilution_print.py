@@ -32,6 +32,11 @@ from typing import Optional
 import yaml
 
 REPO          = Path(__file__).resolve().parent.parent
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from src.lab.robot_connection import max_api_level
+
 PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
 BASE_PROTOCOL = PRINTING_DIR / "01_vial_dilution_paper_print.py"
 
@@ -45,7 +50,13 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
         "vial_dilution_print_v2"),
     3: (PRINTING_DIR / "03_vial_dilution_paper_print_v3.py",
         "vial_dilution_print_v3"),
+    4: (PRINTING_DIR / "04_vial_dilution_paper_print_v4_quicktest.py",
+        "vial_dilution_print_v4"),
 }
+
+# Versions that target the OT-2's real API level (2.15) and therefore simulate under
+# the pinned interpreter, not the repo's default env.
+API_215_VERSIONS = {3, 4}
 
 GENERATED_DIR = REPO / "src" / "protocols" / "generated"
 LABWARE       = REPO / "labware"
@@ -82,7 +93,7 @@ _FLAG_SUBS = {
     "do_print":    (re.compile(r"(?m)^DEFAULT_DO_PRINT\s*=.*$"),    "DEFAULT_DO_PRINT    = {}"),
 }
 
-V3_API_LEVEL = "2.15"
+V3_API_LEVEL = max_api_level()
 V3_SIMULATOR_VERSION = "7.0.2"
 V3_SIMULATOR_PYTHON = (
     REPO / ".venv" / "ot2-api-2.15-py310" / "python.exe"
@@ -686,20 +697,27 @@ def main() -> int:
     # CONFIG the protocol executes (resolved print_groups + normalized sections).
     if str(REPO) not in sys.path:
         sys.path.insert(0, str(REPO))
-    from src.core.workflow_config import normalize_and_validate, WorkflowConfigError
     is_legacy = isinstance(full.get("printing"), dict) and "droplet_volume_ul" in full["printing"]
-    try:
-        nw = normalize_and_validate(full)
-    except WorkflowConfigError as e:
-        print("CONFIG VALIDATION FAILED (shared validators):")
-        print(f"  {e}")
-        return 1
-    config = nw.config
-    config["protocol_version"] = version
-    for note in nw.notes:
-        print(f"  [normalize] {note}")
-    for w in [i for i in nw.issues if i.severity == "warning"]:
-        print(f"  [warning] {w}")
+    if version == 4:
+        # v4 is a deliberately minimal, self-validating quick-test protocol. Its YAML
+        # IS the CONFIG the protocol reads, so it skips the dilution normalizer
+        # entirely — there is no dilution, plate, or print-group resolution to do.
+        config = dict(full)
+        config["protocol_version"] = 4
+    else:
+        from src.core.workflow_config import normalize_and_validate, WorkflowConfigError
+        try:
+            nw = normalize_and_validate(full)
+        except WorkflowConfigError as e:
+            print("CONFIG VALIDATION FAILED (shared validators):")
+            print(f"  {e}")
+            return 1
+        config = nw.config
+        config["protocol_version"] = version
+        for note in nw.notes:
+            print(f"  [normalize] {note}")
+        for w in [i for i in nw.issues if i.severity == "warning"]:
+            print(f"  [warning] {w}")
 
     # Deck-slot uniqueness (structural check on the normalized deck).
     slots: dict = {}
@@ -757,13 +775,16 @@ def main() -> int:
         or (str(V3_SIMULATOR_PYTHON) if V3_SIMULATOR_PYTHON.exists() else None)
         or sys.executable
     )
-    if version == 3:
+    if version in API_215_VERSIONS:
         simulator_problem = _v3_simulator_problem(simulator_python)
         if simulator_problem:
             print(f"SIMULATION ENVIRONMENT INVALID: {simulator_problem}")
             return 1
 
-    ok, output = simulate(run_path, simulator_python if version == 3 else sys.executable)
+    ok, output = simulate(
+        run_path,
+        simulator_python if version in API_215_VERSIONS else sys.executable,
+    )
     tail = "\n".join(line for line in output.splitlines()
                      if any(k in line for k in ("Pre-flight", "Series:", "Printing 8",
                                                 "Returned", "Completed ===", "WARNING")))

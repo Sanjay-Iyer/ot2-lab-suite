@@ -28,6 +28,12 @@ if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(repo))
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 from src.utils.ot2_ssh import OT2SSHSettings
 
@@ -44,6 +50,7 @@ _PROTOCOL_BY_VERSION = {
     1: DEFAULT_PROTOCOL,
     2: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v2_latest.py",
     3: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v3_latest.py",
+    4: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v4_latest.py",
 }
 
 
@@ -77,7 +84,7 @@ TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 
 
 def _api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def _request(method: str, robot_ip: str, path: str, **kwargs: Any) -> dict[str, Any]:
@@ -153,6 +160,22 @@ def _describe_deck(config: dict) -> None:
             continue
         print(f"  slot {str(spec['slot']):>2}  {role_labels.get(role, role):<13} "
               f"{spec.get('load_name', '?')}")
+
+    # v4 quick test has its own tiny shape (one vial, one P20 tip, a few paper spots).
+    if int(config.get("protocol_version", 0) or 0) == 4:
+        src = config.get("source", {})
+        pr = config.get("print", {})
+        slot = deck.get("tuberack", {}).get("slot", "?")
+        print(f"\nSource (rack in slot {slot}):")
+        print(f"  {src.get('vial')}  {src.get('material')} "
+              f"(aspirate {src.get('aspirate_height_mm')} mm above bottom)")
+        rows = pr.get("rows", [])
+        col = pr.get("paper_column")
+        span = f"{rows[0]}{col}..{rows[-1]}{col}" if rows else "?"
+        print("\nPrint plan:")
+        print(f"  p20_single_gen2  {pr.get('volume_ul')} uL x {len(rows)} spot(s) "
+              f"-> paper column {col} ({span}), one reused tip {pr.get('tip')}")
+        return
 
     # Vials: prefer the declared materials, else the legacy sources block.
     materials = config.get("materials") or {}
@@ -392,7 +415,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Upload and run the vial dilution print protocol through the OT-2 HTTP API."
     )
-    parser.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
+    add_robot_host_arguments(parser)
     parser.add_argument("--protocol", default=None,
                         help="Generated protocol file to upload. Default: derived from "
                              "--config's protocol_version (v1 -> "
@@ -432,8 +455,9 @@ def main() -> int:
     print(f"Run log   : {run_log.path}")
 
     try:
-        robot_ip = args.robot_ip
+        robot_ip = resolve_host(args.robot_host)
         os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+        print(connection_summary(robot_ip))
 
         version = _config_version(args.config)
         # --pipette-check needs real motion, so it must not also be a dry run.
@@ -457,6 +481,11 @@ def main() -> int:
                     "validation immediately before upload; do not use "
                     "--skip-build or --skip-validate."
                 )
+        if version == 4 and args.pipette_check:
+            raise ValueError(
+                "--pipette-check is not available for the v4 quick test; it is "
+                "already a minimal no-dilution print. Just add --live."
+            )
 
         protocol_path = Path(
             args.protocol or _protocol_for_config(args.config)).resolve()
@@ -467,7 +496,9 @@ def main() -> int:
                 build_cmd += ["--config", args.config]
             if args.simulator_python:
                 build_cmd += ["--simulator-python", args.simulator_python]
-            if version == 3:
+            if version in (3, 4):
+                # API-2.15 protocols have no runtime parameters, so run modes are
+                # baked into the generated file at build time.
                 build_cmd += [
                     "--set-dry-run", str(dry_run).lower(),
                     "--set-do-dilution", str(do_dilution).lower(),
@@ -477,7 +508,11 @@ def main() -> int:
             # flag is needed here — but the artifact it writes must be the one we
             # upload, which _protocol_for_config() resolved from the same key.
             _run_local_step(build_cmd, "build + simulate")
-        if not args.skip_validate:
+        if version == 4:
+            # v4 has no run-mode matrix — the build already simulated it under API
+            # 2.15, which is the whole check for a quick test.
+            print("[validate matrix] skipped for v4 (build+simulate is the check)")
+        elif not args.skip_validate:
             run_log.event("local_step", label="validate matrix")
             validate_cmd = [sys.executable, "scripts/validate_vial_print.py"]
             if args.config:
@@ -485,7 +520,7 @@ def main() -> int:
             if args.simulator_python:
                 validate_cmd += ["--simulator-python", args.simulator_python]
             if version == 3:
-                validate_cmd += ["--robot-ip", robot_ip]
+                validate_cmd += ["--robot-host", robot_ip]
             _run_local_step(validate_cmd, "validate matrix")
         if not protocol_path.exists():
             raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
@@ -546,7 +581,7 @@ def main() -> int:
             do_print=do_print,
             paper_start_column=args.paper_start_column,
             pipette_check=args.pipette_check,
-            send_runtime_parameters=version != 3,
+            send_runtime_parameters=version not in (3, 4),
         )
         run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 

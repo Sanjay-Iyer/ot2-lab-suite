@@ -31,7 +31,7 @@ different path, set `OT2_API_2_15_PYTHON` to its `python.exe`.
 ```powershell
 conda activate ai
 python scripts\build_vial_dilution_print.py --config configs\printing\bp_20260723_v3.yaml
-python scripts\validate_vial_print.py --config configs\printing\bp_20260723_v3.yaml --robot-ip 169.254.46.57
+python scripts\validate_vial_print.py --config configs\printing\bp_20260723_v3.yaml
 ```
 
 The second command fetches `/health` and requires the generated API level to

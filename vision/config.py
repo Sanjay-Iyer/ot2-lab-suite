@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from dotenv import load_dotenv
+from src.lab.robot_connection import resolve_host
 from src.utils.ot2_ssh import parse_bool
 
 
@@ -60,6 +61,7 @@ def load_vision_config(
     config_path: Path | None = None,
     *,
     validate_identity: bool = True,
+    robot_host: str | None = None,
 ) -> Dict[str, Any]:
     """Load, resolve, and validate the full vision configuration.
 
@@ -90,7 +92,11 @@ def load_vision_config(
     cfg = _load_yaml(config_path)
 
     # 3. Resolve robot section
-    _resolve_robot(cfg, validate_identity=validate_identity)
+    _resolve_robot(
+        cfg,
+        validate_identity=validate_identity,
+        robot_host=robot_host,
+    )
 
     # 4. Resolve local paths (relative → absolute) and create dirs
     _resolve_local_paths(cfg)
@@ -100,19 +106,17 @@ def load_vision_config(
 
 # ─── Internal helpers ────────────────────────────────────────────
 
-def _resolve_robot(cfg: Dict[str, Any], *, validate_identity: bool = True) -> None:
+def _resolve_robot(
+    cfg: Dict[str, Any],
+    *,
+    validate_identity: bool = True,
+    robot_host: str | None = None,
+) -> None:
     """Replace env-var *names* in the robot section with their values."""
     robot = cfg.get("robot", {})
 
-    # Host IP
-    host_var = robot.get("host_env_var", "ROBOT_IP")
-    host = os.getenv(host_var, str(robot.get("ip", ""))).strip()
-    if not host or host in ("127.0.0.1", "localhost"):
-        raise ValueError(
-            f"[vision.config] {host_var} is not set or is a loopback address "
-            f"('{host}'). Set a real OT-2 IP in .env."
-        )
-    robot["host"] = host
+    # Robot address comes from the shared verified resolver, never vision.yaml.
+    robot["host"] = resolve_host(robot_host)
 
     # SSH key path
     key_var = robot.get("ssh_key_env_var", "ROBOT_SSH_KEY_PATH")

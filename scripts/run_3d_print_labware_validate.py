@@ -21,7 +21,12 @@ if __name__ == "__main__" and not __package__:
     repo = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(repo))
 
-from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    base_url,
+    connection_summary,
+    resolve_host,
+)
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -31,7 +36,7 @@ TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 
 
 def api_url(robot_ip: str, path: str) -> str:
-    return f"http://{robot_ip}:31950{path}"
+    return f"{base_url(robot_ip)}{path}"
 
 
 def request_json(method: str, robot_ip: str, path: str, **kwargs: Any) -> dict[str, Any]:
@@ -105,14 +110,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run the one-tip 3D printed labware validation protocol on the OT-2."
     )
-    parser.add_argument("--robot-ip", default=Config.ROBOT_IP or "169.254.46.57")
+    add_robot_host_arguments(parser)
     parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL))
     parser.add_argument("--no-start", action="store_true", help="Upload/create the run but do not press play.")
     parser.add_argument("--no-monitor", action="store_true", help="Start the run and return immediately.")
     parser.add_argument("--poll-seconds", type=float, default=3.0)
     args = parser.parse_args()
 
-    robot_ip = args.robot_ip
+    robot_ip = resolve_host(args.robot_host)
     protocol_path = Path(args.protocol).resolve()
     if not protocol_path.exists():
         raise FileNotFoundError(f"Protocol not found: {protocol_path}")
@@ -120,7 +125,7 @@ def main() -> int:
     os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
     print("=== 3D Print Labware Validate Runner ===")
-    print(f"Robot: {robot_ip}")
+    print(connection_summary(robot_ip))
     print("Deck: slot 7 = 3D vial rack, slot 9 = 300 uL tips, right mount = p300_multi_gen2")
     print("Protocol should pick exactly one tip from H1, then move 20 uL A1 <-> A2.")
     print("Watch the first pickup. If more than one tip engages, stop immediately.")

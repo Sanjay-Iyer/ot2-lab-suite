@@ -10,15 +10,20 @@ if __name__ == "__main__" and not __package__:
     sys.exit(1)
 
 from src.core.config import Config
+from src.lab.robot_connection import (
+    add_robot_host_arguments,
+    connection_summary,
+    resolve_host,
+)
 from src.utils.ot2_ssh import MissingIdentityFileError, OT2SSHSettings
 
 # Robot-side store that opentrons_execute resolves custom labware from:
 #   <this dir>/<namespace>/<loadName>/<version>.json
 REMOTE_CUSTOM_LABWARE_DIR = "/data/labware/v2/custom_definitions"
 
-def deploy():
+def deploy(robot_host=None):
     """Deploys staged protocols and data to the physical OT-2 robot."""
-    robot_ip = Config.ROBOT_IP
+    robot_ip = resolve_host(robot_host)
     deploy_src = Config.DEPLOY_BASE_DIR
     key_path = Config.ROBOT_SSH_KEY_PATH
 
@@ -29,7 +34,8 @@ def deploy():
     # Remote path MUST use forward slashes (Linux)
     robot_dest = Config.REMOTE_USER_STORAGE
     
-    print(f"--- Deploying to OT-2 ({robot_ip}) ---")
+    print(connection_summary(robot_ip))
+    print("--- Deploying to OT-2 ---")
     print(f"Source: {deploy_src}")
     print(f"Destination: {robot_dest}")
     
@@ -40,7 +46,7 @@ def deploy():
     # Professional SCP: Deploy the entire directory content
     # On Windows, we use the local path as is (Pathlib handles it)
     # The remote side is a string with forward slashes
-    settings = OT2SSHSettings.from_config(Config)
+    settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
 
     # Ensure the remote destination exists before copying into it
     try:
@@ -70,7 +76,7 @@ def deploy():
     except subprocess.CalledProcessError as e:
         print(f"Error: Deployment failed with code {e.returncode}")
 
-def deploy_labware(labware_path, dry_run=False):
+def deploy_labware(labware_path, dry_run=False, robot_host=None):
     """Deploy one custom labware JSON to the OT-2's custom_definitions store.
 
     opentrons_execute resolves load_labware(load_name, namespace=, version=) from
@@ -97,7 +103,9 @@ def deploy_labware(labware_path, dry_run=False):
     remote_dir = f"{REMOTE_CUSTOM_LABWARE_DIR}/{namespace}/{load_name}"
     remote_dest = f"{remote_dir}/{version}.json"
 
-    print(f"--- Deploying labware to OT-2 ({Config.ROBOT_IP}) ---")
+    robot_ip = resolve_host(robot_host)
+    print(connection_summary(robot_ip))
+    print("--- Deploying labware to OT-2 ---")
     print(f"Source     : {labware_path}")
     print(f"Identity   : namespace={namespace}, loadName={load_name}, version={version}")
     print(f"Destination: {remote_dest}")
@@ -113,7 +121,7 @@ def deploy_labware(labware_path, dry_run=False):
         print("Error: ROBOT_SSH_KEY_PATH is missing from .env. A private key is required for OT-2 SSH access.")
         return False
 
-    settings = OT2SSHSettings.from_config(Config)
+    settings = OT2SSHSettings.from_config(Config, robot_ip=robot_ip)
 
     # Create the nested destination dir before copying into it.
     try:
@@ -155,6 +163,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Deploy protocols (default) or a custom labware JSON to the OT-2."
     )
+    add_robot_host_arguments(parser)
     parser.add_argument(
         "--labware",
         metavar="JSON",
@@ -168,6 +177,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.labware:
-        sys.exit(0 if deploy_labware(args.labware, dry_run=args.dry_run) else 1)
+        sys.exit(
+            0
+            if deploy_labware(
+                args.labware,
+                dry_run=args.dry_run,
+                robot_host=args.robot_host,
+            )
+            else 1
+        )
     else:
-        deploy()
+        deploy(args.robot_host)

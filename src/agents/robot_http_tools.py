@@ -13,6 +13,7 @@ from langchain.tools import tool
 
 from src.agents.robot_protocol_registry import describe_robot_protocols, get_robot_protocol
 from src.core.config import Config
+from src.lab.robot_connection import base_url, resolve_host
 from src.utils.hashing import hash_file
 from src.utils.paths import PROJECT_ROOT, SIMULATION_RECORDS_PATH
 
@@ -47,8 +48,7 @@ def _has_passing_simulation(protocol_path: Path) -> tuple[bool, str, str]:
 
 
 def _robot_ip(cli_robot_ip: Optional[str]) -> str:
-    robot_ip = (cli_robot_ip or Config.ROBOT_IP or "").strip()
-    return robot_ip
+    return resolve_host(cli_robot_ip)
 
 
 def _set_no_proxy(robot_ip: str) -> None:
@@ -68,11 +68,12 @@ def check_robot_http_api(robot_ip: Optional[str] = None) -> str:
     if auth_error:
         return auth_error
 
-    ip = _robot_ip(robot_ip)
-    if ip in ("", "127.0.0.1", "localhost"):
-        return f"HTTP API check FAILED: robot_ip is {ip!r}; set ROBOT_IP or pass --robot-ip."
+    try:
+        ip = _robot_ip(robot_ip)
+    except RuntimeError as exc:
+        return f"HTTP API check FAILED: {exc}"
     _set_no_proxy(ip)
-    url = f"http://{ip}:31950/health"
+    url = f"{base_url(ip)}/health"
     try:
         response = requests.get(url, headers=HEADERS, timeout=10)
     except requests.RequestException as exc:
@@ -112,9 +113,10 @@ def run_vial_print_robot_http(
     if auth_error:
         return auth_error
 
-    ip = _robot_ip(robot_ip)
-    if ip in ("", "127.0.0.1", "localhost"):
-        return f"REFUSED: robot_ip is {ip!r}; this tool is for the lab laptop connected to the OT-2."
+    try:
+        ip = _robot_ip(robot_ip)
+    except RuntimeError as exc:
+        return f"REFUSED: {exc}"
 
     entry = get_robot_protocol("vial_dilution_print")
     if not entry.runner_script.exists():
@@ -136,7 +138,7 @@ def run_vial_print_robot_http(
     cmd = [
         sys.executable,
         str(entry.runner_script),
-        "--robot-ip",
+        "--robot-host",
         ip,
         "--protocol",
         str(entry.protocol_path),
