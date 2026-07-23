@@ -28,19 +28,24 @@ class TestRobotAutomation(unittest.TestCase):
         self.dummy_protocol = Path("dummy_protocol.py")
         self.dummy_protocol.write_text("metadata = {'apiLevel': '2.15'}\ndef run(ctx): pass")
         self.dummy_hash = "f5f5f5f5" # Mocked later
+        self.dummy_key = Path(".test_tmp") / "robot_automation" / "dummy_key"
+        self.dummy_key.parent.mkdir(parents=True, exist_ok=True)
+        self.dummy_key.write_text("test fixture", encoding="utf-8")
 
     def tearDown(self):
         if self.dummy_protocol.exists():
             self.dummy_protocol.unlink()
         if SIMULATION_RECORDS_PATH.exists():
             SIMULATION_RECORDS_PATH.unlink()
+        if self.dummy_key.exists():
+            self.dummy_key.unlink()
 
     @patch("subprocess.run")
     def test_check_robot_connection_success(self, mock_run):
         # Mock successful SSH checks
         mock_run.return_value = MagicMock(returncode=0, stdout="/usr/bin/opentrons_execute", stderr="")
         
-        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', 'dummy_key'):
+        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', str(self.dummy_key)):
             result = check_robot_connection.func()
             self.assertIn("Connectivity PASSED", result)
 
@@ -54,7 +59,7 @@ class TestRobotAutomation(unittest.TestCase):
         # Mock SSH failure
         mock_run.return_value = MagicMock(returncode=255, stderr="Permission denied (publickey).")
         
-        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', 'dummy_key'):
+        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', str(self.dummy_key)):
             result = check_robot_connection.func()
             self.assertIn("Connectivity FAILED", result)
 
@@ -85,7 +90,7 @@ class TestRobotAutomation(unittest.TestCase):
         mock_hash.return_value = "hash123"
         mock_run.return_value = MagicMock(returncode=0)
         
-        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', 'dummy_key'):
+        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', str(self.dummy_key)):
             result = deploy_protocol_to_robot.func(str(self.dummy_protocol))
             self.assertIn("Deployment SUCCESS", result)
             
@@ -135,7 +140,7 @@ class TestRobotAutomation(unittest.TestCase):
         # 2. Mock successful remote execution
         mock_run.return_value = MagicMock(returncode=0, stdout="Robot Run OK")
         
-        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', 'dummy_key'):
+        with patch.object(Config, 'ROBOT_IP', '169.254.46.57'), patch.object(Config, 'ROBOT_SSH_KEY_PATH', str(self.dummy_key)):
             result = execute_protocol_on_robot.func("/remote/path", "goodhash")
             self.assertIn("Execution COMPLETE", result)
 

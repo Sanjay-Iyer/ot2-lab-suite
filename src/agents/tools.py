@@ -27,6 +27,7 @@ from src.core.config_loader import (
 )
 from src.core.validation.workflow_validator import validate_workflow_against_constraints
 from src.utils.hashing import hash_file
+from src.utils.ot2_ssh import OT2SSHSettings
 
 # --- Global Working State ---
 _WORKING_CONFIG = None
@@ -239,12 +240,10 @@ def get_robot_hardware_status() -> str:
 
     robot_ip = Config.ROBOT_IP
     key_path = Config.ROBOT_SSH_KEY_PATH
-    ssh_user = Config.ROBOT_SSH_USER
-    
     if not key_path:
         return "Error: ROBOT_SSH_KEY_PATH is missing. Cannot check hardware."
 
-    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", key_path]
+    settings = OT2SSHSettings.from_config(Config)
     
     # Common paths for instrument storage on OT-2
     paths = [
@@ -256,7 +255,7 @@ def get_robot_hardware_status() -> str:
     try:
         found_data = None
         for p in paths:
-            cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"cat {p}"]
+            cmd = settings.ssh_command(f"cat {p}", connect_timeout=10)
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode == 0:
                 found_data = json.loads(result.stdout)
@@ -264,7 +263,10 @@ def get_robot_hardware_status() -> str:
         
         if not found_data:
             # Fallback: try to find any json file in the opentrons lib dir that might be it
-            fallback_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "ls /var/lib/opentrons/*.json"]
+            fallback_cmd = settings.ssh_command(
+                "ls /var/lib/opentrons/*.json",
+                connect_timeout=10,
+            )
             subprocess.run(fallback_cmd, capture_output=True, text=True)
             return "Hardware check FAILED: Could not locate instrument configuration file on robot. Please verify pipettes manually."
             
@@ -299,19 +301,25 @@ def check_robot_connection() -> str:
     if not key_path:
         return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
-    ssh_user = Config.ROBOT_SSH_USER
-    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path]
+    settings = OT2SSHSettings.from_config(Config)
     
     try:
         # 1. Test SSH + path existence
-        cmd_ls = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"mkdir -p {Config.REMOTE_USER_STORAGE}/ot2_runs && ls -d {Config.REMOTE_USER_STORAGE}"]
+        cmd_ls = settings.ssh_command(
+            f"mkdir -p {Config.REMOTE_USER_STORAGE}/ot2_runs "
+            f"&& ls -d {Config.REMOTE_USER_STORAGE}",
+            connect_timeout=30,
+        )
         result_ls = subprocess.run(cmd_ls, capture_output=True, text=True)
         
         if result_ls.returncode != 0:
             return f"Connectivity FAILED: SSH unreachable at {robot_ip} (check keys/BatchMode). Error: {result_ls.stderr}"
 
         # 2. Check for opentrons_execute
-        cmd_exe = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "which opentrons_execute"]
+        cmd_exe = settings.ssh_command(
+            "which opentrons_execute",
+            connect_timeout=30,
+        )
         result_exe = subprocess.run(cmd_exe, capture_output=True, text=True)
         
         if result_exe.returncode != 0:
@@ -366,19 +374,32 @@ def deploy_protocol_to_robot(protocol_path: str, config_paths: Optional[List[str
         if not key_path:
             return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
-        ssh_user = Config.ROBOT_SSH_USER
-        
         # Use PurePosixPath for all remote robot paths
         remote_base_dir = PurePosixPath(Config.REMOTE_USER_STORAGE) / "ot2_runs"
         remote_run_dir = remote_base_dir / run_id
         
         # Ensure remote base exists
-        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path]
-        subprocess.run(["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"mkdir -p {remote_base_dir}"], check=True)
+        settings = OT2SSHSettings.from_config(Config)
+        subprocess.run(
+            settings.ssh_command(
+                f"mkdir -p {remote_base_dir}",
+                connect_timeout=30,
+            ),
+            check=True,
+        )
         
         # SCP staging dir
         # local_staging_dir is cast to string. Remote path uses posix string format.
-        subprocess.run(["scp", "-O"] + ssh_opts + ["-r", str(local_staging_dir), f"{ssh_user}@{robot_ip}:{remote_base_dir}/"], check=True)
+        subprocess.run(
+            settings.scp_command(
+                str(local_staging_dir),
+                settings.remote_path(f"{remote_base_dir}/"),
+                recursive=True,
+                legacy_protocol=True,
+                connect_timeout=30,
+            ),
+            check=True,
+        )
         
         return (
             f"Deployment SUCCESS.\n"
@@ -420,21 +441,26 @@ def execute_protocol_on_robot(remote_protocol_path: str, protocol_hash: str) -> 
     if not key_path:
         return "Error: ROBOT_SSH_KEY_PATH is missing from config/.env. A private key is required for OT-2 SSH access."
 
-    ssh_user = Config.ROBOT_SSH_USER
-    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path]
+    settings = OT2SSHSettings.from_config(Config)
     
     # Ensure the remote_protocol_path is treated as a POSIX path
     remote_path_obj = PurePosixPath(remote_protocol_path)
     
     try:
         # Check if file exists first
-        check_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"ls {remote_path_obj}"]
+        check_cmd = settings.ssh_command(
+            f"ls {remote_path_obj}",
+            connect_timeout=30,
+        )
         if subprocess.run(check_cmd, capture_output=True).returncode != 0:
             return f"Error: Protocol file not found on robot at {remote_path_obj}. Did deployment fail?"
 
         print(f"\n[EXECUTE] Triggering opentrons_execute for {remote_path_obj}...")
         # Use -c to run in a login shell which often helps with environment variables/paths
-        cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"opentrons_execute {remote_path_obj}"]
+        cmd = settings.ssh_command(
+            f"opentrons_execute {remote_path_obj}",
+            connect_timeout=30,
+        )
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         

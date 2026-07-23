@@ -675,20 +675,29 @@ def host_run(args: argparse.Namespace) -> None:
 
         # Check existing project path utility config or load default SSH path
         from src.core.config import Config
+        from src.utils.ot2_ssh import OT2SSHSettings
         ssh_key = Config.ROBOT_SSH_KEY_PATH
-        ssh_user = Config.ROBOT_SSH_USER
 
         if not ssh_key:
             logger.error("ROBOT_SSH_KEY_PATH is missing. Check .env configuration.")
             sys.exit(1)
 
-        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "StrictHostKeyChecking=no", "-i", ssh_key]
+        ssh_settings = OT2SSHSettings.from_config(
+            Config,
+            robot_ip=robot_ip,
+            identity_file=ssh_key,
+        )
 
         # SCP run script to robot
         remote_dest_dir = "/var/lib/opentrons/user_storage/ot2_runs"
         remote_script_path = f"{remote_dest_dir}/printing_demo_run.py"
         logger.info(f"Deploying protocol to robot...")
-        deploy_cmd = ["scp", "-O"] + ssh_opts + [str(run_script_path), f"{ssh_user}@{robot_ip}:{remote_script_path}"]
+        deploy_cmd = ssh_settings.scp_command(
+            str(run_script_path),
+            ssh_settings.remote_path(remote_script_path),
+            legacy_protocol=True,
+            connect_timeout=15,
+        )
         
         dep_res = subprocess.run(deploy_cmd, capture_output=True, text=True, check=False)
         if dep_res.returncode != 0:
@@ -698,7 +707,10 @@ def host_run(args: argparse.Namespace) -> None:
 
         # Execute protocol remotely
         logger.info("Triggering protocol run on OT-2 robot...")
-        exec_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"opentrons_execute {remote_script_path}"]
+        exec_cmd = ssh_settings.ssh_command(
+            f"opentrons_execute {remote_script_path}",
+            connect_timeout=15,
+        )
         
         run_res = subprocess.run(exec_cmd, capture_output=True, text=True, check=False)
         
@@ -722,7 +734,13 @@ def host_run(args: argparse.Namespace) -> None:
             temp_transfer_dir.mkdir(exist_ok=True)
 
             remote_image_dir = camera_cfg.get("robot_image_dir", "/data/vision/printing_demo")
-            scp_cmd = ["scp", "-O"] + ssh_opts + ["-r", f"{ssh_user}@{robot_ip}:{remote_image_dir}/*", str(temp_transfer_dir)]
+            scp_cmd = ssh_settings.scp_command(
+                ssh_settings.remote_path(f"{remote_image_dir}/*"),
+                str(temp_transfer_dir),
+                recursive=True,
+                legacy_protocol=True,
+                connect_timeout=15,
+            )
             
             scp_res = subprocess.run(scp_cmd, capture_output=True, text=True, check=False)
             if scp_res.returncode != 0:
@@ -805,7 +823,10 @@ def host_run(args: argparse.Namespace) -> None:
 
             # Cleanup remote directories on OT-2
             logger.info("Cleaning up remote JPEGs on robot...")
-            cleanup_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"rm -rf {remote_image_dir}/*"]
+            cleanup_cmd = ssh_settings.ssh_command(
+                f"rm -rf {remote_image_dir}/*",
+                connect_timeout=15,
+            )
             subprocess.run(cleanup_cmd, check=False)
             
             # Clean local temp_raw

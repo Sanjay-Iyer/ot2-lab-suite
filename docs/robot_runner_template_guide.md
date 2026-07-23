@@ -98,12 +98,13 @@ The run uses the HTTP API, but pulling files off the robot needs **SCP**. Do it 
 successful run, and use the **OT-2 key** — not the default `~/.ssh/id_rsa`:
 
 - key: `--ssh-key` → `.env ROBOT_SSH_KEY_PATH` → `~/.ssh/id_rsa_opentrons`
-- options: `-o BatchMode=yes -o StrictHostKeyChecking=no -i <key>`
+- options: `-o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa -o BatchMode=yes -i <key>`
 - **always** `scp -O` (the OT-2 dropbear server needs the legacy SCP protocol)
 
 See `_pull_images()` in [`run_droplet_error_check.py`](../scripts/run_droplet_error_check.py)
 for the exact, working block. (Manual check the key works:
-`ssh root@169.254.46.57 -i C:\Users\<you>\.ssh\id_rsa_opentrons`.)
+`ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa -i
+C:\Users\<you>\.ssh\id_rsa_opentrons root@169.254.46.57`.)
 
 ---
 

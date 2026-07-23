@@ -36,6 +36,7 @@ if __name__ == "__main__" and not __package__:
 
 from src.core.config import Config
 from src.utils.robot_run_log import RobotRunLog, repo_relative
+from src.utils.ot2_ssh import OT2SSHSettings
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "printing_droplet_error_check.py"
@@ -123,11 +124,6 @@ def _monitor(robot_ip: str, run_id: str, poll_s: float) -> str:
 
 # ── SSH/SCP helpers — used ONLY to pull images (the run uses the HTTP API) ─────────
 
-def _ssh_user_host(robot_ip: str) -> str:
-    user = getattr(Config, "ROBOT_SSH_USER", "root") or "root"
-    return f"{user}@{robot_ip}"
-
-
 def _resolve_ssh_key(cli_key: str | None) -> str:
     """--ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons (NOT the bare id_rsa)."""
     for candidate in (cli_key, getattr(Config, "ROBOT_SSH_KEY_PATH", ""), str(DEFAULT_SSH_KEY)):
@@ -152,11 +148,20 @@ def _pull_images(
         if run_log:
             run_log.event("image_pull_skipped", reason="ssh_key_missing", remote_dir=remote_dir, ssh_key=key)
         return
-    opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
-            "-o", "StrictHostKeyChecking=no", "-i", key]
     LOCAL_VISION_BASE.mkdir(parents=True, exist_ok=True)
     dest = LOCAL_VISION_BASE / local_name   # readable local name; created by scp
-    cmd = ["scp", "-O", "-r", *opts, f"{_ssh_user_host(robot_ip)}:{remote_dir}", str(dest)]
+    settings = OT2SSHSettings.from_config(
+        Config,
+        robot_ip=robot_ip,
+        identity_file=key,
+    )
+    cmd = settings.scp_command(
+        settings.remote_path(remote_dir),
+        str(dest),
+        recursive=True,
+        legacy_protocol=True,
+        connect_timeout=10,
+    )
     print(f"\n[pull images] {' '.join(cmd)}")
     if run_log:
         run_log.event("image_pull_started", remote_dir=remote_dir, local_dest=repo_relative(dest))

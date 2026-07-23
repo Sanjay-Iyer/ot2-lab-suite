@@ -20,7 +20,7 @@
 Verify with:
 ```bash
 ping 169.254.46.57
-ssh -i <key_path> root@169.254.46.57 "echo connected"
+python scripts/check_ot2_ssh.py --robot-ip 169.254.46.57 --identity-file <key_path> --legacy-rsa
 ```
 
 ---
@@ -234,6 +234,8 @@ Type natural language. The agent handles all tool calls internally.
 - Verify the OT-2 is on and the USB/Ethernet cable is connected
 - Run: `ping 169.254.46.57`
 - Check `ROBOT_SSH_KEY_PATH` in `.env` points to the actual key file
+- Set `ROBOT_SSH_IDENTITIES_ONLY=true` and `ROBOT_SSH_LEGACY_RSA=true` for the older OT-2 server
+- Run `python scripts/check_ot2_ssh.py --legacy-rsa` for a motion-free authentication diagnosis
 
 ### "ROBOT_SSH_KEY_PATH is missing"
 - Open `.env` and confirm `ROBOT_SSH_KEY_PATH=` has a real path (not blank)

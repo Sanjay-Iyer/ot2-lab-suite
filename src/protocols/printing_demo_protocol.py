@@ -1385,33 +1385,36 @@ def host_run(args: Any) -> None:
 
         try:
             from src.core.config import Config as RobotConfig
-            ssh_key = args.ssh_key or os.environ.get("ROBOT_SSH_KEY_PATH") or RobotConfig.ROBOT_SSH_KEY_PATH
-            ssh_user = RobotConfig.ROBOT_SSH_USER
-        except ImportError:
-            ssh_key = args.ssh_key or os.environ.get("ROBOT_SSH_KEY_PATH")
-            ssh_user = "root"
+            from src.utils.ot2_ssh import OT2SSHSettings
+        except ImportError as exc:
+            logger.error(f"Repository SSH configuration is unavailable: {exc}")
+            sys.exit(1)
 
-        if not ssh_key:
-            default_key = r"C:\Users\iyersn\.ssh\id_rsa_opentrons"
-            if os.path.exists(default_key):
-                ssh_key = default_key
+        ssh_key = (
+            args.ssh_key
+            or os.environ.get("ROBOT_SSH_KEY_PATH")
+            or RobotConfig.ROBOT_SSH_KEY_PATH
+        )
 
         if not ssh_key:
             logger.error("ROBOT_SSH_KEY_PATH is missing. Check .env configuration or pass via --ssh-key.")
             sys.exit(1)
 
-        ssh_opts = [
-            "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
-            "-o", "StrictHostKeyChecking=no", "-i", ssh_key,
-        ]
+        ssh_settings = OT2SSHSettings.from_config(
+            RobotConfig,
+            robot_ip=robot_ip,
+            identity_file=ssh_key,
+        )
 
         remote_dest_dir = "/var/lib/opentrons/user_storage/ot2_runs"
         remote_script_path = f"{remote_dest_dir}/printing_demo_run.py"
 
         logger.info("Deploying generated robot protocol...")
-        deploy_cmd = (
-            ["scp", "-O"] + ssh_opts
-            + [str(run_script_path), f"{ssh_user}@{robot_ip}:{remote_script_path}"]
+        deploy_cmd = ssh_settings.scp_command(
+            str(run_script_path),
+            ssh_settings.remote_path(remote_script_path),
+            legacy_protocol=True,
+            connect_timeout=15,
         )
         dep_res = subprocess.run(deploy_cmd, capture_output=True, text=True, check=False)
         if dep_res.returncode != 0:
@@ -1420,9 +1423,9 @@ def host_run(args: Any) -> None:
         logger.info("Protocol deployed successfully.")
 
         logger.info("Triggering protocol run on OT-2 robot...")
-        exec_cmd = (
-            ["ssh"] + ssh_opts
-            + [f"{ssh_user}@{robot_ip}", f"opentrons_execute {remote_script_path}"]
+        exec_cmd = ssh_settings.ssh_command(
+            f"opentrons_execute {remote_script_path}",
+            connect_timeout=15,
         )
         run_res = subprocess.run(exec_cmd, capture_output=True, text=True, check=False)
 
@@ -1451,9 +1454,12 @@ def host_run(args: Any) -> None:
             temp_transfer_dir.mkdir(exist_ok=True)
 
             remote_image_dir = camera_cfg.get("robot_image_dir", "/data/vision/printing_demo")
-            scp_cmd = (
-                ["scp", "-O"] + ssh_opts
-                + ["-r", f"{ssh_user}@{robot_ip}:{remote_image_dir}/*", str(temp_transfer_dir)]
+            scp_cmd = ssh_settings.scp_command(
+                ssh_settings.remote_path(f"{remote_image_dir}/*"),
+                str(temp_transfer_dir),
+                recursive=True,
+                legacy_protocol=True,
+                connect_timeout=15,
             )
             scp_res = subprocess.run(scp_cmd, capture_output=True, text=True, check=False)
             if scp_res.returncode != 0:
@@ -1545,7 +1551,10 @@ def host_run(args: Any) -> None:
 
             logger.info("Cleaning up remote images on robot...")
             subprocess.run(
-                ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"rm -rf {remote_image_dir}/*"],
+                ssh_settings.ssh_command(
+                    f"rm -rf {remote_image_dir}/*",
+                    connect_timeout=15,
+                ),
                 check=False,
             )
             if temp_transfer_dir.exists():

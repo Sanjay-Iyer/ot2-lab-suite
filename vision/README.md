@@ -40,7 +40,11 @@ All connection and workflow settings are in one file — nothing is hardcoded in
 robot:
   ip: 169.254.46.57          # Your OT-2's USB/Ethernet IP
   user: root                  # OT-2 SSH user (always root)
-  ssh_key_path: C:\Users\iyersn\.ssh\id_rsa_opentrons
+  host_env_var: ROBOT_IP
+  ssh_user_env_var: ROBOT_SSH_USER
+  ssh_key_env_var: ROBOT_SSH_KEY_PATH
+  ssh_identities_only_env_var: ROBOT_SSH_IDENTITIES_ONLY
+  ssh_legacy_rsa_env_var: ROBOT_SSH_LEGACY_RSA
 
 remote:
   vision_dir: /data/vision    # Where images are saved on the robot

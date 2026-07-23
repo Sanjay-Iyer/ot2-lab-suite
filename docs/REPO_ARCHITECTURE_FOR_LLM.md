@@ -102,6 +102,8 @@ settings include:
 | `ROBOT_IP` | Robot network address; source fallback is `127.0.0.1` |
 | `ROBOT_SSH_USER` | Robot SSH account, normally `root` |
 | `ROBOT_SSH_KEY_PATH` | Private key used for non-interactive SSH/SCP |
+| `ROBOT_SSH_IDENTITIES_ONLY` | Restrict SSH to the configured identity; defaults to `true` |
+| `ROBOT_SSH_LEGACY_RSA` | Add OT-2-scoped `ssh-rsa` user-authentication compatibility when `true` |
 | `ROBOT_REMOTE_RUN_DIR` | Base robot directory exposed as `Config.REMOTE_USER_STORAGE` |
 | `OT_API_CONFIG_DIR` | Local Opentrons API data/config mirror; defaults inside `robot_data/data/` |
 | `LLM_PROVIDER` | `api-key` or `vertexai` |
@@ -331,7 +333,10 @@ runners use the HTTP API. Running them through bare `opentrons_execute` can caus
 
 Current guarded SSH/SCP code uses:
 
+- the shared `src/utils/ot2_ssh.py` command builder;
 - the explicit private key from `ROBOT_SSH_KEY_PATH` via `-i`;
+- `IdentitiesOnly=yes`;
+- `PubkeyAcceptedAlgorithms=+ssh-rsa` only when `ROBOT_SSH_LEGACY_RSA=true`;
 - `BatchMode=yes`, which prevents password prompts inside automation;
 - a finite `ConnectTimeout`;
 - POSIX robot paths;
@@ -344,7 +349,13 @@ Conceptually, the manual low-API sequence is:
 $IP = "169.254.46.57"
 $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $REMOTE = "/var/lib/opentrons/user_storage/ot2_runs"
-$OPTS = @("-i", $KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+$OPTS = @(
+    "-o", "IdentitiesOnly=yes",
+    "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
+    "-i", $KEY,
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=10"
+)
 
 ssh @OPTS root@$IP "mkdir -p $REMOTE"
 scp -O @OPTS "src/protocols/generated/generated_dilution.py" "root@${IP}:$REMOTE/generated_dilution.py"
@@ -366,6 +377,9 @@ The general agent's SSH deployment path:
 
 SSH is also used independently of execution to inspect attached-instrument JSON,
 check calibration files, create/clean camera directories, and verify files.
+Host-key checking remains enabled. See
+[OT-2 SSH compatibility](OT2_SSH_COMPATIBILITY.md) for configuration,
+diagnostics, and host-key-change handling.
 
 ### 7.3 Custom labware deployment
 
@@ -798,14 +812,14 @@ launched, what the robot reported, and what the camera/CV observed.
 | `run_3d_print_labware_validate.py` | HTTP runner for physical labware validation protocol |
 | `check_connectivity.py` | Environment, network, SSH, and calibration diagnostics |
 | `deploy.py` | Bulk SSH/SCP staging deploy or one custom labware JSON deploy |
-| `run_smoke_test.py` | Low-API SSH/SCP/`opentrons_execute` smoke-test path |
+| `run_smoke_test.py` | P20 local simulation by default; explicit HTTP API dry-motion runner |
 | `generate_labware.py` | Parametric YAML-to-Opentrons-JSON generator |
 | `pull_vision_images.py` | Direct guarded SCP pull of a robot vision folder |
 | `pull_ot2_images.py` | Config-driven transfer, inventory, and validation workflow |
 | `test_ot2_camera_capture.py` | Camera endpoint and image-transfer diagnostic; also has mock mode |
 | `validate_vial_print.py` | Active Workflow 01 five-mode output-scanning simulation validator; use with `build_vial_dilution_print.py` |
 | `audit_paths.py` | Detect problematic hardcoded paths and portability issues |
-| `sync_robot.py` | Older broad robot-data copy helper; unlike current guarded pull tools, its source presently lacks the explicit key and `scp -O` pattern |
+| `sync_robot.py` | Broad robot-data pull using the shared SSH settings and `scp -O` |
 
 ## 17. Current implementation caveats an LLM must know
 

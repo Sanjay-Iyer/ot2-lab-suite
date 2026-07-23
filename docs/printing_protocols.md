@@ -58,16 +58,20 @@ No `well.bottom()`, `well.bottom(0)`, or `well.bottom(-...)` calls exist.
 ### SCP deploy command
 
 ```powershell
-scp -O -i C:\Users\iyersn\.ssh\id_rsa_opentrons `
+scp -O `
+    -o IdentitiesOnly=yes `
+    -o PubkeyAcceptedAlgorithms=+ssh-rsa `
+    -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" `
     .\src\protocols\generated\protocol_96.py `
     root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/protocol_96.py
 ```
 
 ### Robot-side verification
 
-```bash
-ssh -i C:\Users\iyersn\.ssh\id_rsa_opentrons root@169.254.46.57 \
-  "grep -n 'opentrons_96_wellplate\|custom_beta\|usascientific\|load_labware\|dry_position_check\|bottom' \
+```powershell
+ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
+  -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@169.254.46.57 `
+  "grep -n 'opentrons_96_wellplate\|custom_beta\|usascientific\|load_labware\|dry_position_check\|bottom' `
    /var/lib/opentrons/user_storage/ot2_runs/protocol_96.py"
 ```
 

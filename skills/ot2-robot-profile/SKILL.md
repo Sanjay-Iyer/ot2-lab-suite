@@ -112,8 +112,11 @@ Verified-good layout for the vial-dilution-print demo: vial rack **slot 7**, pla
   then silently targets localhost and "fails to connect." Set the real link-local
   IP explicitly: `ROBOT_IP=169.254.46.57` (it can change when the robot reconnects;
   re-check in the App → Network or `ping`).
-- SSH: user `root`, key `C:\Users\<you>\.ssh\id_rsa_opentrons`, **BatchMode** (no
-  password prompt). SCP to the robot needs `-O` (legacy protocol; dropbear has no SFTP).
+- SSH: user `root`, key `C:\Users\<you>\.ssh\id_rsa_opentrons`,
+  `IdentitiesOnly=yes`, **BatchMode**, and
+  `PubkeyAcceptedAlgorithms=+ssh-rsa` when `ROBOT_SSH_LEGACY_RSA=true`. SCP to
+  the robot also needs `-O` (legacy protocol; Dropbear has no SFTP). Host-key
+  checking remains enabled.
 - Verify the whole link with `python -m scripts.check_connectivity` (expect every
   step PASS before deploying).
 

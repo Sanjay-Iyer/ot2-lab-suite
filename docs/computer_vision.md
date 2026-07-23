@@ -63,13 +63,17 @@ The OT-2 has no project code on it for vision. Acquisition is pure remote shell:
    sleep 3 ;   # repeated per requested image
    ...
    ```
-   SSH options used: `-o BatchMode=yes -o ConnectTimeout=30 -o StrictHostKeyChecking=no -i <key>`.
+   SSH options come from `src/utils/ot2_ssh.py`: `IdentitiesOnly=yes`, the
+   configured identity, finite timeout, and (when enabled)
+   `PubkeyAcceptedAlgorithms=+ssh-rsa`. Host-key checking remains enabled.
 
 2. **Transfer** ([vision/transfer_ot2_images.py](../vision/transfer_ot2_images.py)) — pulls
    images back with **legacy SCP**:
    ```sh
-   scp -O -i <key> -o BatchMode=yes -o ConnectTimeout=30 \
-       -o StrictHostKeyChecking=no -r root@<ip>:/data/vision/* vision/raw
+   scp -O -o IdentitiesOnly=yes \
+       -o PubkeyAcceptedAlgorithms=+ssh-rsa \
+       -i <key> -o BatchMode=yes -o ConnectTimeout=30 \
+       -r root@<ip>:/data/vision/* vision/raw
    ```
    **`-O` (capital O) is mandatory** — the OT-2 lacks `/usr/libexec/sftp-server`, so default
    (SFTP-based) SCP fails with `sh: /usr/libexec/sftp-server: not found`. Do **not** confuse
@@ -285,10 +289,9 @@ python vision_tests/scripts/test_tip_count_by_slot.py    # per-slot counts
    one-line fix is to point `transfer_ot2_images.py --local-dir vision_tests/raw`, or unify
    the path in config.
 2. **`opencv-python` and `rich` are undeclared** dependencies (see §4).
-3. **Hardcoded, wrong-user SSH key path** in `configs/vision.yaml`:
-   `C:\Users\iyersn\.ssh\id_rsa_opentrons` (`iyersn`, not this machine's `iyer95`). It's the
-   lab laptop's path committed into config — a cross-machine landmine. Consider an env-var
-   override or per-machine local config.
+3. **Machine-specific SSH values** are resolved from `.env` through the
+   `*_env_var` fields in `configs/vision.yaml`; do not put a personal key path in
+   the tracked YAML.
 4. **Pipeline code is duplicated** across all four analysis scripts (`create_binary_mask`,
    `detect_objects` are copy-pasted). Refactor into a shared `vision_tests/lib.py` before
    the logic diverges.

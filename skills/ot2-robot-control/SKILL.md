@@ -32,16 +32,20 @@ agent testing and must not be used for live OT-2 agent interactions.
 | `ROBOT_IP` | OT-2 link-local IP | `169.254.46.57` |
 | `ROBOT_SSH_USER` | SSH user (always root on OT-2) | `root` |
 | `ROBOT_SSH_KEY_PATH` | Path to the private key | `C:\Users\<you>\.ssh\id_rsa_opentrons` |
+| `ROBOT_SSH_IDENTITIES_ONLY` | Use only the configured key | `true` |
+| `ROBOT_SSH_LEGACY_RSA` | Enable old OT-2 RSA signatures | `true` for system v1.15.1 |
 | `ROBOT_REMOTE_RUN_DIR` | Remote run directory | `/var/lib/opentrons/user_storage/ot2_runs` |
 
 Resolved in [`src/core/config.py`](../../src/core/config.py) as
 `Config.ROBOT_IP`, `Config.ROBOT_SSH_USER`, `Config.ROBOT_SSH_KEY_PATH`,
+`Config.ROBOT_SSH_IDENTITIES_ONLY`, `Config.ROBOT_SSH_LEGACY_RSA`, and
 `Config.REMOTE_USER_STORAGE`.
 
 > ✅ **Verified manual connect (key: `id_rsa_opentrons`).** This is the exact command
 > the operator uses; it connects with **no password prompt**:
 > ```powershell
-> ssh root@169.254.46.57 -i C:\Users\iyersn\.ssh\id_rsa_opentrons
+> ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
+>   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@169.254.46.57
 > ```
 > Always use `id_rsa_opentrons` (NOT the default `~/.ssh/id_rsa`, which the robot
 > rejects with `Permission denied (publickey)` and triggers a passphrase prompt). All
@@ -73,7 +77,8 @@ Quick manual checks:
 ping 169.254.46.57
 
 # Does passwordless SSH work? (BatchMode = no interactive prompts)
-ssh -i "$env:ROBOT_SSH_KEY_PATH" -o BatchMode=yes root@169.254.46.57 "echo SSH_OK"
+python scripts\check_ot2_ssh.py --robot-ip 169.254.46.57 `
+  --identity-file "$env:ROBOT_SSH_KEY_PATH" --legacy-rsa
 ```
 
 ## Path A — via the AI agent (recommended, with safety gates)
@@ -123,7 +128,13 @@ All commands use **non-interactive BatchMode** SSH with the key. Remote paths ar
 $IP  = "169.254.46.57"
 $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $REMOTE = "/var/lib/opentrons/user_storage/ot2_runs"
-$OPTS = @("-i", $KEY, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10")
+$OPTS = @(
+    "-o", "IdentitiesOnly=yes",
+    "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
+    "-i", $KEY,
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=10"
+)
 ```
 
 ```powershell
@@ -147,8 +158,8 @@ ssh @OPTS root@$IP "opentrons_execute $REMOTE/generated_dilution.py"
 ### Helper scripts (laptop-side)
 
 ```bash
-# End-to-end smoke test: SSH check → upload → verify → opentrons_execute
-python scripts/run_smoke_test.py --robot-ip 169.254.46.57 --ssh-key "C:\path\to\key"
+# Local smoke-test simulation (no robot connection)
+python scripts/run_smoke_test.py --simulate
 
 # Bulk-deploy the staging directory contents to the robot
 python -m scripts.deploy
@@ -174,6 +185,7 @@ python -m scripts.sync_robot
 |---------|-------------|-----|
 | `Connection timed out` / port 22 unreachable | Robot off, cable unplugged, wrong IP | Power-cycle, check cable, verify `ROBOT_IP` |
 | `Permission denied (publickey)` | Wrong/missing key, key not on robot | Check `ROBOT_SSH_KEY_PATH`; confirm key is in robot `authorized_keys` |
+| `Permission denied (publickey)` on system v1.15.1 | Modern client disabled `ssh-rsa` | Set `ROBOT_SSH_LEGACY_RSA=true`; run `scripts/check_ot2_ssh.py --legacy-rsa` |
 | SCP hangs or `subsystem request failed` | Missing `-O` flag | Add `-O` to the `scp` command |
 | `ROBOT_SSH_KEY_PATH is missing` | `.env` blank | Set the key path in `.env` |
 | `opentrons_execute: not found` | Robot software issue | SSH in and check `which opentrons_execute` |

@@ -30,16 +30,12 @@ if __name__ == "__main__" and not __package__:
 
 from src.core.config import Config
 from src.utils.robot_run_log import RobotRunLog, repo_relative
+from src.utils.ot2_ssh import OT2SSHSettings
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
 DEFAULT_REMOTE_DIR = "/data/vision/vial_dilution_print"
 LOCAL_BASE = REPO / "vision_runs"
-
-
-def _ssh_user_host(robot_ip: str) -> str:
-    user = getattr(Config, "ROBOT_SSH_USER", "root") or "root"
-    return f"{user}@{robot_ip}"
 
 
 def _resolve_ssh_key(cli_key: str | None) -> str:
@@ -83,12 +79,21 @@ def main() -> int:
     dest.parent.mkdir(parents=True, exist_ok=True)
     run_log.update(local_dest=repo_relative(dest))
 
-    opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
-            "-o", "StrictHostKeyChecking=no", "-i", key]
-    cmd = ["scp", "-O", "-r", *opts, f"{_ssh_user_host(args.robot_ip)}:{remote_dir}", str(dest)]
+    settings = OT2SSHSettings.from_config(
+        Config,
+        robot_ip=args.robot_ip,
+        identity_file=key,
+    )
+    cmd = settings.scp_command(
+        settings.remote_path(remote_dir),
+        str(dest),
+        recursive=True,
+        legacy_protocol=True,
+        connect_timeout=10,
+    )
 
     print("=== Pull Vision Images ===")
-    print(f"Robot      : {_ssh_user_host(args.robot_ip)}")
+    print(f"Robot      : {settings.target}")
     print(f"Remote dir : {remote_dir}")
     print(f"Local dest : {dest}")
     print(f"\n[scp] {' '.join(cmd)}")

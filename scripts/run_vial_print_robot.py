@@ -28,6 +28,7 @@ if __name__ == "__main__" and not __package__:
 
 from src.core.config import Config
 from src.utils.robot_run_log import RobotRunLog, repo_relative
+from src.utils.ot2_ssh import OT2SSHSettings
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -258,11 +259,6 @@ def _monitor(robot_ip: str, run_id: str, poll_s: float) -> str:
         time.sleep(poll_s)
 
 
-def _ssh_user_host(robot_ip: str) -> str:
-    user = getattr(Config, "ROBOT_SSH_USER", "root") or "root"
-    return f"{user}@{robot_ip}"
-
-
 def _resolve_ssh_key(cli_key: str | None) -> str:
     """--ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons."""
     for candidate in (cli_key, getattr(Config, "ROBOT_SSH_KEY_PATH", ""), str(DEFAULT_SSH_KEY)):
@@ -270,15 +266,6 @@ def _resolve_ssh_key(cli_key: str | None) -> str:
         if key:
             return key
     return str(DEFAULT_SSH_KEY)
-
-
-def _ssh_opts(key: str, *, timeout_s: int = 10) -> list[str]:
-    return [
-        "-o", "BatchMode=yes",
-        "-o", f"ConnectTimeout={timeout_s}",
-        "-o", "StrictHostKeyChecking=no",
-        "-i", key,
-    ]
 
 
 def _remote_image_dir() -> str:
@@ -302,12 +289,15 @@ def _prepare_remote_image_dir(
         return False
 
     quoted = shlex.quote(remote_dir)
-    cmd = [
-        "ssh",
-        *_ssh_opts(key),
-        _ssh_user_host(robot_ip),
+    settings = OT2SSHSettings.from_config(
+        Config,
+        robot_ip=robot_ip,
+        identity_file=key,
+    )
+    cmd = settings.ssh_command(
         f"mkdir -p {quoted} && rm -f {quoted}/*.jpg {quoted}/*.jpeg {quoted}/*.png",
-    ]
+        connect_timeout=10,
+    )
     print(f"\n[prepare images] clearing {remote_dir}")
     if run_log:
         run_log.event("image_prepare_started", remote_dir=remote_dir)
@@ -339,14 +329,18 @@ def _pull_images(
 
     LOCAL_VISION_BASE.mkdir(parents=True, exist_ok=True)
     dest = LOCAL_VISION_BASE / local_name
-    cmd = [
-        "scp",
-        "-O",
-        "-r",
-        *_ssh_opts(key),
-        f"{_ssh_user_host(robot_ip)}:{remote_dir}",
+    settings = OT2SSHSettings.from_config(
+        Config,
+        robot_ip=robot_ip,
+        identity_file=key,
+    )
+    cmd = settings.scp_command(
+        settings.remote_path(remote_dir),
         str(dest),
-    ]
+        recursive=True,
+        legacy_protocol=True,
+        connect_timeout=10,
+    )
     print(f"\n[pull images] {' '.join(cmd)}")
     if run_log:
         run_log.event("image_pull_started", remote_dir=remote_dir, local_dest=repo_relative(dest))

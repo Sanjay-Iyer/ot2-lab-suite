@@ -34,11 +34,14 @@ The OT-2 authenticates over SSH using a private key (not a password). You need t
 > ✅ **The key in use is `id_rsa_opentrons`.** The verified manual command that connects
 > with **no password prompt** is:
 > ```powershell
-> ssh root@169.254.46.57 -i C:\Users\iyersn\.ssh\id_rsa_opentrons
+> ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
+>   -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" root@169.254.46.57
 > ```
-> Set `.env` → `ROBOT_SSH_KEY_PATH=C:\Users\iyersn\.ssh\id_rsa_opentrons`. Do **not** rely on
+> Set `.env` → `ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons`. Do **not** rely on
 > the default `~/.ssh/id_rsa` — the robot rejects it (`Permission denied (publickey)`) and it
-> prompts for a passphrase. Every `ssh`/`scp` must pass this key with `-i` (and `scp -O`).
+> prompts for a passphrase. Every direct `ssh`/`scp` command must use
+> `IdentitiesOnly=yes`, the configured key, and, for this older robot,
+> `PubkeyAcceptedAlgorithms=+ssh-rsa` (plus `scp -O`).
 > The examples below use a generic `keys\ot2_automation_key` placeholder; substitute
 > `id_rsa_opentrons` (or whatever `ROBOT_SSH_KEY_PATH` points to).
 
@@ -56,21 +59,43 @@ This creates two files:
 - `ot2_automation_key` — your private key (keep this secret)
 - `ot2_automation_key.pub` — your public key (this goes on the robot)
 
-### 2c. Copy the Public Key to the Robot
-You need to add your public key to the robot's authorized keys. If you have temporary password access or the Opentrons app:
+### 2c. Install the Public Key Through the OT-2 HTTP API
+
+First verify that the `.pub` file matches the private key by comparing the two
+fingerprints:
+
 ```powershell
-# Read your public key
-type C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key.pub
-
-# SSH into the robot (you may need the default password for first-time access)
-ssh root@169.254.46.57
-
-# On the robot, paste your public key:
-echo "PASTE_YOUR_PUBLIC_KEY_HERE" >> ~/.ssh/authorized_keys
-exit
+ssh-keygen -lf "$env:USERPROFILE\.ssh\id_rsa_opentrons.pub"
+ssh-keygen -y -f "$env:USERPROFILE\.ssh\id_rsa_opentrons" |
+  ssh-keygen -lf -
 ```
 
-Alternatively, use the **Opentrons Desktop App** to add your SSH key via the robot settings page.
+The fingerprints must match. Then install only the `.pub` file:
+
+```powershell
+$PublicKeyPath = "$env:USERPROFILE\.ssh\id_rsa_opentrons.pub"
+if ([IO.Path]::GetExtension($PublicKeyPath) -ne ".pub") {
+    throw "Refusing non-.pub key path"
+}
+
+$PublicKey = (Get-Content -LiteralPath $PublicKeyPath -Raw).Trim()
+$Body = @{ key = $PublicKey } | ConvertTo-Json -Compress
+
+$Response = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://169.254.46.57:31950/server/ssh_keys" `
+  -Headers @{ "opentrons-version" = "*" } `
+  -ContentType "application/json" `
+  -Body $Body
+
+$KeyId = $Response.data.id
+if (-not $KeyId) { $KeyId = $Response.id }
+Write-Host "Installed key ID: $KeyId"
+```
+
+The response reports the installed key identifier. This operation does not
+delete existing robot keys and does not cause robot motion. Do not print or
+upload the private-key file.
 
 ---
 
@@ -81,7 +106,9 @@ Open `.env` in the project root and ensure these lines are set:
 # OT-2 Robot
 ROBOT_IP=169.254.46.57
 ROBOT_SSH_USER=root
-ROBOT_SSH_KEY_PATH=C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key
+ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
+ROBOT_SSH_IDENTITIES_ONLY=true
+ROBOT_SSH_LEGACY_RSA=true
 ```
 
 > ⚠️ `ROBOT_SSH_KEY_PATH` must point to the **private** key (no `.pub` extension).
@@ -93,9 +120,10 @@ ROBOT_SSH_KEY_PATH=C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key
 
 Run the built-in diagnostic from the project root:
 ```powershell
-conda activate ai
+conda activate llm
 cd C:\code\opentrons_home\ot2-lab-suite
 python -m scripts.check_connectivity
+python scripts\check_ot2_ssh.py --legacy-rsa
 ```
 
 ### What Each Section Should Show
@@ -116,11 +144,14 @@ python -m scripts.check_connectivity
 
 ### 5a. Transfer the Protocol
 ```powershell
+$KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
+$OPTS = @("-o", "IdentitiesOnly=yes", "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa", "-i", $KEY)
+
 # Create a run folder on the robot
-ssh -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/my_run"
+ssh @OPTS root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/my_run"
 
 # Copy the generated protocol to the robot
-scp -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/my_run/
+scp -O @OPTS src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/my_run/
 ```
 
 ### 5b. Deploy Custom Labware (only if your protocol uses it)
@@ -144,7 +175,7 @@ do **not** manage this path.)
 
 ### 5c. Execute the Protocol
 ```powershell
-ssh -i C:\code\opentrons_home\ot2-lab-suite\keys\ot2_automation_key root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/my_run/generated_printing.py"
+ssh @OPTS root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/my_run/generated_printing.py"
 ```
 
 > ⚠️ **The robot will start moving immediately.** Make sure the deck is loaded correctly and you are watching the instrument.
@@ -178,6 +209,6 @@ The agent will:
 |---|---|---|
 | `Port 22 unreachable` | Robot off, cable unplugged, or wrong IP | Check physical setup (Step 1) |
 | `ROBOT_SSH_KEY_PATH is missing` | `.env` not configured | Set the path in `.env` (Step 3) |
-| `Permission denied (publickey)` | Key not on robot or wrong key file | Re-copy public key to robot (Step 2c) |
+| `Permission denied (publickey)` | Key not installed, wrong key, or legacy RSA mode disabled | Verify the key pair, install the `.pub` key, and set `ROBOT_SSH_LEGACY_RSA=true` |
 | `Network is unreachable` | No link-local IP on laptop | Unplug/replug Ethernet, wait 30s |
-| `Host key verification failed` | Robot was reimaged or IP changed | Run `ssh-keygen -R 169.254.46.57` then retry |
+| `Host key verification failed` | Robot identity differs from `known_hosts` | Verify the robot serial through `/health`; only then remove the stale entry as documented in [OT-2 SSH compatibility](OT2_SSH_COMPATIBILITY.md) |

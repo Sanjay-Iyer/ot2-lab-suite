@@ -38,9 +38,18 @@ To connect to your robot, create a `.env` file in the project root:
 
 ```bash
 ROBOT_IP=169.254.46.57
-GOOGLE_API_KEY=your_key_here
+ROBOT_SSH_USER=root
+ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
+ROBOT_SSH_IDENTITIES_ONLY=true
+ROBOT_SSH_LEGACY_RSA=true
+LLM_PROVIDER=vertexai
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
 GEMINI_MODEL=gemini-1.5-flash
 ```
+
+Use `LLM_PROVIDER=api-key` and `GOOGLE_API_KEY` only for simulation-laptop
+agent testing. See [OT-2 SSH compatibility](OT2_SSH_COMPATIBILITY.md).
 
 ## 🧪 Quick Start
 

@@ -38,7 +38,7 @@ Options for each rule: `ERROR` (fatal), `WARN` (warning), or `IGNORE`.
 You can chain the tool with your deployment scripts:
 
 ```bash
-python -m src.utils.preflight my_protocol.py && scp my_protocol.py root@<robot-ip>:/var/lib/opentrons/
+python -m src.utils.preflight my_protocol.py && scp -O -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa -i <key> my_protocol.py root@<robot-ip>:/var/lib/opentrons/
 ```
 
 If the preflight check fails, the SCP command will not execute.

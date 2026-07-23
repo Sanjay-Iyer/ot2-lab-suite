@@ -27,7 +27,9 @@ The run needs **no SSH**. Proven examples: `run_vial_print_robot.py`,
 ## Pulling files back (optional)
 The run is HTTP, but pulling images/logs needs **SCP** with the OT-2 key:
 `--ssh-key` > `.env ROBOT_SSH_KEY_PATH` > `~/.ssh/id_rsa_opentrons` (never the bare
-`id_rsa`), plus `-o BatchMode=yes -o StrictHostKeyChecking=no -i <key>` and **`scp -O`**.
+`id_rsa`), plus `-o IdentitiesOnly=yes`, optional OT-2-scoped
+`-o PubkeyAcceptedAlgorithms=+ssh-rsa`, `-o BatchMode=yes`, `-i <key>`, and
+**`scp -O`**. Host-key verification must remain enabled.
 Working block: `_pull_images()` in `run_droplet_error_check.py`. See also
 [[reference-ot2-ssh-key]] and `SKILL.md`.
 

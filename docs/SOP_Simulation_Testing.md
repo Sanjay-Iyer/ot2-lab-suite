@@ -94,28 +94,31 @@ If you generated a protocol and want to manually send it to the physical OT-2 an
 **Ensure your Robot config is set in `.env`:**
 ```env
 ROBOT_IP=169.254.46.57
-ROBOT_SSH_KEY_PATH=C:\Users\iyersn\.ssh\id_rsa_opentrons
+ROBOT_SSH_KEY_PATH=C:\Users\<username>\.ssh\id_rsa_opentrons
+ROBOT_SSH_IDENTITIES_ONLY=true
+ROBOT_SSH_LEGACY_RSA=true
 ```
 > ⚠️ The `ROBOT_SSH_KEY_PATH` is **machine-specific**. Use the actual path to YOUR private key on THIS laptop. The commands below use `$KEY` as a shorthand — set it first.
 
 **Step A: Set your key path variable in PowerShell**
 ```powershell
-$KEY = "C:\Users\iyersn\.ssh\id_rsa_opentrons"
+$KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
+$OPTS = @("-o", "IdentitiesOnly=yes", "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa", "-i", $KEY)
 ```
 
 **Step B: Transfer the file via SCP**
 *(Replace `run_123` with a unique folder name, and `generated_printing.py` with your actual file).*
 ```powershell
 # Create a folder on the robot
-ssh -i $KEY root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
+ssh @OPTS root@169.254.46.57 "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
 
 # Copy the file to the robot (-O forces legacy SCP protocol; the OT-2 lacks sftp-server)
-scp -O -i $KEY src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
+scp -O @OPTS src\protocols\generated\generated_printing.py root@169.254.46.57:/var/lib/opentrons/user_storage/ot2_runs/run_123/
 ```
 
 **Step C: Execute via SSH**
 ```powershell
-ssh -i $KEY root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/run_123/generated_printing.py"
+ssh @OPTS root@169.254.46.57 "opentrons_execute /var/lib/opentrons/user_storage/ot2_runs/run_123/generated_printing.py"
 ```
 
 ---

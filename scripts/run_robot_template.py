@@ -164,7 +164,8 @@ def main() -> int:
     print(f"\nRun finished with status: {status}")
 
     # >>> OPTIONAL <<< pull files back via SCP after a successful run. Use the OT-2 key
-    # (id_rsa_opentrons), -o BatchMode=yes, and scp -O. See run_droplet_error_check.py.
+    # (id_rsa_opentrons) through OT2SSHSettings, including configured legacy-RSA
+    # compatibility and scp -O. Host-key checking must remain enabled.
 
     return 0 if status == "succeeded" else 1
 

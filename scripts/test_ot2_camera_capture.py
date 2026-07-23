@@ -24,6 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from vision.config import load_vision_config
 from PIL import Image
+from src.utils.ot2_ssh import OT2SSHSettings
 
 def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
     print("=" * 60)
@@ -88,12 +89,11 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
             print(f"[FAIL] Private SSH key not found at: {key}", file=sys.stderr)
             return 1
 
-        ssh_opts = [
-            "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=10",
-            "-o", "StrictHostKeyChecking=no",
-            "-i", str(key)
-        ]
+        settings = OT2SSHSettings.from_mapping(cfg["robot"]).with_overrides(
+            robot_ip=ip,
+            user=user,
+            identity_file=key,
+        )
 
         # Step 1: Capture image on the robot
         remote_filepath = f"{remote_dir}/test_diag_capture.jpg"
@@ -103,7 +103,7 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
             f"curl -s -X POST -H 'opentrons-version: {header_val}' "
             f"{camera_endpoint} --output {remote_filepath}"
         )
-        ssh_cmd = ["ssh"] + ssh_opts + [f"{user}@{ip}", remote_cmd]
+        ssh_cmd = settings.ssh_command(remote_cmd, connect_timeout=10)
         
         print(f"  Running: {' '.join(ssh_cmd)}")
         result = subprocess.run(ssh_cmd, capture_output=True, text=True, check=False)
@@ -116,7 +116,12 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
 
         # Step 2: Transfer the image back
         print("Transferring image via SCP...")
-        scp_cmd = ["scp", "-O"] + ssh_opts + [f"{user}@{ip}:{remote_filepath}", str(local_filepath)]
+        scp_cmd = settings.scp_command(
+            settings.remote_path(remote_filepath),
+            str(local_filepath),
+            legacy_protocol=True,
+            connect_timeout=10,
+        )
         print(f"  Running: {' '.join(scp_cmd)}")
         result = subprocess.run(scp_cmd, capture_output=True, text=True, check=False)
         
@@ -128,7 +133,10 @@ def run_diagnostics(mock: bool = False, robot_ip: str = None) -> int:
 
         # Step 3: Clean up remote file
         print("Cleaning up remote file on the robot...")
-        cleanup_cmd = ["ssh"] + ssh_opts + [f"{user}@{ip}", f"rm -f {remote_filepath}"]
+        cleanup_cmd = settings.ssh_command(
+            f"rm -f {remote_filepath}",
+            connect_timeout=10,
+        )
         subprocess.run(cleanup_cmd, check=False)
 
     # 3. Validate image file integrity using Pillow

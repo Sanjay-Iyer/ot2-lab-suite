@@ -191,6 +191,8 @@ All runtime configuration lives in `.env` at the project root (lab laptop only):
 ROBOT_IP=169.254.46.57          # OT-2 link-local IP
 ROBOT_SSH_USER=root             # SSH user (always root on OT-2)
 ROBOT_SSH_KEY_PATH=/path/to/ot2_ssh_key   # Private key for passwordless SSH
+ROBOT_SSH_IDENTITIES_ONLY=true  # Use only the configured key
+ROBOT_SSH_LEGACY_RSA=true       # Required by older OT-2 SSH servers
 
 # LLM auth by laptop role:
 # Simulation laptop testing may use LLM_PROVIDER=api-key + GOOGLE_API_KEY.

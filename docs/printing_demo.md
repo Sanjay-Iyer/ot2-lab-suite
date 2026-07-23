@@ -130,7 +130,8 @@ If transferred images are placed in the `errors/` directory:
 - Verify that your camera server on the OT-2 is running. The onboard server exposes `http://localhost:31950/camera/picture`.
 - Log into the robot directly to check if pictures can be captured manually:
   ```bash
-  ssh -i <key_path> root@<ROBOT_IP> "curl -s -X POST -H 'opentrons-version: *' http://localhost:31950/camera/picture --output /data/vision/manual_test.jpg"
+  ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa \
+    -i <key_path> root@<ROBOT_IP> "curl -s -X POST -H 'opentrons-version: *' http://localhost:31950/camera/picture --output /data/vision/manual_test.jpg"
   ```
 
 ### 4. Calibration file locations
