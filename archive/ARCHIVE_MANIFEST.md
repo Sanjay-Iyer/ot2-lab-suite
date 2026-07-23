@@ -16,6 +16,7 @@ dependency**. Anything uncertain stays active and is listed in
 | `src/protocols/p20_p300_gen2_alternating_test.py` | `archive/experiments/pipette_bringup/p20_p300_gen2_alternating_test.py` | Experimental two-pipette (P20+P300) alternation bench test; the mixed-pipette behaviour it prototyped is now first-class in the flagship. | Same search: no active references anywhere. | `configs/printing/01_vial_dilution_paper_print.mixed.yaml` | 2026-07-22 | Yes |
 | `src/protocols/vial_rack_clearance_test.py` | `archive/protocols/vial_rack_clearance_test.py` | One-off clearance test protocol for the v2 rack; not part of Workflow 01. | `grep` for `vial_rack_clearance_test` across `*.py/*.md/*.json/*.yaml` returned **zero** references outside the file itself. | none (rack geometry validated by `3d_print_labware_validate.py`, still active) | 2026-07-22 | Yes |
 | `src/printing/` (whole tree: `tools/`, `protocols/`, `configs/`, `logs/`, `README.md`, `test_workflow.py`) | `archive/legacy_src_printing/` | Legacy "v2.0" nanoparticle-printing suite; a self-contained island superseded by `src/core/*` + the flagship. Contained the old `select_pipette` (superseded by `src/core/pipette_selection.py`). | **Zero** `from src.printing` / `import src.printing` in any active `.py`; no test imports it; `pytest.ini` already excluded it from collection; only mention was one docstring line (updated to note the archive). | `src/core/pipette_selection.py` (selection); the flagship (protocols) | 2026-07-22 | Yes — but its `logs/` are historical; restore the tree, don't merge logs |
+| `agent_protocol_config.json` | `archive/legacy_configs/agent_protocol_config.json` | Orphaned pre-unified printing job config at repository root. | Repository-wide search found zero imports, path constants, CLI references, builders, validators, registry entries, agent tools, tests, docs, YAML references, workflow references, or consumers of its unique keys (`total_mix_volume`, `print_volume`). | `configs/printing/01_vial_dilution_paper_print.<variant>.yaml` | 2026-07-22 | Yes |
 
 ## Deeper unused-file audit — classification of candidates
 
@@ -38,6 +39,7 @@ references, YAML path references, doc links, test references, agent-tool referen
 | `scripts/validate_protocol.py` | Uncertain | broken (points at non-existent `verify_tuberack.py`); doc-referenced — kept, flagged |
 | `src/protocols/vial_rack_clearance_test.py` | **Legacy confirmed** | 0 references → archived |
 | `src/printing/` (tree) | **Legacy confirmed** | 0 external imports, not test-collected → archived |
+| `agent_protocol_config.json` | **Legacy confirmed** | 0 references and no schema consumer → archived |
 | `configs/workflows/user/*.yaml`, `src/protocols/generated/*_run_*.py` | Historical | immutable run snapshots / build artifacts — untouched |
 | `vision_tests/` raw images | Out of scope | CV deprioritized; `*.jpg/*.png` git-ignored |
 
