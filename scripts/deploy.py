@@ -10,6 +10,7 @@ if __name__ == "__main__" and not __package__:
     sys.exit(1)
 
 from src.core.config import Config
+from src.utils.ot2_ssh import MissingIdentityFileError, OT2SSHSettings
 
 # Robot-side store that opentrons_execute resolves custom labware from:
 #   <this dir>/<namespace>/<loadName>/<version>.json
@@ -20,7 +21,6 @@ def deploy():
     robot_ip = Config.ROBOT_IP
     deploy_src = Config.DEPLOY_BASE_DIR
     key_path = Config.ROBOT_SSH_KEY_PATH
-    ssh_user = Config.ROBOT_SSH_USER
 
     if not key_path:
         print("Error: ROBOT_SSH_KEY_PATH is missing from .env. A private key is required for OT-2 SSH access.")
@@ -40,19 +40,27 @@ def deploy():
     # Professional SCP: Deploy the entire directory content
     # On Windows, we use the local path as is (Pathlib handles it)
     # The remote side is a string with forward slashes
-    ssh_opts = ["-i", key_path, "-o", "BatchMode=yes", "-o", "ConnectTimeout=30"]
+    settings = OT2SSHSettings.from_config(Config)
 
     # Ensure the remote destination exists before copying into it
-    mkdir_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"mkdir -p {robot_dest}"]
     try:
+        mkdir_cmd = settings.ssh_command(f"mkdir -p {robot_dest}")
         subprocess.run(mkdir_cmd, check=True)
+    except MissingIdentityFileError as e:
+        print(f"Error: {e}")
+        return
     except subprocess.CalledProcessError as e:
         print(f"Error: Could not reach robot / create remote dir (code {e.returncode}). Check SSH keys and connectivity.")
         return
 
     # We use a '.' to mean 'everything in this folder'.
     # -O forces the legacy SCP protocol (the OT-2's dropbear server lacks SFTP).
-    cmd = ["scp", "-O", "-r"] + ssh_opts + [".", f"{ssh_user}@{robot_ip}:{robot_dest}"]
+    cmd = settings.scp_command(
+        ".",
+        settings.remote_path(robot_dest),
+        recursive=True,
+        legacy_protocol=True,
+    )
 
     print(f"Executing: {' '.join(cmd)}")
     try:
@@ -101,24 +109,29 @@ def deploy_labware(labware_path, dry_run=False):
         return True
 
     key_path = Config.ROBOT_SSH_KEY_PATH
-    ssh_user = Config.ROBOT_SSH_USER
-    robot_ip = Config.ROBOT_IP
     if not key_path:
         print("Error: ROBOT_SSH_KEY_PATH is missing from .env. A private key is required for OT-2 SSH access.")
         return False
 
-    ssh_opts = ["-i", key_path, "-o", "BatchMode=yes", "-o", "ConnectTimeout=30"]
+    settings = OT2SSHSettings.from_config(Config)
 
     # Create the nested destination dir before copying into it.
-    mkdir_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"mkdir -p {remote_dir}"]
     try:
+        mkdir_cmd = settings.ssh_command(f"mkdir -p {remote_dir}")
         subprocess.run(mkdir_cmd, check=True)
+    except MissingIdentityFileError as e:
+        print(f"Error: {e}")
+        return False
     except subprocess.CalledProcessError as e:
         print(f"Error: could not reach robot / create remote dir (code {e.returncode}). Check SSH keys and connectivity.")
         return False
 
     # -O forces the legacy SCP protocol (the OT-2's dropbear server lacks SFTP).
-    cmd = ["scp", "-O"] + ssh_opts + [str(labware_path), f"{ssh_user}@{robot_ip}:{remote_dest}"]
+    cmd = settings.scp_command(
+        str(labware_path),
+        settings.remote_path(remote_dest),
+        legacy_protocol=True,
+    )
     print(f"Executing: {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True)
@@ -127,7 +140,7 @@ def deploy_labware(labware_path, dry_run=False):
         return False
 
     # Confirm the file actually landed (directly answers "does it exist on the robot").
-    verify_cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", f"ls -l {remote_dest}"]
+    verify_cmd = settings.ssh_command(f"ls -l {remote_dest}")
     try:
         subprocess.run(verify_cmd, check=True)
     except subprocess.CalledProcessError:

@@ -3,6 +3,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 from src.utils.paths import PROJECT_ROOT, ROBOT_DATA_MIRROR, LOG_DIR, ROBOT_DATA_DIR, DEPLOY_BASE_DIR
+from src.utils.ot2_ssh import parse_bool
 
 # Load .env from root
 load_dotenv(PROJECT_ROOT / ".env")
@@ -30,6 +31,14 @@ class Config:
     ROBOT_IP = os.getenv("ROBOT_IP", "127.0.0.1")
     ROBOT_SSH_USER = os.getenv("ROBOT_SSH_USER", "root")
     ROBOT_SSH_KEY_PATH = os.getenv("ROBOT_SSH_KEY_PATH", "")
+    ROBOT_SSH_IDENTITIES_ONLY = parse_bool(
+        os.getenv("ROBOT_SSH_IDENTITIES_ONLY"),
+        default=True,
+    )
+    ROBOT_SSH_LEGACY_RSA = parse_bool(
+        os.getenv("ROBOT_SSH_LEGACY_RSA"),
+        default=False,
+    )
     
     # ─── AI Models ────────────────────
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")

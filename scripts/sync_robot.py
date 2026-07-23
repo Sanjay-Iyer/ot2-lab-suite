@@ -9,6 +9,7 @@ if __name__ == "__main__" and not __package__:
     sys.exit(1)
 
 from src.core.config import Config
+from src.utils.ot2_ssh import MissingIdentityFileError, OT2SSHSettings
 
 def sync_from_robot():
     robot_ip = Config.ROBOT_IP
@@ -21,12 +22,21 @@ def sync_from_robot():
     # Run scp command to pull data
     # We pull config and logs
     targets = ["config.json", "labware", "pipettes", "logs"]
+    settings = OT2SSHSettings.from_config(Config)
     
     for target in targets:
-        cmd = ["scp", "-r", f"root@{robot_ip}:{robot_src}/{target}", str(local_dest)]
         print(f"Syncing {target}...")
         try:
+            cmd = settings.scp_command(
+                settings.remote_path(f"{robot_src}/{target}"),
+                str(local_dest),
+                recursive=True,
+                legacy_protocol=True,
+            )
             subprocess.run(cmd, check=True)
+        except MissingIdentityFileError as e:
+            print(f"Error: {e}")
+            return
         except subprocess.CalledProcessError:
             print(f"Warning: Failed to sync {target}")
 

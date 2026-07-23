@@ -17,44 +17,20 @@ Usage::
 import argparse
 import subprocess
 import sys
-import yaml
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
 # ─── Project root (vision/transfer_ot2_images.py → parent.parent) ─
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.utils.ot2_ssh import OT2SSHSettings
+from vision.config import load_vision_config
 
 
 # ─── Config loader ──────────────────────────────────────────────
-
-def load_vision_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
-    """Load ``configs/vision.yaml`` from the project root.
-
-    Parameters
-    ----------
-    config_path : Path, optional
-        Override the default config file location.
-
-    Returns
-    -------
-    dict
-        Parsed YAML configuration.
-    """
-    if config_path is None:
-        config_path = PROJECT_ROOT / "configs" / "vision.yaml"
-
-    if not config_path.exists():
-        print(
-            f"[ERROR] Config file not found: {config_path}\n"
-            f"  Expected at: {PROJECT_ROOT / 'configs' / 'vision.yaml'}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
 
 # ─── Helpers ────────────────────────────────────────────────────
 
@@ -86,22 +62,16 @@ def build_scp_command(
        This is **required** because the OT-2 lacks ``sftp-server``.
        Do NOT confuse with ``-o`` (lowercase), which sets SSH options.
     """
-    ip = cfg["robot"]["ip"]
-    user = cfg["robot"]["user"]
-    key = cfg["robot"]["ssh_key_path"]
+    settings = OT2SSHSettings.from_mapping(cfg["robot"])
 
-    cmd: List[str] = [
-        "scp",
-        "-O",                        # Capital O — legacy SCP protocol
-        "-i", key,
-        "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=30",
-        "-o", "StrictHostKeyChecking=no",
-        "-r",                        # Recursive copy
-        f"{user}@{ip}:{remote_dir}/*",
+    return settings.scp_command(
+        settings.remote_path(f"{remote_dir}/*"),
         local_dir,
-    ]
-    return cmd
+        recursive=True,
+        legacy_protocol=True,
+        connect_timeout=30,
+        validate_identity=False,
+    )
 
 
 # ─── Core function ──────────────────────────────────────────────
@@ -157,12 +127,13 @@ def transfer_images(
 
     if dry_run:
         print("[DRY-RUN] Would execute:")
-        print(f"  Remote source : {cfg['robot']['user']}@{cfg['robot']['ip']}:{r_dir}/*")
+        settings = OT2SSHSettings.from_mapping(cfg["robot"])
+        print(f"  Remote source : {settings.remote_path(f'{r_dir}/*')}")
         print(f"  Local dest    : {l_dir}")
         print(f"  Full command  : {' '.join(scp_cmd)}")
         return True
 
-    print(f"Transferring images from OT-2 ({cfg['robot']['ip']})...")
+    print(f"Transferring images from OT-2 ({cfg['robot']['host']})...")
     print(f"  Remote dir : {r_dir}")
     print(f"  Local dir  : {l_dir}")
     print()
@@ -214,7 +185,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    cfg = load_vision_config()
+    cfg = load_vision_config(validate_identity=not args.dry_run)
 
     # Resolve local dir for summary display
     if args.local_dir:

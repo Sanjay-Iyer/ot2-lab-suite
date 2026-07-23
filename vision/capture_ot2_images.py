@@ -16,44 +16,20 @@ Usage::
 import argparse
 import subprocess
 import sys
-import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 # ─── Project root (vision/capture_ot2_images.py → parent.parent) ─
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.utils.ot2_ssh import OT2SSHSettings
+from vision.config import load_vision_config
 
 
 # ─── Config loader ──────────────────────────────────────────────
-
-def load_vision_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
-    """Load ``configs/vision.yaml`` from the project root.
-
-    Parameters
-    ----------
-    config_path : Path, optional
-        Override the default config file location.
-
-    Returns
-    -------
-    dict
-        Parsed YAML configuration.
-    """
-    if config_path is None:
-        config_path = PROJECT_ROOT / "configs" / "vision.yaml"
-
-    if not config_path.exists():
-        print(
-            f"[ERROR] Config file not found: {config_path}\n"
-            f"  Expected at: {PROJECT_ROOT / 'configs' / 'vision.yaml'}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
 
 # ─── Command builders ──────────────────────────────────────────
 
@@ -112,19 +88,11 @@ def build_ssh_command(
         ["ssh", "-o", "BatchMode=yes", ..., "-i", key,
          "root@169.254.46.57", "<remote_command>"]
     """
-    ip = cfg["robot"]["ip"]
-    user = cfg["robot"]["user"]
-    key = cfg["robot"]["ssh_key_path"]
-
-    return [
-        "ssh",
-        "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=30",
-        "-o", "StrictHostKeyChecking=no",
-        "-i", key,
-        f"{user}@{ip}",
+    return OT2SSHSettings.from_mapping(cfg["robot"]).ssh_command(
         remote_command,
-    ]
+        connect_timeout=30,
+        validate_identity=False,
+    )
 
 
 # ─── Core function ──────────────────────────────────────────────
@@ -168,12 +136,13 @@ def capture_images(
 
     if dry_run:
         print("[DRY-RUN] Would execute:")
-        print(f"  SSH target  : {cfg['robot']['user']}@{cfg['robot']['ip']}")
+        settings = OT2SSHSettings.from_mapping(cfg["robot"])
+        print(f"  SSH target  : {settings.target}")
         print(f"  Remote cmd  : {remote_cmd}")
         print(f"  Full command: {' '.join(ssh_cmd)}")
         return True
 
-    print(f"Capturing {count} image(s) on OT-2 ({cfg['robot']['ip']})...")
+    print(f"Capturing {count} image(s) on OT-2 ({cfg['robot']['host']})...")
     print(f"  Delay between captures: {delay}s")
     print(f"  Remote save dir       : {cfg['remote']['vision_dir']}")
     print()
@@ -225,7 +194,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    cfg = load_vision_config()
+    cfg = load_vision_config(validate_identity=not args.dry_run)
     count = args.count if args.count is not None else cfg["capture"]["default_count"]
     delay = args.delay if args.delay is not None else cfg["capture"]["default_delay_seconds"]
 

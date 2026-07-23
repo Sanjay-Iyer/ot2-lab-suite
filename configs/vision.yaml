@@ -5,9 +5,11 @@
 # Edit values here instead of hardcoding them in Python files.
 
 robot:
-  ip: 169.254.46.57
-  user: root
-  ssh_key_path: C:\Users\iyersn\.ssh\id_rsa_opentrons
+  host_env_var: ROBOT_IP
+  ssh_user_env_var: ROBOT_SSH_USER
+  ssh_key_env_var: ROBOT_SSH_KEY_PATH
+  ssh_identities_only_env_var: ROBOT_SSH_IDENTITIES_ONLY
+  ssh_legacy_rsa_env_var: ROBOT_SSH_LEGACY_RSA
 
 remote:
   vision_dir: /data/vision

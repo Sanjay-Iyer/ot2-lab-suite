@@ -1,140 +1,216 @@
 #!/usr/bin/env python3
-import sys
-from pathlib import Path
+"""Simulate or explicitly execute the P20-only dry-motion smoke test."""
+from __future__ import annotations
+
 import argparse
+import json
+import os
+import re
 import subprocess
+import sys
+import time
+from contextlib import ExitStack
+from pathlib import Path
+from typing import Any, Sequence
 
-def main():
-    parser = argparse.ArgumentParser(description="Laptop-side runner for OT-2 Smoke Test.")
-    parser.add_argument(
-        "--robot-ip",
-        type=str,
-        default="169.254.46.57",
-        help="IP address of the physical OT-2 robot."
+import requests
+
+
+REPO = Path(__file__).resolve().parent.parent
+DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "smoke_test.py"
+DEFAULT_LABWARE = REPO / "labware" / "corning_96_wellplate_360ul_custom.json"
+HEADERS = {"opentrons-version": "*"}
+TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
+_SIMULATOR_SHIM = (
+    "import numpy as np; "
+    "np.trapz = getattr(np, 'trapezoid', np.trapz if hasattr(np, 'trapz') else None); "
+    "from opentrons.simulate import main; main()"
+)
+_SIMULATION_ERROR_RE = re.compile(
+    r"Traceback \(most recent call last\)|RuntimeError|LabwareNotFoundError|"
+    r"ProtocolCommandFailedError|InvalidProtocolData|KeyError|AttributeError",
+    re.IGNORECASE,
+)
+_SIMULATION_SUCCESS_TEXT = "P20 dry-motion smoke test complete"
+
+
+def _api_url(robot_ip: str, path: str) -> str:
+    return f"http://{robot_ip}:31950{path}"
+
+
+def _request_json(
+    method: str, robot_ip: str, path: str, **kwargs: Any
+) -> dict[str, Any]:
+    response = requests.request(
+        method,
+        _api_url(robot_ip, path),
+        headers=HEADERS,
+        timeout=30,
+        **kwargs,
     )
-    parser.add_argument(
-        "--ssh-key",
-        type=str,
-        default=r"C:\Users\iyersn\.ssh\id_rsa_opentrons",
-        help="Path to the SSH key."
-    )
-    parser.add_argument(
-        "--local-protocol",
-        type=str,
-        default=str(Path("src/protocols/generated/smoke_test.py")),
-        help="Path to the local smoke test protocol."
-    )
-    parser.add_argument(
-        "--remote-protocol",
-        type=str,
-        default="/var/lib/opentrons/user_storage/ot2_runs/smoke_test.py",
-        help="Target path for the protocol on the robot."
-    )
-    args = parser.parse_args()
-
-    robot_ip = args.robot_ip
-    ssh_key = args.ssh_key
-    local_proto = Path(args.local_protocol).resolve()
-    remote_proto = args.remote_protocol
-    remote_dir = "/var/lib/opentrons/user_storage/ot2_runs"
-
-    ssh_opts = [
-        "-i", ssh_key,
-        "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=10",
-        "-o", "StrictHostKeyChecking=no"
-    ]
-
-    print("=" * 60)
-    print(" OT-2 SMOKE TEST RUNNER ")
-    print("=" * 60)
-
-    # [1/5] Checking local files
-    print("\n[1/5] Checking local files")
-    if not local_proto.exists():
-        print(f"ERROR: Local protocol file not found at: {local_proto}")
-        sys.exit(1)
-    print(f"  ✓ Local protocol file found: {local_proto}")
-
-    if not Path(ssh_key).exists():
-        print(f"ERROR: SSH key file not found at: {ssh_key}")
-        sys.exit(1)
-    print(f"  ✓ SSH key found: {ssh_key}")
-
-    # [2/5] Testing SSH
-    print("\n[2/5] Testing SSH")
-    ssh_cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", "echo SSH_OK"]
     try:
-        print(f"Running command: {' '.join(ssh_cmd)}")
-        res = subprocess.run(ssh_cmd, capture_output=True, text=True, check=True)
-        if "SSH_OK" in res.stdout:
-            print("  ✓ SSH Connection successful: SSH_OK")
-        else:
-            print(f"ERROR: SSH command ran but output did not contain SSH_OK. stdout: {res.stdout.strip()}")
-            sys.exit(1)
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: SSH connection test failed.\nstdout: {e.stdout}\nstderr: {e.stderr}")
-        sys.exit(1)
-
-    # [3/5] Uploading smoke_test.py
-    print("\n[3/5] Uploading smoke_test.py")
-    mkdir_cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", f"mkdir -p {remote_dir}"]
-    try:
-        print(f"Creating remote folder: {' '.join(mkdir_cmd)}")
-        subprocess.run(mkdir_cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: Failed to create remote folder on the robot.")
-        sys.exit(1)
-
-    scp_cmd = ["scp", "-O", "-i", ssh_key, "-o", "StrictHostKeyChecking=no", str(local_proto), f"root@{robot_ip}:{remote_proto}"]
-    try:
-        print(f"Copying file via SCP: {' '.join(scp_cmd)}")
-        subprocess.run(scp_cmd, check=True)
-        print("  ✓ smoke_test.py copied successfully")
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: SCP upload failed.")
-        sys.exit(1)
-
-    # [4/5] Verifying remote file
-    print("\n[4/5] Verifying remote file")
-    verify_cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", f"ls -lah {remote_proto}"]
-    try:
-        print(f"Verifying: {' '.join(verify_cmd)}")
-        res = subprocess.run(verify_cmd, capture_output=True, text=True, check=True)
-        print(res.stdout.strip())
-        print("  ✓ Remote file verified")
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: Verification of remote file failed. Is it missing?")
-        sys.exit(1)
-
-    # [5/5] Running opentrons_execute
-    print("\n[5/5] Running opentrons_execute")
-    exec_cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", f"opentrons_execute {remote_proto}"]
-    print(f"Executing: {' '.join(exec_cmd)}")
-    try:
-        process = subprocess.Popen(
-            exec_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
+        payload = response.json()
+    except ValueError:
+        payload = {"raw": response.text}
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"{method} {path} failed with HTTP {response.status_code}:\n"
+            f"{json.dumps(payload, indent=2)}"
         )
-        while True:
-            line = process.stdout.readline()
-            if not line and process.poll() is not None:
-                break
-            if line:
-                print(line.strip())
-        rc = process.poll()
-        if rc != 0:
-            print(f"\nERROR: Robot execution failed with exit code {rc}")
-            sys.exit(rc)
-        else:
-            print("\n" + "=" * 60)
-            print(" SMOKE TEST SUCCESSFUL ")
-            print("=" * 60)
-    except Exception as e:
-        print(f"ERROR: Failed to execute command. {e}")
-        sys.exit(1)
+    return payload
+
+
+def _upload_protocol(robot_ip: str, protocol_path: Path, labware_path: Path) -> str:
+    with ExitStack() as stack:
+        protocol_file = stack.enter_context(protocol_path.open("rb"))
+        labware_file = stack.enter_context(labware_path.open("rb"))
+        response = requests.post(
+            _api_url(robot_ip, "/protocols"),
+            headers=HEADERS,
+            files=[
+                ("files", (protocol_path.name, protocol_file, "text/x-python")),
+                ("files", (labware_path.name, labware_file, "application/json")),
+            ],
+            timeout=120,
+        )
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {"raw": response.text}
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Protocol upload failed with HTTP {response.status_code}:\n"
+            f"{json.dumps(payload, indent=2)}"
+        )
+    protocol_id = payload.get("data", {}).get("id")
+    if not protocol_id:
+        raise RuntimeError(
+            f"Upload response did not include data.id:\n{json.dumps(payload, indent=2)}"
+        )
+    return str(protocol_id)
+
+
+def simulate_protocol(protocol_path: Path, labware_path: Path) -> int:
+    """Run only the local Opentrons simulator; this function never uses the network."""
+    command = [
+        sys.executable,
+        "-B",
+        "-c",
+        _SIMULATOR_SHIM,
+        "-L",
+        str(labware_path.parent),
+        str(protocol_path),
+    ]
+    print("Local simulation only (no robot connection).")
+    print(f"Protocol: {protocol_path}")
+    result = subprocess.run(
+        command,
+        cwd=REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="")
+    output = result.stdout + result.stderr
+    if (
+        result.returncode != 0
+        or _SIMULATION_ERROR_RE.search(output)
+        or _SIMULATION_SUCCESS_TEXT not in output
+    ):
+        print("P20 local simulation FAILED.", file=sys.stderr)
+        return 1
+    print("P20 local simulation PASSED.")
+    return 0
+
+
+def execute_protocol(
+    robot_ip: str,
+    protocol_path: Path,
+    labware_path: Path,
+    poll_seconds: float,
+) -> int:
+    """Upload, start, and monitor the test. Call only after explicit --execute."""
+    os.environ["NO_PROXY"] = (
+        f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+    )
+    print("PHYSICAL P20 DRY-MOTION TEST")
+    print("Confirm: empty plate in slot 4; paper holder in slot 5; one 20 uL tip at slot 9 A1.")
+    print("No liquid should be present. Stop the robot immediately if any labware is misaligned.")
+
+    protocol_id = _upload_protocol(robot_ip, protocol_path, labware_path)
+    run_payload = _request_json(
+        "POST",
+        robot_ip,
+        "/runs",
+        json={"data": {"protocolId": protocol_id}},
+    )
+    run_id = run_payload.get("data", {}).get("id")
+    if not run_id:
+        raise RuntimeError(
+            f"Create-run response did not include data.id:\n{json.dumps(run_payload, indent=2)}"
+        )
+    _request_json(
+        "POST",
+        robot_ip,
+        f"/runs/{run_id}/actions",
+        json={"data": {"actionType": "play"}},
+    )
+
+    last_status = None
+    while True:
+        payload = _request_json("GET", robot_ip, f"/runs/{run_id}")
+        status = str(payload.get("data", {}).get("status", "unknown"))
+        if status != last_status:
+            print(f"Status: {status}")
+            last_status = status
+        if status in TERMINAL_STATUSES:
+            return 0 if status == "succeeded" else 1
+        time.sleep(poll_seconds)
+
+
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="P20-only dry-motion smoke test (local simulation by default)."
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Run locally with the Opentrons simulator (the default).",
+    )
+    mode.add_argument(
+        "--execute",
+        action="store_true",
+        help="Explicitly upload and run physical dry motion through the OT-2 HTTP API.",
+    )
+    parser.add_argument("--robot-ip", default="169.254.46.57")
+    parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL))
+    parser.add_argument("--labware", default=str(DEFAULT_LABWARE))
+    parser.add_argument("--poll-seconds", type=float, default=2.0)
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parse_args(argv)
+    protocol_path = Path(args.protocol).resolve()
+    labware_path = Path(args.labware).resolve()
+    if not protocol_path.is_file():
+        raise FileNotFoundError(f"Protocol not found: {protocol_path}")
+    if not labware_path.is_file():
+        raise FileNotFoundError(f"Custom labware definition not found: {labware_path}")
+
+    if args.execute:
+        return execute_protocol(
+            args.robot_ip,
+            protocol_path,
+            labware_path,
+            args.poll_seconds,
+        )
+    return simulate_protocol(protocol_path, labware_path)
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

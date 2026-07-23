@@ -20,6 +20,8 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional
 
+from src.utils.ot2_ssh import OT2SSHSettings
+
 logger = logging.getLogger("vision.transfer")
 
 
@@ -35,25 +37,14 @@ def _sanitise_filename(name: str) -> str:
 
 # ─── SSH / SCP helpers ──────────────────────────────────────────
 
-def _ssh_opts(cfg: Dict[str, Any]) -> List[str]:
-    """Return the common SSH option flags used by both ssh and scp."""
-    key_path = str(cfg["robot"]["ssh_key_path"])
-    return [
-        "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=30",
-        "-o", "StrictHostKeyChecking=no",
-        "-i", key_path,
-    ]
-
-
-def _ssh_target(cfg: Dict[str, Any]) -> str:
-    """Return ``user@host`` for ssh/scp commands."""
-    return f"{cfg['robot']['username']}@{cfg['robot']['host']}"
+def _ssh_settings(cfg: Dict[str, Any]) -> OT2SSHSettings:
+    """Return centralized SSH settings for the resolved vision config."""
+    return OT2SSHSettings.from_mapping(cfg["robot"])
 
 
 def check_connectivity(cfg: Dict[str, Any]) -> bool:
     """Return *True* if the OT-2 responds to a simple SSH command."""
-    cmd = ["ssh"] + _ssh_opts(cfg) + [_ssh_target(cfg), "echo ok"]
+    cmd = _ssh_settings(cfg).ssh_command("echo ok")
     logger.info("Checking OT-2 connectivity: %s", " ".join(cmd))
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode == 0:
@@ -116,7 +107,7 @@ def discover_remote_files(
     extensions = cfg.get("transfer", {}).get("file_extensions", [".jpg", ".jpeg", ".png", ".zip"])
 
     find_cmd = _build_find_command(remote_dirs, extensions)
-    cmd = ["ssh"] + _ssh_opts(cfg) + [_ssh_target(cfg), find_cmd]
+    cmd = _ssh_settings(cfg).ssh_command(find_cmd)
 
     logger.info("Discovering remote files: %s", " ".join(cmd))
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -231,10 +222,11 @@ def transfer_images(
             continue
 
         # SCP the file (legacy mode with -O for OT-2 compatibility)
-        scp_cmd = (
-            ["scp", "-O"]
-            + _ssh_opts(cfg)
-            + [f"{_ssh_target(cfg)}:{remote_path}", str(local_dest)]
+        settings = _ssh_settings(cfg)
+        scp_cmd = settings.scp_command(
+            settings.remote_path(remote_path),
+            str(local_dest),
+            legacy_protocol=True,
         )
         logger.info("SCP: %s", " ".join(scp_cmd))
 

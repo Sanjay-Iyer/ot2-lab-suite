@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from dotenv import load_dotenv
+from src.utils.ot2_ssh import parse_bool
 
 
 # ─── Project-root discovery ──────────────────────────────────────
@@ -57,6 +58,8 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 
 def load_vision_config(
     config_path: Path | None = None,
+    *,
+    validate_identity: bool = True,
 ) -> Dict[str, Any]:
     """Load, resolve, and validate the full vision configuration.
 
@@ -87,7 +90,7 @@ def load_vision_config(
     cfg = _load_yaml(config_path)
 
     # 3. Resolve robot section
-    _resolve_robot(cfg)
+    _resolve_robot(cfg, validate_identity=validate_identity)
 
     # 4. Resolve local paths (relative → absolute) and create dirs
     _resolve_local_paths(cfg)
@@ -97,13 +100,13 @@ def load_vision_config(
 
 # ─── Internal helpers ────────────────────────────────────────────
 
-def _resolve_robot(cfg: Dict[str, Any]) -> None:
+def _resolve_robot(cfg: Dict[str, Any], *, validate_identity: bool = True) -> None:
     """Replace env-var *names* in the robot section with their values."""
     robot = cfg.get("robot", {})
 
     # Host IP
     host_var = robot.get("host_env_var", "ROBOT_IP")
-    host = os.getenv(host_var, "").strip()
+    host = os.getenv(host_var, str(robot.get("ip", ""))).strip()
     if not host or host in ("127.0.0.1", "localhost"):
         raise ValueError(
             f"[vision.config] {host_var} is not set or is a loopback address "
@@ -113,22 +116,41 @@ def _resolve_robot(cfg: Dict[str, Any]) -> None:
 
     # SSH key path
     key_var = robot.get("ssh_key_env_var", "ROBOT_SSH_KEY_PATH")
-    key_path_str = os.getenv(key_var, "").strip()
+    key_path_str = os.getenv(key_var, str(robot.get("ssh_key_path", ""))).strip()
     if not key_path_str:
         raise ValueError(
             f"[vision.config] {key_var} is not set in .env. "
             "Provide the path to the OT-2 SSH private key."
         )
     key_path = Path(key_path_str).resolve()
-    if not key_path.exists():
+    if validate_identity and not key_path.exists():
         raise FileNotFoundError(
             f"[vision.config] SSH key not found at {key_path} "
             f"(from env var {key_var})."
         )
     robot["ssh_key_path"] = key_path
 
-    # Username (default: root)
-    robot.setdefault("username", "root")
+    # Username and SSH compatibility settings
+    user_var = robot.get("ssh_user_env_var", "ROBOT_SSH_USER")
+    robot["username"] = os.getenv(
+        user_var,
+        str(robot.get("username") or robot.get("user") or "root"),
+    ).strip() or "root"
+
+    identities_var = robot.get(
+        "ssh_identities_only_env_var",
+        "ROBOT_SSH_IDENTITIES_ONLY",
+    )
+    robot["ssh_identities_only"] = parse_bool(
+        os.getenv(identities_var),
+        default=True,
+    )
+
+    legacy_var = robot.get("ssh_legacy_rsa_env_var", "ROBOT_SSH_LEGACY_RSA")
+    robot["ssh_legacy_rsa"] = parse_bool(
+        os.getenv(legacy_var),
+        default=False,
+    )
 
 
 def _resolve_local_paths(cfg: Dict[str, Any]) -> None:

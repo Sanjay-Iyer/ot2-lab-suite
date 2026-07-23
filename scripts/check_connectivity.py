@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 from src.core.config import Config
+from src.utils.ot2_ssh import OT2SSHSettings
 
 def mask_secret(secret: str) -> str:
     if not secret:
@@ -42,6 +43,8 @@ def main():
     
     print(f"ROBOT_IP: {Config.ROBOT_IP}")
     print(f"ROBOT_SSH_USER: {Config.ROBOT_SSH_USER}")
+    print(f"ROBOT_SSH_IDENTITIES_ONLY: {Config.ROBOT_SSH_IDENTITIES_ONLY}")
+    print(f"ROBOT_SSH_LEGACY_RSA: {Config.ROBOT_SSH_LEGACY_RSA}")
     
     key_path_val = Config.ROBOT_SSH_KEY_PATH
     if key_path_val:
@@ -128,9 +131,11 @@ def main():
     elif not Path(key_path_val).exists():
         print(f"FAIL: Configured SSH key path does not exist.")
     else:
-        ssh_user = Config.ROBOT_SSH_USER
-        ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=30", "-i", key_path_val]
-        cmd = ["ssh"] + ssh_opts + [f"{ssh_user}@{robot_ip}", "echo 'SSH Connection Successful'"]
+        settings = OT2SSHSettings.from_config(Config)
+        cmd = settings.ssh_command(
+            "echo 'SSH Connection Successful'",
+            connect_timeout=30,
+        )
         
         try:
             res = subprocess.run(cmd, capture_output=True, text=True)
@@ -140,7 +145,11 @@ def main():
                 print("FAIL: SSH authentication rejected or timed out.")
                 print(f"Error output: {res.stderr.strip()}")
                 print("\nTroubleshooting Commands:")
-                print(f"  ssh -i \"{key_path_val}\" {ssh_user}@{robot_ip}")
+                legacy = " --legacy-rsa" if settings.legacy_rsa else " --no-legacy-rsa"
+                print(
+                    f"  python scripts/check_ot2_ssh.py --robot-ip {robot_ip} "
+                    f"--identity-file \"{key_path_val}\"{legacy}"
+                )
         except Exception as e:
             print(f"FAIL: Failed to run SSH command: {e}")
 
@@ -153,7 +162,11 @@ def main():
 def check_robot_calibration_paths(robot_ip: str, ssh_key: str) -> None:
     """SSH into the robot and report details for legacy and current calibration paths."""
     print("\n--- 6. OT-2 Calibration Paths Check ---")
-    ssh_opts = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-i", ssh_key]
+    settings = OT2SSHSettings.from_config(
+        Config,
+        robot_ip=robot_ip,
+        identity_file=ssh_key,
+    )
     
     paths_to_check = [
         "/data/deck_calibration.json",
@@ -182,7 +195,7 @@ def check_robot_calibration_paths(robot_ip: str, ssh_key: str) -> None:
         "done"
     )
     
-    cmd = ["ssh"] + ssh_opts + [f"root@{robot_ip}", check_script]
+    cmd = settings.ssh_command(check_script, connect_timeout=15)
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if res.returncode == 0:
