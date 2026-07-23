@@ -8,7 +8,7 @@
 #   python scripts/build_vial_dilution_print.py --config configs/workflows/defaults/vial_dilution_print.yaml
 #
 # The builder validates this file, embeds it into a generated copy of
-# src/protocols/vial_dilution_print.py, and simulates it. See
+# src/protocols/printing/01_vial_dilution_paper_print.py, and simulates it. See
 # docs/vial_dilution_print_demo.md for the full knob reference.
 #
 # Every top-level block below (except `run_modes`) becomes the protocol's CONFIG

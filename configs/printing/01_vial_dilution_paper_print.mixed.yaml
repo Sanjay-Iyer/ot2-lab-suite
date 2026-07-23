@@ -1,0 +1,92 @@
+# =============================================================================
+# 03_mixed_p20_p300.yaml  —  MIXED run: P20 single-spot + P300 8-up in one workflow
+# =============================================================================
+# Demonstrates all of it in one run:
+#   * P20 (single-channel, left)  prints 5 uL and 10 uL groups, one droplet at a time
+#   * P300 (8-channel, right)     prints 30 uL and 35 uL groups, 8 droplets at once
+#   * water AND ethanol declared as materials in the 20 mL rack
+#   * independent tips per pipette; every reused tip returns to its own rack
+#   * no paper-destination overlap (P300 -> cols 1-4, P20 -> cols 5-8)
+#
+# Build + simulate:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+
+deck:
+  tuberack:     {slot: 7}
+  plate:        {slot: 4}
+  paper:        {slot: 5}
+  tiprack_p300: {slot: 9}
+  tiprack_p20:  {slot: 2}     # slot 2: verified clear of the P300 single-nozzle collision envelope
+
+labware:
+  tuberack:     {load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  tiprack_p300: {load_name: opentrons_96_tiprack_300ul}
+  tiprack_p20:  {load_name: opentrons_96_tiprack_20ul}
+
+pipettes:
+  - {name: p300_multi_gen2, mount: right, single_start: A1}
+  - {name: p20_single_gen2, mount: left}
+
+# water + ethanol are configured solvents (not hardcoded in Python); dyes are stocks.
+materials:
+  water:      {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A1, initial_volume_ul: 15000}
+  ethanol:    {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A2, initial_volume_ul: 15000}
+  orange_dye: {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A3, initial_volume_ul: 8000}
+  blue_dye:   {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A4, initial_volume_ul: 8000}
+
+dilution_plan:
+  enabled: true
+  total_volume_ul: 200
+  water_material: water           # ethanol is available for future water/ethanol mixtures
+  water_setup_tip: H12
+  factors: {mode: explicit, explicit: [1, 2, 5, 10, 20, 30, 40, 50]}
+  series:
+    - {name: orange, material: orange_dye, destination_column: "11", setup_tip: H11}
+    - {name: blue,   material: blue_dye,   destination_column: "9",  setup_tip: H10}
+
+mixing_plan: {mix_reps: 5, mix_volume_ul: 150}
+
+print_groups:
+  # ---- P300 8-up groups (30 & 35 uL) -> paper columns 1-4 --------------------
+  - name: coarse_30ul
+    volume_ul: 30
+    pipette: auto                 # -> p300_multi_gen2
+    layout: column_8up
+    source: {plate_column: "11"}
+    replicates: 2                 # paper columns 1-2
+    destination: {paper_start_column: 1, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 5, blow_out: true, post_dispense_delay_s: 0.5, move_speed_mm_per_s: 50}
+    tips: {block_column: 1, reuse: true, return: true}
+  - name: coarse_35ul
+    volume_ul: 35
+    pipette: auto
+    layout: column_8up
+    source: {plate_column: "9"}
+    replicates: 2                 # paper columns 3-4
+    destination: {paper_start_column: 3, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 5, blow_out: true, post_dispense_delay_s: 0.5, move_speed_mm_per_s: 50}
+    tips: {block_column: 2, reuse: true, return: true}
+  # ---- P20 single-spot groups (5 & 10 uL) -> paper columns 5-8 ---------------
+  - name: fine_5ul
+    volume_ul: 5
+    pipette: auto                 # -> p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11", wells: [A11, B11, C11]}
+    replicates: 2                 # paper columns 5-6
+    destination: {paper_start_column: 5, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A1, reuse: true, return: true}
+  - name: fine_10ul
+    volume_ul: 10
+    pipette: auto
+    layout: single_spot
+    source: {plate_column: "9", wells: [A9, B9, C9]}
+    replicates: 2                 # paper columns 7-8
+    destination: {paper_start_column: 7, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A2, reuse: true, return: true}
+
+imaging: {capture_before: true, capture_after: true, robot_image_dir: /data/vision/vial_dilution_print}
+tip_policy: {return_tips: true}

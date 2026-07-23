@@ -3,7 +3,7 @@
 scripts/build_vial_dilution_print.py
 ====================================
 Turn configs/workflows/defaults/vial_dilution_print.yaml into a robot-ready copy of
-src/protocols/vial_dilution_print.py with the YAML embedded as the CONFIG dict, then
+src/protocols/printing/01_vial_dilution_paper_print.py with the YAML embedded as the CONFIG dict, then
 simulate it. This is how the YAML reaches the OT-2 (the robot can't read the repo).
 
   conda activate ai
@@ -30,7 +30,7 @@ from typing import Optional
 import yaml
 
 REPO          = Path(__file__).resolve().parent.parent
-BASE_PROTOCOL = REPO / "src" / "protocols" / "vial_dilution_print.py"
+BASE_PROTOCOL = REPO / "src" / "protocols" / "printing" / "01_vial_dilution_paper_print.py"
 GENERATED_DIR = REPO / "src" / "protocols" / "generated"
 LABWARE       = REPO / "labware"
 DEFAULT_CONFIG = REPO / "configs" / "workflows" / "defaults" / "vial_dilution_print.yaml"
@@ -363,14 +363,45 @@ def main() -> int:
         return 1
     full      = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
     run_modes = full.pop("run_modes", {})   # not part of CONFIG
-    config    = full
 
-    problems = validate(config)
-    if problems:
-        print("CONFIG VALIDATION FAILED:")
-        for p in problems:
-            print(f"  - {p}")
+    # Authoritative shared validation + normalization (pipette selection, materials,
+    # print-group layout/destination rules). One implementation of each rule lives in
+    # src/core/*; the build script never re-implements them. Produces the internal
+    # CONFIG the protocol executes (resolved print_groups + normalized sections).
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    from src.core.workflow_config import normalize_and_validate, WorkflowConfigError
+    is_legacy = isinstance(full.get("printing"), dict) and "droplet_volume_ul" in full["printing"]
+    try:
+        nw = normalize_and_validate(full)
+    except WorkflowConfigError as e:
+        print("CONFIG VALIDATION FAILED (shared validators):")
+        print(f"  {e}")
         return 1
+    config = nw.config
+    for note in nw.notes:
+        print(f"  [normalize] {note}")
+    for w in [i for i in nw.issues if i.severity == "warning"]:
+        print(f"  [warning] {w}")
+
+    # Deck-slot uniqueness (structural check on the normalized deck).
+    slots: dict = {}
+    for role, spec in config.get("deck", {}).items():
+        s = spec.get("slot")
+        if s in slots:
+            print(f"CONFIG VALIDATION FAILED: deck slot {s} shared by '{slots[s]}' and '{role}'.")
+            return 1
+        slots[s] = role
+
+    # Legacy flat configs also run the historical structural validator (tip
+    # allocation, geometry, factor sanity) written against the old printing schema.
+    if is_legacy:
+        problems = validate(config)
+        if problems:
+            print("CONFIG VALIDATION FAILED:")
+            for p in problems:
+                print(f"  - {p}")
+            return 1
     print("Config validation passed.")
 
     base_text = BASE_PROTOCOL.read_text(encoding="utf-8")

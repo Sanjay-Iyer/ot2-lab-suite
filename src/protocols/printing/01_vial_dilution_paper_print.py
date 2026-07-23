@@ -1,18 +1,39 @@
 #!/usr/bin/env python3
 """
-OT-2 Protocol: 20 mL Vial Dilution -> Single-Tip Paper Print Demo (config-driven)
+Workflow 01 — Vial Dilution -> Paper Print (OT-2 protocol, config-driven)
 ================================================================================
-Builds blue and orange food-coloring dilution series in two columns of a 96-well
-plate, drawing water and dye from 20 mL scintillation vials in the custom v2 tube
-rack with SINGLE-nozzle setup tips, then switches to the full 8-channel head to
-print orange first and blue second onto paper. Tips are RETURNED to the box, not trashed.
-CV snapshots are captured at the start, a few middle steps, and the end.
+FILE ROLE
+  * ENTRY POINT: this is the robot protocol the OT-2 executes (via the Opentrons App /
+    engine). It runs entirely from the embedded ``CONFIG`` dict.
+  * Build it from a YAML with ``scripts/build_vial_dilution_print.py`` (which embeds the
+    CONFIG and simulates); the generated copies live in ``src/protocols/generated/``.
+  * EDIT the Python freely for motion/logic. Do NOT hand-edit the ``CONFIG`` block
+    (it is regenerated) — edit a YAML in ``configs/printing/`` instead.
+
+INPUTS  : embedded ``CONFIG`` (deck, pipettes, sources, dilution, color_series,
+          print_groups, camera, tips, flow_rates, safety) + App runtime params
+          (dry_run / do_dilution / do_print / print_start_column).
+OUTPUTS : liquid handling on the OT-2; two camera JPEGs (one before, one after) written
+          to ``camera.robot_image_dir`` on the robot; protocol comments (the simulation log).
+HARDWARE: right = ``p300_multi_gen2`` (8-up printing + dilution); left =
+          ``p20_single_gen2`` (single-spot printing). Needs a 20 µL rack for the P20.
+          apiLevel 2.28 (partial-mode ``return_tip()``).
+SIDE EFFECTS: on the real robot, curl to the camera API and mkdir of the image dir;
+          both are no-ops while ``protocol.is_simulating()``.
+SAFETY  : dispense heights / paper standoff / vial depths are NOT calibrated here —
+          verify on the physical robot (see docs/printing/WORK_LAPTOP_PHYSICAL_VALIDATION.md).
+
+WHAT IT DOES
+  Builds dye dilution series in 96-well plate columns (water + dye from 20 mL vials via
+  SINGLE-nozzle setup tips), mixes them, then prints per ``print_groups`` — the P300
+  8-up (``column_8up``) and/or the P20 one spot at a time (``single_spot``). Tips are
+  RETURNED to their racks, not trashed. One image is captured before and one after.
 
 >>> EVERYTHING is driven by the CONFIG dict below. <<<
-Edit CONFIG directly for a quick change, OR keep the canonical settings in
-  configs/workflows/defaults/vial_dilution_print.yaml
-and run  scripts/build_vial_dilution_print.py  to generate a robot-ready copy with
-that YAML embedded between the CONFIG markers. See docs/vial_dilution_print_demo.md.
+Keep canonical settings in a YAML under configs/printing/ (or the legacy
+  configs/workflows/defaults/vial_dilution_print.yaml) and run
+  scripts/build_vial_dilution_print.py to generate a robot-ready copy with that YAML
+  embedded between the CONFIG markers. See docs/printing/01_vial_dilution_paper_print.md.
 
 DECK / WHY apiLevel 2.28 / HOW TO RUN - see the demo guide + skills/ot2-robot-profile.
 Short version:
@@ -69,8 +90,17 @@ CONFIG = {
         "tiprack":  {"slot": 9, "load_name": "opentrons_96_tiprack_300ul"},
     },
 
-    # ── Pipette (FIXED hardware: 8-channel p300 on the right mount) ───────────────
+    # ── Pipettes (mounted hardware) ──────────────────────────────────────────────
+    # `pipette` = the primary multichannel P300 that drives dilution + column_8up
+    # printing (kept for backward compatibility and its single_start nozzle).
+    # `pipettes` = every mounted pipette; the left-mounted single-channel P20 is
+    # optional and only needed for single_spot print groups. Each print group names
+    # the concrete pipette it runs on (resolved at build time by the selection
+    # service), so the protocol never chooses a pipette itself.
     "pipette": {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
+    "pipettes": [
+        {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
+    ],
 
     # ── Liquid sources: which VIAL in the rack holds what ────────────────────────
     "sources": {
@@ -146,6 +176,39 @@ CONFIG = {
         "blow_out": True,
         "touch_tip": False,
     },
+
+    # ── Print groups (the unified printing schema) ───────────────────────────────
+    # Each group is one homogeneous batch of droplets: a volume, a resolved pipette,
+    # a layout, a source plate column, paper destination, and its own tips. The
+    # build script resolves `pipette` from the volume via the selection service and
+    # embeds the concrete name here; the protocol dispatches on `layout`:
+    #   column_8up  -> p300_multi_gen2, 8 droplets at once (existing path)
+    #   single_spot -> p20_single_gen2, one droplet at a time (single channel)
+    # These defaults mirror the orange/blue 8-up prints (P300, 30 uL).
+    "print_groups": [
+        {
+            "name": "orange", "volume_ul": 30.0, "pipette": "p300_multi_gen2",
+            "layout": "column_8up",
+            "source": {"plate_column": "11"},
+            "replicates": 3,
+            "destination": {"paper_start_column": 1, "spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0}},
+            "dispense": {"z_mm": 1.0, "air_gap_ul": 5.0, "air_gap_height_mm": 20.0,
+                         "blow_out": True, "touch_tip": False,
+                         "post_dispense_delay_s": 0.5, "move_speed_mm_per_s": 50.0},
+            "tips": {"block_column": 1, "reuse": True, "return": True},
+        },
+        {
+            "name": "blue", "volume_ul": 30.0, "pipette": "p300_multi_gen2",
+            "layout": "column_8up",
+            "source": {"plate_column": "9"},
+            "replicates": 3,
+            "destination": {"paper_start_column": 4, "spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0}},
+            "dispense": {"z_mm": 1.0, "air_gap_ul": 5.0, "air_gap_height_mm": 20.0,
+                         "blow_out": True, "touch_tip": False,
+                         "post_dispense_delay_s": 0.5, "move_speed_mm_per_s": 50.0},
+            "tips": {"block_column": 2, "reuse": True, "return": True},
+        },
+    ],
 
     # ── Tips: return to the box (True) or drop to trash (False) ──────────────────
     "tips": {"return_tips": True},
@@ -308,6 +371,41 @@ def resolve_print_tip(printing_cfg: dict, plate_rows: list) -> str:
 def resolve_print_tip_for_column(print_block_column, plate_rows: list) -> str:
     """Return the top well of a specific 8-tip print column."""
     return f"{plate_rows[0]}{int(print_block_column)}"
+
+
+def _derive_print_groups(color_series: list, printing_cfg: dict) -> list:
+    """Backward-compat only: build column_8up P300 groups from legacy color_series.
+
+    Used when an OLD embedded CONFIG has no `print_groups`. New/built configs always
+    carry resolved `print_groups`; this involves no pipette selection (legacy prints
+    are always the P300), so it does not duplicate the selection service.
+    """
+    spacing = printing_cfg.get("replicate_spacing_mm", {"x": 9.0, "y": 0.0, "z": 0.0})
+    dispense = {
+        "z_mm": printing_cfg.get("dispense_z_mm", 1.0),
+        "air_gap_ul": printing_cfg.get("air_gap_ul", 0.0),
+        "air_gap_height_mm": printing_cfg.get("air_gap_height_mm", 20.0),
+        "blow_out": printing_cfg.get("blow_out", True),
+        "touch_tip": printing_cfg.get("touch_tip", False),
+        "post_dispense_delay_s": printing_cfg.get("post_dispense_delay_s", 0.5),
+        "move_speed_mm_per_s": printing_cfg.get("move_speed_mm_per_s"),
+    }
+    groups = []
+    for s in color_series:
+        groups.append({
+            "name": s["name"],
+            "volume_ul": printing_cfg.get("droplet_volume_ul", 20.0),
+            "pipette": "p300_multi_gen2", "layout": "column_8up",
+            "source": {"plate_column": str(s.get("destination_column",
+                                                 printing_cfg.get("source_column", "9")))},
+            "replicates": s.get("num_replicates", printing_cfg.get("num_replicates", 1)),
+            "destination": {"paper_start_column": s.get("paper_start_column", 1),
+                            "spacing_mm": spacing},
+            "dispense": dispense,
+            "tips": {"block_column": s.get("print_block_column", 1),
+                     "reuse": True, "return": True},
+        })
+    return groups
 
 
 def resolve_paper_start_column(printing_cfg: dict, runtime_start) -> int:
@@ -569,23 +667,27 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
                     f"{series['name']} {well} ({fold}x): stock {stock} uL > "
                     f"pipette max {pipette.max_volume} uL."
                 )
-    droplet_volume = float(pr["droplet_volume_ul"])
-    air_gap = float(pr.get("air_gap_ul", 0.0))
-    dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
-    move_speed = pr.get("move_speed_mm_per_s")
-    if droplet_volume <= 0:
-        errors.append(f"droplet_volume_ul must be > 0, got {droplet_volume}.")
-    if air_gap < 0:
-        errors.append(f"air_gap_ul must be >= 0, got {air_gap}.")
-    if dwell_s < 0:
-        errors.append(f"post_dispense_delay_s must be >= 0, got {dwell_s}.")
-    if move_speed is not None and float(move_speed) <= 0:
-        errors.append(f"move_speed_mm_per_s must be > 0 or null, got {move_speed}.")
-    droplet_plus_air = droplet_volume + air_gap
-    if droplet_plus_air > pipette.max_volume:
-        errors.append(
-            f"droplet {droplet_volume} uL + air gap {air_gap} uL "
-            f"= {droplet_plus_air} uL > pipette max {pipette.max_volume} uL.")
+    # Legacy flat-print droplet sanity. New-schema configs express per-group volumes
+    # in print_groups (validated at build time by src/core/print_groups.py), so this
+    # block only runs when a legacy `printing.droplet_volume_ul` is present.
+    if pr.get("droplet_volume_ul") is not None:
+        droplet_volume = float(pr["droplet_volume_ul"])
+        air_gap = float(pr.get("air_gap_ul", 0.0))
+        dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
+        move_speed = pr.get("move_speed_mm_per_s")
+        if droplet_volume <= 0:
+            errors.append(f"droplet_volume_ul must be > 0, got {droplet_volume}.")
+        if air_gap < 0:
+            errors.append(f"air_gap_ul must be >= 0, got {air_gap}.")
+        if dwell_s < 0:
+            errors.append(f"post_dispense_delay_s must be >= 0, got {dwell_s}.")
+        if move_speed is not None and float(move_speed) <= 0:
+            errors.append(f"move_speed_mm_per_s must be > 0 or null, got {move_speed}.")
+        droplet_plus_air = droplet_volume + air_gap
+        if droplet_plus_air > pipette.max_volume:
+            errors.append(
+                f"droplet {droplet_volume} uL + air gap {air_gap} uL "
+                f"= {droplet_plus_air} uL > pipette max {pipette.max_volume} uL.")
     if dil["mix_volume_ul"] > pipette.max_volume:
         errors.append(
             f"mix volume {dil['mix_volume_ul']} uL > pipette max {pipette.max_volume} uL.")
@@ -663,12 +765,13 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
                     f"is below the p300 ~{min_ok:.0f} uL accurate minimum "
                     "(visual demo only)."
                 )
-    droplet_volume = float(pr["droplet_volume_ul"])
-    if 0 < droplet_volume < min_ok:
-        protocol.comment(
-            f"WARNING: print droplet {droplet_volume:g} uL is below the p300 "
-            f"~{min_ok:.0f} uL accurate minimum; start around 30 uL for food-coloring prints."
-        )
+    if pr.get("droplet_volume_ul") is not None:
+        droplet_volume = float(pr["droplet_volume_ul"])
+        if 0 < droplet_volume < min_ok:
+            protocol.comment(
+                f"WARNING: print droplet {droplet_volume:g} uL is below the p300 "
+                f"~{min_ok:.0f} uL accurate minimum; start around 30 uL for food-coloring prints."
+            )
 
 
 def _capture_image(protocol, filename: str) -> None:
@@ -902,7 +1005,7 @@ def run(protocol: protocol_api.ProtocolContext):
     params = protocol.params
     deck = CONFIG["deck"]
     dil = CONFIG["dilution"]
-    pr = CONFIG["printing"]
+    pr = CONFIG.get("printing", {})
     cam = CONFIG["camera"]
     return_tips = CONFIG["tips"]["return_tips"]
 
@@ -922,9 +1025,28 @@ def run(protocol: protocol_api.ProtocolContext):
         "paper": _load(deck["paper"]),
         "tiprack": _load(deck["tiprack"]),
     }
-    pipette = protocol.load_instrument(
-        CONFIG["pipette"]["name"], CONFIG["pipette"]["mount"], tip_racks=[lw["tiprack"]]
-    )
+    # Optional dedicated 20 uL rack for the single-channel P20 (mixed/P20 runs need
+    # it; the P20 cannot use 300 uL tips). Absent for P300-only runs.
+    if deck.get("tiprack_p20"):
+        lw["tiprack_p20"] = _load(deck["tiprack_p20"])
+
+    def _rack_for(name: str):
+        """A P20 draws from the 20 uL rack; every other pipette from the 300 uL rack."""
+        if "p20" in name and "tiprack_p20" in lw:
+            return lw["tiprack_p20"]
+        return lw["tiprack"]
+
+    # Load every mounted pipette. Separate InstrumentContext objects keep the P20 and
+    # P300 tip state fully independent. `pipette` is the primary P300 (dilution +
+    # column_8up printing); the P20, when mounted, runs single_spot groups.
+    pipette_cfgs = CONFIG.get("pipettes") or [CONFIG["pipette"]]
+    instruments = {
+        pc["name"]: protocol.load_instrument(
+            pc["name"], pc["mount"], tip_racks=[_rack_for(pc["name"])])
+        for pc in pipette_cfgs
+    }
+    primary_name = CONFIG["pipette"]["name"]
+    pipette = instruments.get(primary_name) or next(iter(instruments.values()))
 
     plate_rows = list(lw["plate"].rows_by_name().keys())
     tiprack_rows = list(lw["tiprack"].rows_by_name().keys())
@@ -982,9 +1104,9 @@ def run(protocol: protocol_api.ProtocolContext):
 
     _apply_flow_rates(pipette)
 
-    if cam["capture_before"]:
-        _capture_image(protocol, "before_deck.jpg")
-        _capture_image(protocol, "before_plate.jpg")
+    # One beginning-of-run image (CV kept minimal: one before + one after only).
+    if cam.get("capture_before", True):
+        _capture_image(protocol, "before.jpg")
 
     water_vial = lw["tuberack"][CONFIG["sources"]["water_vial"]]
     vial_aspirate_height = float(CONFIG["sources"].get("vial_aspirate_height_mm", 4.0))
@@ -994,102 +1116,190 @@ def run(protocol: protocol_api.ProtocolContext):
         for series in color_series
     }
 
-    def _pick_print_tips(series: dict, purpose: str) -> str:
-        pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
-        if purpose == "mix":
-            protocol.comment("Nozzle layout: ALL for 8-channel dilution mixing.")
-        else:
-            protocol.comment("Nozzle layout: ALL for 8-channel paper print.")
-        print_tip = resolve_print_tip_for_column(series["print_block_column"], tiprack_rows)
-        pipette.pick_up_tip(lw["tiprack"][print_tip])
-        protocol.comment(
-            f"8-channel print: picked tips from column {series['print_block_column']} "
-            f"starting at {print_tip} for {series['name']}."
-        )
-        return print_tip
+    # ── Print-group dispatch helpers (unified schema) ────────────────────────────
+    # Printing is driven entirely by CONFIG["print_groups"]; each group carries its
+    # resolved pipette + layout. column_8up runs on the P300 (existing motion),
+    # single_spot on the single-channel P20 (one droplet at a time). Selection was
+    # done at build time by src/core/pipette_selection.py — the protocol never
+    # chooses a pipette, it only executes the resolved plan.
+    print_groups = CONFIG.get("print_groups") or _derive_print_groups(color_series, pr)
 
-    def _mix_series(series: dict) -> None:
-        wells = series_wells[series["name"]]
-        src_anchor = wells[0]
-        mix_vol = min(dil["mix_volume_ul"], total, float(pipette.max_volume))
-        protocol.comment(
-            f"Mixing {series['name']} plate column {series['destination_column']} "
-            f"(8 channels) ({dil['mix_reps']} x {mix_vol} uL)."
-        )
-        if dil["mix_reps"] > 0 and mix_vol > 0:
-            pipette.mix(dil["mix_reps"], mix_vol, lw["plate"][src_anchor])
+    def _return_or_drop_inst(inst) -> None:
+        if inst.has_tip:
+            inst.return_tip() if return_tips else inst.drop_tip()
 
-    def _print_series(series: dict, mixed_this_run: bool) -> None:
-        wells = series_wells[series["name"]]
-        src_anchor = wells[0]
-        paper_anchor = f"{plate_rows[0]}{series['paper_start_column']}"
-        paper_well = lw["paper"][paper_anchor]
-        spacing = pr["replicate_spacing_mm"]
+    def _group_source_wells(group: dict) -> list:
+        """Plate wells this group aspirates from: explicit `source.wells`, else the
+        first N rows of `source.plate_column` (N = number of dilution factors)."""
+        src = group.get("source", {})
+        if src.get("wells"):
+            return [str(w).upper() for w in src["wells"]]
+        col = str(src.get("plate_column"))
+        n = min(len(factors) if factors else len(plate_rows), len(plate_rows))
+        return [f"{plate_rows[i]}{col}" for i in range(n)]
 
-        air_gap = float(pr.get("air_gap_ul", 0.0))
-        air_gap_height = float(pr.get("air_gap_height_mm", 10.0))
-        dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
-        move_speed = pr.get("move_speed_mm_per_s")
-        move_speed = float(move_speed) if move_speed is not None else None
-        protocol.comment(
-            f"Paper print: {series['name']} starts at paper column "
-            f"{series['paper_start_column']} and covers columns "
-            f"{format_paper_columns(series['paper_start_column'], series['num_replicates'])}; "
-            f"{series['num_replicates']} replicate(s) sweeping right by {spacing['x']} mm each"
-            + (f"; {air_gap:g} uL anti-drip air gap" if air_gap > 0 else "")
-            + (f"; move speed {move_speed:g} mm/s" if move_speed else "")
-            + (f"; dwell {dwell_s:g} s." if dwell_s > 0 else ".")
-        )
-
-        for rep in range(int(series["num_replicates"])):
+    def _mix_source_column(group: dict) -> None:
+        """8-channel P300 mix of a group's source column, ANCHORED AT ROW A so all 8
+        nozzles stay on the plate (tips already picked up). Anchoring at the group's
+        first source well would put nozzles off the front edge when that well is not in
+        row A (e.g. a single_spot group sourcing D11/E11/F11)."""
+        src = group.get("source", {})
+        col = src.get("plate_column") or _well_column(_group_source_wells(group)[0])
+        anchor = f"{plate_rows[0]}{col}"
+        mix_vol = min(dil.get("mix_volume_ul", 0.0), total, float(pipette.max_volume))
+        if dil.get("mix_reps", 0) > 0 and mix_vol > 0:
             protocol.comment(
-                f"Aspirating {pr['droplet_volume_ul']} uL from {series['name']} "
-                f"plate column {series['destination_column']}; 8-channel paper "
-                f"replicate {rep + 1}."
-            )
-            pipette.aspirate(pr["droplet_volume_ul"], lw["plate"][src_anchor])
-            if air_gap > 0:
-                pipette.air_gap(air_gap, height=air_gap_height)
-                protocol.comment(
-                    f"Lifted {air_gap_height:g} mm above the well top, then pulled "
-                    f"{air_gap:g} uL air gap (anti-drip)."
-                )
-            dest = paper_well.bottom(pr["dispense_z_mm"]).move(
-                Point(
-                    x=rep * spacing["x"],
-                    y=rep * spacing.get("y", 0.0),
-                    z=rep * spacing.get("z", 0.0),
-                )
-            )
+                f"Mixing source column {col} 8-up ({dil['mix_reps']} x {mix_vol:g} uL).")
+            pipette.mix(dil["mix_reps"], mix_vol, lw["plate"][anchor])
+
+    def _dispense_settings(group: dict) -> dict:
+        d = group.get("dispense", {})
+        return {
+            "z": float(d.get("z_mm", 1.0)),
+            "air_gap": float(d.get("air_gap_ul", 0.0)),
+            "air_gap_height": float(d.get("air_gap_height_mm", 10.0)),
+            "dwell": float(d.get("post_dispense_delay_s", 0.0) or 0.0),
+            "move_speed": (float(d["move_speed_mm_per_s"])
+                           if d.get("move_speed_mm_per_s") is not None else None),
+            "blow_out": bool(d.get("blow_out", False)),
+            "touch_tip": bool(d.get("touch_tip", False)),
+        }
+
+    def _print_column_8up(group: dict, inst, do_mix: bool) -> None:
+        """P300 8-channel print: pick an 8-tip block, optionally mix, print, return."""
+        block = int(group["tips"]["block_column"])
+        block_tip = resolve_print_tip_for_column(block, tiprack_rows)
+        inst.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
+        inst.pick_up_tip(lw["tiprack"][block_tip])
+        protocol.comment(
+            f"[{group['name']}] column_8up on {inst.name}: picked 8 tips from column {block}.")
+        if do_mix:
+            _mix_source_column(group)
+        wells = _group_source_wells(group)
+        s = _dispense_settings(group)
+        vol = float(group["volume_ul"])
+        spacing = group["destination"].get("spacing_mm", {"x": 9.0, "y": 0.0, "z": 0.0})
+        start_col = int(group["destination"]["paper_start_column"])
+        reps = int(group["replicates"])
+        paper_well = lw["paper"][f"{plate_rows[0]}{start_col}"]
+        for rep in range(reps):
+            inst.aspirate(vol, lw["plate"][wells[0]])
+            if s["air_gap"] > 0:
+                inst.air_gap(s["air_gap"], height=s["air_gap_height"])
+            dest = paper_well.bottom(s["z"]).move(Point(
+                x=rep * spacing.get("x", 9.0),
+                y=rep * spacing.get("y", 0.0),
+                z=rep * spacing.get("z", 0.0)))
             protocol.comment(
-                f"Printing 8 droplets onto paper (slot {deck['paper']['slot']}) "
-                f"from {series['name']} plate column {series['destination_column']} "
-                f"-> paper column ~{series['paper_start_column'] + rep}, "
-                f"replicate {rep + 1}, z={pr['dispense_z_mm']} mm."
-            )
-            dispense_volume = pr["droplet_volume_ul"] + air_gap
-            if move_speed and move_speed > 0:
-                pipette.move_to(dest, speed=move_speed)
-                pipette.dispense(dispense_volume)
+                f"[{group['name']}] 8 droplets -> paper column ~{start_col + rep}, "
+                f"replicate {rep + 1}, {vol:g} uL, z={s['z']} mm.")
+            if s["move_speed"] and s["move_speed"] > 0:
+                inst.move_to(dest, speed=s["move_speed"])
+                inst.dispense(vol + s["air_gap"])
             else:
-                pipette.dispense(dispense_volume, dest)
-            if pr.get("blow_out"):
-                pipette.blow_out(dest)
-            if dwell_s > 0:
-                protocol.delay(seconds=dwell_s)
-            if pr.get("touch_tip"):
-                pipette.touch_tip()
-            if pr.get("blow_out") and rep < int(series["num_replicates"]) - 1:
-                pipette.move_to(paper_well.top(air_gap_height))
-                pipette.prepare_to_aspirate()
-                protocol.comment(
-                    "Reset plunger in air over paper (prepare_to_aspirate) so the next "
-                    "replicate aspirates cleanly."
-                )
-        if mixed_this_run:
+                inst.dispense(vol + s["air_gap"], dest)
+            if s["blow_out"]:
+                inst.blow_out(dest)
+            if s["dwell"] > 0:
+                protocol.delay(seconds=s["dwell"])
+            if s["touch_tip"]:
+                inst.touch_tip()
+            if s["blow_out"] and rep < reps - 1:
+                inst.move_to(paper_well.top(s["air_gap_height"]))
+                inst.prepare_to_aspirate()
+        _return_or_drop_inst(inst)
+        protocol.comment(
+            f"[{group['name']}] {'returned' if return_tips else 'dropped'} 8-tip block.")
+
+    def _resolve_mix_block(group: dict) -> int:
+        """8-tip block column for a single_spot group's P300 pre-mix. Reuse the
+        column_8up block that already services this SAME source column (so the block
+        only ever touches one colour); else an explicit tips.mix_block_column; else a
+        free tiprack column not used by any print block or dilution setup tip, assigned
+        per distinct single_spot source column. Prevents cross-colour contamination."""
+        src_col = str(group.get("source", {}).get("plate_column"))
+        for g in print_groups:
+            if (g.get("layout") == "column_8up"
+                    and str(g.get("source", {}).get("plate_column")) == src_col):
+                return int(g["tips"]["block_column"])
+        explicit = group.get("tips", {}).get("mix_block_column")
+        if explicit:
+            return int(explicit)
+        used = {int(g["tips"]["block_column"]) for g in print_groups
+                if g.get("layout") == "column_8up" and g.get("tips", {}).get("block_column")}
+        for t in [dil.get("water_setup_tip"), dil.get("setup_tip"),
+                  *[s.get("setup_tip") for s in color_series]]:
+            if t:
+                used.add(_well_column(t))
+        ss_cols: list = []
+        for g in print_groups:
+            if g.get("layout") == "single_spot":
+                c = str(g.get("source", {}).get("plate_column"))
+                if c not in ss_cols:
+                    ss_cols.append(c)
+        free = [c for c in range(1, 13) if c not in used]
+        idx = ss_cols.index(src_col) if src_col in ss_cols else 0
+        return free[idx % len(free)] if free else 1
+
+    def _mix_with_p300(group: dict) -> None:
+        """For a single_spot (P20) group, mix its source column 8-up with the P300,
+        using a colour-safe tip block (see _resolve_mix_block)."""
+        block = _resolve_mix_block(group)
+        block_tip = resolve_print_tip_for_column(block, tiprack_rows)
+        pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
+        pipette.pick_up_tip(lw["tiprack"][block_tip])
+        protocol.comment(
+            f"[{group['name']}] P300 pre-mix of source column "
+            f"{group.get('source', {}).get('plate_column')} with 8-tip block {block}.")
+        _mix_source_column(group)
+        _return_or_drop_inst(pipette)
+
+    def _print_single_spot(group: dict, inst, do_mix: bool) -> None:
+        """P20 single-channel print: one droplet at a time. NEVER an 8-nozzle layout.
+
+        Source wells map down paper rows (A,B,...) within a paper column; replicates
+        sweep across paper columns. The P20 tip is reused across the group and
+        returned to its own 20 uL rack.
+        """
+        if do_mix:
+            _mix_with_p300(group)  # single-channel P20 cannot mix a column 8-up
+        wells = _group_source_wells(group)
+        tips_cfg = group.get("tips", {})
+        tip_well = tips_cfg.get("well")
+        reuse = tips_cfg.get("reuse", True)
+        s = _dispense_settings(group)
+        vol = float(group["volume_ul"])
+        start_col = int(group["destination"]["paper_start_column"])
+        reps = int(group["replicates"])
+        rack = _rack_for(inst.name)
+        if reuse and tip_well:
+            inst.pick_up_tip(rack[tip_well])
             protocol.comment(
-                f"{series['name']} mixed and printed with the same 8-channel tip block."
-            )
+                f"[{group['name']}] single_spot on {inst.name}: picked reusable tip {tip_well}.")
+        for rep in range(reps):
+            for wi, well in enumerate(wells):
+                if not reuse:
+                    inst.pick_up_tip(rack[tip_well] if tip_well else None)
+                inst.aspirate(vol, lw["plate"][well])
+                if s["air_gap"] > 0:
+                    inst.air_gap(s["air_gap"], height=s["air_gap_height"])
+                paper_row = plate_rows[wi % len(plate_rows)]
+                paper_col = start_col + rep
+                dest = lw["paper"][f"{paper_row}{paper_col}"].bottom(s["z"])
+                protocol.comment(
+                    f"[{group['name']}] single droplet {well} -> paper {paper_row}{paper_col}, "
+                    f"replicate {rep + 1}, {vol:g} uL, z={s['z']} mm.")
+                inst.dispense(vol + s["air_gap"], dest)
+                if s["blow_out"]:
+                    inst.blow_out(dest)
+                if s["dwell"] > 0:
+                    protocol.delay(seconds=s["dwell"])
+                if not reuse:
+                    _return_or_drop_inst(inst)
+        if reuse:
+            _return_or_drop_inst(inst)
+        protocol.comment(
+            f"[{group['name']}] {'returned' if return_tips else 'dropped'} P20 tip.")
 
     if params.do_dilution and dil["enabled"]:
         pipette.configure_nozzle_layout(
@@ -1149,14 +1359,14 @@ def run(protocol: protocol_api.ProtocolContext):
                 f"{'returned' if return_tips else 'dropped'} tip {series['setup_tip']}."
             )
 
-        if not (params.do_print and pr["enabled"]):
-            for series in color_series:
-                _pick_print_tips(series, "mix")
-                _mix_series(series)
-                _return_or_drop()
+        if not (params.do_print and pr.get("enabled", True)):
+            # Dilution requested without printing: still mix each source column 8-up
+            # with the P300 so the plate is homogeneous for later use / imaging.
+            for group in print_groups:
+                _mix_with_p300(group)
                 protocol.comment(
-                    f"Returned 8-channel print tips from column "
-                    f"{series['print_block_column']} (none disposed)."
+                    f"Mixed source column {group['source'].get('plate_column')} "
+                    f"(no print this run)."
                 )
 
         protocol.comment(
@@ -1167,134 +1377,36 @@ def run(protocol: protocol_api.ProtocolContext):
             )
             + "."
         )
-        _capture_image(protocol, "plate_after_dilution.jpg")
 
-    if params.do_print and pr["enabled"]:
-        for series in color_series:
-            mixed_this_run = bool(params.do_dilution and dil["enabled"])
-            _pick_print_tips(series, "mix" if mixed_this_run else "print")
-            if mixed_this_run:
-                _mix_series(series)
-            _print_series(series, mixed_this_run)
-            _return_or_drop()
-            protocol.comment(
-                f"{'Returned' if return_tips else 'Dropped'} 8-channel print tips from "
-                f"column {series['print_block_column']} "
-                f"({'none disposed' if return_tips else 'disposed to trash'})."
-            )
-
-        _capture_image(protocol, "paper_print_8_channel.jpg")
+    if params.do_print and pr.get("enabled", True):
+        # Unified print dispatch: each group runs on its resolved pipette. Mixing
+        # (when diluting this run) happens per group: column_8up mixes with its own
+        # P300 block; single_spot mixes with the P300 first, then prints on the P20.
+        do_mix = bool(params.do_dilution and dil["enabled"])
+        for group in print_groups:
+            inst = instruments.get(group["pipette"])
+            if inst is None:
+                raise RuntimeError(
+                    f"Print group '{group['name']}' requires pipette "
+                    f"'{group['pipette']}', which is not mounted "
+                    f"(mounted: {sorted(instruments)}). Add it to CONFIG['pipettes']."
+                )
+            if group.get("layout") == "single_spot":
+                _print_single_spot(group, inst, do_mix)
+            else:
+                _print_column_8up(group, inst, do_mix)
         protocol.comment(
             "Paper print complete: "
             + "; ".join(
-                f"{series['name']} paper columns "
-                f"{format_paper_columns(series['paper_start_column'], series['num_replicates'])}"
-                for series in color_series
+                f"{g['name']} paper columns "
+                f"{format_paper_columns(g['destination']['paper_start_column'], g['replicates'])}"
+                for g in print_groups
             )
             + "."
         )
-        if cam["capture_after"]:
-            _capture_image(protocol, "after_deck.jpg")
-            _capture_image(protocol, "after_plate.jpg")
-        protocol.comment("=== Vial Dilution -> Paper Print Demo Completed ===")
-        return
 
-        if not pipette.has_tip:
-            pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
-            protocol.comment("Nozzle layout: ALL for 8-channel paper print.")
-
-            pipette.pick_up_tip(lw["tiprack"][print_tip])
-            protocol.comment(
-                f"8-channel print: picked tips from column {pr['print_block_column']} "
-                f"starting at {print_tip}."
-            )
-
-        src_anchor = print_src_wells[0]
-        paper_anchor = print_paper_wells[0]
-        paper_well = lw["paper"][paper_anchor]
-        spacing = pr["replicate_spacing_mm"]
-
-        air_gap = float(pr.get("air_gap_ul", 0.0))
-        air_gap_height = float(pr.get("air_gap_height_mm", 10.0))
-        dwell_s = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
-        move_speed = pr.get("move_speed_mm_per_s")
-        move_speed = float(move_speed) if move_speed is not None else None
-        protocol.comment(
-            f"Paper print: starting at paper column {paper_start_column} (1 = far left); "
-            f"{pr['num_replicates']} replicate(s) sweeping right by {spacing['x']} mm each"
-            + (f"; {air_gap:g} uL anti-drip air gap" if air_gap > 0 else "")
-            + (f"; move speed {move_speed:g} mm/s" if move_speed else "")
-            + (f"; dwell {dwell_s:g} s." if dwell_s > 0 else ".")
-        )
-
-        for rep in range(int(pr["num_replicates"])):
-            protocol.comment(
-                f"Aspirating {pr['droplet_volume_ul']} uL from plate column "
-                f"{pr['source_column']}; 8-channel paper replicate {rep + 1}."
-            )
-            pipette.aspirate(pr["droplet_volume_ul"], lw["plate"][src_anchor])
-            # Anti-drip air gap: lift the tip CLEAR of the liquid FIRST, THEN pull air
-            # in so the gap captures AIR (not more liquid) and holds the droplet during
-            # travel. air_gap()'s `height` moves this many mm above the well TOP before
-            # aspirating — raise air_gap_height_mm if liquid is still being drawn.
-            if air_gap > 0:
-                pipette.air_gap(air_gap, height=air_gap_height)
-                protocol.comment(
-                    f"Lifted {air_gap_height:g} mm above the well top, then pulled "
-                    f"{air_gap:g} uL air gap (anti-drip)."
-                )
-            dest = paper_well.bottom(pr["dispense_z_mm"]).move(
-                Point(
-                    x=rep * spacing["x"],
-                    y=rep * spacing.get("y", 0.0),
-                    z=rep * spacing.get("z", 0.0),
-                )
-            )
-            protocol.comment(
-                f"Printing 8 droplets onto paper (slot {deck['paper']['slot']}) "
-                f"from plate column {pr['source_column']} -> paper column "
-                f"~{paper_start_column + rep}, replicate {rep + 1}, "
-                f"z={pr['dispense_z_mm']} mm."
-            )
-            # Dispense the droplet AND the air gap (air exits first, then the liquid).
-            dispense_volume = pr["droplet_volume_ul"] + air_gap
-            if move_speed and move_speed > 0:
-                pipette.move_to(dest, speed=move_speed)
-                pipette.dispense(dispense_volume)
-            else:
-                pipette.dispense(dispense_volume, dest)
-            if pr.get("blow_out"):
-                pipette.blow_out(dest)
-            if dwell_s > 0:
-                protocol.delay(seconds=dwell_s)
-            if pr.get("touch_tip"):
-                pipette.touch_tip()
-            # blow_out() leaves the plunger PAST its aspirate-ready position
-            # (ready_to_aspirate=False). Without intervention, the NEXT replicate's
-            # aspirate makes the engine auto-"prepare to aspirate" AT the plate well —
-            # an extra plunger pull right over the liquid. That is the "double suck" seen
-            # on replicates 2+ but never on replicate 1 (whose freshly picked-up tip is
-            # already prepared). Reset the plunger HERE, lifted in dry air over the paper
-            # (clear of both the plate liquid and the just-printed droplet), so each
-            # replicate's plate aspirate is a single clean motion identical to the first.
-            if pr.get("blow_out") and rep < int(pr["num_replicates"]) - 1:
-                pipette.move_to(paper_well.top(air_gap_height))
-                pipette.prepare_to_aspirate()
-                protocol.comment(
-                    "Reset plunger in air over paper (prepare_to_aspirate) so the next "
-                    "replicate aspirates cleanly — no double-suck at the plate."
-                )
-        _return_or_drop()
-
-        _capture_image(protocol, "paper_print_8_channel.jpg")
-        protocol.comment(
-            f"{'Returned' if return_tips else 'Dropped'} 8-channel print tips from "
-            f"column {pr['print_block_column']} "
-            f"({'none disposed' if return_tips else 'disposed to trash'})."
-        )
-
-    if cam["capture_after"]:
-        _capture_image(protocol, "after_deck.jpg")
-        _capture_image(protocol, "after_plate.jpg")
+    # End-of-run image: one snapshot after the whole workflow.
+    if cam.get("capture_after", True):
+        _capture_image(protocol, "after.jpg")
 
     protocol.comment("=== Vial Dilution -> Paper Print Demo Completed ===")

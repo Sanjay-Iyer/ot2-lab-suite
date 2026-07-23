@@ -25,7 +25,7 @@ This skill is the ground truth for that pipeline. For its sub-topics see:
 | Artifact | Path |
 |----------|------|
 | Workflow config (edit this) | [`configs/workflows/defaults/vial_dilution_print.yaml`](../../configs/workflows/defaults/vial_dilution_print.yaml) |
-| Base protocol template | [`src/protocols/vial_dilution_print.py`](../../src/protocols/vial_dilution_print.py) |
+| Base protocol template | [`src/protocols/printing/01_vial_dilution_paper_print.py`](../../src/protocols/printing/01_vial_dilution_paper_print.py) |
 | Generated, robot-ready copies | `src/protocols/generated/vial_dilution_print_latest.py` (+ timestamped) |
 | Vial labware (explicit geometry) | [`labware/tuberack_3dprint_20ml_8vials_v2.json`](../../labware/tuberack_3dprint_20ml_8vials_v2.json) |
 | Plate / paper labware | `labware/corning_96_wellplate_360ul_custom.json` |

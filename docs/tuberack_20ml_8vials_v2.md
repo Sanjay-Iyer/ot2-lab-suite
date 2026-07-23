@@ -72,7 +72,7 @@ The simulator loads custom definitions from a directory via `-L labware`
 resolves against `labware/`:
 
 ```powershell
-python src\protocols\simulate_protocol.py src\protocols\vial_dilution_print.py
+python src\protocols\simulate_protocol.py src\protocols\printing\01_vial_dilution_paper_print.py
 ```
 
 ## 5. Deploy to the robot

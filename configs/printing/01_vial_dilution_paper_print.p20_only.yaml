@@ -1,0 +1,74 @@
+# =============================================================================
+# 01_p20_only.yaml  —  P20-ONLY printing (single-spot, one droplet at a time)
+# =============================================================================
+# All PRINTING is done by the left-mounted single-channel p20_single_gen2 in
+# `single_spot` layout (5 uL and 10 uL droplets).
+#
+# HARDWARE NOTE (important): preparing the 200 uL dilutions is beyond the P20's
+# 1-20 uL range, so the P300 is still mounted to PREPARE and MIX the plate; the
+# P20 then prints from the prepared wells. This is "P20-only printing", not
+# "P20-only hardware" — a single-channel P20 physically cannot make 200 uL
+# transfers. To run with ONLY a P20 mounted, set dilution_plan.enabled: false and
+# pre-fill the plate by hand.
+#
+# Build + simulate:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p20_only.yaml
+
+deck:
+  tuberack:     {slot: 7}
+  plate:        {slot: 4}
+  paper:        {slot: 5}
+  tiprack_p300: {slot: 9}     # 300 uL tips for the P300 (dilution prep)
+  tiprack_p20:  {slot: 2}     # 20 uL tips for the P20 (slot 2 = clear of the P300 partial-tip envelope)
+
+labware:
+  tuberack:     {load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  tiprack_p300: {load_name: opentrons_96_tiprack_300ul}
+  tiprack_p20:  {load_name: opentrons_96_tiprack_20ul}
+
+pipettes:
+  - {name: p300_multi_gen2, mount: right, single_start: A1}   # prepares + mixes dilutions
+  - {name: p20_single_gen2, mount: left}                      # prints every droplet (single-spot)
+
+materials:
+  water:      {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A1, initial_volume_ul: 15000}
+  orange_dye: {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A3, initial_volume_ul: 8000}
+
+dilution_plan:
+  enabled: true
+  total_volume_ul: 200
+  water_material: water
+  water_setup_tip: H12
+  factors: {mode: explicit, explicit: [1, 2, 5, 10, 20, 30, 40, 50]}
+  series:
+    - {name: orange, material: orange_dye, destination_column: "11", setup_tip: H11}
+
+mixing_plan: {mix_reps: 5, mix_volume_ul: 150}
+
+# Two P20 single-spot groups (5 uL and 10 uL). Each aspirates from three prepared
+# wells (A/B/C of the orange column) and prints them one droplet at a time down
+# paper rows A/B/C; replicates sweep across paper columns. No paper overlap.
+print_groups:
+  - name: fine_5ul
+    volume_ul: 5
+    pipette: auto                        # auto -> p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11", wells: [A11, B11, C11]}
+    replicates: 2                        # -> paper columns 1-2
+    destination: {paper_start_column: 1, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A1, reuse: true, return: true}     # one P20 tip, reused, returned to the 20 uL rack
+  - name: fine_10ul
+    volume_ul: 10
+    pipette: p20_single_gen2             # explicit selection (equivalent to auto here)
+    layout: single_spot
+    source: {plate_column: "11", wells: [D11, E11, F11]}
+    replicates: 2                        # -> paper columns 3-4
+    destination: {paper_start_column: 3, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A2, reuse: true, return: true}     # a DIFFERENT P20 tip (independent of fine_5ul)
+
+imaging: {capture_before: true, capture_after: true, robot_image_dir: /data/vision/vial_dilution_print}
+tip_policy: {return_tips: true}

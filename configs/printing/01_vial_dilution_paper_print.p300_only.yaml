@@ -1,0 +1,76 @@
+# =============================================================================
+# 02_p300_only.yaml  —  P300-ONLY printing (existing 8-up behaviour)
+# =============================================================================
+# Vial -> 96-well dilution -> paper print, using ONLY the right-mounted 8-channel
+# p300_multi_gen2. Prints 8 droplets at once (column_8up). This reproduces the
+# historical flagship behaviour in the new, fully-configuration-driven schema.
+#
+# Build + simulate:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p300_only.yaml
+# Everything below is readable without opening the Python — see docs/printing/.
+
+# --- Deck: which slot holds each item -----------------------------------------
+deck:
+  tuberack:     {slot: 7}     # 20 mL custom vial rack
+  plate:        {slot: 4}     # 96-well dilution plate
+  paper:        {slot: 5}     # paper, addressed as a 96-well coordinate grid
+  tiprack_p300: {slot: 9}     # 300 uL tips for the P300
+
+# --- Labware: the definition loaded into each deck role ------------------------
+labware:
+  tuberack:     {load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  tiprack_p300: {load_name: opentrons_96_tiprack_300ul}
+
+# --- Pipettes: what is mounted on each side -----------------------------------
+pipettes:
+  - {name: p300_multi_gen2, mount: right, single_start: A1}   # 8-channel, does everything here
+
+# --- Materials: what liquid is in each 20 mL vial -----------------------------
+materials:
+  water:      {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A1, initial_volume_ul: 15000}
+  blue_dye:   {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A2, initial_volume_ul: 8000}
+  orange_dye: {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A3, initial_volume_ul: 8000}
+
+# --- Dilution plan: which plate columns are prepared, and from what -----------
+dilution_plan:
+  enabled: true
+  total_volume_ul: 200            # volume in every dilution well
+  water_material: water           # the diluent
+  water_setup_tip: H12            # single-nozzle water tip (H-row: idle nozzles clear the rack)
+  factors: {mode: explicit, explicit: [1, 2, 5, 10, 20, 30, 40, 50]}   # 8 folds -> rows A..H
+  series:
+    - {name: orange, material: orange_dye, destination_column: "11", setup_tip: H11}
+    - {name: blue,   material: blue_dye,   destination_column: "9",  setup_tip: H10}
+
+# --- Mixing plan: how the diluted columns are homogenised (P300, 8-up) ---------
+mixing_plan: {mix_reps: 5, mix_volume_ul: 150}
+
+# --- Print groups: each is one volume printed by one pipette -------------------
+# column_8up => 8 droplets at once on the P300. paper columns must not overlap.
+print_groups:
+  - name: orange_30
+    volume_ul: 30
+    pipette: auto                 # auto -> p300_multi_gen2 (only pipette that fits 30 uL)
+    layout: column_8up
+    source: {plate_column: "11"}  # aspirate the orange dilution column
+    replicates: 2                 # -> paper columns 1-2
+    destination: {paper_start_column: 1, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 5, blow_out: true, post_dispense_delay_s: 0.5, move_speed_mm_per_s: 50}
+    tips: {block_column: 1, reuse: true, return: true}
+  - name: blue_35
+    volume_ul: 35
+    pipette: auto
+    layout: column_8up
+    source: {plate_column: "9"}
+    replicates: 2                 # -> paper columns 3-4
+    destination: {paper_start_column: 3, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 5, blow_out: true, post_dispense_delay_s: 0.5, move_speed_mm_per_s: 50}
+    tips: {block_column: 2, reuse: true, return: true}
+
+# --- Imaging: one image before, one after (CV kept minimal) -------------------
+imaging: {capture_before: true, capture_after: true, robot_image_dir: /data/vision/vial_dilution_print}
+
+# --- Tip policy: reuse assigned tips and return them to the rack ---------------
+tip_policy: {return_tips: true}

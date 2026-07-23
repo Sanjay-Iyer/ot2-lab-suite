@@ -35,7 +35,7 @@ LABWARE_DIR   = REPO / "labware"
 LABWARE_JSON  = LABWARE_DIR / "tuberack_3dprint_20ml_8vials_v2.json"
 PLATE_JSON    = LABWARE_DIR / "corning_96_wellplate_360ul_custom.json"
 WORKFLOW_YAML = REPO / "configs" / "workflows" / "defaults" / "vial_dilution_print.yaml"
-PROTOCOL_BASE = REPO / "src" / "protocols" / "vial_dilution_print.py"
+PROTOCOL_BASE = REPO / "src" / "protocols" / "printing" / "01_vial_dilution_paper_print.py"
 
 # P300 physical max (only used where we cannot load the YAML, as a last resort)
 P300_MAX_UL   = 300.0

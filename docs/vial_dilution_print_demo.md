@@ -12,7 +12,7 @@ start, a few middle steps, and the end, and a CV script logs a reviewable verdic
 |------|------|
 | [`configs/workflows/defaults/vial_dilution_print.yaml`](../configs/workflows/defaults/vial_dilution_print.yaml) | **The config — edit this.** All knobs + defaults |
 | [`scripts/build_vial_dilution_print.py`](../scripts/build_vial_dilution_print.py) | Builds a robot-ready protocol from the YAML, then simulates |
-| [`src/protocols/vial_dilution_print.py`](../src/protocols/vial_dilution_print.py) | The protocol template (embedded `CONFIG` + pre-flight + camera capture) |
+| [`src/protocols/printing/01_vial_dilution_paper_print.py`](../src/protocols/printing/01_vial_dilution_paper_print.py) | The protocol template (embedded `CONFIG` + pre-flight + camera capture) |
 | [`scripts/validate_vial_print.py`](../scripts/validate_vial_print.py) | Multi-case simulation gate (asserts on output text) |
 | [`vision_tests/scripts/verify_print_droplets.py`](../vision_tests/scripts/verify_print_droplets.py) | CV droplet count/colour/shape → CV log |
 | [`vision_tests/lib.py`](../vision_tests/lib.py) | Shared classical-CV pipeline |
@@ -36,7 +36,7 @@ The builder validates the YAML, writes
 `CONFIG` baked in, and simulates it. That generated file is what you deploy/run on the
 robot (the robot can't read the repo YAML — the config must be embedded). For a quick
 one-off you can also edit the `CONFIG` dict directly at the top of
-`src/protocols/vial_dilution_print.py`.
+`src/protocols/printing/01_vial_dilution_paper_print.py`.
 
 ### Every knob (YAML section → what it controls)
 
@@ -200,7 +200,7 @@ python scripts\generate_labware.py configs\labware\tuberack_3dprint_20ml_8vials_
 python scripts\build_vial_dilution_print.py
 
 # 1b. (alt) simulate the template with its default CONFIG directly
-python src\protocols\simulate_protocol.py src\protocols\vial_dilution_print.py
+python src\protocols\simulate_protocol.py src\protocols\printing\01_vial_dilution_paper_print.py
 
 # 2. ROBUST multi-case gate — the source of truth. Expect: ALL CASES PASSED
 python scripts\validate_vial_print.py

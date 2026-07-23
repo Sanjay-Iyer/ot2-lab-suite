@@ -1,0 +1,24 @@
+{
+  "command": [
+    "C:\\Users\\iyer95\\miniconda3\\envs\\ai\\python.exe",
+    "scripts\\pull_vision_images.py",
+    "--robot-ip",
+    "127.0.0.1",
+    "--ssh-key",
+    "C:\\tmp\\missing_ot2_key_for_log_test"
+  ],
+  "cwd": "C:\\code\\opentrons_home\\ot2-lab-suite",
+  "error": "SSH key not found at C:\\tmp\\missing_ot2_key_for_log_test",
+  "events": [],
+  "exit_code": 1,
+  "finished_at": "2026-06-12T19:35:11Z",
+  "host": "ScienceThing",
+  "remote_dir": "/data/vision/vial_dilution_print",
+  "robot_ip": "127.0.0.1",
+  "schema_version": 1,
+  "script": "pull_vision_images.py",
+  "ssh_key": "C:\\tmp\\missing_ot2_key_for_log_test",
+  "started_at": "2026-06-12T19:35:11Z",
+  "status": "error",
+  "user": "iyer95"
+}

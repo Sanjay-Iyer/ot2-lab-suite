@@ -2,7 +2,7 @@
 vision_tests/scripts/verify_print_droplets.py
 =============================================
 Computer-vision QC for the vial-dilution -> paper-print demo
-(src/protocols/vial_dilution_print.py).
+(src/protocols/printing/01_vial_dilution_paper_print.py).
 
 It reads the paper-print image(s), detects the printed droplets, and logs an
 easy-to-review verdict:

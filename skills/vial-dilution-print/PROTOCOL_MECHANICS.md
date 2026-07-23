@@ -1,6 +1,6 @@
 # Vial-Dilution-Print — Protocol Mechanics
 
-How [`src/protocols/vial_dilution_print.py`](../../src/protocols/vial_dilution_print.py)
+How [`src/protocols/printing/01_vial_dilution_paper_print.py`](../../src/protocols/printing/01_vial_dilution_paper_print.py)
 actually moves. Everything here is config-driven from the embedded `CONFIG` dict;
 see [PARAMETERS.md](PARAMETERS.md) for the knobs.
 

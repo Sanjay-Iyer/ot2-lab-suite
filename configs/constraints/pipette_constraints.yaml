@@ -17,6 +17,27 @@ pipettes:
       - left
       - right
 
+  # 8-channel GEN2 pipettes. Volume ranges match their single-channel siblings;
+  # the channel count is derived from the "multi" name by the selection service
+  # (src/core/pipette_selection.py), so no extra field is needed here.
+  p300_multi_gen2:
+    min_volume_ul: 20
+    max_volume_ul: 300
+    recommended_min_volume_ul: 30
+    recommended_max_volume_ul: 300
+    mounts_allowed:
+      - left
+      - right
+
+  p20_multi_gen2:
+    min_volume_ul: 1
+    max_volume_ul: 20
+    recommended_min_volume_ul: 2
+    recommended_max_volume_ul: 20
+    mounts_allowed:
+      - left
+      - right
+
   p1000_single_gen2:
     min_volume_ul: 100
     max_volume_ul: 1000

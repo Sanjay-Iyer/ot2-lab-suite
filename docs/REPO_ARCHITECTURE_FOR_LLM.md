@@ -224,7 +224,7 @@ For vial printing, `scripts/build_vial_dilution_print.py`:
    tip allocation, paper sweep, and related invariants.
 4. Rewrites `DEFAULT_DRY_RUN`, `DEFAULT_DO_DILUTION`, and `DEFAULT_DO_PRINT`.
 5. Replaces the region between `# >>> CONFIG START >>>` and
-   `# <<< CONFIG END <<<` in `src/protocols/vial_dilution_print.py`.
+   `# <<< CONFIG END <<<` in `src/protocols/printing/01_vial_dilution_paper_print.py`.
 6. Writes a timestamped artifact and
    `src/protocols/generated/vial_dilution_print_latest.py`.
 7. Simulates the timestamped artifact with the repository's custom labware.
@@ -237,7 +237,7 @@ self-contained. Edit the YAML or base template, never `*_latest.py` directly.
 
 ### 5.3 What the current vial protocol does on the robot
 
-`src/protocols/vial_dilution_print.py` uses Opentrons API `2.28` and executes this
+`src/protocols/printing/01_vial_dilution_paper_print.py` uses Opentrons API `2.28` and executes this
 logic:
 
 1. Load the exact vial rack, dilution plate, paper-coordinate plate, tip rack,

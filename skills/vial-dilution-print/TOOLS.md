@@ -24,7 +24,7 @@ python scripts/build_vial_dilution_print.py --no-sim
 
 **Preconditions**
 - `ai` env active (`opentrons`, `numpy`, `pyyaml`).
-- Base template present at `src/protocols/vial_dilution_print.py` with the
+- Base template present at `src/protocols/printing/01_vial_dilution_paper_print.py` with the
   `# >>> CONFIG START >>>` / `# <<< CONFIG END <<<` markers intact.
 - Custom labware JSON present under `labware/` (passed to the simulator via `-L`).
 
@@ -73,7 +73,7 @@ python scripts/validate_vial_print.py --config configs/workflows/user/my_run.yam
 
 **Target file priority:**
 `src/protocols/generated/vial_dilution_print_latest.py` →
-`src/protocols/vial_dilution_print.py`.
+`src/protocols/printing/01_vial_dilution_paper_print.py`.
 
 > When the AI agent (below) builds from a user config, it threads that same path
 > into `--config` automatically. Hand-runs of the bare command still validate the

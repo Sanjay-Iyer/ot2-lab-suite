@@ -15,7 +15,7 @@ expected operations, turning the run-mode matrix into a real pass/fail gate.
 TARGET FILE PRIORITY
 --------------------
   1. src/protocols/generated/vial_dilution_print_latest.py  (deployed artifact)
-  2. src/protocols/vial_dilution_print.py                   (base template, fallback)
+  2. src/protocols/printing/01_vial_dilution_paper_print.py (base template, fallback)
 
 Always validate the generated file when it exists — that is what actually runs on
 the robot. Fall back to the base template if no generated file is present yet.
@@ -50,7 +50,7 @@ LABWARE   = REPO / "labware"
 
 # Target the generated (deployed) artifact; fall back to the base template.
 _GENERATED = REPO / "src" / "protocols" / "generated" / "vial_dilution_print_latest.py"
-_BASE      = REPO / "src" / "protocols" / "vial_dilution_print.py"
+_BASE      = REPO / "src" / "protocols" / "printing" / "01_vial_dilution_paper_print.py"
 PROTOCOL   = _GENERATED if _GENERATED.exists() else _BASE
 
 # Workflow YAML: source of truth for well names and fold values used in must_contain
@@ -157,7 +157,7 @@ def _build_cases(workflow_cfg: dict) -> list:
         for series in color_series
     ]
     series_prints = [
-        f"from {str(series.get('name', 'dye')).lower()} plate column {series.get('destination_column', col)}"
+        f"{str(series.get('name', 'dye')).lower()} paper columns"
         for series in color_series
     ]
 
@@ -170,18 +170,18 @@ def _build_cases(workflow_cfg: dict) -> list:
            "Water setup transfers done",
            *[f"Diluting well {well} to {top_fold:g}x" for well in top_wells],
            *stock_setup_done,
-           "Nozzle layout: ALL for 8-channel dilution mixing",
-           "8-channel print: picked tips from column",
-           "Printing 8 droplets onto paper",
+           "picked 8 tips from column",
+           "8 droplets -> paper column",
            *series_prints,
-           "Returned 8-channel print tips",
+           "returned 8-tip block",
+           "Paper print complete:",
            "Demo Completed ==="],
          ["PRE-FLIGHT VALIDATION FAILED", "Completed (dry run)"]),
 
         ("dry_run",
          dict(dry=True, dilution=True, print=True), False, True,
          ["Pre-flight validation passed", "DRY RUN", "Completed (dry run)"],
-         ["Diluting well", "Printing 8 droplets onto paper"]),
+         ["Diluting well", "8 droplets -> paper column"]),
 
         ("dilution_only",
          dict(dry=False, dilution=True, print=False), False, True,
@@ -189,20 +189,17 @@ def _build_cases(workflow_cfg: dict) -> list:
           "Water setup transfers done",
           *[f"Diluting well {well} to {top_fold:g}x" for well in top_wells],
           *stock_setup_done,
-          "Nozzle layout: ALL for 8-channel dilution mixing",
-          "8-channel print: picked tips from column",
-          "Returned 8-channel print tips",
+          "Mixed source column",
           "Dilution series complete",
           *series_columns,
           "Demo Completed ==="],
-         ["Printing 8 droplets onto paper"]),
+         ["8 droplets -> paper column"]),
 
         ("print_only",
          dict(dry=False, dilution=False, print=True), False, True,
-         ["Nozzle layout: ALL for 8-channel paper print",
-          "8-channel print: picked tips from column",
-          "Printing 8 droplets onto paper",
-          "Returned 8-channel print tips", "Demo Completed ==="],
+         ["picked 8 tips from column",
+          "8 droplets -> paper column",
+          "returned 8-tip block", "Paper print complete:", "Demo Completed ==="],
          ["Diluting well"]),
 
         ("wrong_labware",

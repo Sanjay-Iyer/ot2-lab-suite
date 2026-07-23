@@ -295,8 +295,11 @@ def test_offline_pipeline_build_validate_cv():
     """
     assert "Defaults loaded" in vpt.load_vial_print_defaults.invoke({})
 
+    # 30 uL: a valid P300 volume. (Sub-20 uL droplets like the old 18 uL are now
+    # correctly REJECTED for a P300-only setup by the shared pipette-selection
+    # validator — small volumes must use the P20. See src/core/pipette_selection.py.)
     upd = vpt.update_vial_print_params.invoke(
-        {"num_dilutions": 4, "droplet_volume_ul": 18.0, "num_replicates": 2})
+        {"num_dilutions": 4, "droplet_volume_ul": 30.0, "num_replicates": 2})
     assert "updated" in upd.lower()
 
     build_out = vpt.build_vial_print_protocol.invoke({})
