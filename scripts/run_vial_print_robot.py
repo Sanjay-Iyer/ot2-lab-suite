@@ -106,15 +106,85 @@ def _run_local_step(command: list[str], label: str) -> None:
     subprocess.run(command, cwd=REPO, check=True)
 
 
+def _custom_labware_files(protocol_path: Path) -> list[Path]:
+    """Custom labware JSONs the protocol references that live in the repo's labware/.
+
+    The robot only knows labware that was previously imported to it (via the App) or
+    that is uploaded WITH the protocol. Standard Opentrons labware (e.g. the tipracks)
+    is built in and has no file here, so it is skipped. Uploading the referenced
+    custom defs makes a run self-contained: a brand-new labware like the flat paper
+    surface works without a manual App import first."""
+    cfg = _embedded_config(protocol_path) or {}
+    files: list[Path] = []
+    seen: set[str] = set()
+    for spec in cfg.get("deck", {}).values():
+        if not isinstance(spec, dict):
+            continue
+        name = spec.get("load_name")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        path = REPO / "labware" / f"{name}.json"
+        if path.exists():
+            files.append(path)
+    return files
+
+
+def _report_run_error(robot_ip: str, run_id: str, run_log) -> None:
+    """Print the robot's own error(s) for a non-succeeded run so failures are not blind.
+
+    Reads the run object's `errors`, then the last few failed commands, which carry
+    the specific detail (e.g. a labware-not-found, or a hard collision)."""
+    try:
+        run = _request("GET", robot_ip, f"/runs/{run_id}").get("data", {})
+    except Exception as exc:  # noqa: BLE001 - reporting must never mask the failure
+        print(f"(could not fetch run error detail: {exc})")
+        return
+    errors = run.get("errors") or []
+    print("\n--- robot run error ---")
+    for err in errors:
+        print(f"  {err.get('errorType', 'Error')}: {err.get('detail', err)}")
+    try:
+        cmds = _request(
+            "GET", robot_ip, f"/runs/{run_id}/commands",
+        ).get("data", [])
+        failed = [c for c in cmds if c.get("status") == "failed"]
+        for c in failed[-3:]:
+            ce = c.get("error", {})
+            print(f"  command {c.get('commandType')}: "
+                  f"{ce.get('errorType', '')} {ce.get('detail', '')}".rstrip())
+    except Exception:  # noqa: BLE001
+        pass
+    print("--- end ---")
+    run_log.event("run_error", errors=errors)
+
+
 def _upload_protocol(robot_ip: str, protocol_path: Path) -> str:
-    print(f"\n[upload] {protocol_path}")
-    with protocol_path.open("rb") as handle:
+    lw_files = _custom_labware_files(protocol_path)
+    extra = f" + {len(lw_files)} custom labware def(s)" if lw_files else ""
+    print(f"\n[upload] {protocol_path.name}{extra}")
+    for p in lw_files:
+        print(f"         labware: {p.name}")
+    handles = []
+    try:
+        multipart = [("files", (protocol_path.name, protocol_path.open("rb"), "text/x-python"))]
+        handles.append(multipart[0][1][1])
+        for p in lw_files:
+            fh = p.open("rb")
+            handles.append(fh)
+            multipart.append(("files", (p.name, fh, "application/json")))
         response = requests.post(
             _api_url(robot_ip, "/protocols"),
             headers=HEADERS,
-            files={"files": (protocol_path.name, handle, "text/x-python")},
+            files=multipart,
             timeout=120,
         )
+    finally:
+        for fh in handles:
+            try:
+                fh.close()
+            except OSError:
+                pass
     try:
         payload = response.json()
     except ValueError:
@@ -127,6 +197,11 @@ def _upload_protocol(robot_ip: str, protocol_path: Path) -> str:
     protocol_id = payload.get("data", {}).get("id")
     if not protocol_id:
         raise RuntimeError(f"Protocol upload response did not include data.id:\n{json.dumps(payload, indent=2)}")
+    # Surface analysis errors (e.g. a labware definition the robot still cannot load)
+    # instead of letting them silently fail the run later.
+    for analysis in payload.get("data", {}).get("analysisSummaries", []):
+        if analysis.get("status") == "completed" and analysis.get("result") == "not-ok":
+            print("WARNING: protocol analysis reported problems; the run may fail.")
     print(f"Protocol ID: {protocol_id}")
     return protocol_id
 
@@ -597,6 +672,8 @@ def main() -> int:
         run_log.event("run_started", run_id=run_id)
         status = _monitor(robot_ip, run_id, args.poll_seconds)
         print(f"\nRun finished with status: {status}")
+        if status != "succeeded":
+            _report_run_error(robot_ip, run_id, run_log)
         if args.live and not args.no_pull_images:
             _pull_images(robot_ip, args.ssh_key, image_run_id, run_log)
         exit_code = 0 if status == "succeeded" else 1

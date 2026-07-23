@@ -32,7 +32,7 @@ requirements = {"robotType": "OT-2", "apiLevel": "2.15"}
 
 # Run modes (the build script rewrites these from the YAML's run_modes / CLI flags).
 # API 2.15 has no runtime parameters, so the modes are baked into the file.
-DEFAULT_DRY_RUN     = True
+DEFAULT_DRY_RUN     = False
 DEFAULT_DO_DILUTION = False # v4 never dilutes; kept so the build flag substitution is uniform
 DEFAULT_DO_PRINT    = True
 
@@ -52,7 +52,7 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
   'print': { 'volume_ul': 5.0,
              'paper_column': 1,
              'rows': ['A', 'B', 'C', 'D'],
-             'z_mm': 1.5,
+             'z_mm': 3.5,
              'blow_out': True,
              'post_dispense_delay_s': 0.3,
              'tip': 'A1'},

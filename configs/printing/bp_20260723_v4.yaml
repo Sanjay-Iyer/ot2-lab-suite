@@ -33,7 +33,7 @@ print:
   volume_ul: 5.0             # <= 20 (P20 capacity)
   paper_column: 1            # which paper column to dab
   rows: [A, B, C, D]         # one spot per row; shorten for an even quicker check
-  z_mm: 1.5                  # true standoff ABOVE the paper surface (well bottom = paper plane)
+  z_mm: 3.5                  # standoff ABOVE paper surface -> tip ~9.5 mm above deck (6.0 well + 3.5)
   blow_out: true
   post_dispense_delay_s: 0.3
   tip: A1                    # single reused P20 tip (slot-9 rack)
