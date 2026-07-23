@@ -1,5 +1,5 @@
 # =============================================================================
-# 02_p300_only.yaml  —  P300-ONLY printing (existing 8-up behaviour)
+# 01_vial_dilution_paper_print.p300_only.yaml  —  P300-ONLY printing (existing 8-up behaviour)
 # =============================================================================
 # Vial -> 96-well dilution -> paper print, using ONLY the right-mounted 8-channel
 # p300_multi_gen2. Prints 8 droplets at once (column_8up). This reproduces the

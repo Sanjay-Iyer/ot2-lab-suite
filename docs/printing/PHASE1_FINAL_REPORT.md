@@ -13,7 +13,9 @@ build-time validation, examples, tests, simulation, focused organization, and LL
 - `src/core/workflow_config.py` — build-time normalizer + shared-validator entry point.
 
 **Configs**
-- `configs/printing/01_vial_dilution_paper_print.p20_only.yaml`, `02_p300_only.yaml`, `03_mixed_p20_p300.yaml`
+- `configs/printing/01_vial_dilution_paper_print.p20_only.yaml`,
+  `configs/printing/01_vial_dilution_paper_print.p300_only.yaml`, and
+  `configs/printing/01_vial_dilution_paper_print.mixed.yaml`
 - `configs/printing/README.md` (numbered index)
 
 **Tests**

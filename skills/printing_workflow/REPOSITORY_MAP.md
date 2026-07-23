@@ -12,7 +12,9 @@ Quick reference for an LLM working inside `skills/`:
 - **Normalizer:** `src/core/workflow_config.py` (new sections → internal CONFIG + all validators)
 
 ## Configs & labware
-- Examples: `configs/printing/01_vial_dilution_paper_print.p20_only.yaml`, `02_p300_only.yaml`, `03_mixed_p20_p300.yaml`
+- Examples: `configs/printing/01_vial_dilution_paper_print.p20_only.yaml`,
+  `01_vial_dilution_paper_print.p300_only.yaml`,
+  `01_vial_dilution_paper_print.mixed.yaml`
 - Constraints: `configs/constraints/pipette_constraints.yaml`
 - Labware (filename == loadName): `labware/tuberack_3dprint_20ml_8vials_v2.json`,
   `corning_96_wellplate_360ul_custom.json`, standard `opentrons_96_tiprack_{20,300}ul`
@@ -25,7 +27,7 @@ using the `ai` conda env.
 ## File classification
 | Kind | Examples | Edit? |
 |---|---|---|
-| Entry point | `vial_dilution_print.py` (logic, not CONFIG) | Yes (logic) |
+| Entry point | `src/protocols/printing/01_vial_dilution_paper_print.py` (logic, not CONFIG) | Yes (logic) |
 | Library module | `src/core/*.py` | Yes (carefully) |
 | Config | `configs/printing/*.yaml`, `configs/constraints/*.yaml` | Yes |
 | Generated | `src/protocols/generated/*` | No |

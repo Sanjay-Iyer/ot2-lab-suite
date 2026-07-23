@@ -1,5 +1,5 @@
 # =============================================================================
-# 01_p20_only.yaml  —  P20-ONLY printing (single-spot, one droplet at a time)
+# 01_vial_dilution_paper_print.p20_only.yaml  —  P20-ONLY printing (single-spot, one droplet at a time)
 # =============================================================================
 # All PRINTING is done by the left-mounted single-channel p20_single_gen2 in
 # `single_spot` layout (5 uL and 10 uL droplets).

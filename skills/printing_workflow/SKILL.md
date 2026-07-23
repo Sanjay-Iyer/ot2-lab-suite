@@ -20,7 +20,8 @@ Full map: [REPOSITORY_MAP.md](REPOSITORY_MAP.md) (mirrors `docs/printing/REPOSIT
   `src/core/workflow_config.py`.
 
 ## 2. Choosing / creating a configuration
-Start from `configs/printing/0{1,2,3}_*.yaml` (see `configs/printing/README.md`). Copy the
+Start from `configs/printing/01_vial_dilution_paper_print.<variant>.yaml` (see
+`configs/printing/README.md`). Copy the
 closest one and edit. The unified schema sections are visually distinct:
 `deck / labware / pipettes / materials / dilution_plan / mixing_plan / print_groups /
 imaging / tip_policy`. See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md).

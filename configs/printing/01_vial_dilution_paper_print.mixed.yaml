@@ -1,5 +1,5 @@
 # =============================================================================
-# 03_mixed_p20_p300.yaml  —  MIXED run: P20 single-spot + P300 8-up in one workflow
+# 01_vial_dilution_paper_print.mixed.yaml  —  MIXED run: P20 single-spot + P300 8-up in one workflow
 # =============================================================================
 # Demonstrates all of it in one run:
 #   * P20 (single-channel, left)  prints 5 uL and 10 uL groups, one droplet at a time
