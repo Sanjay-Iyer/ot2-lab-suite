@@ -2,9 +2,10 @@
 """
 Terminal runner for the vial dilution -> paper print demo.
 
-This uses the robot HTTP API instead of opentrons_execute, which is important for
-this apiLevel 2.28 protocol. By default it creates a dry run. Pass --live to run
-the real liquid-handling print.
+This uses the robot HTTP API instead of opentrons_execute. By default it creates
+a dry run. Pass --live to run the real liquid-handling print. Protocol v3 targets
+API 2.15 and bakes run modes into the generated file because runtime parameters
+are unavailable at that API level.
 """
 from __future__ import annotations
 
@@ -42,7 +43,19 @@ CONFIG_END_SENTINEL   = "# <<< CONFIG END <<<"
 _PROTOCOL_BY_VERSION = {
     1: DEFAULT_PROTOCOL,
     2: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v2_latest.py",
+    3: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v3_latest.py",
 }
+
+
+def _config_version(config_path: str | None) -> int:
+    if not config_path:
+        return 1
+    try:
+        import yaml
+        raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
+        return int(raw.get("protocol_version", 1))
+    except (OSError, ValueError, TypeError, ImportError):
+        return 1
 
 
 def _protocol_for_config(config_path: str | None) -> Path:
@@ -54,12 +67,7 @@ def _protocol_for_config(config_path: str | None) -> Path:
     """
     if not config_path:
         return DEFAULT_PROTOCOL
-    try:
-        import yaml
-        raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
-        version = int(raw.get("protocol_version", 1))
-    except (OSError, ValueError, TypeError, ImportError):
-        return DEFAULT_PROTOCOL
+    version = _config_version(config_path)
     return _PROTOCOL_BY_VERSION.get(version, DEFAULT_PROTOCOL)
 REMOTE_VISION_DIR = "/data/vision/vial_dilution_print"
 LOCAL_VISION_BASE = REPO / "vision_runs" / "vial_dilution_print"
@@ -170,6 +178,26 @@ def _describe_deck(config: dict) -> None:
     # Tip plan: dilution setup tips, then each print group's own tips.
     dil = config.get("dilution", {})
     print("\nTip plan:")
+    if int(config.get("protocol_version", 0) or 0) == 3:
+        p20_tips = config.get("tips", {}).get("p20", {})
+        by_row = p20_tips.get("print_by_row", {})
+        print(f"  P20 rack   water setup tip {p20_tips.get('water')}")
+        if dil.get("stock_tip_policy", "single") == "single":
+            print(f"  P20 rack   bp stock setup tip {p20_tips.get('stock')}")
+        else:
+            print("  P20 rack   bp stock tips by row: "
+                  + ", ".join(f"{row}={tip}" for row, tip in
+                              p20_tips.get("stock_by_row", {}).items()))
+        print("  P20 rack   print tips by dilution row: "
+              + ", ".join(f"{row}={by_row.get(row)}" for row in "ABCDEFGH"))
+        print("  P300 rack  full 8-tip mixing block column "
+              f"{config.get('tips', {}).get('p300', {}).get('mix_block_column')}")
+        for g in config.get("print_groups", []):
+            start_col = g.get("destination", {}).get("paper_start_column")
+            print(f"  p20_single_gen2  {g.get('name')}: {g.get('volume_ul')} uL, "
+                  f"plate column {g.get('source', {}).get('plate_column')} "
+                  f"-> paper column {start_col}, one row-mapped tip")
+        return
     if dil.get("enabled", True):
         print(f"  P300 rack  water setup tip {dil.get('water_setup_tip', '?')}")
         for s in config.get("color_series", []):
@@ -204,6 +232,7 @@ def _create_run(
     do_print: bool,
     paper_start_column: int | None = None,
     pipette_check: bool = False,
+    send_runtime_parameters: bool = True,
 ) -> str:
     run_time_parameter_values: dict[str, Any] = {
         "dry_run": dry_run,
@@ -218,14 +247,15 @@ def _create_run(
     # otherwise the protocol uses the value baked in from the workflow YAML at build.
     if paper_start_column is not None:
         run_time_parameter_values["print_start_column"] = paper_start_column
-    body = {
-        "data": {
-            "protocolId": protocol_id,
-            "runTimeParameterValues": run_time_parameter_values,
-        }
-    }
+    data: dict[str, Any] = {"protocolId": protocol_id}
+    if send_runtime_parameters:
+        data["runTimeParameterValues"] = run_time_parameter_values
+    body = {"data": data}
     print("\n[create run]")
-    print(json.dumps(body["data"]["runTimeParameterValues"], indent=2))
+    if send_runtime_parameters:
+        print(json.dumps(run_time_parameter_values, indent=2))
+    else:
+        print("run modes are baked into the API-2.15 protocol; no runtime parameters sent")
     payload = _request("POST", robot_ip, "/runs", json=body)
     run_id = payload.get("data", {}).get("id")
     if not run_id:
@@ -366,8 +396,8 @@ def main() -> int:
     parser.add_argument("--protocol", default=None,
                         help="Generated protocol file to upload. Default: derived from "
                              "--config's protocol_version (v1 -> "
-                             "vial_dilution_print_latest.py, v2 -> "
-                             "vial_dilution_print_v2_latest.py).")
+                             "vial_dilution_print_latest.py, v2/v3 -> their "
+                             "versioned latest artifact).")
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
     parser.add_argument(
         "--pipette-check", action="store_true",
@@ -387,6 +417,11 @@ def main() -> int:
              "silently regenerate the protocol from the DEFAULT config.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
     parser.add_argument("--skip-validate", action="store_true", help="Do not run scripts/validate_vial_print.py first.")
+    parser.add_argument(
+        "--simulator-python", default=None,
+        help="v3 isolated simulator Python containing opentrons==7.0.2. Default: "
+             "OT2_API_2_15_PYTHON.",
+    )
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
     parser.add_argument("--poll-seconds", type=float, default=5.0, help="Status polling interval.")
     parser.add_argument("--ssh-key", default=None, help="SSH key for image pullback. Default: ROBOT_SSH_KEY_PATH or ~/.ssh/id_rsa_opentrons.")
@@ -400,6 +435,29 @@ def main() -> int:
         robot_ip = args.robot_ip
         os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
+        version = _config_version(args.config)
+        # --pipette-check needs real motion, so it must not also be a dry run.
+        dry_run = not (args.live or args.pipette_check)
+        do_dilution = not args.no_dilution
+        do_print = not args.no_print
+        if version == 3:
+            if args.pipette_check:
+                raise ValueError(
+                    "--pipette-check is not available for API-2.15 v3; its P300 "
+                    "always uses a complete column of eight tips."
+                )
+            if args.paper_start_column is not None:
+                raise ValueError(
+                    "--paper-start-column is not available for v3; columns 1-4 "
+                    "are fixed in the validated config."
+                )
+            if args.skip_build or args.skip_validate:
+                raise ValueError(
+                    "v3 requires build, pinned simulation, and live /health "
+                    "validation immediately before upload; do not use "
+                    "--skip-build or --skip-validate."
+                )
+
         protocol_path = Path(
             args.protocol or _protocol_for_config(args.config)).resolve()
         if not args.skip_build:
@@ -407,6 +465,14 @@ def main() -> int:
             build_cmd = [sys.executable, "scripts/build_vial_dilution_print.py"]
             if args.config:
                 build_cmd += ["--config", args.config]
+            if args.simulator_python:
+                build_cmd += ["--simulator-python", args.simulator_python]
+            if version == 3:
+                build_cmd += [
+                    "--set-dry-run", str(dry_run).lower(),
+                    "--set-do-dilution", str(do_dilution).lower(),
+                    "--set-do-print", str(do_print).lower(),
+                ]
             # The builder reads protocol_version from the config itself, so no version
             # flag is needed here — but the artifact it writes must be the one we
             # upload, which _protocol_for_config() resolved from the same key.
@@ -416,15 +482,14 @@ def main() -> int:
             validate_cmd = [sys.executable, "scripts/validate_vial_print.py"]
             if args.config:
                 validate_cmd += ["--config", args.config]
+            if args.simulator_python:
+                validate_cmd += ["--simulator-python", args.simulator_python]
+            if version == 3:
+                validate_cmd += ["--robot-ip", robot_ip]
             _run_local_step(validate_cmd, "validate matrix")
         if not protocol_path.exists():
             raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 
-        # --pipette-check needs real motion, so it must NOT also be a dry run (the
-        # dry-run branch returns before the check).
-        dry_run = not (args.live or args.pipette_check)
-        do_dilution = not args.no_dilution
-        do_print = not args.no_print
         image_run_id = datetime.now().strftime("run_%Y%m%d_%H%M%S")
         rtp: dict[str, Any] = {
             "dry_run": dry_run,
@@ -481,6 +546,7 @@ def main() -> int:
             do_print=do_print,
             paper_start_column=args.paper_start_column,
             pipette_check=args.pipette_check,
+            send_runtime_parameters=version != 3,
         )
         run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 

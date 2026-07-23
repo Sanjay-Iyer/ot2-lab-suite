@@ -10,6 +10,33 @@ Build any of them with:
 python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.<variant>.yaml
 ```
 
+## BP v3: robot API 7.0.2 / Protocol API 2.15
+
+`bp_20260723_v3.yaml` is the robot-compatible BP workflow. It does not use
+partial-nozzle pickup: the P20 performs all vial transfers and all four paper
+spot volumes, while the P300 multi-channel pipette only mixes plate column 11
+with a complete column of eight tips.
+
+Opentrons 7.0.2 has dependencies that conflict with the main `ai` environment,
+so its simulator is intentionally isolated:
+
+```powershell
+conda create --prefix .venv\ot2-api-2.15-py310 python=3.10 pip -y
+.\.venv\ot2-api-2.15-py310\python.exe -m pip install -r requirements-ot2-api-2.15.txt
+```
+
+The build and validation scripts automatically find that interpreter. On a
+different path, set `OT2_API_2_15_PYTHON` to its `python.exe`.
+
+```powershell
+conda activate ai
+python scripts\build_vial_dilution_print.py --config configs\printing\bp_20260723_v3.yaml
+python scripts\validate_vial_print.py --config configs\printing\bp_20260723_v3.yaml --robot-ip 169.254.46.57
+```
+
+The second command fetches `/health` and requires the generated API level to
+equal the robot's reported maximum before running all five simulation modes.
+
 | File | Pipettes | Droplets | Layout | Status (simulation) |
 |------|----------|----------|--------|---------------------|
 | `01_vial_dilution_paper_print.p20_only.yaml` | P300 (dilution prep) + P20 (printing) | 5 µL, 10 µL | `single_spot` | Simulated OK |

@@ -1,0 +1,8 @@
+# Isolated simulator for the deployed OT-2:
+#   robot API 7.0.2, maximum Python Protocol API 2.15.
+#
+# Do not install this into the main `ai` environment. Opentrons 7.0.2 requires
+# Pydantic 1.8.2, while the repository's config/build layer requires Pydantic 2.
+# Create a dedicated environment and point OT2_API_2_15_PYTHON at its Python.
+opentrons==7.0.2
+setuptools<81

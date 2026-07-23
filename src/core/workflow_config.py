@@ -165,17 +165,37 @@ def _normalize_new(raw: Mapping[str, Any], materials: dict) -> tuple[dict, list[
             s["paper_start_column"] = 1
             s["num_replicates"] = 1
 
+    total_volume = float(dplan.get("total_volume_ul", 200.0))
+    mix_cap = float(mplan.get("mix_volume_cap_ul", 100.0))
+    mix_fraction = float(mplan.get("mix_fraction", 0.66))
+    mix_volume = float(
+        mplan.get("mix_volume_ul", min(mix_cap, mix_fraction * total_volume))
+    )
     dilution = {
         "enabled": dplan.get("enabled", True),
         "destination_column": str(dplan.get("destination_column", color_series[0]["destination_column"] if color_series else "9")),
-        "total_volume_ul": float(dplan.get("total_volume_ul", 200.0)),
+        "total_volume_ul": total_volume,
         "factors": dplan["factors"],
         "mix_reps": int(mplan.get("mix_reps", 0)),
-        "mix_volume_ul": float(mplan.get("mix_volume_ul", 0.0)),
+        "mix_volume_ul": mix_volume,
         "water_setup_tip": dplan.get("water_setup_tip", "H12"),
         "setup_tip": dplan.get("setup_tip", dplan.get("water_setup_tip", "H12")),
         "single_tip_columns": dplan.get("single_tip_columns", [12]),
     }
+    # Protocol v3 uses the single-channel P20 for every vial transfer, splitting
+    # volumes into chunks at or below max_transfer_ul. These fields are harmless
+    # to earlier protocols and keep the normalized CONFIG self-contained.
+    for key, default in (
+        ("transfer_pipette", None),
+        ("max_transfer_ul", 20.0),
+        ("dead_volume_ul", 30.0),
+        ("stock_tip_policy", "single"),
+        ("water_dispense_from_top_mm", -2.0),
+        ("stock_dispense_from_top_mm", -1.0),
+    ):
+        value = dplan.get(key, default)
+        if value is not None:
+            dilution[key] = value
     # Protocol v2 only: route dilution transfers at/below a threshold to a small-volume
     # pipette (the P20). Passed straight through — v1 ignores it, v2's pre-flight
     # validates it against the mounted pipettes and the 20 uL rack.
@@ -202,7 +222,10 @@ def _normalize_new(raw: Mapping[str, Any], materials: dict) -> tuple[dict, list[
         "color_series": color_series,
         "print_groups": [dict(g) for g in raw.get("print_groups", [])],
         "printing": {"enabled": bool(raw.get("print_groups"))},
-        "tips": {"return_tips": raw.get("tip_policy", {}).get("return_tips", True)},
+        "tips": {
+            "return_tips": raw.get("tip_policy", {}).get("return_tips", True),
+            **dict(raw.get("tip_policy", {})),
+        },
         "camera": camera,
         "materials": {n: m.model_dump(exclude_none=True) for n, m in materials.items()},
         "flow_rates": raw.get("flow_rates", {"aspirate": 20.0, "dispense": 80.0, "mix": None}),

@@ -17,8 +17,10 @@ src/protocols/generated/ -> simulate (scans output text for errors).
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import math
+import os
 import pprint
 import re
 import subprocess
@@ -41,6 +43,8 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
     1: (BASE_PROTOCOL, "vial_dilution_print"),
     2: (PRINTING_DIR / "02_vial_dilution_paper_print_p20_dilution.py",
         "vial_dilution_print_v2"),
+    3: (PRINTING_DIR / "03_vial_dilution_paper_print_v3.py",
+        "vial_dilution_print_v3"),
 }
 
 GENERATED_DIR = REPO / "src" / "protocols" / "generated"
@@ -67,7 +71,8 @@ _SHIM = (
 # Tightened: only genuine Python error markers, not user comment phrases like "not allowed"
 _ERROR_RE = re.compile(
     r"Traceback \(most recent call last\)|RuntimeError|LabwareNotFoundError|"
-    r"ProtocolCommandFailedError|InvalidProtocolData|KeyError|AttributeError",
+    r"ProtocolCommandFailedError|InvalidProtocolData|FileNotFoundError|"
+    r"KeyError|AttributeError",
     re.IGNORECASE,
 )
 
@@ -75,6 +80,19 @@ _FLAG_SUBS = {
     "dry_run":     (re.compile(r"(?m)^DEFAULT_DRY_RUN\s*=.*$"),     "DEFAULT_DRY_RUN     = {}"),
     "do_dilution": (re.compile(r"(?m)^DEFAULT_DO_DILUTION\s*=.*$"), "DEFAULT_DO_DILUTION = {}"),
     "do_print":    (re.compile(r"(?m)^DEFAULT_DO_PRINT\s*=.*$"),    "DEFAULT_DO_PRINT    = {}"),
+}
+
+V3_API_LEVEL = "2.15"
+V3_SIMULATOR_VERSION = "7.0.2"
+V3_SIMULATOR_PYTHON = (
+    REPO / ".venv" / "ot2-api-2.15-py310" / "python.exe"
+)
+_V3_FORBIDDEN_NOZZLE_NAMES = {
+    "SINGLE",
+    "PARTIAL_COLUMN",
+    "COLUMN",
+    "ROW",
+    "ALL",
 }
 
 
@@ -326,6 +344,245 @@ def validate(cfg: dict) -> list:
     return errors
 
 
+def _v3_tip_locations(config: dict) -> list[str]:
+    p20 = config.get("tips", {}).get("p20", {})
+    locations = [str(p20.get("water", "")), str(p20.get("stock", ""))]
+    by_row = p20.get("print_by_row", {})
+    locations.extend(str(by_row.get(row, "")) for row in "ABCDEFGH")
+    if config.get("dilution", {}).get("stock_tip_policy") == "per_well":
+        stock_by_row = p20.get("stock_by_row", {})
+        locations = [str(p20.get("water", ""))]
+        locations.extend(str(stock_by_row.get(row, "")) for row in "ABCDEFGH")
+        locations.extend(str(by_row.get(row, "")) for row in "ABCDEFGH")
+    return locations
+
+
+def _v3_source_problems(source: str) -> list[str]:
+    """Static checks for API-2.15 and P300 targeting invariants."""
+    problems: list[str] = []
+    if "configure_" + "nozzle_layout" in source:
+        problems.append("v3 source contains a partial-nozzle configuration call")
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        return [f"v3 source is not valid Python: {exc}"]
+
+    api_level = None
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "requirements":
+                    try:
+                        req = ast.literal_eval(node.value)
+                    except (ValueError, TypeError):
+                        req = {}
+                    api_level = str(req.get("apiLevel", ""))
+                    if req.get("robotType") != "OT-2":
+                        problems.append("v3 requirements.robotType must be OT-2")
+    if api_level != V3_API_LEVEL:
+        problems.append(
+            f"v3 emitted apiLevel must be {V3_API_LEVEL}, got {api_level or '(missing)'}"
+        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            imported: set[str] = set()
+            if isinstance(node, ast.ImportFrom):
+                imported.update(alias.name for alias in node.names)
+            else:
+                imported.update(alias.name.rsplit(".", 1)[-1] for alias in node.names)
+            bad = imported & _V3_FORBIDDEN_NOZZLE_NAMES
+            if bad:
+                problems.append(
+                    "v3 imports nozzle-layout constant(s): " + ", ".join(sorted(bad))
+                )
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        owner = node.func.value
+        if not isinstance(owner, ast.Name) or owner.id != "p300":
+            continue
+        rendered_args = " ".join(
+            ast.get_source_segment(source, arg) or "" for arg in node.args
+        )
+        rendered_args += " " + " ".join(
+            ast.get_source_segment(source, kw.value) or "" for kw in node.keywords
+        )
+        if "tuberack" in rendered_args:
+            problems.append(
+                f"P300 command {node.func.attr} targets the slot-7 tuberack"
+            )
+    return problems
+
+
+def validate_v3(config: dict, source: str) -> list[str]:
+    """Validate v3's physical design before a generated file can be emitted."""
+    errors = _v3_source_problems(source)
+    deck = config.get("deck", {})
+    expected_slots = {
+        "tuberack": 7,
+        "plate": 4,
+        "paper": 5,
+        "tiprack": 8,
+        "tiprack_p20": 9,
+    }
+    for role, expected in expected_slots.items():
+        actual = deck.get(role, {}).get("slot")
+        if int(actual or -1) != expected:
+            errors.append(f"v3 deck.{role}.slot must be {expected}, got {actual}")
+
+    pipettes = {p.get("name"): p for p in config.get("pipettes", [])}
+    if pipettes.get("p20_single_gen2", {}).get("mount") != "left":
+        errors.append("v3 requires p20_single_gen2 on the left mount")
+    if pipettes.get("p300_multi_gen2", {}).get("mount") != "right":
+        errors.append("v3 requires p300_multi_gen2 on the right mount")
+
+    dilution = config.get("dilution", {})
+    factors = _resolve_factors(dilution)
+    total = float(dilution.get("total_volume_ul", 0.0))
+    max_transfer = float(dilution.get("max_transfer_ul", 0.0))
+    dead_volume = float(dilution.get("dead_volume_ul", 0.0))
+    if dilution.get("transfer_pipette") != "p20_single_gen2":
+        errors.append("v3 dilution.transfer_pipette must be p20_single_gen2")
+    if not (0 < max_transfer <= 20.0):
+        errors.append(
+            f"v3 dilution.max_transfer_ul must be in (0, 20], got {max_transfer}"
+        )
+    chunk_limit = max_transfer if max_transfer > 0 else 20.0
+    if len(factors) != 8:
+        errors.append(f"v3 requires exactly 8 dilution factors, got {len(factors)}")
+
+    print_groups = config.get("print_groups", [])
+    print_total = sum(float(g.get("volume_ul", 0.0)) for g in print_groups)
+    if total > 340.0:
+        errors.append(f"v3 V={total:g} uL exceeds the 340 uL safe well fill")
+    if total + 0.01 < print_total + dead_volume:
+        errors.append(
+            f"v3 V={total:g} uL must be >= print consumption {print_total:g} "
+            f"+ dead volume {dead_volume:g} uL"
+        )
+    for factor in factors:
+        if factor <= 0:
+            errors.append(f"dilution factor must be positive, got {factor}")
+            continue
+        stock = total / factor
+        water = total - stock
+        if abs((stock + water) - total) > 0.1:
+            errors.append(
+                f"{factor:g}x stock + water differs from V by more than 0.1 uL"
+            )
+        for name, volume in (("stock", stock), ("water", water)):
+            remaining = volume
+            while remaining > 0.01:
+                chunk = min(chunk_limit, remaining)
+                if chunk > 20.0:
+                    errors.append(
+                        f"{factor:g}x {name} chunk {chunk:g} uL exceeds P20 capacity"
+                    )
+                remaining = round(remaining - chunk, 6)
+
+    expected_print = [(1, 20.0), (2, 15.0), (3, 10.0), (4, 5.0)]
+    actual_print = [
+        (int(g.get("destination", {}).get("paper_start_column", 0)),
+         float(g.get("volume_ul", 0.0)))
+        for g in print_groups
+    ]
+    if actual_print != expected_print:
+        errors.append(
+            f"v3 paper plan must be {expected_print}, got {actual_print}"
+        )
+    for group in print_groups:
+        if group.get("pipette") != "p20_single_gen2":
+            errors.append(f"{group.get('name')}: v3 printing must use the P20")
+        if group.get("layout") != "single_spot":
+            errors.append(f"{group.get('name')}: v3 printing must use single_spot")
+        if float(group.get("volume_ul", 0.0)) > 20.0:
+            errors.append(f"{group.get('name')}: P20 print volume exceeds 20 uL")
+        group_tips = group.get("tips", {})
+        if (
+            group_tips.get("strategy") != "per_source_row"
+            or group_tips.get("map_ref") != "print_by_row"
+        ):
+            errors.append(
+                f"{group.get('name')}: v3 must reference the print_by_row tip map"
+            )
+
+    tip_locations = _v3_tip_locations(config)
+    if any(not re.fullmatch(r"[A-H](?:[1-9]|1[0-2])", tip) for tip in tip_locations):
+        errors.append(f"v3 P20 tip map has invalid locations: {tip_locations}")
+    if len(tip_locations) != len(set(tip_locations)):
+        errors.append(f"v3 P20 tip map must be unique, got {tip_locations}")
+    if dilution.get("stock_tip_policy") == "single" and len(tip_locations) != 10:
+        errors.append("v3 single-stock-tip plan must allocate exactly 10 P20 tips")
+
+    mix_volume = float(dilution.get("mix_volume_ul", 0.0))
+    if not (20.0 <= mix_volume < total):
+        errors.append(
+            f"v3 mix volume must be >=20 uL and below V; got {mix_volume:g}"
+        )
+    if int(config.get("tips", {}).get("p300", {}).get("mix_block_column", 0)) != 1:
+        errors.append("v3 P300 mix tips must be full tiprack column 1")
+
+    rack_json = _load_labware_json(
+        deck.get("tuberack", {}).get("load_name", "")
+    )
+    if rack_json is None:
+        errors.append("v3 custom tuberack JSON is missing")
+    else:
+        declared = float(rack_json.get("dimensions", {}).get("zDimension", 0.0))
+        well_tops = [
+            float(well.get("z", 0.0)) + float(well.get("depth", 0.0))
+            for well in rack_json.get("wells", {}).values()
+        ]
+        physical_top = max(well_tops, default=0.0)
+        expected = float(
+            config.get("safety", {}).get("expected_tuberack_z_dimension_mm", 0.0)
+        )
+        clearance = float(
+            config.get("safety", {}).get("p300_travel_clearance_mm", 0.0)
+        )
+        if abs(declared - physical_top) > 0.5:
+            errors.append(
+                f"tuberack zDimension {declared:g} mm does not cover well top "
+                f"{physical_top:g} mm"
+            )
+        if abs(declared - expected) > 0.5:
+            errors.append(
+                f"tuberack zDimension {declared:g} mm differs from expected {expected:g}"
+            )
+        if declared + clearance <= physical_top:
+            errors.append(
+                "configured P300 travel envelope does not clear the slot-7 rack"
+            )
+    return errors
+
+
+def _v3_simulator_problem(python_executable: str) -> Optional[str]:
+    check = subprocess.run(
+        [
+            python_executable,
+            "-c",
+            "import importlib.metadata; "
+            "print(importlib.metadata.version('opentrons'))",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if check.returncode != 0:
+        return (
+            f"{python_executable} cannot load opentrons package metadata; "
+            f"install requirements-ot2-api-2.15.txt in the isolated simulator "
+            f"environment ({check.stderr.strip()})"
+        )
+    installed = check.stdout.strip().splitlines()[-1]
+    if installed != V3_SIMULATOR_VERSION:
+        return (
+            f"opentrons=={V3_SIMULATOR_VERSION} is required for v3 simulation; "
+            f"{python_executable} reports {installed}. Set OT2_API_2_15_PYTHON or "
+            "pass --simulator-python."
+        )
+    return None
+
+
 # ── Generation ────────────────────────────────────────────────────────────────────
 
 def build_source(base_text: str, cfg: dict, run_modes: dict) -> str:
@@ -350,10 +607,15 @@ def build_source(base_text: str, cfg: dict, run_modes: dict) -> str:
     return out[:line_start] + new_region + out[line_end:]
 
 
-def simulate(path: Path) -> tuple:
+def simulate(path: Path, python_executable: str | None = None) -> tuple:
+    python_executable = python_executable or sys.executable
+    simulator_config = REPO / ".test_tmp" / "opentrons-simulator"
+    simulator_config.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["OT_API_CONFIG_DIR"] = str(simulator_config)
     proc = subprocess.run(
-        [sys.executable, "-c", _SHIM, "-L", str(LABWARE), path.name],
-        cwd=str(path.parent), capture_output=True, text=True,
+        [python_executable, "-c", _SHIM, "-L", str(LABWARE), path.name],
+        cwd=str(path.parent), capture_output=True, text=True, env=env,
     )
     output = proc.stdout + "\n" + proc.stderr
     errors = [ln.strip() for ln in output.splitlines() if _ERROR_RE.search(ln)]
@@ -370,8 +632,26 @@ def main() -> int:
     ap.add_argument("--protocol-version", type=int, default=None,
                     choices=sorted(PROTOCOL_VERSIONS),
                     help="Base protocol to build from. Default: the config's "
-                         "'protocol_version' key, else 1. v2 routes sub-threshold "
-                         "dilution transfers to the P20.")
+                         "'protocol_version' key, else 1.")
+    ap.add_argument(
+        "--set-dry-run", choices=("true", "false"), default=None,
+        help="Override the generated DEFAULT_DRY_RUN flag.",
+    )
+    ap.add_argument(
+        "--set-do-dilution", choices=("true", "false"), default=None,
+        help="Override the generated DEFAULT_DO_DILUTION flag.",
+    )
+    ap.add_argument(
+        "--set-do-print", choices=("true", "false"), default=None,
+        help="Override the generated DEFAULT_DO_PRINT flag.",
+    )
+    ap.add_argument(
+        "--simulator-python",
+        default=None,
+        help="Python executable for simulation. v3 requires an isolated interpreter "
+             "with opentrons==7.0.2. Default: OT2_API_2_15_PYTHON, then the current "
+             "interpreter.",
+    )
     args = ap.parse_args()
 
     cfg_path = Path(args.config)
@@ -380,6 +660,13 @@ def main() -> int:
         return 1
     full      = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
     run_modes = full.pop("run_modes", {})   # not part of CONFIG
+    for key, value in (
+        ("dry_run", args.set_dry_run),
+        ("do_dilution", args.set_do_dilution),
+        ("do_print", args.set_do_print),
+    ):
+        if value is not None:
+            run_modes[key] = value == "true"
 
     # Protocol version: CLI wins, else the config's own declaration, else v1.
     version = args.protocol_version or int(full.pop("protocol_version", 1))
@@ -408,6 +695,7 @@ def main() -> int:
         print(f"  {e}")
         return 1
     config = nw.config
+    config["protocol_version"] = version
     for note in nw.notes:
         print(f"  [normalize] {note}")
     for w in [i for i in nw.issues if i.severity == "warning"]:
@@ -431,10 +719,24 @@ def main() -> int:
             for p in problems:
                 print(f"  - {p}")
             return 1
+    base_text = base_protocol.read_text(encoding="utf-8")
+    if version == 3:
+        problems = validate_v3(config, base_text)
+        if problems:
+            print("CONFIG VALIDATION FAILED (v3 safety rules):")
+            for problem in problems:
+                print(f"  - {problem}")
+            return 1
     print("Config validation passed.")
 
-    base_text = base_protocol.read_text(encoding="utf-8")
     generated = build_source(base_text, config, run_modes)
+    if version == 3:
+        source_problems = _v3_source_problems(generated)
+        if source_problems:
+            print("GENERATED SOURCE VALIDATION FAILED (v3 safety rules):")
+            for problem in source_problems:
+                print(f"  - {problem}")
+            return 1
 
     GENERATED_DIR.mkdir(parents=True, exist_ok=True)
     # Timestamp in local time with UTC offset suffix for unambiguous log correlation
@@ -449,7 +751,19 @@ def main() -> int:
     if args.no_sim:
         return 0
 
-    ok, output = simulate(run_path)
+    simulator_python = (
+        args.simulator_python
+        or os.environ.get("OT2_API_2_15_PYTHON")
+        or (str(V3_SIMULATOR_PYTHON) if V3_SIMULATOR_PYTHON.exists() else None)
+        or sys.executable
+    )
+    if version == 3:
+        simulator_problem = _v3_simulator_problem(simulator_python)
+        if simulator_problem:
+            print(f"SIMULATION ENVIRONMENT INVALID: {simulator_problem}")
+            return 1
+
+    ok, output = simulate(run_path, simulator_python if version == 3 else sys.executable)
     tail = "\n".join(line for line in output.splitlines()
                      if any(k in line for k in ("Pre-flight", "Series:", "Printing 8",
                                                 "Returned", "Completed ===", "WARNING")))

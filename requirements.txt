@@ -2,8 +2,8 @@
 # Install: pip install -r requirements.txt
 
 # --- Core Lab Automation ---
-# vial_dilution_print.py requires apiLevel 2.28 for partial-mode return_tip().
-# opentrons 9.0.0 is the simulator version verified for that protocol.
+# Main development environment. Protocol v3 is validated in a separate environment
+# pinned by requirements-ot2-api-2.15.txt because Opentrons 7 requires Pydantic 1.
 opentrons>=9.0,<10.0
 pydantic>=2.0
 pydantic-settings

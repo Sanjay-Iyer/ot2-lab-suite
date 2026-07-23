@@ -1,0 +1,153 @@
+# BP nanoparticle dilution series -> paper print, protocol v3.
+# OT-2 robot software 7.0.2 / Python Protocol API 2.15.
+#
+# P20 single-channel:
+#   - all vial access
+#   - all dilution transfers, split into transfers of at most 20 uL
+#   - all 32 paper spots
+# P300 multi-channel:
+#   - one full 8-tip-column pickup for mixing plate column 11 only
+#
+# Safe local build (defaults to dry-run mode):
+#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v3.yaml
+
+protocol_version: 3
+
+run_modes:
+  dry_run: true
+  do_dilution: true
+  do_print: true
+
+deck:
+  tiprack_p300: {slot: 8}
+  tiprack_p20:  {slot: 9}
+  tuberack:     {slot: 7}
+  plate:        {slot: 4}
+  paper:        {slot: 5}
+
+labware:
+  tuberack:     {load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  tiprack_p300: {load_name: opentrons_96_tiprack_300ul}
+  tiprack_p20:  {load_name: opentrons_96_tiprack_20ul}
+
+pipettes:
+  - {name: p300_multi_gen2, mount: right}
+  - {name: p20_single_gen2, mount: left}
+
+materials:
+  water:
+    role: solvent
+    labware: tuberack_3dprint_20ml_8vials_v2
+    vial: A1
+    initial_volume_ul: 20000
+    aspirate_height_mm: 4.0
+  bp:
+    role: stock
+    labware: tuberack_3dprint_20ml_8vials_v2
+    vial: A2
+    initial_volume_ul: 10000
+    aspirate_height_mm: 4.0
+
+dilution_plan:
+  enabled: true
+  total_volume_ul: 150
+  water_material: water
+  transfer_pipette: p20_single_gen2
+  max_transfer_ul: 20
+  dead_volume_ul: 30
+  stock_tip_policy: single
+  water_dispense_from_top_mm: -2.0
+  stock_dispense_from_top_mm: -1.0
+  factors: {mode: explicit, explicit: [1, 2, 5, 10, 15, 20, 25, 50]}
+  series:
+    - {name: bp, material: bp, destination_column: "11"}
+
+mixing_plan:
+  mix_reps: 5
+  mix_volume_cap_ul: 100
+  mix_fraction: 0.66
+
+flow_rates:
+  p20: {aspirate: 3.0, dispense: 3.0}
+  p300: {aspirate: 50.0, dispense: 100.0}
+
+print_groups:
+  - name: col1_20ul_p20
+    volume_ul: 20
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false
+    destination: {paper_start_column: 1}
+    dispense: {z_mm: 1.0, air_gap_ul: 0, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {strategy: per_source_row, map_ref: print_by_row, reuse: true, return: false}
+
+  - name: col2_15ul_p20
+    volume_ul: 15
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false
+    destination: {paper_start_column: 2}
+    dispense: {z_mm: 1.0, air_gap_ul: 0, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {strategy: per_source_row, map_ref: print_by_row, reuse: true, return: false}
+
+  - name: col3_10ul_p20
+    volume_ul: 10
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false
+    destination: {paper_start_column: 3}
+    dispense: {z_mm: 1.0, air_gap_ul: 0, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {strategy: per_source_row, map_ref: print_by_row, reuse: true, return: false}
+
+  - name: col4_5ul_p20
+    volume_ul: 5
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false
+    destination: {paper_start_column: 4}
+    dispense: {z_mm: 1.0, air_gap_ul: 0, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {strategy: per_source_row, map_ref: print_by_row, reuse: true, return: false}
+
+imaging:
+  enabled: true
+  capture_before: true
+  capture_after: true
+  robot_image_dir: /data/vision/vial_dilution_print
+
+tip_policy:
+  return_tips: false
+  p20:
+    water: A1
+    stock: A2
+    print_by_row:
+      A: A3
+      B: A4
+      C: A5
+      D: A6
+      E: A7
+      F: A8
+      G: A9
+      H: A10
+  p300:
+    mix_block_column: 1
+
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_tuberack_z_dimension_mm: 60.0
+  p300_travel_clearance_mm: 5.0
+  max_well_fill_ul: 340.0
+  p20_max_volume_ul: 20.0

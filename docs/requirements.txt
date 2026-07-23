@@ -1,7 +1,7 @@
 # Nanoparticle Printing Optimization Suite — Dependencies
 # Install with: pip install -r requirements.txt
 
-opentrons>=7.0,<9.0          # OT-2 Python API + built-in simulator
+opentrons>=7.0,<9.0          # General tools; v3 uses the isolated pinned file
 pyyaml>=6.0,<7.0             # YAML config reading/writing
 pandas>=1.5                  # CSV / DataFrame operations
 numpy>=1.23                  # Numerical computations

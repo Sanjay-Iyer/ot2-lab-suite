@@ -91,6 +91,11 @@ class TipSpec(_Strict):
     # single-channel explicit tip well (e.g. H12) OR 8-channel full-column pickup.
     well: Optional[str] = None
     block_column: Optional[int] = None
+    # v3 can keep one P20 tip per dilution/source row while printing several
+    # volume groups. The concrete row -> tip mapping lives once in the workflow's
+    # global tip_policy block and is referenced by name from each group.
+    strategy: Optional[Literal["per_source_row"]] = None
+    map_ref: Optional[str] = None
     reuse: bool = True
     return_tip: bool = Field(default=True, alias="return")
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -288,8 +293,16 @@ def resolve_and_validate(
             issues.append(Issue("error", g.name, str(e)))
 
         # Tip assignment must match the layout.
-        if g.layout == "single_spot" and not g.tips.well:
-            issues.append(Issue("error", g.name, "single_spot layout requires tips.well (a single tip position)."))
+        if g.layout == "single_spot" and not (
+            g.tips.well
+            or (g.tips.strategy == "per_source_row" and g.tips.map_ref)
+        ):
+            issues.append(Issue(
+                "error",
+                g.name,
+                "single_spot layout requires tips.well or a "
+                "tips.strategy=per_source_row mapping reference.",
+            ))
         if g.layout == "column_8up" and g.tips.block_column is None:
             issues.append(Issue("error", g.name, "column_8up layout requires tips.block_column (full 8-tip pickup)."))
 
