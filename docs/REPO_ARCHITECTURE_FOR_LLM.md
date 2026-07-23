@@ -803,7 +803,7 @@ launched, what the robot reported, and what the camera/CV observed.
 | `pull_vision_images.py` | Direct guarded SCP pull of a robot vision folder |
 | `pull_ot2_images.py` | Config-driven transfer, inventory, and validation workflow |
 | `test_ot2_camera_capture.py` | Camera endpoint and image-transfer diagnostic; also has mock mode |
-| `validate_protocol.py` | Output-scanning simulation validator for a protocol matrix |
+| `validate_vial_print.py` | Active Workflow 01 five-mode output-scanning simulation validator; use with `build_vial_dilution_print.py` |
 | `audit_paths.py` | Detect problematic hardcoded paths and portability issues |
 | `sync_robot.py` | Older broad robot-data copy helper; unlike current guarded pull tools, its source presently lacks the explicit key and `scp -O` pattern |
 

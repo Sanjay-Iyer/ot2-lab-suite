@@ -36,6 +36,20 @@ OT-2, camera, or fixtures. Do not mark any step complete from the home computer.
 ## 3. Dry / conservative physical checks (start here — smallest blast radius)
 9. **Dry run without liquids** where safe (App runtime `dry_run = true`): confirm motion
    planning, no unexpected contact.
+
+   For the paper fixture, use a conservative dry sweep before dispensing liquid:
+   pick up one P300 column (8 tips), visit each paper column that the planned run will
+   use, pause long enough to inspect all eight tip positions, and confirm the tips clear
+   the fixture walls and stop above the paper without scraping. Return the eight tips to
+   their original rack positions after the sweep. Stop immediately on any contact or
+   alignment error.
+
+   The retired `paper_print_96_flat` experiment used different geometry and deck
+   assumptions (paper surface at 6 mm above deck, 14 mm outer walls, a nominal 1 mm
+   standoff, and the P300 tip rack in slot 8). **Do not reuse those numeric assumptions.**
+   Workflow 01 uses `corning_96_wellplate_360ul_custom` as the paper coordinate proxy,
+   paper slot 5, and the P300 tip rack in slot 9. Verify the active fixture and configured
+   `dispense.z_mm` physically in the Opentrons App setup before the sweep.
 10. **Test P20 tip pickup and return** (20 µL rack, slot 2): one pick + return; confirm the
     tip seats and returns to the same well.
 11. **Test P300 tip pickup and return** (300 µL rack, slot 9): one 8-tip block pick + return.

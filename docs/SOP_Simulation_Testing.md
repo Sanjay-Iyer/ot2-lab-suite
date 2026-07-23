@@ -25,11 +25,12 @@ python -m opentrons.simulate src\protocols\mock_test_protocol.py
 
 ## 1b. Multi-Mode Validation (diagnostic protocols)
 
-Some protocols have several run modes (e.g. the tube-rack verification —
-see [verify_tuberack.md](verify_tuberack.md)). Validate **every mode at once**:
+Workflow 01 has several run modes. Build and simulate the selected configuration, then
+validate **every mode at once** against that same configuration:
 
 ```powershell
-python scripts\validate_protocol.py
+python scripts\build_vial_dilution_print.py --config configs\printing\01_vial_dilution_paper_print.mixed.yaml
+python scripts\validate_vial_print.py --config configs\printing\01_vial_dilution_paper_print.mixed.yaml
 ```
 
 It runs each flag combination through the simulator and **asserts on the output
@@ -39,8 +40,9 @@ text**, then prints `ALL CASES PASSED` / `SOME CASES FAILED`.
 > protocol raises at runtime** (it prints the error but exits clean). So the
 > `simulate_protocol.py` "SIMULATION SUCCESS" banner — keyed off the exit code —
 > can mask a real error (this is how a removed-API call slipped through once).
-> For anything non-trivial, use `validate_protocol.py` or read the simulator
-> output for `Error`/`Exception`, rather than trusting the banner alone.
+> For Workflow 01, use `build_vial_dilution_print.py` followed by
+> `validate_vial_print.py`, or read the simulator output for `Error`/`Exception`,
+> rather than trusting the process exit code alone.
 
 ---
 

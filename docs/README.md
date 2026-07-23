@@ -26,7 +26,7 @@ ot2-lab-suite/
 ├── robot_data/         # Shared data mirror
 │   ├── data/           # Mirrors /data on the OT-2 (Logs, Calibration)
 │   └── deploy/         # Local staging for robot uploads
-├── scripts/            # Deploy / sync / generate_labware / validate_protocol
+├── scripts/            # Deploy / sync / generate_labware / Workflow 01 validation
 ├── tests/              # Unit & Integration tests
 └── docs/               # System & Agent guides
 ```
@@ -70,7 +70,7 @@ python scripts/sync_robot.py
 - [Preflight Validation Guide](../src/utils/README_preflight.md)
 
 **SOPs**
-- [Simulation & Testing](SOP_Simulation_Testing.md) — run modes, `validate_protocol.py`, gates
+- [Simulation & Testing](SOP_Simulation_Testing.md) — Workflow 01 build/simulation and validation gates
 - [Robot Deployment](SOP_Robot_Deployment.md) — connectivity, custom-labware deploy, execute
 
 **Skills** (`skills/`)
