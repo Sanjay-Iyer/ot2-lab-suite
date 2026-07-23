@@ -39,10 +39,10 @@ pipettes:
 
 # Vial rack has 8 positions: A1-A4 (back row) and B1-B4 (front row).
 materials:
-  water: {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A1, initial_volume_ul: 15000}
-  # bp = the gold/silver nanoparticle stock. Needs ~440 uL for this plan (incl. 10%
-  # overage); raise/lower initial_volume_ul to whatever is actually in the vial.
-  bp:    {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A2, initial_volume_ul: 5000}
+  # As loaded on the bench: water 20 mL in A1, bp 10 mL in A2.
+  # This plan draws ~1325 uL water and ~435 uL bp (both incl. the 10% overage).
+  water: {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A1, initial_volume_ul: 20000}
+  bp:    {role: stock,   labware: tuberack_3dprint_20ml_8vials_v2, vial: A2, initial_volume_ul: 10000}
 
 dilution_plan:
   enabled: true

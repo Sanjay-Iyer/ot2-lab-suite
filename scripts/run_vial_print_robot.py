@@ -9,6 +9,7 @@ the real liquid-handling print.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import shlex
@@ -31,6 +32,11 @@ from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "vial_dilution_print_latest.py"
+
+# Markers the builder writes around the embedded CONFIG dict (keep in sync with
+# scripts/build_vial_dilution_print.py).
+CONFIG_START_SENTINEL = "# >>> CONFIG START >>>"
+CONFIG_END_SENTINEL   = "# <<< CONFIG END <<<"
 # Generated artifact per protocol version (see scripts/build_vial_dilution_print.py).
 _PROTOCOL_BY_VERSION = {
     1: DEFAULT_PROTOCOL,
@@ -107,6 +113,85 @@ def _upload_protocol(robot_ip: str, protocol_path: Path) -> str:
         raise RuntimeError(f"Protocol upload response did not include data.id:\n{json.dumps(payload, indent=2)}")
     print(f"Protocol ID: {protocol_id}")
     return protocol_id
+
+
+def _embedded_config(protocol_path: Path) -> dict | None:
+    """Extract the CONFIG dict embedded in a generated protocol.
+
+    The generated file is the artifact actually uploaded to the robot, so reading the
+    deck/tip plan back out of it is the only description that cannot drift from the
+    run. The builder writes a plain `pprint` repr between the sentinels, which is
+    literal-eval-able. Returns None if the file is missing or not a generated build.
+    """
+    try:
+        text = protocol_path.read_text(encoding="utf-8")
+        start = text.index(CONFIG_START_SENTINEL)
+        start = text.index("CONFIG = {", start) + len("CONFIG = ")
+        end = text.index(CONFIG_END_SENTINEL)
+        return ast.literal_eval(text[start:end].rstrip().rstrip("\n"))
+    except (OSError, ValueError, SyntaxError):
+        return None
+
+
+def _describe_deck(config: dict) -> None:
+    """Print the deck layout, vial assignments and tip plan from the embedded CONFIG."""
+    deck = config.get("deck", {})
+    role_labels = {"tuberack": "vial rack", "plate": "mixing plate", "paper": "paper",
+                   "tiprack": "P300 tips", "tiprack_p20": "P20 tips"}
+    print("\nDeck (from the built protocol):")
+    for role, spec in deck.items():
+        if not isinstance(spec, dict) or spec.get("slot") is None:
+            continue
+        print(f"  slot {str(spec['slot']):>2}  {role_labels.get(role, role):<13} "
+              f"{spec.get('load_name', '?')}")
+
+    # Vials: prefer the declared materials, else the legacy sources block.
+    materials = config.get("materials") or {}
+    rack = deck.get("tuberack", {}).get("load_name")
+    vials = [(m.get("vial"), f"{name} ({m.get('role', 'material')})")
+             for name, m in materials.items()
+             if isinstance(m, dict) and (not rack or m.get("labware") == rack)]
+    if not vials:
+        sources = config.get("sources", {})
+        vials = [(sources.get("water_vial"), "water")]
+        vials += [(s.get("dye_vial"), s.get("name", "dye"))
+                  for s in config.get("color_series", [])]
+    vials = [(v, label) for v, label in vials if v]
+    if vials:
+        slot = deck.get("tuberack", {}).get("slot", "?")
+        print(f"\nVials (rack in slot {slot}):")
+        for vial, label in sorted(vials):
+            print(f"  {vial}  {label}")
+    height = config.get("sources", {}).get("vial_aspirate_height_mm")
+    if height is not None:
+        print(f"  aspirate height: {height} mm above vial bottom")
+
+    # Tip plan: dilution setup tips, then each print group's own tips.
+    dil = config.get("dilution", {})
+    print("\nTip plan:")
+    if dil.get("enabled", True):
+        print(f"  P300 rack  water setup tip {dil.get('water_setup_tip', '?')}")
+        for s in config.get("color_series", []):
+            print(f"  P300 rack  {s.get('name')} stock setup tip {s.get('setup_tip')}")
+        sv = dil.get("small_volume") or {}
+        if sv.get("enabled"):
+            per = sv.get("series_setup_tips") or {}
+            print(f"  P20 rack   small-volume dilution (<= "
+                  f"{sv.get('threshold_ul', 20)} uL) on {sv.get('pipette')}: "
+                  f"water tip {sv.get('water_setup_tip')}"
+                  + (", " + ", ".join(f"{k} tip {v}" for k, v in per.items()) if per else ""))
+    for g in config.get("print_groups", []):
+        tips = g.get("tips", {})
+        where = (f"8-tip block column {tips.get('block_column')}"
+                 if g.get("layout") == "column_8up" else f"tip {tips.get('well')}")
+        start_col = g.get("destination", {}).get("paper_start_column")
+        reps = int(g.get("replicates", 1))
+        cols = str(start_col) if reps <= 1 else f"{start_col}-{start_col + reps - 1}"
+        drops = int(g.get("droplets_per_spot", 1) or 1)
+        print(f"  {g.get('pipette', '?'):<16} {g.get('name')}: {g.get('volume_ul')} uL"
+              + (f" x{drops} droplets/spot" if drops > 1 else "")
+              + f", plate column {g.get('source', {}).get('plate_column')}"
+              f" -> paper column {cols}, {where}")
 
 
 def _create_run(
@@ -367,8 +452,12 @@ def main() -> int:
         print(f"Print     : {do_print}")
         if args.paper_start_column is not None:
             print(f"Paper col : {args.paper_start_column} (CLI override)")
-        print("\nDeck must be: slot 7 vial rack (A1 water, A2 blue dye, A3 orange dye), slot 4 plate, slot 5 paper, slot 9 tips.")
-        print("Tip plan  : setup tips H12 water, H11 orange, H10 blue; 8-channel print tips from columns 1 orange and 2 blue.")
+        embedded = _embedded_config(protocol_path)
+        if embedded:
+            _describe_deck(embedded)
+        else:
+            print("\nWARNING: could not read the CONFIG out of "
+                  f"{protocol_path.name}; check the deck against your YAML by hand.")
         if args.live and not args.no_pull_images:
             print(f"Images    : will pull {_remote_image_dir()} to {LOCAL_VISION_BASE / image_run_id} after the run.")
 
