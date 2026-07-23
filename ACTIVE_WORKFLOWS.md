@@ -33,6 +33,12 @@ generates under its own basename, so the two never overwrite each other.
 | 1 (default) | `src/protocols/printing/01_vial_dilution_paper_print.py` | `generated/vial_dilution_print_latest.py` | every vial→plate transfer on the P300 |
 | 2 | `src/protocols/printing/02_vial_dilution_paper_print_p20_dilution.py` | `generated/vial_dilution_print_v2_latest.py` | transfers ≤ `dilution_plan.small_volume.threshold_ul` on the P20 |
 
+v2 also adds a **pipette check** bring-up mode (`--pipette-check`): it picks up and
+returns every tip the config uses on both mounts, visiting each labware at its working
+height. Real motion, no liquid — it sits between the dry run (which moves nothing) and a
+live run (which commits material), and is the step that proves tip pickup/return, labware
+offsets, and the P20's reach into the 55 mm vials.
+
 Printing behaviour is identical in both. v2 exists because the P300 is inaccurate below
 ~20 µL, which biases the most dilute points of a series. `scripts/validate_vial_print.py`
 and `scripts/run_vial_print_robot.py` both read `protocol_version` from `--config` and

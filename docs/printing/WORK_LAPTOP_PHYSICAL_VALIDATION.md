@@ -34,8 +34,27 @@ OT-2, camera, or fixtures. Do not mark any step complete from the home computer.
 8. **Verify pipette offsets and deck calibration** are current in the App (re-run if stale).
 
 ## 3. Dry / conservative physical checks (start here — smallest blast radius)
+
+### 3a. Protocol v2 only: the automated pipette check
+Protocol v2 (`configs/printing/*_v2.yaml`, `protocol_version: 2`) replaces the manual dry
+sweep in step 9 with a built-in bring-up mode driven by the same config as the real run:
+```
+python scripts/run_vial_print_robot.py --config configs/printing/bp_20260723_v2.yaml --pipette-check
+```
+It picks up and returns **every** tip the config uses on **both** mounts (P300 setup tips,
+each 8-tip print block, every P20 dilution and print tip) and visits each vial at
+`sources.vial_aspirate_height_mm`, the plate anchor, and every paper column at that
+group's `dispense.z_mm`. Real motion, **no liquid**. Watch for: tip seating on pickup and
+return, any contact at the paper, and — new in v2 — whether the short 20 µL tip reaches
+down into the 55 mm vials without the P20's nozzle body fouling the vial mouth. It ends
+with `PIPETTE CHECK COMPLETE: N tip pickup/return cycle(s), no liquid moved.`
+
+Run this **before** the first `--live` run. Stop on any contact or alignment error.
+
+### 3b. Manual checks
 9. **Dry run without liquids** where safe (App runtime `dry_run = true`): confirm motion
-   planning, no unexpected contact.
+   planning, no unexpected contact. Note this moves nothing at all — it loads labware,
+   runs pre-flight, and returns. Use 3a (v2) or the manual sweep below for real motion.
 
    For the paper fixture, use a conservative dry sweep before dispensing liquid:
    pick up one P300 column (8 tips), visit each paper column that the planned run will

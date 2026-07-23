@@ -202,12 +202,17 @@ def _create_run(
     do_dilution: bool,
     do_print: bool,
     paper_start_column: int | None = None,
+    pipette_check: bool = False,
 ) -> str:
     run_time_parameter_values: dict[str, Any] = {
         "dry_run": dry_run,
         "do_dilution": do_dilution,
         "do_print": do_print,
     }
+    # Only send pipette_check to protocols that declare it (v2); v1 would reject an
+    # unknown runtime parameter.
+    if pipette_check:
+        run_time_parameter_values["pipette_check"] = True
     # Only forward the paper start column when explicitly overridden on the CLI;
     # otherwise the protocol uses the value baked in from the workflow YAML at build.
     if paper_start_column is not None:
@@ -370,6 +375,11 @@ def main() -> int:
                              "vial_dilution_print_latest.py, v2 -> "
                              "vial_dilution_print_v2_latest.py).")
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
+    parser.add_argument(
+        "--pipette-check", action="store_true",
+        help="Bring-up mode (protocol v2): pick up and return every tip this config "
+             "uses on BOTH mounts, visiting each labware at its working height. Real "
+             "motion, NO liquid. Run this before the first --live run.")
     parser.add_argument("--no-dilution", action="store_true", help="Skip dilution phase.")
     parser.add_argument("--no-print", action="store_true", help="Skip print phase.")
     parser.add_argument(
@@ -416,7 +426,9 @@ def main() -> int:
         if not protocol_path.exists():
             raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 
-        dry_run = not args.live
+        # --pipette-check needs real motion, so it must NOT also be a dry run (the
+        # dry-run branch returns before the check).
+        dry_run = not (args.live or args.pipette_check)
         do_dilution = not args.no_dilution
         do_print = not args.no_print
         image_run_id = datetime.now().strftime("run_%Y%m%d_%H%M%S")
@@ -425,6 +437,8 @@ def main() -> int:
             "do_dilution": do_dilution,
             "do_print": do_print,
         }
+        if args.pipette_check:
+            rtp["pipette_check"] = True
         if args.paper_start_column is not None:
             rtp["print_start_column"] = args.paper_start_column
         run_log.update(
@@ -447,7 +461,9 @@ def main() -> int:
         print("\n=== Vial Dilution Print Robot Runner ===")
         print(f"Robot     : {robot_ip}")
         print(f"Protocol  : {protocol_path}")
-        print(f"Mode      : {'LIVE LIQUID RUN' if args.live else 'DRY RUN'}")
+        mode = ("PIPETTE CHECK (motion, no liquid)" if args.pipette_check
+                else "LIVE LIQUID RUN" if args.live else "DRY RUN (no motion)")
+        print(f"Mode      : {mode}")
         print(f"Dilution  : {do_dilution}")
         print(f"Print     : {do_print}")
         if args.paper_start_column is not None:
@@ -470,6 +486,7 @@ def main() -> int:
             do_dilution=do_dilution,
             do_print=do_print,
             paper_start_column=args.paper_start_column,
+            pipette_check=args.pipette_check,
         )
         run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 

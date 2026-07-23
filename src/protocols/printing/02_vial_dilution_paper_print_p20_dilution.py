@@ -97,6 +97,7 @@ metadata = {
 DEFAULT_DRY_RUN     = False   # load + pre-flight + comments only (no liquid motion)
 DEFAULT_DO_DILUTION = True    # run the dilution phase
 DEFAULT_DO_PRINT    = True    # run the 8-channel print phase
+DEFAULT_PIPETTE_CHECK = False # bring-up: exercise both pipettes with NO liquid, then stop
 
 # ════════════════════════════════════════════════════════════════════════════════
 # >>> CONFIG START >>>   (the builder replaces everything up to "<<< CONFIG END")
@@ -317,6 +318,12 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         variable_name="do_print", display_name="Run print phase",
         description="Pick up 8 tips and print the plate column onto paper once.",
         default=DEFAULT_DO_PRINT)
+    parameters.add_bool(
+        variable_name="pipette_check", display_name="Pipette check (no liquid)",
+        # Opentrons caps a runtime-parameter description at 100 characters.
+        description="Pick up and return every tip on both mounts at working height. "
+                    "Motion, no liquid.",
+        default=DEFAULT_PIPETTE_CHECK)
     parameters.add_int(
         variable_name="print_start_column", display_name="Paper start column",
         description="Leftmost paper column to start on (1=far left); raise to skip already-printed columns.",
@@ -1252,6 +1259,85 @@ def run(protocol: protocol_api.ProtocolContext):
     if params.dry_run:
         protocol.comment("DRY RUN: labware + pipette loaded, pre-flight passed. No liquid motion.")
         protocol.comment("=== Vial Dilution -> Paper Print Demo Completed (dry run) ===")
+        return
+
+    # ── Pipette / deck bring-up check (motion, but NO liquid) ────────────────────
+    # Between the dry run (which moves nothing) and a live run (which commits real
+    # material) there was no way to prove the hardware works. This mode picks up and
+    # returns every tip this config uses on BOTH mounts and visits each labware at its
+    # actual working height — so tip pickup/return, labware offsets, and the P20's
+    # reach down into the 55 mm vials are all proven before any liquid is at risk.
+    if getattr(params, "pipette_check", False):
+        vial_h = float(CONFIG["sources"].get("vial_aspirate_height_mm", 4.0))
+        vials = [CONFIG["sources"]["water_vial"]] + [
+            s["dye_vial"] for s in color_series if s.get("dye_vial")]
+        plate_anchor = (f"{plate_rows[0]}{color_series[0]['destination_column']}"
+                        if color_series else f"{plate_rows[0]}1")
+        checked = 0
+
+        def _visit(inst, label: str, tip_well: str, rack) -> None:
+            """Pick a tip, touch every station at working height, return the tip."""
+            nonlocal checked
+            protocol.comment(f"[check] {inst.name}: picking tip {tip_well} ({label}).")
+            inst.pick_up_tip(rack[tip_well])
+            for vial in vials:
+                protocol.comment(
+                    f"[check] {inst.name}: vial {vial} at {vial_h} mm above bottom "
+                    f"(reach + clearance test).")
+                inst.move_to(lw["tuberack"][vial].bottom(vial_h))
+            protocol.comment(f"[check] {inst.name}: plate {plate_anchor}.")
+            inst.move_to(lw["plate"][plate_anchor].top())
+            for g in CONFIG.get("print_groups", []):
+                col = int(g["destination"]["paper_start_column"])
+                z = float(g.get("dispense", {}).get("z_mm", 1.0))
+                protocol.comment(
+                    f"[check] {inst.name}: paper column {col} at z={z} mm "
+                    f"(group '{g['name']}').")
+                inst.move_to(lw["paper"][f"{plate_rows[0]}{col}"].bottom(z))
+            inst.return_tip() if return_tips else inst.drop_tip()
+            protocol.comment(
+                f"[check] {inst.name}: {'returned' if return_tips else 'dropped'} "
+                f"tip {tip_well}.")
+            checked += 1
+
+        # P300: single-nozzle setup tips (dilution), then each 8-tip print block.
+        pipette.configure_nozzle_layout(
+            style=SINGLE, start=CONFIG["pipette"]["single_start"], tip_racks=[lw["tiprack"]])
+        for tip, label in ([(water_setup_tip, "water setup")]
+                           + [(s["setup_tip"], f"{s['name']} stock setup")
+                              for s in color_series]):
+            _visit(pipette, label, tip, lw["tiprack"])
+        for g in CONFIG.get("print_groups", []):
+            if g.get("layout") != "column_8up":
+                continue
+            block = int(g["tips"]["block_column"])
+            pipette.configure_nozzle_layout(style=ALL, tip_racks=[lw["tiprack"]])
+            _visit(pipette, f"8-tip block column {block} ({g['name']})",
+                   resolve_print_tip_for_column(block, tiprack_rows), lw["tiprack"])
+
+        # P20: small-volume dilution tips first, then every single_spot print tip.
+        sv = dil.get("small_volume") or {}
+        p20 = instruments.get(sv.get("pipette", "p20_single_gen2"))
+        p20_tips: list = []
+        if p20 is not None and sv.get("enabled", True):
+            p20_tips.append((sv.get("water_setup_tip"), "small-volume water"))
+            for s in color_series:
+                p20_tips.append((
+                    (sv.get("series_setup_tips") or {}).get(s["name"], sv.get("setup_tip")),
+                    f"small-volume {s['name']} stock"))
+        for g in CONFIG.get("print_groups", []):
+            if g.get("layout") == "single_spot":
+                p20_tips.append((g.get("tips", {}).get("well"),
+                                 f"print group '{g['name']}'"))
+        for tip, label in p20_tips:
+            if p20 is None or not tip:
+                continue
+            _visit(p20, label, tip, _rack_for(p20.name))
+
+        protocol.comment(
+            f"PIPETTE CHECK COMPLETE: {checked} tip pickup/return cycle(s), no liquid "
+            f"moved. Inspect for collisions, tip seating, and P20 depth in the vials.")
+        protocol.comment("=== Vial Dilution -> Paper Print Demo Completed (pipette check) ===")
         return
 
     _apply_flow_rates(pipette)
