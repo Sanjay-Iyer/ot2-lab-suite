@@ -31,6 +31,29 @@ from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "vial_dilution_print_latest.py"
+# Generated artifact per protocol version (see scripts/build_vial_dilution_print.py).
+_PROTOCOL_BY_VERSION = {
+    1: DEFAULT_PROTOCOL,
+    2: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v2_latest.py",
+}
+
+
+def _protocol_for_config(config_path: str | None) -> Path:
+    """The generated protocol a config builds into, from its `protocol_version` key.
+
+    Uploading the wrong artifact is the failure mode this prevents: a v2 config builds
+    ``vial_dilution_print_v2_latest.py``, while the v1 default path would silently
+    upload whatever v1 build happened to be lying around.
+    """
+    if not config_path:
+        return DEFAULT_PROTOCOL
+    try:
+        import yaml
+        raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
+        version = int(raw.get("protocol_version", 1))
+    except (OSError, ValueError, TypeError, ImportError):
+        return DEFAULT_PROTOCOL
+    return _PROTOCOL_BY_VERSION.get(version, DEFAULT_PROTOCOL)
 REMOTE_VISION_DIR = "/data/vision/vial_dilution_print"
 LOCAL_VISION_BASE = REPO / "vision_runs" / "vial_dilution_print"
 DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
@@ -256,7 +279,11 @@ def main() -> int:
         description="Upload and run the vial dilution print protocol through the OT-2 HTTP API."
     )
     parser.add_argument("--robot-ip", default=Config.ROBOT_IP, help="Robot IP address.")
-    parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL), help="Generated protocol file to upload.")
+    parser.add_argument("--protocol", default=None,
+                        help="Generated protocol file to upload. Default: derived from "
+                             "--config's protocol_version (v1 -> "
+                             "vial_dilution_print_latest.py, v2 -> "
+                             "vial_dilution_print_v2_latest.py).")
     parser.add_argument("--live", action="store_true", help="Run liquid motion. Default is dry run.")
     parser.add_argument("--no-dilution", action="store_true", help="Skip dilution phase.")
     parser.add_argument("--no-print", action="store_true", help="Skip print phase.")
@@ -264,6 +291,11 @@ def main() -> int:
         "--paper-start-column", type=int, default=None, metavar="N",
         help="Override the leftmost paper column to print on (1-12). Default: the "
              "value baked into the generated protocol from the workflow YAML.")
+    parser.add_argument(
+        "--config", default=None, metavar="YAML",
+        help="Workflow YAML to rebuild from (passed to build_vial_dilution_print.py). "
+             "Default: that script's own default config. Without this, a rebuild would "
+             "silently regenerate the protocol from the DEFAULT config.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
     parser.add_argument("--skip-validate", action="store_true", help="Do not run scripts/validate_vial_print.py first.")
     parser.add_argument("--no-start", action="store_true", help="Upload and create the run, but do not press play.")
@@ -279,13 +311,23 @@ def main() -> int:
         robot_ip = args.robot_ip
         os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
 
-        protocol_path = Path(args.protocol).resolve()
+        protocol_path = Path(
+            args.protocol or _protocol_for_config(args.config)).resolve()
         if not args.skip_build:
             run_log.event("local_step", label="build + simulate")
-            _run_local_step([sys.executable, "scripts/build_vial_dilution_print.py"], "build + simulate")
+            build_cmd = [sys.executable, "scripts/build_vial_dilution_print.py"]
+            if args.config:
+                build_cmd += ["--config", args.config]
+            # The builder reads protocol_version from the config itself, so no version
+            # flag is needed here — but the artifact it writes must be the one we
+            # upload, which _protocol_for_config() resolved from the same key.
+            _run_local_step(build_cmd, "build + simulate")
         if not args.skip_validate:
             run_log.event("local_step", label="validate matrix")
-            _run_local_step([sys.executable, "scripts/validate_vial_print.py"], "validate matrix")
+            validate_cmd = [sys.executable, "scripts/validate_vial_print.py"]
+            if args.config:
+                validate_cmd += ["--config", args.config]
+            _run_local_step(validate_cmd, "validate matrix")
         if not protocol_path.exists():
             raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 
@@ -311,6 +353,7 @@ def main() -> int:
             local_image_run_id=image_run_id,
             local_image_dir=repo_relative(LOCAL_VISION_BASE / image_run_id),
             local_image_base=repo_relative(LOCAL_VISION_BASE),
+            config=args.config,
             skip_build=args.skip_build,
             skip_validate=args.skip_validate,
             run_time_parameter_values=rtp,

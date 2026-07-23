@@ -24,6 +24,28 @@ embedded `CONFIG`. Do **not** hand-edit the `CONFIG` block; edit a YAML and rebu
 - `configs/printing/01_vial_dilution_paper_print.mixed.yaml`
 - Legacy flat config (still supported, auto-migrated): `configs/workflows/defaults/vial_dilution_print.yaml`
 
+### Protocol versions
+A config selects its base protocol with `protocol_version:` (default 1). Each version
+generates under its own basename, so the two never overwrite each other.
+
+| version | base protocol | generated artifact | dilution |
+|---|---|---|---|
+| 1 (default) | `src/protocols/printing/01_vial_dilution_paper_print.py` | `generated/vial_dilution_print_latest.py` | every vial→plate transfer on the P300 |
+| 2 | `src/protocols/printing/02_vial_dilution_paper_print_p20_dilution.py` | `generated/vial_dilution_print_v2_latest.py` | transfers ≤ `dilution_plan.small_volume.threshold_ul` on the P20 |
+
+Printing behaviour is identical in both. v2 exists because the P300 is inaccurate below
+~20 µL, which biases the most dilute points of a series. `scripts/validate_vial_print.py`
+and `scripts/run_vial_print_robot.py` both read `protocol_version` from `--config` and
+target the matching artifact.
+
+### Experiment configs
+- `configs/printing/bp_20260723.yaml` — BP (Au/Ag) nanoparticle stock, 8 dilutions
+  (1/2/5/10/15/20/25/50x) in plate column 11 → paper columns 1-5 at 30 (P300), 20, 10, 5
+  and 5 µL ×3 stacked droplets (P20). Deck: tiprack_p300=8, tiprack_p20=9, tuberack=7,
+  plate=4, paper=5.
+- `configs/printing/bp_20260723_v2.yaml` — the same experiment on protocol v2; the
+  15/20/25/50x stock volumes (13.33/10/8/4 µL) run on the P20 instead of the P300.
+
 ### Custom labware (filenames must equal internal `loadName` — never renamed)
 - `labware/tuberack_3dprint_20ml_8vials_v2.json` (active 20 mL vial rack; the un-versioned
   `tuberack_3dprint_20ml_8vials` name does **not** exist on disk)

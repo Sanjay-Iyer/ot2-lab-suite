@@ -126,3 +126,45 @@ def test_p20_group_but_no_p20_mounted_rejected():
     })
     with pytest.raises(WorkflowConfigError, match="No mounted pipette"):
         normalize_and_validate(raw)
+
+
+# ── the bp experiment configs (v1 + v2) ───────────────────────────────────────
+
+def _load_path(name):
+    return yaml.safe_load((CONFIG_DIR / name).read_text(encoding="utf-8"))
+
+
+def test_bp_config_normalizes():
+    nw = normalize_and_validate(_load_path("bp_20260723.yaml"))
+    g = _groups(nw)
+    assert g["col1_30ul_p300"] == ("p300_multi_gen2", "column_8up")
+    assert all(g[n] == ("p20_single_gen2", "single_spot")
+               for n in ("col2_20ul_p20", "col3_10ul_p20",
+                         "col4_5ul_p20", "col5_5ul_x3_p20"))
+    by_name = {grp["name"]: grp for grp in nw.config["print_groups"]}
+    assert by_name["col5_5ul_x3_p20"]["droplets_per_spot"] == 3
+    # Only the first group mixes the shared source column.
+    assert by_name["col1_30ul_p300"]["mix_before"] is True
+    assert not any(by_name[n]["mix_before"] for n in
+                   ("col2_20ul_p20", "col3_10ul_p20", "col4_5ul_p20", "col5_5ul_x3_p20"))
+
+
+def test_bp_v2_carries_small_volume_routing():
+    raw = _load_path("bp_20260723_v2.yaml")
+    assert raw["protocol_version"] == 2
+    nw = normalize_and_validate(raw)
+    sv = nw.config["dilution"]["small_volume"]
+    assert sv["enabled"] is True
+    assert sv["pipette"] == "p20_single_gen2"
+    assert sv["threshold_ul"] == 20
+    assert sv["series_setup_tips"] == {"bp": "A11"}
+    # The P20's dilution tips must not collide with any print group's P20 tip.
+    print_tips = {g["tips"]["well"] for g in nw.config["print_groups"]
+                  if g.get("layout") == "single_spot"}
+    assert not print_tips & {sv["water_setup_tip"], *sv["series_setup_tips"].values()}
+
+
+def test_small_volume_absent_by_default():
+    # v1 configs must not gain a small_volume block (v1 has no such phase).
+    nw = normalize_and_validate(_load_path("bp_20260723.yaml"))
+    assert "small_volume" not in nw.config["dilution"]

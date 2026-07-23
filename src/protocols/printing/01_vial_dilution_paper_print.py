@@ -774,6 +774,20 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
             )
 
 
+def _droplets_per_spot(group: dict) -> int:
+    """How many droplets a print group stacks on each paper spot (default 1).
+
+    Each droplet is a full aspirate -> dispense cycle at the SAME destination, so a
+    spot ends up with ``volume_ul * droplets_per_spot``. Validated at build time by
+    src/core/print_groups.py (integer >= 1).
+    """
+    try:
+        n = int(group.get("droplets_per_spot", 1) or 1)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, n)
+
+
 def _capture_image(protocol, filename: str) -> None:
     """Capture a JPEG from the OT-2 camera over HTTP. No-op while simulating."""
     if not CONFIG["camera"]["enabled"]:
@@ -1182,31 +1196,39 @@ def run(protocol: protocol_api.ProtocolContext):
         start_col = int(group["destination"]["paper_start_column"])
         reps = int(group["replicates"])
         paper_well = lw["paper"][f"{plate_rows[0]}{start_col}"]
+        drops = _droplets_per_spot(group)
+        remaining = reps * drops
         for rep in range(reps):
-            inst.aspirate(vol, lw["plate"][wells[0]])
-            if s["air_gap"] > 0:
-                inst.air_gap(s["air_gap"], height=s["air_gap_height"])
             dest = paper_well.bottom(s["z"]).move(Point(
                 x=rep * spacing.get("x", 9.0),
                 y=rep * spacing.get("y", 0.0),
                 z=rep * spacing.get("z", 0.0)))
-            protocol.comment(
-                f"[{group['name']}] 8 droplets -> paper column ~{start_col + rep}, "
-                f"replicate {rep + 1}, {vol:g} uL, z={s['z']} mm.")
-            if s["move_speed"] and s["move_speed"] > 0:
-                inst.move_to(dest, speed=s["move_speed"])
-                inst.dispense(vol + s["air_gap"])
-            else:
-                inst.dispense(vol + s["air_gap"], dest)
-            if s["blow_out"]:
-                inst.blow_out(dest)
-            if s["dwell"] > 0:
-                protocol.delay(seconds=s["dwell"])
-            if s["touch_tip"]:
-                inst.touch_tip()
-            if s["blow_out"] and rep < reps - 1:
-                inst.move_to(paper_well.top(s["air_gap_height"]))
-                inst.prepare_to_aspirate()
+            # Stacked droplets: each one re-aspirates and returns to the SAME spot.
+            for drop in range(drops):
+                inst.aspirate(vol, lw["plate"][wells[0]])
+                if s["air_gap"] > 0:
+                    inst.air_gap(s["air_gap"], height=s["air_gap_height"])
+                protocol.comment(
+                    f"[{group['name']}] 8 droplets -> paper column ~{start_col + rep}, "
+                    f"replicate {rep + 1}, droplet {drop + 1}/{drops}, "
+                    f"{vol:g} uL, z={s['z']} mm.")
+                if s["move_speed"] and s["move_speed"] > 0:
+                    inst.move_to(dest, speed=s["move_speed"])
+                    inst.dispense(vol + s["air_gap"])
+                else:
+                    inst.dispense(vol + s["air_gap"], dest)
+                if s["blow_out"]:
+                    inst.blow_out(dest)
+                if s["dwell"] > 0:
+                    protocol.delay(seconds=s["dwell"])
+                if s["touch_tip"]:
+                    inst.touch_tip()
+                remaining -= 1
+                # blow_out leaves the plunger unprepared; re-prepare IN AIR so the next
+                # aspirate does not suck an extra slug at the source well's top.
+                if s["blow_out"] and remaining > 0:
+                    inst.move_to(paper_well.top(s["air_gap_height"]))
+                    inst.prepare_to_aspirate()
         _return_or_drop_inst(inst)
         protocol.comment(
             f"[{group['name']}] {'returned' if return_tips else 'dropped'} 8-tip block.")
@@ -1276,26 +1298,39 @@ def run(protocol: protocol_api.ProtocolContext):
             inst.pick_up_tip(rack[tip_well])
             protocol.comment(
                 f"[{group['name']}] single_spot on {inst.name}: picked reusable tip {tip_well}.")
+        drops = _droplets_per_spot(group)
+        remaining = reps * len(wells) * drops
         for rep in range(reps):
             for wi, well in enumerate(wells):
-                if not reuse:
-                    inst.pick_up_tip(rack[tip_well] if tip_well else None)
-                inst.aspirate(vol, lw["plate"][well])
-                if s["air_gap"] > 0:
-                    inst.air_gap(s["air_gap"], height=s["air_gap_height"])
                 paper_row = plate_rows[wi % len(plate_rows)]
                 paper_col = start_col + rep
-                dest = lw["paper"][f"{paper_row}{paper_col}"].bottom(s["z"])
-                protocol.comment(
-                    f"[{group['name']}] single droplet {well} -> paper {paper_row}{paper_col}, "
-                    f"replicate {rep + 1}, {vol:g} uL, z={s['z']} mm.")
-                inst.dispense(vol + s["air_gap"], dest)
-                if s["blow_out"]:
-                    inst.blow_out(dest)
-                if s["dwell"] > 0:
-                    protocol.delay(seconds=s["dwell"])
-                if not reuse:
-                    _return_or_drop_inst(inst)
+                paper_well = lw["paper"][f"{paper_row}{paper_col}"]
+                dest = paper_well.bottom(s["z"])
+                # Stacked droplets: go back to the source well and print the SAME spot
+                # again, `drops` times, so the spot receives vol * drops in total.
+                for drop in range(drops):
+                    if not reuse:
+                        inst.pick_up_tip(rack[tip_well] if tip_well else None)
+                    inst.aspirate(vol, lw["plate"][well])
+                    if s["air_gap"] > 0:
+                        inst.air_gap(s["air_gap"], height=s["air_gap_height"])
+                    protocol.comment(
+                        f"[{group['name']}] single droplet {well} -> paper "
+                        f"{paper_row}{paper_col}, replicate {rep + 1}, "
+                        f"droplet {drop + 1}/{drops}, {vol:g} uL, z={s['z']} mm.")
+                    inst.dispense(vol + s["air_gap"], dest)
+                    if s["blow_out"]:
+                        inst.blow_out(dest)
+                    if s["dwell"] > 0:
+                        protocol.delay(seconds=s["dwell"])
+                    remaining -= 1
+                    if not reuse:
+                        _return_or_drop_inst(inst)
+                    elif s["blow_out"] and remaining > 0:
+                        # Re-prepare the plunger IN AIR after blow_out so the next
+                        # aspirate does not take an extra slug at the source well top.
+                        inst.move_to(paper_well.top(s["air_gap_height"]))
+                        inst.prepare_to_aspirate()
         if reuse:
             _return_or_drop_inst(inst)
         protocol.comment(
@@ -1363,6 +1398,8 @@ def run(protocol: protocol_api.ProtocolContext):
             # Dilution requested without printing: still mix each source column 8-up
             # with the P300 so the plate is homogeneous for later use / imaging.
             for group in print_groups:
+                if not group.get("mix_before", True):
+                    continue
                 _mix_with_p300(group)
                 protocol.comment(
                     f"Mixed source column {group['source'].get('plate_column')} "
@@ -1384,6 +1421,9 @@ def run(protocol: protocol_api.ProtocolContext):
         # P300 block; single_spot mixes with the P300 first, then prints on the P20.
         do_mix = bool(params.do_dilution and dil["enabled"])
         for group in print_groups:
+            # A group may opt out of its pre-mix (mix_before: false) when an earlier
+            # group already mixed the same source column this run.
+            group_mix = do_mix and bool(group.get("mix_before", True))
             inst = instruments.get(group["pipette"])
             if inst is None:
                 raise RuntimeError(
@@ -1392,9 +1432,9 @@ def run(protocol: protocol_api.ProtocolContext):
                     f"(mounted: {sorted(instruments)}). Add it to CONFIG['pipettes']."
                 )
             if group.get("layout") == "single_spot":
-                _print_single_spot(group, inst, do_mix)
+                _print_single_spot(group, inst, group_mix)
             else:
-                _print_column_8up(group, inst, do_mix)
+                _print_column_8up(group, inst, group_mix)
         protocol.comment(
             "Paper print complete: "
             + "; ".join(

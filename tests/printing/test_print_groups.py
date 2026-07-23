@@ -170,3 +170,41 @@ def test_legacy_flat_printing_only_migrates_to_one_group():
                         "paper_start_column": 1, "print_block_column": 1}}
     parsed = parse_print_config(cfg)
     assert len(parsed.groups) == 1 and parsed.groups[0].name == "print"
+
+
+# ── stacked droplets (droplets_per_spot) + mix_before ─────────────────────────
+
+def test_droplets_per_spot_defaults_to_one():
+    parsed = parse_print_config(_cfg([_p20_group()]))
+    g = parsed.groups[0]
+    assert g.droplets_per_spot == 1
+    assert g.mix_before is True
+    assert g.volume_per_source_well_ul() == 5 * 3  # volume * replicates * 1 droplet
+
+
+def test_droplets_per_spot_multiplies_source_demand():
+    parsed = parse_print_config(_cfg([_p20_group(droplets_per_spot=3)]))
+    g = parsed.groups[0]
+    assert g.droplets_per_spot == 3
+    assert g.volume_per_source_well_ul() == 5 * 3 * 3
+    # Stacking droplets does not change which paper columns are occupied.
+    assert g.paper_columns() == [1, 2, 3]
+
+
+def test_droplets_per_spot_must_be_at_least_one():
+    with pytest.raises(Exception):
+        parse_print_config(_cfg([_p20_group(droplets_per_spot=0)]))
+
+
+def test_stacked_droplets_warn_when_they_exceed_the_source_well():
+    # 5 uL x 3 replicates x 10 droplets = 150 uL drawn from a 100 uL well.
+    parsed = parse_print_config(_cfg([_p20_group(droplets_per_spot=10)]))
+    _choices, issues = resolve_and_validate(parsed, dilution_config={"total_volume_ul": 100})
+    assert any(i.severity == "warning" and "150" in i.message for i in issues)
+
+
+def test_mix_before_can_be_disabled_per_group():
+    parsed = parse_print_config(_cfg([_p300_group(), _p20_group(mix_before=False)]))
+    by_name = {g.name: g for g in parsed.groups}
+    assert by_name["coarse"].mix_before is True
+    assert by_name["fine"].mix_before is False

@@ -30,7 +30,19 @@ from typing import Optional
 import yaml
 
 REPO          = Path(__file__).resolve().parent.parent
-BASE_PROTOCOL = REPO / "src" / "protocols" / "printing" / "01_vial_dilution_paper_print.py"
+PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
+BASE_PROTOCOL = PRINTING_DIR / "01_vial_dilution_paper_print.py"
+
+# Protocol versions. v1 = P300-only dilution; v2 additionally routes dilution
+# transfers at/below dilution.small_volume.threshold_ul to the P20. A config selects
+# one with `protocol_version: 2` (or --protocol-version 2); each version generates
+# under its own basename so the two never overwrite each other.
+PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
+    1: (BASE_PROTOCOL, "vial_dilution_print"),
+    2: (PRINTING_DIR / "02_vial_dilution_paper_print_p20_dilution.py",
+        "vial_dilution_print_v2"),
+}
+
 GENERATED_DIR = REPO / "src" / "protocols" / "generated"
 LABWARE       = REPO / "labware"
 DEFAULT_CONFIG = REPO / "configs" / "workflows" / "defaults" / "vial_dilution_print.yaml"
@@ -355,6 +367,11 @@ def main() -> int:
                     help="Path to the YAML config.")
     ap.add_argument("--no-sim", action="store_true",
                     help="Generate only; skip simulation.")
+    ap.add_argument("--protocol-version", type=int, default=None,
+                    choices=sorted(PROTOCOL_VERSIONS),
+                    help="Base protocol to build from. Default: the config's "
+                         "'protocol_version' key, else 1. v2 routes sub-threshold "
+                         "dilution transfers to the P20.")
     args = ap.parse_args()
 
     cfg_path = Path(args.config)
@@ -363,6 +380,18 @@ def main() -> int:
         return 1
     full      = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
     run_modes = full.pop("run_modes", {})   # not part of CONFIG
+
+    # Protocol version: CLI wins, else the config's own declaration, else v1.
+    version = args.protocol_version or int(full.pop("protocol_version", 1))
+    if version not in PROTOCOL_VERSIONS:
+        print(f"ERROR: unknown protocol_version {version} "
+              f"(known: {sorted(PROTOCOL_VERSIONS)})")
+        return 1
+    base_protocol, generated_stem = PROTOCOL_VERSIONS[version]
+    if not base_protocol.exists():
+        print(f"ERROR: base protocol for version {version} not found: {base_protocol}")
+        return 1
+    print(f"Protocol version: v{version} ({base_protocol.relative_to(REPO)})")
 
     # Authoritative shared validation + normalization (pipette selection, materials,
     # print-group layout/destination rules). One implementation of each rule lives in
@@ -404,14 +433,14 @@ def main() -> int:
             return 1
     print("Config validation passed.")
 
-    base_text = BASE_PROTOCOL.read_text(encoding="utf-8")
+    base_text = base_protocol.read_text(encoding="utf-8")
     generated = build_source(base_text, config, run_modes)
 
     GENERATED_DIR.mkdir(parents=True, exist_ok=True)
     # Timestamp in local time with UTC offset suffix for unambiguous log correlation
     ts = datetime.now(tz=timezone.utc).astimezone().strftime("%Y%m%d_%H%M%S")
-    run_path    = GENERATED_DIR / f"vial_dilution_print_run_{ts}.py"
-    latest_path = GENERATED_DIR / "vial_dilution_print_latest.py"
+    run_path    = GENERATED_DIR / f"{generated_stem}_run_{ts}.py"
+    latest_path = GENERATED_DIR / f"{generated_stem}_latest.py"
     for dest in (run_path, latest_path):
         dest.write_text(generated, encoding="utf-8")
     print(f"Generated: {run_path.relative_to(REPO)}")

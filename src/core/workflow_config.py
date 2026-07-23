@@ -176,6 +176,11 @@ def _normalize_new(raw: Mapping[str, Any], materials: dict) -> tuple[dict, list[
         "setup_tip": dplan.get("setup_tip", dplan.get("water_setup_tip", "H12")),
         "single_tip_columns": dplan.get("single_tip_columns", [12]),
     }
+    # Protocol v2 only: route dilution transfers at/below a threshold to a small-volume
+    # pipette (the P20). Passed straight through — v1 ignores it, v2's pre-flight
+    # validates it against the mounted pipettes and the 20 uL rack.
+    if dplan.get("small_volume") is not None:
+        dilution["small_volume"] = dict(dplan["small_volume"])
 
     imaging = raw.get("imaging", {})
     camera = {

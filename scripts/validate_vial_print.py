@@ -48,10 +48,22 @@ import yaml
 REPO      = Path(__file__).resolve().parent.parent
 LABWARE   = REPO / "labware"
 
-# Target the generated (deployed) artifact; fall back to the base template.
-_GENERATED = REPO / "src" / "protocols" / "generated" / "vial_dilution_print_latest.py"
-_BASE      = REPO / "src" / "protocols" / "printing" / "01_vial_dilution_paper_print.py"
-PROTOCOL   = _GENERATED if _GENERATED.exists() else _BASE
+# Target the generated (deployed) artifact; fall back to the base template. Each
+# protocol version has its own generated basename + base template, selected by the
+# config's `protocol_version` (v2 = P20-assisted dilution).
+_GENERATED_DIR = REPO / "src" / "protocols" / "generated"
+_PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
+_VERSION_FILES: dict[int, tuple[Path, Path]] = {
+    1: (_GENERATED_DIR / "vial_dilution_print_latest.py",
+        _PRINTING_DIR / "01_vial_dilution_paper_print.py"),
+    2: (_GENERATED_DIR / "vial_dilution_print_v2_latest.py",
+        _PRINTING_DIR / "02_vial_dilution_paper_print_p20_dilution.py"),
+}
+
+
+def _resolve_protocol(version: int) -> tuple[Path, Path]:
+    """(target, base) for a protocol version; unknown versions fall back to v1."""
+    return _VERSION_FILES.get(version, _VERSION_FILES[1])
 
 # Workflow YAML: source of truth for well names and fold values used in must_contain
 _WORKFLOW_YAML = REPO / "configs" / "workflows" / "defaults" / "vial_dilution_print.yaml"
@@ -115,9 +127,31 @@ def _resolve_factors(fc: dict) -> list:
 
 # ── Dynamic must-contain generation ──────────────────────────────────────────────
 
+def _normalize(workflow_cfg: dict) -> dict:
+    """Return the internal CONFIG shape (dilution + color_series) for any workflow YAML.
+
+    New-schema configs express the plan as `dilution_plan:`/`series:`; the assertions
+    below are written against the internal `dilution:`/`color_series:` shape. Reuse the
+    authoritative normalizer (src/core/workflow_config.py) rather than re-deriving it,
+    and fall back to the raw dict for legacy configs or if normalization fails.
+    """
+    if not any(k in workflow_cfg for k in ("materials", "dilution_plan", "labware")):
+        return workflow_cfg
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    try:
+        from src.core.workflow_config import normalize_and_validate
+        return normalize_and_validate(workflow_cfg, strict=False).config
+    except Exception as exc:  # noqa: BLE001 - validator failures are the builder's job
+        print(f"WARNING: could not normalize the workflow YAML ({exc}); "
+              f"deriving assertions from the raw dict.")
+        return workflow_cfg
+
+
 def _build_cases(workflow_cfg: dict) -> list:
     """Build the CASES list from the workflow YAML so that changing destination_column
     or the factor list never silently breaks the validator."""
+    workflow_cfg = _normalize(workflow_cfg)
     dil     = workflow_cfg.get("dilution", {})
     pr      = workflow_cfg.get("printing", {})
     col     = str(dil.get("destination_column", "1"))
@@ -156,10 +190,31 @@ def _build_cases(workflow_cfg: dict) -> list:
         f"{str(series.get('name', 'dye')).lower()}={series.get('destination_column', col)}"
         for series in color_series
     ]
+    # The end-of-print summary lists PRINT GROUP names, which only coincide with the
+    # series names for legacy configs (where each series migrates to one group).
     series_prints = [
+        f"{g['name']} paper columns"
+        for g in workflow_cfg.get("print_groups", []) if g.get("name")
+    ] or [
         f"{str(series.get('name', 'dye')).lower()} paper columns"
         for series in color_series
     ]
+
+    # Layout-specific motion assertions. A P20-only config has no column_8up group and
+    # therefore never emits the 8-tip strings; asserting them unconditionally made any
+    # single-channel config unpassable. Derive them from the layouts actually present.
+    groups  = workflow_cfg.get("print_groups", [])
+    has_8up = (not groups) or any(g.get("layout", "column_8up") == "column_8up"
+                                  for g in groups)
+    has_spot = any(g.get("layout") == "single_spot" for g in groups)
+    print_motion = []
+    if has_8up:
+        print_motion += ["picked 8 tips from column", "8 droplets -> paper column",
+                         "returned 8-tip block"]
+    if has_spot:
+        print_motion += ["single droplet", "returned P20 tip"]
+    # The "no printing happened" assertion for dilution-only / dry runs.
+    no_print_marker = "8 droplets -> paper column" if has_8up else "single droplet"
 
     return [
         # name, flags, bad_labware, expect_ok, must_contain, must_not_contain
@@ -170,10 +225,8 @@ def _build_cases(workflow_cfg: dict) -> list:
            "Water setup transfers done",
            *[f"Diluting well {well} to {top_fold:g}x" for well in top_wells],
            *stock_setup_done,
-           "picked 8 tips from column",
-           "8 droplets -> paper column",
+           *print_motion,
            *series_prints,
-           "returned 8-tip block",
            "Paper print complete:",
            "Demo Completed ==="],
          ["PRE-FLIGHT VALIDATION FAILED", "Completed (dry run)"]),
@@ -181,7 +234,7 @@ def _build_cases(workflow_cfg: dict) -> list:
         ("dry_run",
          dict(dry=True, dilution=True, print=True), False, True,
          ["Pre-flight validation passed", "DRY RUN", "Completed (dry run)"],
-         ["Diluting well", "8 droplets -> paper column"]),
+         ["Diluting well", no_print_marker]),
 
         ("dilution_only",
          dict(dry=False, dilution=True, print=False), False, True,
@@ -193,13 +246,11 @@ def _build_cases(workflow_cfg: dict) -> list:
           "Dilution series complete",
           *series_columns,
           "Demo Completed ==="],
-         ["8 droplets -> paper column"]),
+         [no_print_marker]),
 
         ("print_only",
          dict(dry=False, dilution=False, print=True), False, True,
-         ["picked 8 tips from column",
-          "8 droplets -> paper column",
-          "returned 8-tip block", "Paper print complete:", "Demo Completed ==="],
+         [*print_motion, "Paper print complete:", "Demo Completed ==="],
          ["Diluting well"]),
 
         ("wrong_labware",
@@ -260,23 +311,12 @@ def main() -> int:
              "(default: the committed default). Pass the same user config used to "
              "build the generated protocol so a custom factor list / destination "
              "column validates against its own expectations, not the default's.")
+    ap.add_argument(
+        "--protocol-version", type=int, default=None, choices=sorted(_VERSION_FILES),
+        help="Which generated protocol to validate. Default: the config's "
+             "'protocol_version' key, else 1.")
     args = ap.parse_args()
     workflow_yaml = Path(args.config)
-
-    # ── Announce which file is being validated ────────────────────────────────────
-    if PROTOCOL == _GENERATED:
-        print(f"Validating GENERATED protocol: {PROTOCOL.relative_to(REPO)}")
-    else:
-        print(
-            f"WARNING: Generated protocol not found at "
-            f"{_GENERATED.relative_to(REPO)}; "
-            f"falling back to base template: {PROTOCOL.relative_to(REPO)}\n"
-            f"  Run 'python scripts/build_vial_dilution_print.py' first."
-        )
-
-    if not PROTOCOL.exists():
-        print(f"ERROR: protocol not found: {PROTOCOL}")
-        return 1
 
     # ── Load workflow YAML for dynamic case generation ────────────────────────────
     if not workflow_yaml.exists():
@@ -285,6 +325,28 @@ def main() -> int:
     if workflow_yaml != _WORKFLOW_YAML:
         print(f"Deriving case assertions from: {workflow_yaml}")
     workflow_cfg = yaml.safe_load(workflow_yaml.read_text(encoding="utf-8")) or {}
+
+    # ── Pick the protocol version the config was built for ────────────────────────
+    version = args.protocol_version or int(workflow_cfg.pop("protocol_version", 1))
+    generated, base = _resolve_protocol(version)
+    PROTOCOL = generated if generated.exists() else base
+    print(f"Protocol version: v{version}")
+
+    # ── Announce which file is being validated ────────────────────────────────────
+    if PROTOCOL == generated:
+        print(f"Validating GENERATED protocol: {PROTOCOL.relative_to(REPO)}")
+    else:
+        print(
+            f"WARNING: Generated protocol not found at "
+            f"{generated.relative_to(REPO)}; "
+            f"falling back to base template: {PROTOCOL.relative_to(REPO)}\n"
+            f"  Run 'python scripts/build_vial_dilution_print.py "
+            f"--config {workflow_yaml}' first."
+        )
+
+    if not PROTOCOL.exists():
+        print(f"ERROR: protocol not found: {PROTOCOL}")
+        return 1
 
     CASES = _build_cases(workflow_cfg)
     source = PROTOCOL.read_text(encoding="utf-8")

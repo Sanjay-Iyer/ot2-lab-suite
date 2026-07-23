@@ -1,0 +1,131 @@
+# =============================================================================
+# bp_20260723.yaml  —  BP nanoparticle dilution series -> paper print
+# Created 2026-07-23. Workflow 01 (vial dilution -> 96-well mixing -> paper print).
+# =============================================================================
+# ONE nanoparticle stock ("bp", a single Au/Ag mixture) in the 20 mL vial rack.
+#   * 8 dilutions: 1x 2x 5x 10x 15x 20x 25x 50x, 200 uL final each,
+#     built down rows A-H of PLATE COLUMN 11.
+#   * printed onto 5 paper columns, one dilution per paper row:
+#       paper col 1 : 30 uL  x1 droplet   P300 8-channel (all 8 rows at once)
+#       paper col 2 : 20 uL  x1 droplet   P20 single, one spot at a time
+#       paper col 3 : 10 uL  x1 droplet   P20
+#       paper col 4 :  5 uL  x1 droplet   P20
+#       paper col 5 :  5 uL  x3 droplets  P20  <- stacked on the SAME spot
+#
+# `droplets_per_spot` is the repeat-droplet control: N separate aspirate->dispense
+# cycles onto one paper location (the tip goes back to the plate between each), so
+# that spot receives volume_ul * N. Set it to 1 for a normal single droplet.
+#
+# Build + simulate:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723.yaml
+
+deck:
+  tiprack_p300: {slot: 8}     # 300 uL tips  (P300 multi)
+  tiprack_p20:  {slot: 9}     # 20 uL tips   (P20 single)
+  tuberack:     {slot: 7}     # 20 mL vial holder
+  plate:        {slot: 4}     # 96-well mixing / dilution plate
+  paper:        {slot: 5}     # paper holder, addressed as a 96-well coordinate grid
+
+labware:
+  tuberack:     {load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:        {load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  tiprack_p300: {load_name: opentrons_96_tiprack_300ul}
+  tiprack_p20:  {load_name: opentrons_96_tiprack_20ul}
+
+pipettes:
+  - {name: p300_multi_gen2, mount: right, single_start: A1}
+  - {name: p20_single_gen2, mount: left}
+
+# Vial rack has 8 positions: A1-A4 (back row) and B1-B4 (front row).
+materials:
+  water: {role: solvent, labware: tuberack_3dprint_20ml_8vials_v2, vial: A1, initial_volume_ul: 15000}
+  # bp = the gold/silver nanoparticle stock. Needs ~440 uL for this plan (incl. 10%
+  # overage); raise/lower initial_volume_ul to whatever is actually in the vial.
+  bp:    {role: dye,     labware: tuberack_3dprint_20ml_8vials_v2, vial: A2, initial_volume_ul: 5000}
+
+dilution_plan:
+  enabled: true
+  total_volume_ul: 200            # final volume per dilution well
+  water_material: water
+  water_setup_tip: H12            # single-tip pickup, row H (P300 single_start A1)
+  factors: {mode: explicit, explicit: [1, 2, 5, 10, 15, 20, 25, 50]}
+  series:
+    - {name: bp, material: bp, destination_column: "11", setup_tip: H10}
+
+# 8-up P300 mix of plate column 11 before printing (homogenises the nanoparticle
+# dilutions). Runs once — only the first print group sets mix_before: true.
+mixing_plan: {mix_reps: 5, mix_volume_ul: 150}
+
+print_groups:
+  # ---- paper column 1: 30 uL, P300 8-channel, all 8 dilutions in one shot -------
+  - name: col1_30ul_p300
+    volume_ul: 30
+    pipette: p300_multi_gen2
+    layout: column_8up
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: true              # the ONE pre-print mix of plate column 11
+    destination: {paper_start_column: 1, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 5, blow_out: true, post_dispense_delay_s: 0.5, move_speed_mm_per_s: 50}
+    tips: {block_column: 1, reuse: true, return: true}
+
+  # ---- paper column 2: 20 uL, P20 single spot ----------------------------------
+  # air_gap_ul MUST stay 0 here: 20 uL is the P20's full capacity, any air gap on
+  # top of it would overfill the pipette.
+  - name: col2_20ul_p20
+    volume_ul: 20
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false             # column 11 already mixed by col1_30ul_p300
+    destination: {paper_start_column: 2, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 0, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A1, reuse: true, return: true}
+
+  # ---- paper column 3: 10 uL, P20 single spot ----------------------------------
+  - name: col3_10ul_p20
+    volume_ul: 10
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false
+    destination: {paper_start_column: 3, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A2, reuse: true, return: true}
+
+  # ---- paper column 4: 5 uL, P20 single spot -----------------------------------
+  - name: col4_5ul_p20
+    volume_ul: 5
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 1
+    mix_before: false
+    destination: {paper_start_column: 4, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 0.3}
+    tips: {well: A3, reuse: true, return: true}
+
+  # ---- paper column 5: 5 uL x 3 droplets on the SAME spot (15 uL total) ---------
+  # post_dispense_delay_s is longer here so each droplet has a moment to wick in
+  # before the next one lands on top of it.
+  - name: col5_5ul_x3_p20
+    volume_ul: 5
+    pipette: p20_single_gen2
+    layout: single_spot
+    source: {plate_column: "11"}
+    replicates: 1
+    droplets_per_spot: 3          # <-- 3 droplets stacked per spot
+    mix_before: false
+    destination: {paper_start_column: 5, spacing_mm: {x: 9, y: 0, z: 0}}
+    dispense: {z_mm: 1.0, air_gap_ul: 2, blow_out: true, post_dispense_delay_s: 1.0}
+    tips: {well: A4, reuse: true, return: true}
+
+imaging: {capture_before: true, capture_after: true, robot_image_dir: /data/vision/bp_20260723}
+tip_policy: {return_tips: true}

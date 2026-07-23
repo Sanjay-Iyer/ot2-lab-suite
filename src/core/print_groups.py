@@ -103,12 +103,26 @@ class PrintGroup(_Strict):
     layout: Layout = "single_spot"
     source: SourceSpec
     replicates: int = Field(default=1, ge=1)
+    # Droplets stacked on the SAME paper spot. Each one is its own aspirate ->
+    # dispense cycle (the tip goes back to the source well and returns), so a spot
+    # receives volume_ul * droplets_per_spot in total. Used to build up loading on
+    # one location instead of spreading it over more paper columns.
+    droplets_per_spot: int = Field(default=1, ge=1)
+    # Mix this group's source column 8-up with the P300 before printing. Default True
+    # keeps the historical behaviour; set False on later groups that share a source
+    # column with an earlier one so the column is only mixed once (avoids re-dipping
+    # a print block that has already touched paper back into the plate).
+    mix_before: bool = True
     destination: DestinationSpec
     dispense: DispenseSpec = Field(default_factory=DispenseSpec)
     tips: TipSpec = Field(default_factory=TipSpec)
 
     def wells_per_dispense(self) -> int:
         return _WELLS_PER_DISPENSE[self.layout]
+
+    def volume_per_source_well_ul(self) -> float:
+        """Total µL drawn from each source well by this group."""
+        return self.volume_ul * self.replicates * self.droplets_per_spot
 
     def paper_columns(self) -> list[int]:
         """Paper columns this group occupies (one per replicate line)."""
@@ -314,13 +328,14 @@ def resolve_and_validate(
         src_seen[col] = g.name
 
     # Optional: per-well transfer vs available source volume. A group draws
-    # volume_ul per replicate from EACH source well, so the per-well demand is
-    # volume_ul * replicates (independent of how many wells/channels are used).
+    # volume_ul per replicate per stacked droplet from EACH source well, so the
+    # per-well demand is volume_ul * replicates * droplets_per_spot (independent of
+    # how many wells/channels are used).
     if dilution_config:
         avail = dilution_config.get("total_volume_ul")
         if isinstance(avail, (int, float)):
             for g in parsed.groups:
-                needed_per_well = g.volume_ul * g.replicates
+                needed_per_well = g.volume_per_source_well_ul()
                 if needed_per_well > avail:
                     issues.append(Issue(
                         "warning", g.name,

@@ -1,33 +1,57 @@
 #!/usr/bin/env python3
 """
-Workflow 01 — Vial Dilution -> Paper Print (OT-2 protocol, config-driven)
+Workflow 02 — Vial Dilution -> Paper Print, P20-ASSISTED DILUTION (OT-2 protocol)
 ================================================================================
+VERSION 2 of the workflow-01 printing script. Identical printing behaviour; the ONE
+difference is the DILUTION phase:
+
+    Workflow 01 does every vial -> plate transfer with the P300 single nozzle. Below
+    the P300's ~20 µL accurate minimum that is inaccurate, so the most dilute points
+    of a series (small stock volumes) carry real concentration error.
+
+    Workflow 02 routes any dilution transfer at or below
+    ``dilution.small_volume.threshold_ul`` (default 20 µL) to the single-channel
+    ``p20_single_gen2`` on the LEFT mount, which is accurate down to 1 µL. Larger
+    transfers still run on the P300. Each pipette keeps its OWN setup tip per phase,
+    picked up lazily (only if that pipette is actually needed) and returned before the
+    next phase, so no colour/material carries between series.
+
+Use 02 when the concentrations matter (real nanoparticles, quantitative work). Use 01
+when a single pipette is enough (dye demos) or no P20 is mounted.
+
 FILE ROLE
   * ENTRY POINT: this is the robot protocol the OT-2 executes (via the Opentrons App /
     engine). It runs entirely from the embedded ``CONFIG`` dict.
-  * Build it from a YAML with ``scripts/build_vial_dilution_print.py`` (which embeds the
-    CONFIG and simulates); the generated copies live in ``src/protocols/generated/``.
+  * Build it from a YAML with ``scripts/build_vial_dilution_print.py`` — set
+    ``protocol_version: 2`` in the YAML (or pass ``--protocol-version 2``). Generated
+    copies live in ``src/protocols/generated/`` as ``vial_dilution_print_v2_*``.
   * EDIT the Python freely for motion/logic. Do NOT hand-edit the ``CONFIG`` block
     (it is regenerated) — edit a YAML in ``configs/printing/`` instead.
 
-INPUTS  : embedded ``CONFIG`` (deck, pipettes, sources, dilution, color_series,
-          print_groups, camera, tips, flow_rates, safety) + App runtime params
+INPUTS  : embedded ``CONFIG`` (deck, pipettes, sources, dilution incl.
+          ``dilution.small_volume``, color_series, print_groups, camera, tips,
+          flow_rates, safety) + App runtime params
           (dry_run / do_dilution / do_print / print_start_column).
 OUTPUTS : liquid handling on the OT-2; two camera JPEGs (one before, one after) written
           to ``camera.robot_image_dir`` on the robot; protocol comments (the simulation log).
-HARDWARE: right = ``p300_multi_gen2`` (8-up printing + dilution); left =
-          ``p20_single_gen2`` (single-spot printing). Needs a 20 µL rack for the P20.
-          apiLevel 2.28 (partial-mode ``return_tip()``).
+HARDWARE: right = ``p300_multi_gen2`` (8-up printing + large dilution transfers); left =
+          ``p20_single_gen2`` (single-spot printing + SMALL dilution transfers). The
+          20 µL rack is REQUIRED, not optional. apiLevel 2.28 (partial-mode
+          ``return_tip()``).
 SIDE EFFECTS: on the real robot, curl to the camera API and mkdir of the image dir;
           both are no-ops while ``protocol.is_simulating()``.
 SAFETY  : dispense heights / paper standoff / vial depths are NOT calibrated here —
           verify on the physical robot (see docs/printing/WORK_LAPTOP_PHYSICAL_VALIDATION.md).
+          NEW FOR V2: the P20 now reaches into the 55 mm deep 20 mL vials. Confirm on
+          the real robot that a 20 µL tip reaches the liquid without the nozzle body
+          fouling the vial mouth, and raise ``sources.vial_aspirate_height_mm`` if not.
 
 WHAT IT DOES
-  Builds dye dilution series in 96-well plate columns (water + dye from 20 mL vials via
-  SINGLE-nozzle setup tips), mixes them, then prints per ``print_groups`` — the P300
-  8-up (``column_8up``) and/or the P20 one spot at a time (``single_spot``). Tips are
-  RETURNED to their racks, not trashed. One image is captured before and one after.
+  Builds dilution series in 96-well plate columns (water + stock from 20 mL vials via
+  SINGLE-nozzle setup tips, small volumes on the P20), mixes them, then prints per
+  ``print_groups`` — the P300 8-up (``column_8up``) and/or the P20 one spot at a time
+  (``single_spot``). Tips are RETURNED to their racks, not trashed. One image is
+  captured before and one after.
 
 >>> EVERYTHING is driven by the CONFIG dict below. <<<
 Keep canonical settings in a YAML under configs/printing/ (or the legacy
@@ -59,148 +83,223 @@ import shutil
 import subprocess
 
 metadata = {
-    "protocolName": "OT-2 Vial Dilution -> 8-Channel Paper Print Demo",
+    "protocolName": "OT-2 Vial Dilution -> Paper Print (v2, P20-assisted dilution)",
     "author": "Antigravity AI Agent",
     "description": (
-        "Config-driven blue/orange dilution series from 20 mL vials into 96-well "
-        "plate columns, then ordered 8-channel paper prints."
+        "Config-driven dilution series from 20 mL vials into 96-well plate columns "
+        "with sub-20 uL transfers on the P20, then paper prints (P300 8-up and/or "
+        "P20 single-spot)."
     ),
     "apiLevel": "2.28",  # 2.28 REQUIRED: partial-mode return_tip() (blocked < 2.28)
 }
 
 # ── Runtime-parameter DEFAULTS (operator overrides in the App per run) ──────────
-DEFAULT_DRY_RUN     = False
-DEFAULT_DO_DILUTION = True
-DEFAULT_DO_PRINT    = True
+DEFAULT_DRY_RUN     = False   # load + pre-flight + comments only (no liquid motion)
+DEFAULT_DO_DILUTION = True    # run the dilution phase
+DEFAULT_DO_PRINT    = True    # run the 8-channel print phase
 
 # ════════════════════════════════════════════════════════════════════════════════
-# >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
-                          'load_name': 'tuberack_3dprint_20ml_8vials_v2',
-                          'namespace': 'custom_beta',
-                          'version': 1},
-            'plate': { 'slot': 4,
-                       'load_name': 'corning_96_wellplate_360ul_custom',
-                       'namespace': 'custom_beta',
-                       'version': 1},
-            'paper': { 'slot': 5,
-                       'load_name': 'corning_96_wellplate_360ul_custom',
-                       'namespace': 'custom_beta',
-                       'version': 1},
-            'tiprack': {'slot': 9, 'load_name': 'opentrons_96_tiprack_300ul'}},
-  'pipette': {'name': 'p300_multi_gen2', 'mount': 'right', 'single_start': 'A1'},
-  'sources': { 'water_vial': 'A1',
-               'blue_dye_vial': 'A2',
-               'orange_dye_vial': 'A3',
-               'food_coloring_vial': 'A2',
-               'vial_aspirate_height_mm': 4.0},
-  'dilution': { 'enabled': True,
-                'destination_column': '9',
-                'total_volume_ul': 200.0,
-                'factors': { 'mode': 'explicit',
-                             'explicit': [1.0, 2.0, 5.0, 10.0],
-                             'step_factor': 2,
-                             'start': 1,
-                             'end': 50,
-                             'count': 8},
-                'mix_reps': 3,
-                'mix_volume_ul': 120.0,
-                'water_setup_tip': 'H12',
-                'setup_tip': 'H12',
-                'single_tip_columns': [12]},
-  'color_series': [ { 'name': 'orange',
-                      'dye_vial': 'A3',
-                      'destination_column': '11',
-                      'setup_tip': 'H11',
-                      'print_block_column': 1,
-                      'paper_start_column': 1,
-                      'num_replicates': 3},
-                    { 'name': 'blue',
-                      'dye_vial': 'A2',
-                      'destination_column': '9',
-                      'setup_tip': 'H10',
-                      'print_block_column': 2,
-                      'paper_start_column': 4,
-                      'num_replicates': 3}],
-  'printing': { 'enabled': True,
-                'source_column': '9',
-                'droplet_volume_ul': 20.0,
-                'num_replicates': 3,
-                'paper_start_column': 1,
-                'dispense_z_mm': 1.0,
-                'air_gap_ul': 5.0,
-                'air_gap_height_mm': 20.0,
-                'post_dispense_delay_s': 0.5,
-                'move_speed_mm_per_s': 50.0,
-                'replicate_spacing_mm': {'x': 9.0, 'y': 0.0, 'z': 0.0},
-                'print_block_column': 1,
-                'blow_out': True,
-                'touch_tip': False},
-  'tips': {'return_tips': True},
-  'camera': { 'enabled': True,
-              'capture_before': True,
-              'capture_after': True,
-              'capture_mid_rows': ['C', 'E', 'H'],
-              'robot_image_dir': '/data/vision/vial_dilution_print',
-              'robot_api_url': 'http://localhost:31950/camera/picture',
-              'capture_timeout_s': 5},
-  'flow_rates': {'aspirate': 20.0, 'dispense': 80.0, 'mix': None},
-  'cv': { 'expected_droplets': 4,
-          'min_circularity_ok': 0.6,
-          'detection': {'threshold_method': 'otsu', 'min_area': 250, 'invert': True}},
-  'safety': { 'expected_tuberack_load_name': 'tuberack_3dprint_20ml_8vials_v2',
-              'expected_well_count': 8,
-              'expected_diameter_mm': 28.0,
-              'expected_depth_mm': 55.0,
-              'expected_row_spacing_mm': 34.0,
-              'expected_col_spacing_mm': 31.0,
-              'geometry_tolerance_mm': 0.5,
-              'pipette_min_accurate_ul': 20.0,
-              'expected_plate_well_count': 96,
-              'tiprack_rows_per_column': 8,
-              'pipette_max_volume_ul': 300.0},
-  'print_groups': [ { 'name': 'orange',
-                      'volume_ul': 20.0,
-                      'pipette': 'p300_multi_gen2',
-                      'layout': 'column_8up',
-                      'source': { 'plate_column': '11',
-                                  'wells': None,
-                                  'vial': None,
-                                  'aspirate_height_mm': None},
-                      'replicates': 3,
-                      'droplets_per_spot': 1,
-                      'mix_before': True,
-                      'destination': { 'paper_start_column': 1,
-                                       'spacing_mm': {'x': 9.0, 'y': 0.0, 'z': 0.0}},
-                      'dispense': { 'z_mm': 1.0,
-                                    'air_gap_ul': 5.0,
-                                    'air_gap_height_mm': 20.0,
-                                    'blow_out': True,
-                                    'touch_tip': False,
-                                    'post_dispense_delay_s': 0.5,
-                                    'move_speed_mm_per_s': 50.0},
-                      'tips': {'well': None, 'block_column': 1, 'reuse': True, 'return': True}},
-                    { 'name': 'blue',
-                      'volume_ul': 20.0,
-                      'pipette': 'p300_multi_gen2',
-                      'layout': 'column_8up',
-                      'source': { 'plate_column': '9',
-                                  'wells': None,
-                                  'vial': None,
-                                  'aspirate_height_mm': None},
-                      'replicates': 3,
-                      'droplets_per_spot': 1,
-                      'mix_before': True,
-                      'destination': { 'paper_start_column': 4,
-                                       'spacing_mm': {'x': 9.0, 'y': 0.0, 'z': 0.0}},
-                      'dispense': { 'z_mm': 1.0,
-                                    'air_gap_ul': 5.0,
-                                    'air_gap_height_mm': 20.0,
-                                    'blow_out': True,
-                                    'touch_tip': False,
-                                    'post_dispense_delay_s': 0.5,
-                                    'move_speed_mm_per_s': 50.0},
-                      'tips': {'well': None, 'block_column': 2, 'reuse': True, 'return': True}}]}
+# >>> CONFIG START >>>   (the builder replaces everything up to "<<< CONFIG END")
+# ════════════════════════════════════════════════════════════════════════════════
+CONFIG = {
+    # ── Deck: slot + labware identity for each position ──────────────────────────
+    "deck": {
+        "tuberack": {"slot": 7, "load_name": "tuberack_3dprint_20ml_8vials_v2",
+                     "namespace": "custom_beta", "version": 1},
+        "plate":    {"slot": 4, "load_name": "corning_96_wellplate_360ul_custom",
+                     "namespace": "custom_beta", "version": 1},
+        # Paper is modelled as a 96-well plate for coordinate anchoring only.
+        # dispense_z_mm controls the actual tip height above the paper surface.
+        "paper":    {"slot": 5, "load_name": "corning_96_wellplate_360ul_custom",
+                     "namespace": "custom_beta", "version": 1},
+        "tiprack":  {"slot": 9, "load_name": "opentrons_96_tiprack_300ul"},
+        # REQUIRED in v2: the P20 does the small dilution transfers, so it always
+        # needs its own 20 uL rack (in v1 this rack was optional).
+        "tiprack_p20": {"slot": 2, "load_name": "opentrons_96_tiprack_20ul"},
+    },
+
+    # ── Pipettes (mounted hardware) ──────────────────────────────────────────────
+    # `pipette` = the primary multichannel P300 that drives dilution + column_8up
+    # printing (kept for backward compatibility and its single_start nozzle).
+    # `pipettes` = every mounted pipette; the left-mounted single-channel P20 is
+    # optional and only needed for single_spot print groups. Each print group names
+    # the concrete pipette it runs on (resolved at build time by the selection
+    # service), so the protocol never chooses a pipette itself.
+    "pipette": {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
+    "pipettes": [
+        {"name": "p300_multi_gen2", "mount": "right", "single_start": "A1"},
+        # v2: the P20 is REQUIRED — it performs every dilution transfer at or below
+        # dilution.small_volume.threshold_ul.
+        {"name": "p20_single_gen2", "mount": "left"},
+    ],
+
+    # ── Liquid sources: which VIAL in the rack holds what ────────────────────────
+    "sources": {
+        "water_vial": "A1",
+        "blue_dye_vial": "A2",
+        "orange_dye_vial": "A3",
+        "food_coloring_vial": "A2",  # legacy alias for the blue dye stock
+        "vial_aspirate_height_mm": 4.0,  # above vial bottom; absolute model Z = 5 + 4 = 9 mm
+    },
+
+    # ── Dilution series ──────────────────────────────────────────────────────────
+    "dilution": {
+        "enabled": True,
+        "destination_column": "9",     # which plate column holds the series (A..H of it)
+        "total_volume_ul": 200.0,      # volume in every well (<= 360 well, <= 300 tip)
+        # Fold factors. mode = explicit | geometric | linear | log
+        "factors": {
+            "mode": "explicit",
+            "explicit": [1, 2, 5, 10, 20, 30, 40, 50],
+            "step_factor": 2,
+            "start": 1, "end": 50, "count": 8,
+        },
+        "mix_reps": 3,
+        "mix_volume_ul": 120.0,
+        # One setup tip only. With single_start=A1, an H-row tip makes the idle
+        # nozzles hang off the front edge of the tiprack during pickup.
+        "water_setup_tip": "H12",
+        "setup_tip": "H12",
+        "single_tip_columns": [12],    # legacy alias; not used by the one-tip setup
+
+        # ── v2: small-volume routing ─────────────────────────────────────────────
+        # Any vial -> plate transfer at or below threshold_ul runs on `pipette`
+        # instead of the P300. Tip wells below are in the 20 uL rack and must not
+        # collide with any print group's P20 tip well.
+        "small_volume": {
+            "enabled": True,
+            "pipette": "p20_single_gen2",
+            "threshold_ul": 20.0,
+            "min_volume_ul": 1.0,           # below this NO mounted pipette is accurate
+            "water_setup_tip": "A12",       # P20 tip for small WATER transfers
+            "setup_tip": "A11",             # default P20 tip for stock transfers
+            "series_setup_tips": {},        # {series_name: tip_well} overrides
+        },
+    },
+
+    # Prep both 8-step series, then print orange first (paper columns 1-3) and
+    # blue second (paper columns 4-6). Each dye has its own setup tip and 8-tip
+    # print block to avoid carrying color between vials, plate columns, or paper.
+    "color_series": [
+        {
+            "name": "orange",
+            "dye_vial": "A3",
+            "destination_column": "11",
+            "setup_tip": "H11",
+            "print_block_column": 1,
+            "paper_start_column": 1,
+            "num_replicates": 3,
+        },
+        {
+            "name": "blue",
+            "dye_vial": "A2",
+            "destination_column": "9",
+            "setup_tip": "H10",
+            "print_block_column": 2,
+            "paper_start_column": 4,
+            "num_replicates": 3,
+        },
+    ],
+
+    # ── Printing ─────────────────────────────────────────────────────────────────
+    "printing": {
+        "enabled": True,
+        "source_column": "9",          # plate column to print (8 wells, one per channel)
+        "droplet_volume_ul": 30.0,
+        "num_replicates": 3,           # triplicate 8-channel prints of the column
+        "paper_start_column": 1,       # leftmost paper column to start printing on (1 = far left)
+        # Height above the bottom of the paper-proxy well. For the custom Corning
+        # plate the well bottom is close to the paper reference plane; 1.0 mm keeps
+        # the tips close enough for droplet transfer without scraping the paper.
+        "dispense_z_mm": 1.0,
+        # X/Y/Z offset per replicate. z: 0.0 = flat paper (no vertical stacking).
+        "replicate_spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0},
+        "print_block_column": 1,       # full 8-tip pickup from tiprack column 1
+        "air_gap_ul": 5.0,             # anti-drip air pulled in below the droplet before travel
+        "post_dispense_delay_s": 0.5,  # dwell at the paper so the droplet detaches
+        "move_speed_mm_per_s": 50.0,   # smooth travel to the print location; None = default
+        "blow_out": True,
+        "touch_tip": False,
+    },
+
+    # ── Print groups (the unified printing schema) ───────────────────────────────
+    # Each group is one homogeneous batch of droplets: a volume, a resolved pipette,
+    # a layout, a source plate column, paper destination, and its own tips. The
+    # build script resolves `pipette` from the volume via the selection service and
+    # embeds the concrete name here; the protocol dispatches on `layout`:
+    #   column_8up  -> p300_multi_gen2, 8 droplets at once (existing path)
+    #   single_spot -> p20_single_gen2, one droplet at a time (single channel)
+    # These defaults mirror the orange/blue 8-up prints (P300, 30 uL).
+    "print_groups": [
+        {
+            "name": "orange", "volume_ul": 30.0, "pipette": "p300_multi_gen2",
+            "layout": "column_8up",
+            "source": {"plate_column": "11"},
+            "replicates": 3,
+            "destination": {"paper_start_column": 1, "spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0}},
+            "dispense": {"z_mm": 1.0, "air_gap_ul": 5.0, "air_gap_height_mm": 20.0,
+                         "blow_out": True, "touch_tip": False,
+                         "post_dispense_delay_s": 0.5, "move_speed_mm_per_s": 50.0},
+            "tips": {"block_column": 1, "reuse": True, "return": True},
+        },
+        {
+            "name": "blue", "volume_ul": 30.0, "pipette": "p300_multi_gen2",
+            "layout": "column_8up",
+            "source": {"plate_column": "9"},
+            "replicates": 3,
+            "destination": {"paper_start_column": 4, "spacing_mm": {"x": 9.0, "y": 0.0, "z": 0.0}},
+            "dispense": {"z_mm": 1.0, "air_gap_ul": 5.0, "air_gap_height_mm": 20.0,
+                         "blow_out": True, "touch_tip": False,
+                         "post_dispense_delay_s": 0.5, "move_speed_mm_per_s": 50.0},
+            "tips": {"block_column": 2, "reuse": True, "return": True},
+        },
+    ],
+
+    # ── Tips: return to the box (True) or drop to trash (False) ──────────────────
+    "tips": {"return_tips": True},
+
+    # ── Camera / CV capture timing ───────────────────────────────────────────────
+    "camera": {
+        "enabled": True,
+        "capture_before": True,
+        "capture_after": True,
+        # Row LETTERS only — destination_column is appended at runtime.
+        # e.g. "C" + "1" -> "C1". Changing destination_column auto-shifts captures.
+        "capture_mid_rows": ["C", "E", "H"],
+        "robot_image_dir": "/data/vision/vial_dilution_print",
+        "robot_api_url": "http://localhost:31950/camera/picture",
+        "capture_timeout_s": 5,
+    },
+
+    # ── Flow rates (uL/s); null/None = Opentrons default ─────────────────────────
+    # `small_volume` applies to the P20 during dilution; null/absent = Opentrons
+    # defaults (the P300's 20/80 uL/s would be far too fast for a 20 uL barrel).
+    "flow_rates": {"aspirate": 20.0, "dispense": 80.0, "mix": None,
+                   "small_volume": {"aspirate": 3.0, "dispense": 3.0}},
+
+    # ── Computer-vision expectations (used HOST-side by verify_print_droplets) ────
+    "cv": {
+        "expected_droplets": 8,
+        "min_circularity_ok": 0.6,
+        "detection": {"threshold_method": "otsu", "min_area": 250, "invert": True},
+    },
+
+    # ── Safety / pre-flight expectations ─────────────────────────────────────────
+    "safety": {
+        "expected_tuberack_load_name": "tuberack_3dprint_20ml_8vials_v2",
+        "expected_well_count": 8,
+        "expected_diameter_mm": 28.0,
+        "expected_depth_mm": 55.0,
+        "expected_row_spacing_mm": 34.0,
+        "expected_col_spacing_mm": 31.0,
+        "geometry_tolerance_mm": 0.5,
+        "pipette_min_accurate_ul": 20.0,
+        "expected_plate_well_count": 96,
+        "tiprack_rows_per_column": 8,
+        "pipette_max_volume_ul": 300.0,
+    },
+}
+# ════════════════════════════════════════════════════════════════════════════════
 # <<< CONFIG END <<<
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -688,6 +787,74 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
                 f"{n_paper_cols}. Lower printing.num_replicates or the start column."
             )
 
+    # ── v2: small-volume (P20) dilution routing ───────────────────────────────────
+    sv = dil.get("small_volume") or {}
+    if sv.get("enabled", True):
+        sv_name = sv.get("pipette", "p20_single_gen2")
+        sv_threshold = float(sv.get("threshold_ul", 20.0))
+        mounted_names = [p["name"] for p in (CONFIG.get("pipettes") or [CONFIG["pipette"]])]
+        if sv_name not in mounted_names:
+            errors.append(
+                f"dilution.small_volume.pipette '{sv_name}' is not mounted "
+                f"(mounted: {mounted_names}). Add it to CONFIG['pipettes'] or set "
+                f"dilution.small_volume.enabled=false to run every transfer on the P300."
+            )
+        elif "tiprack_p20" not in lw:
+            errors.append(
+                f"'{sv_name}' does the small dilution transfers but no 20 uL rack is "
+                f"loaded. Add deck.tiprack_p20 to the config."
+            )
+        else:
+            sv_rack_tips = set(lw["tiprack_p20"].wells_by_name().keys())
+            # Every P20 tip this run uses, and who uses it — dilution setup tips must
+            # not collide with each other or with a print group's reusable tip.
+            sv_tips: dict = {}
+
+            def _claim(well, owner):
+                if well is None:
+                    return
+                well = str(well).upper()
+                if well not in sv_rack_tips:
+                    errors.append(f"{owner} tip {well!r} is not in the loaded 20 uL rack.")
+                elif well in sv_tips:
+                    errors.append(
+                        f"20 uL tip {well} is claimed by both '{sv_tips[well]}' and "
+                        f"'{owner}'; each must have its own tip to avoid carryover."
+                    )
+                else:
+                    sv_tips[well] = owner
+
+            # A tip is only needed where a transfer actually falls at/below threshold.
+            water_small = any(
+                0 < dilution_volumes(total, fold)[1] <= sv_threshold for fold in factors)
+            if water_small:
+                _claim(sv.get("water_setup_tip", "A12"), "small-volume water")
+            for series, _wells in series_wells:
+                if any(0 < dilution_volumes(total, fold)[0] <= sv_threshold
+                       for fold in factors):
+                    _claim(
+                        (sv.get("series_setup_tips") or {}).get(
+                            series["name"], sv.get("setup_tip", "A11")),
+                        f"small-volume {series['name']} stock",
+                    )
+            for group in CONFIG.get("print_groups", []):
+                if group.get("layout") == "single_spot":
+                    _claim(group.get("tips", {}).get("well"),
+                           f"print group '{group.get('name')}'")
+
+            # Nothing may fall below the small-volume pipette's own minimum.
+            sv_min = float(sv.get("min_volume_ul", 1.0))
+            for series, wells in series_wells:
+                for well, fold in zip(wells, factors):
+                    stock, water = dilution_volumes(total, fold)
+                    for label, vol in (("stock", stock), ("water", water)):
+                        if 0 < vol < sv_min:
+                            errors.append(
+                                f"{series['name']} {well} ({fold:g}x): {label} {vol} uL is "
+                                f"below the {sv_name} minimum {sv_min} uL. Raise "
+                                f"dilution.total_volume_ul or drop this fold factor."
+                            )
+
     # ── Camera: validate capture_mid_rows entries against actual plate rows ───────
     dest_col = str(dil["destination_column"])
     for row_letter in cam.get("capture_mid_rows", []):
@@ -703,17 +870,31 @@ def _preflight(protocol, lw, pipette, factors, dil_wells, setup_tip,
         )
     protocol.comment("Pre-flight validation passed: config + labware geometry OK.")
 
-    # Non-fatal accuracy warnings (sub-minimum stock volumes)
+    # Non-fatal accuracy warnings. In v2 a sub-minimum stock volume is only a problem
+    # if it still lands on the P300 — anything routed to the small-volume pipette is
+    # reported as handled, which is the whole point of this version.
     min_ok = safety["pipette_min_accurate_ul"]
+    sv_threshold = float(sv.get("threshold_ul", 20.0)) if sv.get("enabled", True) else 0.0
+    routed = 0
     for series, wells in series_wells:
         for well, fold in zip(wells, factors):
             stock, _ = dilution_volumes(total, fold)
-            if 0 < stock < min_ok:
+            if not (0 < stock < min_ok):
+                continue
+            if stock <= sv_threshold:
+                routed += 1
+            else:
                 protocol.comment(
                     f"WARNING: {series['name']} {well} ({fold}x) stock {stock} uL "
-                    f"is below the p300 ~{min_ok:.0f} uL accurate minimum "
-                    "(visual demo only)."
+                    f"is below the p300 ~{min_ok:.0f} uL accurate minimum and is NOT "
+                    f"covered by the small-volume pipette (threshold "
+                    f"{sv_threshold:g} uL)."
                 )
+    if routed:
+        protocol.comment(
+            f"Small-volume routing covers {routed} sub-{min_ok:.0f} uL stock transfer(s) "
+            f"on {sv.get('pipette', 'p20_single_gen2')}."
+        )
     if pr.get("droplet_volume_ul") is not None:
         droplet_volume = float(pr["droplet_volume_ul"])
         if 0 < droplet_volume < min_ok:
@@ -773,8 +954,16 @@ def _capture_image(protocol, filename: str) -> None:
     protocol.comment(f"--- CV CAPTURE END: {filename} ---")
 
 
-def _apply_flow_rates(pipette):
+def _apply_flow_rates(pipette, key: str = None):
+    """Apply CONFIG["flow_rates"] to a pipette.
+
+    `key` selects a nested override block (v2 uses "small_volume" for the P20, whose
+    20 uL barrel should not inherit the P300's 20/80 uL/s rates). A missing block
+    leaves the Opentrons defaults for that pipette in place.
+    """
     fr = CONFIG["flow_rates"]
+    if key is not None:
+        fr = fr.get(key) or {}
     if fr.get("aspirate"):
         pipette.flow_rate.aspirate = fr["aspirate"]
     if fr.get("dispense"):
@@ -1285,16 +1474,58 @@ def run(protocol: protocol_api.ProtocolContext):
         protocol.comment(
             f"[{group['name']}] {'returned' if return_tips else 'dropped'} P20 tip.")
 
+    # ── v2 small-volume routing ──────────────────────────────────────────────────
+    # Every vial -> plate transfer is dispatched by VOLUME: at or below the threshold
+    # it runs on the single-channel P20 (accurate to 1 uL), above it on the P300.
+    # Each pipette owns its own setup tip per phase and picks it up only if that
+    # pipette is actually used, so a series that needs no small transfer never
+    # touches a P20 tip.
+    sv_cfg      = dil.get("small_volume") or {}
+    sv_enabled  = bool(sv_cfg.get("enabled", True))
+    sv_name     = sv_cfg.get("pipette", "p20_single_gen2")
+    sv_inst     = instruments.get(sv_name) if sv_enabled else None
+    sv_threshold = float(sv_cfg.get("threshold_ul", 20.0))
+    if sv_inst is not None:
+        _apply_flow_rates(sv_inst, key="small_volume")
+
+    def _dilution_inst(volume_ul: float):
+        """Pipette for one dilution transfer: P20 at/below threshold, else P300."""
+        if sv_inst is not None and 0 < volume_ul <= sv_threshold:
+            return sv_inst
+        return pipette
+
+    def _sv_tip(series_name=None) -> str:
+        """The P20's setup tip well for a phase (per-series override, then default)."""
+        if series_name is None:
+            return sv_cfg.get("water_setup_tip", "A12")
+        return (sv_cfg.get("series_setup_tips") or {}).get(
+            series_name, sv_cfg.get("setup_tip", "A11"))
+
+    def _engage_setup_tip(inst, tip_well: str, label: str) -> None:
+        """Pick this phase's setup tip on `inst`, once. The P300 must first drop into
+        its SINGLE-nozzle layout; the P20 is single-channel and draws from its own rack."""
+        if inst.has_tip:
+            return
+        if inst is pipette:
+            inst.configure_nozzle_layout(
+                style=SINGLE, start=CONFIG["pipette"]["single_start"],
+                tip_racks=[lw["tiprack"]])
+            inst.pick_up_tip(lw["tiprack"][tip_well])
+        else:
+            inst.pick_up_tip(_rack_for(inst.name)[tip_well])
+        protocol.comment(
+            f"One-tip setup: picked tip {tip_well} on {inst.name} for {label}.")
+
+    def _release_setup_tips() -> None:
+        for inst in (pipette, sv_inst):
+            if inst is not None and inst.has_tip:
+                inst.return_tip() if return_tips else inst.drop_tip()
+
     if params.do_dilution and dil["enabled"]:
-        pipette.configure_nozzle_layout(
-            style=SINGLE, start=CONFIG["pipette"]["single_start"], tip_racks=[lw["tiprack"]]
-        )
         protocol.comment(
-            f"Nozzle layout: SINGLE ({CONFIG['pipette']['single_start']}) for one-tip setup."
-        )
-        pipette.pick_up_tip(lw["tiprack"][water_setup_tip])
-        protocol.comment(
-            f"One-tip setup: picked tip {water_setup_tip} for water-only transfers."
+            f"Small-volume routing: transfers <= {sv_threshold:g} uL run on "
+            + (f"{sv_name} (left)." if sv_inst is not None
+               else "the P300 (no small-volume pipette available).")
         )
         protocol.comment(
             f"Vial aspiration height: {vial_aspirate_height} mm above modeled vial bottom."
@@ -1305,42 +1536,43 @@ def run(protocol: protocol_api.ProtocolContext):
                 _stock, water_vol = dilution_volumes(total, fold)
                 if water_vol <= 0:
                     continue
+                inst = _dilution_inst(water_vol)
+                tip = water_setup_tip if inst is pipette else _sv_tip()
+                _engage_setup_tip(inst, tip, "water-only transfers")
                 protocol.comment(
-                    f"Dispensing {water_vol} uL water -> {series['name']} {well_name}."
+                    f"Dispensing {water_vol} uL water -> {series['name']} {well_name} "
+                    f"on {inst.name}."
                 )
-                pipette.aspirate(water_vol, water_vial_aspirate)
-                pipette.dispense(water_vol, lw["plate"][well_name])
+                inst.aspirate(water_vol, water_vial_aspirate)
+                inst.dispense(water_vol, lw["plate"][well_name])
 
-        _return_or_drop()
+        _release_setup_tips()
         protocol.comment(
-            f"Water setup transfers done; {'returned' if return_tips else 'dropped'} "
-            f"tip {water_setup_tip}."
+            f"Water setup transfers done; tips "
+            f"{'returned' if return_tips else 'dropped'}."
         )
 
         for series in color_series:
-            pipette.configure_nozzle_layout(
-                style=SINGLE, start=CONFIG["pipette"]["single_start"], tip_racks=[lw["tiprack"]]
-            )
-            pipette.pick_up_tip(lw["tiprack"][series["setup_tip"]])
-            protocol.comment(
-                f"One-tip setup: picked tip {series['setup_tip']} for {series['name']} "
-                f"stock transfers from vial {series['dye_vial']}."
-            )
             for well_name, fold in zip(series_wells[series["name"]], factors):
                 stock, _water_vol = dilution_volumes(total, fold)
                 if stock <= 0:
                     continue
+                inst = _dilution_inst(stock)
+                tip = series["setup_tip"] if inst is pipette else _sv_tip(series["name"])
+                _engage_setup_tip(
+                    inst, tip, f"{series['name']} stock from vial {series['dye_vial']}")
                 protocol.comment(
                     f"Diluting well {well_name} to {fold:g}x "
-                    f"({series['name']} stock {stock} uL); setup tip "
-                    f"{series['setup_tip']}."
+                    f"({series['name']} stock {stock} uL) on {inst.name}; "
+                    f"setup tip {tip}."
                 )
-                pipette.aspirate(stock, dye_vial_aspirates[series["name"]])
-                pipette.dispense(stock, lw["plate"][well_name])
-            _return_or_drop()
+                inst.aspirate(stock, dye_vial_aspirates[series["name"]])
+                inst.dispense(stock, lw["plate"][well_name])
+            # Release BOTH tips at the end of each series so nothing carries over.
+            _release_setup_tips()
             protocol.comment(
-                f"{series['name']} stock transfers done; "
-                f"{'returned' if return_tips else 'dropped'} tip {series['setup_tip']}."
+                f"{series['name']} stock transfers done; tips "
+                f"{'returned' if return_tips else 'dropped'}."
             )
 
         if not (params.do_print and pr.get("enabled", True)):
