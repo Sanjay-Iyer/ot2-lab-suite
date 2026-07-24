@@ -53,7 +53,7 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
   'materials': { 'water': {'role': 'solvent', 'vial': 'A1', 'aspirate_height_mm': 4.0},
                  'nanoparticle': {'role': 'sample', 'vial': 'A2', 'aspirate_height_mm': 4.0}},
   'dilution': { 'enabled': True,
-                'plate_column': '11',
+                'plate_column': '12',
                 'total_volume_ul': 150.0,
                 'factors': [1, 2, 5, 8, 10, 15, 20, 50],
                 'max_transfer_ul': 20.0,
@@ -65,10 +65,26 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
              'blow_out': True,
              'post_dispense_delay_s': 0.3,
              'paper_columns': 12,
-             'groups': [ {'volume_ul': 20.0, 'replicates': 1, 'droplets_per_spot': 1},
-                         {'volume_ul': 15.0, 'replicates': 1, 'droplets_per_spot': 1},
-                         {'volume_ul': 10.0, 'replicates': 1, 'droplets_per_spot': 1},
-                         {'volume_ul': 5.0, 'replicates': 1, 'droplets_per_spot': 1}]},
+             'groups': [ { 'volume_ul': 20.0,
+                           'replicates': 1,
+                           'droplets_per_spot': 1,
+                           'air_gap_ul': 2.0},
+                         { 'volume_ul': 15.0,
+                           'replicates': 1,
+                           'droplets_per_spot': 1,
+                           'air_gap_ul': 0.0},
+                         { 'volume_ul': 10.0,
+                           'replicates': 1,
+                           'droplets_per_spot': 1,
+                           'air_gap_ul': 0.0},
+                         { 'volume_ul': 5.0,
+                           'replicates': 1,
+                           'droplets_per_spot': 1,
+                           'air_gap_ul': 0.0},
+                         { 'volume_ul': 5.0,
+                           'replicates': 1,
+                           'droplets_per_spot': 3,
+                           'paper_column': 6}]},
   'tips': { 'return_tips': True,
             'p20': { 'solvent_setup': 'A1',
                      'sample_setup': 'A2',
@@ -125,29 +141,56 @@ def _material_by_role(role):
 
 
 def _plan_paper_layout(paper_columns_available):
-    """Assign paper columns to print groups left-to-right.
+    """Assign paper columns to print groups.
 
-    Expands each group into `replicates` side-by-side spots and lays them out in
-    group order. Returns (placed, skipped): `placed` spots each carry a concrete
-    `column` (1-based) and fit within the paper; `skipped` spots did not fit. This is
-    what makes over-sized plans degrade gracefully instead of failing — the caller
-    prints `placed` and reports `skipped`."""
+    A group may pin itself with `paper_column: N` (it then occupies N, N+1, ... for
+    its replicates). Groups without it float and fill the lowest still-free columns,
+    left to right, in group order — so the common case needs no column bookkeeping,
+    but a specific column can be targeted when you want one.
+
+    Returns (placed, skipped, conflicts): `placed` spots carry a concrete 1-based
+    `column` and fit on the paper, `skipped` spots fall past the paper's width (the
+    caller prints what fits and reports the rest), and `conflicts` lists columns
+    claimed by more than one group (a config error).
+    """
     pr = CONFIG["print"]
     budget = min(int(pr.get("paper_columns", paper_columns_available)),
                  int(paper_columns_available))
-    desired = []
+
+    pinned, floating = [], []
     for index, group in enumerate(pr["groups"], start=1):
+        start = group.get("paper_column")
         for replicate in range(1, int(group.get("replicates", 1)) + 1):
-            desired.append({
+            spot = {
                 "volume_ul": float(group["volume_ul"]),
                 "droplets": int(group.get("droplets_per_spot", 1)),
+                "air_gap": float(group.get("air_gap_ul", 0.0)),
                 "group": index,
                 "replicate": replicate,
-            })
-    placed = desired[:budget]
-    for column, spot in enumerate(placed, start=1):
-        spot["column"] = column
-    return placed, desired[budget:]
+            }
+            if start is None:
+                floating.append(spot)
+            else:
+                spot["column"] = int(start) + replicate - 1
+                pinned.append(spot)
+
+    taken, conflicts = {}, []
+    for spot in pinned:
+        if spot["column"] in taken:
+            conflicts.append(spot["column"])
+        taken[spot["column"]] = spot
+    next_column = 1
+    for spot in floating:
+        while next_column in taken:
+            next_column += 1
+        spot["column"] = next_column
+        taken[next_column] = spot
+        next_column += 1
+
+    ordered = sorted(taken.values(), key=lambda s: s["column"])
+    placed = [s for s in ordered if s["column"] <= budget]
+    skipped = [s for s in ordered if s["column"] > budget]
+    return placed, skipped, sorted(set(conflicts))
 
 
 def _release_tip(pipette, return_tips):
@@ -226,9 +269,20 @@ def _preflight(protocol, labware, p20):
         errors.append("mixing.volume_ul must be in (0, 20]")
 
     # Print groups: volumes within the P20, positive replicate/droplet counts.
+    p20_max = float(safety["p20_max_volume_ul"])
     for index, group in enumerate(pr["groups"], start=1):
-        if float(group["volume_ul"]) > float(safety["p20_max_volume_ul"]):
-            errors.append(f"print group {index} volume {group['volume_ul']} exceeds 20 uL")
+        volume = float(group["volume_ul"])
+        air_gap = float(group.get("air_gap_ul", 0.0))
+        if volume > p20_max:
+            errors.append(f"print group {index} volume {volume:g} exceeds 20 uL")
+        if air_gap < 0:
+            errors.append(f"print group {index} air_gap_ul must be >= 0")
+        # The tip holds liquid + air gap at once, so the pair must fit the pipette.
+        if volume + air_gap > p20_max:
+            errors.append(
+                f"print group {index}: volume {volume:g} + air gap {air_gap:g} = "
+                f"{volume + air_gap:g} uL exceeds the P20's {p20_max:g} uL"
+            )
         if int(group.get("replicates", 1)) < 1:
             errors.append(f"print group {index} replicates must be >= 1")
         if int(group.get("droplets_per_spot", 1)) < 1:
@@ -249,7 +303,12 @@ def _preflight(protocol, labware, p20):
     # Paper layout: assign columns and confirm every PLACED spot exists. Spots that
     # overflow the paper are NOT errors — they are printed as far as they fit and
     # reported at run time (graceful degradation).
-    placed, skipped = _plan_paper_layout(len(labware["paper"].columns()))
+    placed, skipped, conflicts = _plan_paper_layout(len(labware["paper"].columns()))
+    if conflicts:
+        errors.append(
+            f"paper column(s) {conflicts} are claimed by more than one print group; "
+            f"change a group's paper_column or its replicates"
+        )
     column = str(dilution["plate_column"])
     plate_names = labware["plate"].wells_by_name()
     paper_names = labware["paper"].wells_by_name()
@@ -380,17 +439,25 @@ def _print_paper(protocol, labware, p20, placed, skipped):
         for spot in placed:
             volume = spot["volume_ul"]
             drops = spot["droplets"]
+            air_gap = spot["air_gap"]
             paper_well = labware["paper"][f"{row}{spot['column']}"]
             # One printing step = mix the source, then lay down `drops` drop(s) on the
             # same paper spot (droplets_per_spot). Default drops=1 is a single drop.
             protocol.comment(
                 f"Row {row} -> paper column {spot['column']}: mix {mix_reps}x, then "
-                f"{drops} x {volume:g} uL drop(s)."
+                f"{drops} x {volume:g} uL drop(s)"
+                + (f" with a {air_gap:g} uL air gap." if air_gap > 0 else ".")
             )
             p20.mix(mix_reps, mix_vol, source.bottom(mix_h))
             for _drop in range(drops):
                 p20.aspirate(volume, source.bottom(asp_h))
-                p20.dispense(volume, paper_well.bottom(z))
+                # Anti-drip: pull an air gap above the liquid for the trip to the
+                # paper. air_gap() moves to the well top first, so the plunger is
+                # also re-prepared out of the liquid.
+                if air_gap > 0:
+                    p20.air_gap(air_gap)
+                # Push the air gap and the liquid back out together.
+                p20.dispense(volume + air_gap, paper_well.bottom(z))
                 if blow_out:
                     p20.blow_out(paper_well.bottom(z))
                 if dwell > 0:

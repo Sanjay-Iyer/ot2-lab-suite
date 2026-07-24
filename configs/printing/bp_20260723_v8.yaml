@@ -1,0 +1,67 @@
+# =============================================================================
+# bp_20260723_v8.yaml — direct vial -> paper print (protocol v8, OT-2 API 2.15)
+# =============================================================================
+# No dilution, no mixing plate. Every droplet comes straight from the 20 mL stock
+# vial in the slot-7 rack and lands on the slot-5 paper (96-flat) plate.
+#
+# Deck:
+#   slot 5  paper_print_96_flat            <- printing surface
+#   slot 7  tuberack_3dprint_20ml_8vials   <- 20 mL stock vials
+#   slot 9  opentrons_96_tiprack_20ul      <- P20 tips
+#
+# Layer plan produced by `print.passes` below:
+#   column 6 -> 1 drop      column 8 -> 2 drops      column 9 -> 5 drops
+#   with a 5 min drying rest after every pass except the last.
+#
+# Build + run:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v8.yaml
+#   python scripts/run_vial_print_robot.py --config configs/printing/bp_20260723_v8.yaml --live
+# =============================================================================
+protocol_version: 8
+
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  paper:       {slot: 5, load_name: paper_print_96_flat,             namespace: custom_beta, version: 1}
+  tuberack:    {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+source:
+  vial: A1                     # which vial in the slot-7 rack holds the stock
+  material: nanoparticle       # label only; printed into the run log
+  aspirate_height_mm: 4.0      # above the modeled vial bottom (vial depth 55 mm)
+  park_height_mm: 5.0          # tip parks this far above the vial top during rests
+  # Optional re-suspension of the stock at the start of each pass. reps: 0 = off.
+  mix_before_pass: {reps: 0, volume_ul: 15.0, height_mm: 4.0}
+
+print:
+  volume_ul: 5.0               # droplet size; volume_ul + air_gap_ul must be <= 20
+  rows: [A, B, C, D, E, F, G, H]
+  z_mm: 4.5                    # standoff above the paper surface
+  # Anti-drip: air pulled in below the droplet for the trip from vial to paper,
+  # then pushed back out with it. blow_out clears whatever still clings to the tip.
+  air_gap_ul: 3.0
+  air_gap_height_mm: 5.0       # gap is taken this far above the vial top (out of liquid)
+  blow_out: true
+  post_dispense_delay_s: 0.3
+
+  # One pass = one droplet on every row of every column listed, then a rest.
+  # Repeating a column in a later pass stacks another layer on the same spots.
+  passes:
+    - {columns: [6, 8, 9], rest_minutes: 5}   # layer 1 -> columns 6, 8, 9
+    - {columns: [8, 9],    rest_minutes: 5}   # layer 2 -> columns 8, 9
+    - {columns: [9],       rest_minutes: 5}   # layer 3 -> column 9
+    - {columns: [9],       rest_minutes: 5}   # layer 4 -> column 9
+    - {columns: [9],       rest_minutes: 0}   # layer 5 -> column 9, then done
+
+tips:
+  return_tips: true            # put the tip back in its rack slot instead of the trash
+  p20: {print_tip: A1}         # ONE tip for the whole job (single vial, single material)
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+
+safety:
+  p20_max_volume_ul: 20.0
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2

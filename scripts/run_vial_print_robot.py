@@ -52,15 +52,20 @@ _PROTOCOL_BY_VERSION = {
     3: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v3_latest.py",
     4: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v4_latest.py",
     6: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v6_latest.py",
+    7: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v7_latest.py",
+    8: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v8_latest.py",
 }
 
 # Versions that target API 2.15 on the robot: run modes are baked into the generated
 # file at build time and no runtime parameters are sent.
-API_215_VERSIONS = {3, 4, 6}
+API_215_VERSIONS = {3, 4, 6, 7, 8}
 
 # Versions with no camera step — skip all before/after image handling (and the SSH
 # it needs) for these.
-IMAGELESS_VERSIONS = {4, 6}
+IMAGELESS_VERSIONS = {4, 6, 7, 8}
+
+# Versions with no run-mode matrix; the build's own simulation is the whole check.
+NO_MATRIX_VERSIONS = {4, 6, 7, 8}
 
 
 def _config_version(config_path: str | None) -> int:
@@ -247,6 +252,67 @@ def _describe_deck(config: dict) -> None:
 
     pv = int(config.get("protocol_version", 0) or 0)
 
+    # v8 direct vial -> paper: no dilution, no plate, layered passes with drying rests.
+    if pv == 8:
+        src = config.get("source", {})
+        pr = config.get("print", {})
+        rows = [str(r) for r in pr.get("rows", [])]
+        slot = deck.get("tuberack", {}).get("slot", "?")
+        print(f"\nSource (rack in slot {slot}):")
+        print(f"  {src.get('vial')}  {src.get('material')} "
+              f"(aspirate {src.get('aspirate_height_mm')} mm above bottom) "
+              f"— NEAT STOCK, nothing is diluted")
+        mix = src.get("mix_before_pass") or {}
+        if int(mix.get("reps", 0) or 0):
+            print(f"  re-suspend {mix.get('reps')}x @ {mix.get('volume_ul')} uL "
+                  f"before each pass")
+        print(f"\nDroplet: {pr.get('volume_ul')} uL + {pr.get('air_gap_ul', 0)} uL air gap, "
+              f"z={pr.get('z_mm')} mm above paper, "
+              f"blow_out={pr.get('blow_out', True)}")
+        # Layer counts must match the protocol's own expansion of `passes`.
+        layers: dict = {}
+        rest_total = 0.0
+        passes = pr.get("passes", [])
+        print(f"\nPrint plan ({len(passes)} pass(es), rows {', '.join(rows)}, "
+              f"one reused tip {config.get('tips', {}).get('p20', {}).get('print_tip')}):")
+        for i, spec in enumerate(passes, start=1):
+            cols = [int(c) for c in spec.get("columns", [])]
+            for c in cols:
+                layers[c] = layers.get(c, 0) + 1
+            rest = float(spec.get("rest_minutes", 0) or 0)
+            rest_total += rest
+            tail = f", rest {rest:g} min" if rest > 0 else ""
+            print(f"  pass {i}: column(s) "
+                  + ", ".join(f"{c} (layer {layers[c]})" for c in cols) + tail)
+        drops = sum(len(s.get("columns", [])) for s in passes) * len(rows)
+        print(f"\nTotals: " + ", ".join(f"col {c} = {n} layer(s)"
+                                        for c, n in sorted(layers.items())))
+        print(f"  {drops} droplet(s) = {drops * float(pr.get('volume_ul', 0)):g} uL "
+              f"drawn from vial {src.get('vial')}; {rest_total:g} min of drying rests.")
+        return
+
+    # v7 print-only: no dilution, no vials — just an already-prepared plate column.
+    if pv == 7:
+        src = config.get("source", {})
+        mix = config.get("mixing", {})
+        pr = config.get("print", {})
+        rows = src.get("rows", [])
+        print(f"\nSource: plate column {src.get('plate_column')} "
+              f"(ALREADY PREPARED — nothing is diluted)")
+        print(f"  rows: {', '.join(rows)}")
+        print(f"\nPrint plan (P20, z={pr.get('z_mm')} mm, mix {mix.get('reps')}x "
+              f"@ {mix.get('volume_ul')} uL before each):")
+        for g in pr.get("groups", []):
+            pin = g.get("paper_column")
+            where = f"column {pin}" if pin is not None else "auto column"
+            reps = int(g.get("replicates", 1))
+            drops = int(g.get("droplets_per_spot", 1))
+            if reps > 1:
+                where += f" x{reps}"
+            drop_txt = f", {drops} drops/spot" if drops > 1 else ""
+            print(f"  {g.get('volume_ul')} uL -> {where}{drop_txt}")
+        return
+
     # v6 P20-only workflow: role-tagged materials, dilution, mix-before-print.
     if pv == 6:
         slot = deck.get("tuberack", {}).get("slot", "?")
@@ -263,24 +329,23 @@ def _describe_deck(config: dict) -> None:
         print(f"\nPrint plan (P20, z={pr.get('z_mm')} mm, mix {mix.get('reps')}x "
               f"@ {mix.get('volume_ul')} uL before each; auto columns, "
               f"paper width {pr.get('paper_columns')}):")
-        col = 0
+        # The protocol owns column assignment (pinned + auto-fill); report each group
+        # as declared rather than re-deriving the layout here and risking drift.
         needed = 0
         for g in pr.get("groups", []):
             reps = int(g.get("replicates", 1))
             drops = int(g.get("droplets_per_spot", 1))
             needed += reps
-            span = []
-            for _ in range(reps):
-                col += 1
-                span.append(col)
-            drop_txt = f" x{drops} drops/spot" if drops > 1 else ""
-            rep_txt = f" x{reps} cols" if reps > 1 else ""
-            print(f"  {g.get('volume_ul')} uL -> column(s) "
-                  f"{','.join(str(c) for c in span)}{rep_txt}{drop_txt}")
+            pin = g.get("paper_column")
+            where = f"column {pin}" if pin is not None else "auto column"
+            if reps > 1:
+                where += f" x{reps}"
+            drop_txt = f", {drops} drops/spot" if drops > 1 else ""
+            print(f"  {g.get('volume_ul')} uL -> {where}{drop_txt}")
         budget = int(pr.get("paper_columns", 12))
         if needed > budget:
             print(f"  NOTE: plan needs {needed} columns but paper has {budget}; "
-                  f"{needed - budget} will be skipped at run time.")
+                  f"the overflow is skipped at run time.")
         return
 
     # v4 quick test has its own tiny shape (one vial, one P20 tip, a few paper spots).
@@ -603,7 +668,7 @@ def main() -> int:
                     "validation immediately before upload; do not use "
                     "--skip-build or --skip-validate."
                 )
-        if version in (4, 6) and args.pipette_check:
+        if version in (4, 6, 7, 8) and args.pipette_check:
             raise ValueError(
                 f"--pipette-check is not available for v{version} (API-2.15, no "
                 f"runtime parameters). Just add --live."
@@ -630,7 +695,7 @@ def main() -> int:
             # flag is needed here — but the artifact it writes must be the one we
             # upload, which _protocol_for_config() resolved from the same key.
             _run_local_step(build_cmd, "build + simulate")
-        if version in (4, 6):
+        if version in NO_MATRIX_VERSIONS:
             # These self-contained protocols have no run-mode matrix — the build
             # already simulated them, which is the whole check.
             print(f"[validate matrix] skipped for v{version} (build+simulate is the check)")

@@ -54,11 +54,16 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
         "vial_dilution_print_v4"),
     6: (PRINTING_DIR / "06_vial_dilution_paper_print_v6_p20only.py",
         "vial_dilution_print_v6"),
+    7: (PRINTING_DIR / "07_paper_print_v7_print_only.py",
+        "vial_dilution_print_v7"),
+    8: (PRINTING_DIR / "08_vial_direct_paper_print_v8.py",
+        "vial_dilution_print_v8"),
 }
 
 # Versions whose YAML IS the embedded CONFIG (self-validating protocols that skip the
-# dilution normalizer). v4 = quick test; v6 = P20-only dilute/mix/print workflow.
-EMBED_RAW_VERSIONS = {4, 6}
+# dilution normalizer). v4 = quick test; v6 = P20-only dilute/mix/print workflow;
+# v7 = print-only from an already-prepared plate; v8 = direct vial -> paper, layered.
+EMBED_RAW_VERSIONS = {4, 6, 7, 8}
 
 # Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
 # needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately

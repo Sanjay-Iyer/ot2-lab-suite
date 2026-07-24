@@ -1,0 +1,62 @@
+# Paper print ONLY, protocol v7. OT-2 software 7.0.2 / Python API 2.15.
+#
+# Assumes 96-well plate column 11 is ALREADY prepared. Nothing is diluted, no vials
+# are touched. The P20 mixes each source well and prints 5 uL onto paper column 6.
+#
+# Build (dry-run by default) + simulate:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v7.yaml
+
+protocol_version: 7
+
+run_modes:
+  dry_run: true          # flip to false (or use the runner's --live) for real motion
+  do_print: true
+
+deck:
+  plate:       {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+  # Unused by v7 — declared only so the robot knows the tall rack is on the deck for
+  # travel clearance. DELETE this line if the vial rack is not physically in slot 7.
+  tuberack:    {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+# The already-prepared plate column, and which of its rows to print.
+source:
+  plate_column: "11"
+  rows: [A, B, C, D, E, F, G, H]
+
+# 2 up-down mixes of the source well right before each print (the plate has been
+# sitting, so this re-suspends before drawing).
+mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
+
+print:
+  z_mm: 4.5                    # standoff above the paper surface
+  aspirate_height_mm: 1.0
+  blow_out: true
+  post_dispense_delay_s: 0.3
+  paper_columns: 12
+  # replicates / droplets_per_spot / paper_column behave exactly as in v6.
+  # air_gap_ul: anti-drip air pulled ABOVE the liquid for the trip to the paper, then
+  # pushed out with it. volume + air_gap must stay <= 20 uL. Set 0 to disable.
+  groups:
+    - {volume_ul: 5.0, replicates: 1, droplets_per_spot: 1, paper_column: 6, air_gap_ul: 2.0}
+
+tips:
+  return_tips: true            # put each tip back in its rack slot instead of the trash
+  p20:
+    print_by_row:              # one tip per source row
+      A: A1
+      B: A2
+      C: A3
+      D: A4
+      E: A5
+      F: A6
+      G: A7
+      H: A8
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+
+safety:
+  p20_max_volume_ul: 20.0

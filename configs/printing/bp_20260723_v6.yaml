@@ -36,7 +36,8 @@ materials:
 
 dilution:
   enabled: true
-  plate_column: "11"           # the 8 dilutions go down rows A-H of this plate column
+  plate_column: "12"           # the 8 dilutions go down rows A-H of this plate column
+                               # (dilution AND the pre-print mixing both happen here)
   total_volume_ul: 150.0       # final volume per dilution well
   factors: [1, 2, 5, 8, 10, 15, 20, 50]
   max_transfer_ul: 20.0        # P20 splits larger volumes into <=20 uL chunks
@@ -53,13 +54,19 @@ print:
   post_dispense_delay_s: 0.3
   paper_columns: 12            # width of the paper grid; a plan needing more prints what fits
   # Paper columns are auto-assigned left-to-right in this order. Per group:
-  #   replicates       = side-by-side paper columns that get this volume
+  #   replicates        = side-by-side paper columns that get this volume
   #   droplets_per_spot = drops stacked on each spot (N x volume on one location)
+  #   paper_column      = OPTIONAL, pins this group to a specific column
+  #   air_gap_ul        = OPTIONAL anti-drip air pulled above the liquid for the trip
+  #                       to the paper. volume + air_gap must stay <= 20 uL, so the
+  #                       20 uL group MUST keep 0. Currently off everywhere.
   groups:
-    - {volume_ul: 20.0, replicates: 1, droplets_per_spot: 1}
-    - {volume_ul: 15.0, replicates: 1, droplets_per_spot: 1}
-    - {volume_ul: 10.0, replicates: 1, droplets_per_spot: 1}
-    - {volume_ul: 5.0,  replicates: 1, droplets_per_spot: 1}
+    - {volume_ul: 20.0, replicates: 1, droplets_per_spot: 1, air_gap_ul: 0.0}   # -> column 1 (no room for a gap)
+    - {volume_ul: 15.0, replicates: 1, droplets_per_spot: 1, air_gap_ul: 0.0}   # -> column 2 (max 5.0)
+    - {volume_ul: 10.0, replicates: 1, droplets_per_spot: 1, air_gap_ul: 0.0}   # -> column 3 (max 10.0)
+    - {volume_ul: 5.0,  replicates: 1, droplets_per_spot: 1, air_gap_ul: 0.0}   # -> column 4 (max 15.0)
+    # Pinned to column 6 (column 5 deliberately left blank), 3 drops stacked per spot.
+    - {volume_ul: 5.0,  replicates: 1, droplets_per_spot: 3, paper_column: 6}
 
 tips:
   return_tips: true            # put each tip back in its rack slot instead of the trash
