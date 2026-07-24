@@ -52,7 +52,13 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
         "vial_dilution_print_v3"),
     4: (PRINTING_DIR / "04_vial_dilution_paper_print_v4_quicktest.py",
         "vial_dilution_print_v4"),
+    6: (PRINTING_DIR / "06_vial_dilution_paper_print_v6_p20only.py",
+        "vial_dilution_print_v6"),
 }
+
+# Versions whose YAML IS the embedded CONFIG (self-validating protocols that skip the
+# dilution normalizer). v4 = quick test; v6 = P20-only dilute/mix/print workflow.
+EMBED_RAW_VERSIONS = {4, 6}
 
 # Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
 # needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately
@@ -702,12 +708,12 @@ def main() -> int:
     if str(REPO) not in sys.path:
         sys.path.insert(0, str(REPO))
     is_legacy = isinstance(full.get("printing"), dict) and "droplet_volume_ul" in full["printing"]
-    if version == 4:
-        # v4 is a deliberately minimal, self-validating quick-test protocol. Its YAML
-        # IS the CONFIG the protocol reads, so it skips the dilution normalizer
-        # entirely — there is no dilution, plate, or print-group resolution to do.
+    if version in EMBED_RAW_VERSIONS:
+        # These self-validating protocols read their YAML directly as CONFIG, so they
+        # skip the dilution normalizer entirely — the protocol's own pre-flight is the
+        # authority on its config shape.
         config = dict(full)
-        config["protocol_version"] = 4
+        config["protocol_version"] = version
     else:
         from src.core.workflow_config import normalize_and_validate, WorkflowConfigError
         try:

@@ -1,0 +1,85 @@
+# Sample dilution -> paper print, protocol v6. OT-2 software 7.0.2 / Python API 2.15.
+#
+# WHOLE workflow on the P20 single-channel — no P300. One sample diluted in one
+# solvent, mixed, and printed on paper. Materials carry a ROLE flag so future runs
+# can swap sample/solvent without code changes:
+#   role: solvent  -> the diluent
+#   role: sample   -> the thing being diluted
+#
+# First test: dilute nanoparticle in water at 1/2/5/8/10/15/20/50x, then print each
+# dilution at 20/15/10/5 uL (paper columns 1-4). Two P20 mixes before every print.
+#
+# v6 is embedded verbatim (self-validating; it does not go through the dilution
+# normalizer). Build (dry-run by default) + simulate:
+#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v6.yaml
+
+protocol_version: 6
+
+run_modes:
+  dry_run: true          # flip to false (or use the runner's --live) for real motion
+  do_dilution: true
+  do_print: true
+
+deck:
+  tuberack:    {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate:       {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+# role tags the purpose. Add more samples/solvents later by role; the protocol picks
+# the one solvent and the one sample by role, not by name.
+materials:
+  water:        {role: solvent, vial: A1, aspirate_height_mm: 4.0}
+  nanoparticle: {role: sample,  vial: A2, aspirate_height_mm: 4.0}
+
+dilution:
+  enabled: true
+  plate_column: "11"           # the 8 dilutions go down rows A-H of this plate column
+  total_volume_ul: 150.0       # final volume per dilution well
+  factors: [1, 2, 5, 8, 10, 15, 20, 50]
+  max_transfer_ul: 20.0        # P20 splits larger volumes into <=20 uL chunks
+  solvent_dispense_from_top_mm: -2.0
+  sample_dispense_from_top_mm: -1.0
+
+# 2 up-down mixes of the source well right before each print aspiration.
+mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
+
+print:
+  z_mm: 4.5                    # standoff above the paper surface (raised 1 mm from v4's 3.5)
+  aspirate_height_mm: 1.0
+  blow_out: true
+  post_dispense_delay_s: 0.3
+  paper_columns: 12            # width of the paper grid; a plan needing more prints what fits
+  # Paper columns are auto-assigned left-to-right in this order. Per group:
+  #   replicates       = side-by-side paper columns that get this volume
+  #   droplets_per_spot = drops stacked on each spot (N x volume on one location)
+  groups:
+    - {volume_ul: 20.0, replicates: 1, droplets_per_spot: 1}
+    - {volume_ul: 15.0, replicates: 1, droplets_per_spot: 1}
+    - {volume_ul: 10.0, replicates: 1, droplets_per_spot: 1}
+    - {volume_ul: 5.0,  replicates: 1, droplets_per_spot: 1}
+
+tips:
+  return_tips: true            # put each tip back in its rack slot instead of the trash
+  p20:
+    solvent_setup: A1          # shared tip for all solvent transfers
+    sample_setup:  A2          # shared tip for all sample transfers
+    print_by_row:              # one tip per dilution row (mix + print its 4 volumes)
+      A: A3
+      B: A4
+      C: A5
+      D: A6
+      E: A7
+      F: A8
+      G: A9
+      H: A10
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_well_count: 8
+  p20_max_volume_ul: 20.0
+  max_well_fill_ul: 340.0

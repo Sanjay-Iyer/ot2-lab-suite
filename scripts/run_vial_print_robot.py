@@ -51,7 +51,16 @@ _PROTOCOL_BY_VERSION = {
     2: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v2_latest.py",
     3: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v3_latest.py",
     4: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v4_latest.py",
+    6: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v6_latest.py",
 }
+
+# Versions that target API 2.15 on the robot: run modes are baked into the generated
+# file at build time and no runtime parameters are sent.
+API_215_VERSIONS = {3, 4, 6}
+
+# Versions with no camera step — skip all before/after image handling (and the SSH
+# it needs) for these.
+IMAGELESS_VERSIONS = {4, 6}
 
 
 def _config_version(config_path: str | None) -> int:
@@ -236,8 +245,46 @@ def _describe_deck(config: dict) -> None:
         print(f"  slot {str(spec['slot']):>2}  {role_labels.get(role, role):<13} "
               f"{spec.get('load_name', '?')}")
 
+    pv = int(config.get("protocol_version", 0) or 0)
+
+    # v6 P20-only workflow: role-tagged materials, dilution, mix-before-print.
+    if pv == 6:
+        slot = deck.get("tuberack", {}).get("slot", "?")
+        print(f"\nMaterials (rack in slot {slot}):")
+        for name, m in config.get("materials", {}).items():
+            print(f"  {m.get('vial')}  {name} [{m.get('role')}] "
+                  f"(aspirate {m.get('aspirate_height_mm')} mm above bottom)")
+        dil = config.get("dilution", {})
+        factors = ", ".join(f"{f:g}x" for f in dil.get("factors", []))
+        print(f"\nDilution: {factors} in plate column {dil.get('plate_column')}, "
+              f"{dil.get('total_volume_ul')} uL each.")
+        mix = config.get("mixing", {})
+        pr = config.get("print", {})
+        print(f"\nPrint plan (P20, z={pr.get('z_mm')} mm, mix {mix.get('reps')}x "
+              f"@ {mix.get('volume_ul')} uL before each; auto columns, "
+              f"paper width {pr.get('paper_columns')}):")
+        col = 0
+        needed = 0
+        for g in pr.get("groups", []):
+            reps = int(g.get("replicates", 1))
+            drops = int(g.get("droplets_per_spot", 1))
+            needed += reps
+            span = []
+            for _ in range(reps):
+                col += 1
+                span.append(col)
+            drop_txt = f" x{drops} drops/spot" if drops > 1 else ""
+            rep_txt = f" x{reps} cols" if reps > 1 else ""
+            print(f"  {g.get('volume_ul')} uL -> column(s) "
+                  f"{','.join(str(c) for c in span)}{rep_txt}{drop_txt}")
+        budget = int(pr.get("paper_columns", 12))
+        if needed > budget:
+            print(f"  NOTE: plan needs {needed} columns but paper has {budget}; "
+                  f"{needed - budget} will be skipped at run time.")
+        return
+
     # v4 quick test has its own tiny shape (one vial, one P20 tip, a few paper spots).
-    if int(config.get("protocol_version", 0) or 0) == 4:
+    if pv == 4:
         src = config.get("source", {})
         pr = config.get("print", {})
         slot = deck.get("tuberack", {}).get("slot", "?")
@@ -556,10 +603,10 @@ def main() -> int:
                     "validation immediately before upload; do not use "
                     "--skip-build or --skip-validate."
                 )
-        if version == 4 and args.pipette_check:
+        if version in (4, 6) and args.pipette_check:
             raise ValueError(
-                "--pipette-check is not available for the v4 quick test; it is "
-                "already a minimal no-dilution print. Just add --live."
+                f"--pipette-check is not available for v{version} (API-2.15, no "
+                f"runtime parameters). Just add --live."
             )
 
         protocol_path = Path(
@@ -571,7 +618,7 @@ def main() -> int:
                 build_cmd += ["--config", args.config]
             if args.simulator_python:
                 build_cmd += ["--simulator-python", args.simulator_python]
-            if version in (3, 4):
+            if version in API_215_VERSIONS:
                 # API-2.15 protocols have no runtime parameters, so run modes are
                 # baked into the generated file at build time.
                 build_cmd += [
@@ -583,10 +630,10 @@ def main() -> int:
             # flag is needed here — but the artifact it writes must be the one we
             # upload, which _protocol_for_config() resolved from the same key.
             _run_local_step(build_cmd, "build + simulate")
-        if version == 4:
-            # v4 has no run-mode matrix — the build already simulated it under API
-            # 2.15, which is the whole check for a quick test.
-            print("[validate matrix] skipped for v4 (build+simulate is the check)")
+        if version in (4, 6):
+            # These self-contained protocols have no run-mode matrix — the build
+            # already simulated them, which is the whole check.
+            print(f"[validate matrix] skipped for v{version} (build+simulate is the check)")
         elif not args.skip_validate:
             run_log.event("local_step", label="validate matrix")
             validate_cmd = [sys.executable, "scripts/validate_vial_print.py"]
@@ -643,7 +690,10 @@ def main() -> int:
         else:
             print("\nWARNING: could not read the CONFIG out of "
                   f"{protocol_path.name}; check the deck against your YAML by hand.")
-        if args.live and not args.no_pull_images:
+        # v4/v6 capture no images (no camera), so skip all image handling for them.
+        images_enabled = (args.live and not args.no_pull_images
+                          and version not in IMAGELESS_VERSIONS)
+        if images_enabled:
             print(f"Images    : will pull {_remote_image_dir()} to {LOCAL_VISION_BASE / image_run_id} after the run.")
 
         protocol_id = _upload_protocol(robot_ip, protocol_path)
@@ -656,7 +706,7 @@ def main() -> int:
             do_print=do_print,
             paper_start_column=args.paper_start_column,
             pipette_check=args.pipette_check,
-            send_runtime_parameters=version not in (3, 4),
+            send_runtime_parameters=version not in API_215_VERSIONS,
         )
         run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
 
@@ -665,7 +715,7 @@ def main() -> int:
             run_log.finish("created_not_started", exit_code=0)
             return 0
 
-        if args.live and not args.no_pull_images and not args.no_clean_remote_images:
+        if images_enabled and not args.no_clean_remote_images:
             _prepare_remote_image_dir(robot_ip, args.ssh_key, run_log)
 
         _play_run(robot_ip, run_id)
@@ -674,7 +724,7 @@ def main() -> int:
         print(f"\nRun finished with status: {status}")
         if status != "succeeded":
             _report_run_error(robot_ip, run_id, run_log)
-        if args.live and not args.no_pull_images:
+        if images_enabled:
             _pull_images(robot_ip, args.ssh_key, image_run_id, run_log)
         exit_code = 0 if status == "succeeded" else 1
         run_log.finish(status, exit_code=exit_code)

@@ -32,7 +32,7 @@ requirements = {"robotType": "OT-2", "apiLevel": "2.15"}
 
 # Run modes (the build script rewrites these from the YAML's run_modes / CLI flags).
 # API 2.15 has no runtime parameters, so the modes are baked into the file.
-DEFAULT_DRY_RUN     = False
+DEFAULT_DRY_RUN     = True
 DEFAULT_DO_DILUTION = False # v4 never dilutes; kept so the build flag substitution is uniform
 DEFAULT_DO_PRINT    = True
 
