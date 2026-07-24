@@ -267,8 +267,10 @@ def _describe_deck(config: dict) -> None:
             print(f"  re-suspend {mix.get('reps')}x @ {mix.get('volume_ul')} uL "
                   f"before each pass")
         print(f"\nDroplet: {pr.get('volume_ul')} uL + {pr.get('air_gap_ul', 0)} uL air gap, "
-              f"z={pr.get('z_mm')} mm above paper, "
-              f"blow_out={pr.get('blow_out', True)}")
+              f"z={pr.get('z_mm')} mm above paper")
+        print(f"  clearing: push_out {pr.get('push_out_ul', 0)} uL"
+              + (" then blow_out" if pr.get("blow_out", True) else ", blow_out OFF")
+              + f", {pr.get('post_dispense_delay_s', 0)} s hold per spot")
         # Layer counts must match the protocol's own expansion of `passes`.
         layers: dict = {}
         rest_total = 0.0

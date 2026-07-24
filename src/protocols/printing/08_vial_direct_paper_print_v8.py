@@ -18,9 +18,11 @@ pass list rather than needing a per-column drop count:
 
   -> column 6 ends with 1 layer, column 8 with 2, column 9 with 5.
 
-Anti-drip: each droplet is aspirated from the vial, an air gap is pulled in
-below it for the trip across the deck, and the pair is dispensed together above
-the paper and followed by a blow-out so nothing is left clinging to the tip.
+Anti-drip / full-delivery: each droplet is aspirated from the vial, an air gap is
+pulled in below it for the trip across the deck, and the pair is dispensed
+together above the paper. The dispense carries a `push_out` that drives the
+plunger past its bottom stop, and a blow-out follows it, so the tip is cleared
+twice over and nothing is left clinging.
 
 One P20 tip serves the whole job (single source, single material) and is held
 through the rests; between passes the tip parks over the open source vial so any
@@ -70,7 +72,7 @@ CONFIG = {
     },
     "pipette": {"name": "p20_single_gen2", "mount": "left"},
     "source": {
-        "vial": "A1",
+        "vial": "A2",
         "material": "nanoparticle",
         "aspirate_height_mm": 4.0,
         "park_height_mm": 5.0,
@@ -80,13 +82,14 @@ CONFIG = {
     "print": {
         "volume_ul": 5.0,
         "rows": ["A", "B", "C", "D", "E", "F", "G", "H"],
-        "z_mm": 4.5,
-        "air_gap_ul": 3.0,
+        "z_mm": 4.4,
+        "air_gap_ul": 1.5,
         "air_gap_height_mm": 5.0,
+        "push_out_ul": 3.0,
         "blow_out": True,
-        "post_dispense_delay_s": 0.3,
+        "post_dispense_delay_s": 2.0,
         "passes": [
-            {"columns": [6, 8, 9], "rest_minutes": 5},
+            {"columns": [7, 8, 9], "rest_minutes": 5},
             {"columns": [8, 9], "rest_minutes": 5},
             {"columns": [9], "rest_minutes": 5},
             {"columns": [9], "rest_minutes": 5},
@@ -178,6 +181,17 @@ def _preflight(protocol, labware, p20):
         errors.append("print.z_mm must be >= 0")
     if float(pr.get("post_dispense_delay_s", 0.0) or 0.0) < 0:
         errors.append("print.post_dispense_delay_s must be >= 0")
+    # push_out drives the plunger past its bottom stop on the dispense itself. It is
+    # only legal on a dispense that empties the tip (ours always is), and the hardware
+    # caps how far past bottom the plunger can go — the robot rejects an overlarge
+    # value at run time, so keep it modest.
+    push_out = float(pr.get("push_out_ul", 0.0) or 0.0)
+    if push_out < 0:
+        errors.append(f"print.push_out_ul must be >= 0, got {push_out:g}")
+    if push_out > p20_max:
+        errors.append(
+            f"print.push_out_ul {push_out:g} exceeds the P20's {p20_max:g} uL"
+        )
 
     mix = src.get("mix_before_pass") or {}
     mix_reps = int(mix.get("reps", 0) or 0)
@@ -257,6 +271,7 @@ def _print_paper(protocol, labware, p20, rows, passes, layers):
     z = float(pr["z_mm"])
     air_gap = float(pr.get("air_gap_ul", 0.0))
     air_gap_h = float(pr.get("air_gap_height_mm", 5.0))
+    push_out = float(pr.get("push_out_ul", 0.0) or 0.0)
     blow_out = bool(pr.get("blow_out", True))
     dwell = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
     mix = src.get("mix_before_pass") or {}
@@ -289,9 +304,15 @@ def _print_paper(protocol, labware, p20, rows, passes, layers):
                 # out of the liquid.
                 if air_gap > 0:
                     p20.air_gap(air_gap, height=air_gap_h)
-                # Push the air gap and the droplet back out together, then clear the
-                # tip so nothing is left hanging for the next spot.
-                p20.dispense(volume + air_gap, paper_well.bottom(z))
+                # Push the air gap and the droplet back out together. push_out drives
+                # the plunger past its bottom stop on the same dispense, which shifts
+                # the residual film off the orifice; blow_out then clears the tip
+                # again. Belt and braces — blow-out alone was leaving liquid behind.
+                if push_out > 0:
+                    p20.dispense(volume + air_gap, paper_well.bottom(z),
+                                 push_out=push_out)
+                else:
+                    p20.dispense(volume + air_gap, paper_well.bottom(z))
                 if blow_out:
                     p20.blow_out(paper_well.bottom(z))
                 if dwell > 0:
@@ -348,8 +369,9 @@ def run(protocol: protocol_api.ProtocolContext):
     )
     protocol.comment(
         f"Droplet: {pr['volume_ul']:g} uL + {pr.get('air_gap_ul', 0.0):g} uL air gap, "
-        f"dispensed {pr['z_mm']:g} mm above the paper"
-        + (", blow-out on." if pr.get("blow_out", True) else ", blow-out OFF.")
+        f"dispensed {pr['z_mm']:g} mm above the paper; "
+        f"push_out {float(pr.get('push_out_ul', 0.0) or 0.0):g} uL"
+        + (" then blow-out." if pr.get("blow_out", True) else ", blow-out OFF.")
     )
     protocol.comment(
         "Layer plan: "

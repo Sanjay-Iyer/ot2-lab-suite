@@ -10,7 +10,7 @@
 #   slot 9  opentrons_96_tiprack_20ul      <- P20 tips
 #
 # Layer plan produced by `print.passes` below:
-#   column 6 -> 1 drop      column 8 -> 2 drops      column 9 -> 5 drops
+#   column 7 -> 1 drop      column 8 -> 2 drops      column 9 -> 5 drops
 #   with a 5 min drying rest after every pass except the last.
 #
 # Build + run:
@@ -29,7 +29,7 @@ deck:
 pipette: {name: p20_single_gen2, mount: left}
 
 source:
-  vial: A1                     # which vial in the slot-7 rack holds the stock
+  vial: A2                     # which vial in the slot-7 rack holds the stock
   material: nanoparticle       # label only; printed into the run log
   aspirate_height_mm: 4.0      # above the modeled vial bottom (vial depth 55 mm)
   park_height_mm: 5.0          # tip parks this far above the vial top during rests
@@ -39,18 +39,32 @@ source:
 print:
   volume_ul: 5.0               # droplet size; volume_ul + air_gap_ul must be <= 20
   rows: [A, B, C, D, E, F, G, H]
-  z_mm: 4.5                    # standoff above the paper surface
-  # Anti-drip: air pulled in below the droplet for the trip from vial to paper,
-  # then pushed back out with it. blow_out clears whatever still clings to the tip.
-  air_gap_ul: 3.0
+
+  # ---- PRINT HEIGHT — the knob to tune between runs -------------------------
+  # Standoff of the tip above the paper surface at dispense/push-out/blow-out.
+  # SMALLER = CLOSER to the paper. Nudge in 0.1 mm steps and re-run; nothing else
+  # in this file depends on it.
+  #   4.5 = original v8    4.4 = current    4.3 = one more step closer
+  # Do not go below ~0.5 mm: the tip would touch the paper and wick/smear.
+  z_mm: 4.4
+
+  # ---- Getting every drop out of the tip ------------------------------------
+  # air_gap_ul : air pulled in BELOW the droplet for the trip from vial to paper,
+  #              then pushed back out with it. Anti-drip during travel.
+  # push_out_ul: drives the plunger PAST its bottom stop on the dispense itself,
+  #              shifting the residual film off the tip orifice.
+  # blow_out   : a second clearing pass after the push-out.
+  # push-out and blow-out both run — blow-out alone was leaving liquid behind.
+  air_gap_ul: 1.5
   air_gap_height_mm: 5.0       # gap is taken this far above the vial top (out of liquid)
+  push_out_ul: 3.0
   blow_out: true
-  post_dispense_delay_s: 0.3
+  post_dispense_delay_s: 2.0   # hold at the spot after each droplet, for wicking
 
   # One pass = one droplet on every row of every column listed, then a rest.
   # Repeating a column in a later pass stacks another layer on the same spots.
   passes:
-    - {columns: [6, 8, 9], rest_minutes: 5}   # layer 1 -> columns 6, 8, 9
+    - {columns: [7, 8, 9], rest_minutes: 5}   # layer 1 -> columns 7, 8, 9
     - {columns: [8, 9],    rest_minutes: 5}   # layer 2 -> columns 8, 9
     - {columns: [9],       rest_minutes: 5}   # layer 3 -> column 9
     - {columns: [9],       rest_minutes: 5}   # layer 4 -> column 9
