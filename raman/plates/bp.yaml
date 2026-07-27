@@ -1,0 +1,29 @@
+# =============================================================================
+# PLATE CONFIG - sample "bp"
+# -----------------------------------------------------------------------------
+# Describes how scan numbers map onto physical dots on the printing paper, and
+# how result files get named. This is SEPARATE from the peak-analysis configs
+# (configs/*.yaml) so you can run any analysis on any plate:
+#
+#     python src/process_raman.py --config peaks_1080 --plate bp
+#
+# Add more samples by copying this file to plates/<sample>.yaml.
+# =============================================================================
+name: bp                       # sample name -> used as the filename prefix
+description: "BP sample: 3 columns (A-C) x 8 rows (1-8), column-major from scan 00673."
+
+# --- plate geometry (fully dynamic: add/remove columns or rows freely) ---
+columns: [A, B, C]             # e.g. [A, B, C, D] for 4 columns
+rows: [1, 2, 3, 4, 5, 6, 7, 8] # e.g. [1, 2, 3, 4, 5, 6] for 6 rows
+start_scan: 673                # scan number of the first dot (A1)
+order: column_major            # column_major (A1..A8, B1..B8, ...) | row_major (A1,B1,C1, A2,...)
+
+# --- how to read the scan number out of an input file name ---
+# Matches "Scan 00673 ...", "scan_00673", "SCAN-673 extra text", etc.
+# Captures the digits (leading zeros stripped) -> 673.
+scan_regex: '(?i)scan[ _-]?0*(\d+)'
+
+# --- result naming ---
+date_format: "%m%d%y"                    # 072726  (month, day, year)
+name_pattern: "{sample}_{spot}_{date}"   # bp_A1_072726
+fallback_pattern: "{stem}_{date}"        # used when a scan can't be mapped

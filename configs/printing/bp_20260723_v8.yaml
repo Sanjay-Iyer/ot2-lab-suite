@@ -44,9 +44,10 @@ print:
   # Standoff of the tip above the paper surface at dispense/push-out/blow-out.
   # SMALLER = CLOSER to the paper. Nudge in 0.1 mm steps and re-run; nothing else
   # in this file depends on it.
-  #   4.5 = original v8    4.4 = current    4.3 = one more step closer
+  #   4.5 = original v8    4.4 = first nudge    4.0 = current
+  # Tip-end height above the deck = 6.0 (modeled paper surface) + z_mm.
   # Do not go below ~0.5 mm: the tip would touch the paper and wick/smear.
-  z_mm: 4.4
+  z_mm: 4.0
 
   # ---- Getting every drop out of the tip ------------------------------------
   # air_gap_ul : air pulled in BELOW the droplet for the trip from vial to paper,

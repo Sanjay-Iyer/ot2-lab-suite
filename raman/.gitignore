@@ -1,0 +1,11 @@
+# Generated results (regenerated on each run; not source of truth).
+results/
+
+# Real raw data lives on the work laptop; don't commit large data dumps.
+# The template scan is kept (see negation below) so the pipeline is testable.
+raw/*.csv
+!raw/Randomized_Scan_00649.csv
+
+# Python noise
+__pycache__/
+*.pyc

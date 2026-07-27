@@ -1,0 +1,68 @@
+# =============================================================================
+# CONFIG 3: "all peaks" - automatic global detection
+# -----------------------------------------------------------------------------
+# Use this when you don't know how many peaks there are, or want to survey a
+# whole spectrum. Instead of listing target windows, scipy.find_peaks scans the
+# entire baseline-corrected spectrum and reports everything that clears the
+# thresholds below. Tighten min_prominence / min_snr to reject noise; loosen to
+# catch weak bands. `global_max_peaks` caps how many (strongest) are reported.
+#
+# (If instead you want many *named* targets, set mode: targeted and list them
+#  under peaks: exactly like configs 1 and 2 - there is no limit on how many.)
+# =============================================================================
+name: "all_peaks"
+description: "Automatic detection of all peaks above threshold across the full spectrum."
+
+io:
+  input_dir: raw
+  output_dir: results
+  file_glob: "*.csv"
+  csv:
+    has_header: null
+    wavelength_col: 0
+    intensity_col: 1
+    delimiter: ","
+
+analysis_range:
+  enabled: false
+  min: 400
+  max: 2300
+
+preprocessing:
+  baseline:
+    method: arpls
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol
+    savgol: {window: 11, polyorder: 3}
+  normalize:
+    method: none
+
+noise:
+  method: mad_derivative
+
+detection:
+  mode: global              # find every qualifying peak automatically
+  min_height: null
+  min_prominence: 3.0       # in SNR-independent intensity units; RAISE to cut noise
+  min_snr: 3.0              # require peaks to be >=3x the noise sigma
+  min_width: 2              # cm^-1 ; reject single-point spikes
+  max_width: null
+  distance: 8               # min spacing between peaks, cm^-1
+  global_max_peaks: 30      # report at most the 30 strongest (null = no cap)
+
+fitting:
+  enabled: true
+  model: gaussian
+
+# `peaks:` is ignored in global mode (kept empty for clarity).
+peaks: []
+
+plotting:
+  overview: true
+  zoom: false               # no fixed windows to zoom in global mode
+  dpi: 150
+  figsize: [14, 6]
+  show_raw: true
+  show_baseline: true
+  annotate: true

@@ -1,0 +1,70 @@
+# =============================================================================
+# CONFIG 1 (DEFAULT): single peak near 1080 cm^-1
+# -----------------------------------------------------------------------------
+# The 1080 band drifts between ~1070 and ~1090, so the search window is wide
+# (1080 +/- 20  ->  1060-1100). Widen `window` if your real band moves further.
+#
+# To add peaks: copy the block under `peaks:` and change name/center. The number
+# of peaks is simply however many entries you list here - 1, 3, 5, or many.
+# =============================================================================
+name: "1080_only"
+description: "Single targeted band near 1080 cm^-1 (primary analyte). Default config."
+
+io:
+  input_dir: raw            # relative to raman/ ; drop your CSVs here
+  output_dir: results
+  file_glob: "*.csv"
+  csv:
+    has_header: null        # null = auto-detect header; true/false to force
+    wavelength_col: 0       # column 1 = Raman shift (cm^-1)
+    intensity_col: 1        # column 2 = intensity
+    delimiter: ","
+
+analysis_range:
+  enabled: false            # set true to crop before processing
+  min: 400
+  max: 2300
+
+preprocessing:
+  baseline:
+    method: arpls           # arpls | als | poly | rolling_min | none
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol          # savgol | none
+    savgol: {window: 11, polyorder: 3}
+  normalize:
+    method: none            # none | max | area | minmax | snv
+
+noise:
+  method: mad_derivative    # robust, peak-insensitive noise estimate for SNR
+
+detection:
+  mode: targeted            # look only inside each peak's window below
+  # Qualification thresholds. null = disabled. A found peak must pass all set.
+  min_height: null
+  min_prominence: null
+  min_snr: null
+  min_width: null           # cm^-1
+  max_width: null
+
+fitting:
+  enabled: true
+  model: gaussian           # gaussian | lorentzian | voigt | none
+
+peaks:
+  - name: "band_1080"
+    center: 1080
+    window: 20              # searches 1060-1100 cm^-1
+    primary: true
+    # optional per-peak overrides, e.g.:
+    # min_snr: 3.0
+    # min_prominence: 150
+
+plotting:
+  overview: true
+  zoom: true
+  dpi: 150
+  figsize: [12, 6]
+  show_raw: true
+  show_baseline: true
+  annotate: true

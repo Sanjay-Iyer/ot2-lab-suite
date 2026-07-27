@@ -1,0 +1,67 @@
+# =============================================================================
+# CONFIG 2: two peaks - 1080 cm^-1 (primary) and 1580 cm^-1 (secondary)
+# -----------------------------------------------------------------------------
+# Same pipeline as config 1, just a second entry in the `peaks:` list. This is
+# the pattern for going from 1 -> N peaks: add more blocks under `peaks:`.
+# =============================================================================
+name: "1080_1580"
+description: "Two targeted bands: 1080 (primary) and 1580 (secondary) cm^-1."
+
+io:
+  input_dir: raw
+  output_dir: results
+  file_glob: "*.csv"
+  csv:
+    has_header: null
+    wavelength_col: 0
+    intensity_col: 1
+    delimiter: ","
+
+analysis_range:
+  enabled: false
+  min: 400
+  max: 2300
+
+preprocessing:
+  baseline:
+    method: arpls
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol
+    savgol: {window: 11, polyorder: 3}
+  normalize:
+    method: none
+
+noise:
+  method: mad_derivative
+
+detection:
+  mode: targeted
+  min_height: null
+  min_prominence: null
+  min_snr: null
+  min_width: null
+  max_width: null
+
+fitting:
+  enabled: true
+  model: gaussian
+
+peaks:
+  - name: "band_1080"
+    center: 1080
+    window: 20              # 1060-1100
+    primary: true
+  - name: "band_1580"
+    center: 1580
+    window: 25              # 1555-1605 ; G-band type features can be broad
+    primary: false
+
+plotting:
+  overview: true
+  zoom: true
+  dpi: 150
+  figsize: [12, 6]
+  show_raw: true
+  show_baseline: true
+  annotate: true

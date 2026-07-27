@@ -1,0 +1,7 @@
+# Raman processing dependencies (already present in the conda `ai` env).
+# Install into a fresh env with:  pip install -r requirements.txt
+numpy>=1.24
+scipy>=1.10
+pandas>=2.0
+matplotlib>=3.7
+PyYAML>=6.0
