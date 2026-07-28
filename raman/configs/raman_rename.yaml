@@ -1,0 +1,36 @@
+# Separate YAML-only filename migration.
+# Preview from the repository root with:
+#   python raman\rename_raman_files.py
+#
+# The safe defaults copy files and preserve every original. dry_run: true
+# writes only a manifest; set it to false after inspecting that manifest.
+
+rename:
+  input_root: raw
+  output_root: raw/renamed
+  file_glob: "*.csv"
+  operation: copy              # copy | move
+  dry_run: true
+  overwrite: false
+
+  # scan_number follows Randomized_Scan_00649 numerically. Use filename when
+  # old names do not contain a scan number.
+  sort_by: scan_number         # scan_number | filename
+  scan_regex: '(?i)scan[ _-]?0*(\d+)'
+
+  start_sequence: 1
+  zero_padding: 4
+  sample_type: change-me
+  columns: [A, B, C]
+  rows: [1, 2, 3, 4, 5, 6, 7, 8]
+  order: column_major
+  # Preserve physical positions across missing scans by using scan-start_scan.
+  position_mapping: scan_number_offset
+  start_scan_number: 649
+  allow_scan_gaps: false
+
+  # Supported tokens: sequence, sample_type, column, row, spot, original_stem.
+  # The default structure is parsed automatically by analyze_raman.py.
+  filename_pattern: "{sequence}__sample-{sample_type}__column-{column}__row-{row}"
+  on_unmapped: error           # error | skip when files exceed plate capacity
+  manifest_file: rename_manifest.csv

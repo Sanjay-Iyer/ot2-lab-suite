@@ -5,6 +5,15 @@ Nothing about which peaks to look for, thresholds, or preprocessing is
 hardcoded here - the modules only implement the *mechanics*.
 """
 
-__all__ = ["config", "io_utils", "preprocessing", "detection", "plotting"]
+__all__ = [
+    "analysis_workflow",
+    "config",
+    "detection",
+    "io_utils",
+    "naming",
+    "plotting",
+    "preprocessing",
+    "workflow_config",
+]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

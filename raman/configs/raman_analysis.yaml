@@ -1,0 +1,139 @@
+# Main YAML-only Raman workflow.
+# Run from the repository root with:
+#   python raman\analyze_raman.py
+
+analysis:
+  name: initial_1080_peak_test
+  input_root: raw
+  output_root: results
+  timestamped_run_directory: true
+
+# File paths are relative to analysis.input_root. Metadata written into a
+# canonical filename by rename_raman_files.py is read automatically. Explicit
+# label/sample_type/column/row values here override filename metadata.
+spectra:
+  - file: Randomized_Scan_00649.csv
+    label: Randomized scan 00649
+    include: true
+    include_in_overlay: false
+    include_in_groups: false
+
+csv:
+  has_header: null
+  delimiter: ","
+  comment: null
+  raman_shift_column: 0
+  intensity_column: 1
+  raman_shift_units: "cm^-1"
+
+preprocessing:
+  sort_axis: true
+  remove_nonfinite: true
+  merge_duplicate_shifts: true
+
+# Disabled by default to avoid suppressing narrow or weak bands. When enabled,
+# the odd window length is in data points.
+smoothing:
+  enabled: false
+  method: savitzky_golay
+  window_length: 7
+  polynomial_order: 2
+
+# arPLS is a smooth, asymmetrically weighted fluorescence-background model.
+# Higher lambda values make the baseline stiffer.
+baseline:
+  enabled: true
+  method: arpls
+  lambda: 100000.0
+  asymmetry: 0.001
+  convergence_ratio: 1.0e-6
+  iterations: 50
+
+target_peak:
+  name: band_1080
+  expected_position_cm1: 1080.0
+  search_window_cm1: [1060.0, 1100.0]
+  integration_window_cm1: [1065.0, 1095.0]
+  minimum_snr: 3.0
+  minimum_prominence: null
+  minimum_prominence_to_noise: 3.0
+  minimum_points_for_width: 5
+  minimum_width_cm1: 3.0
+  maximum_width_cm1: 40.0
+  maximum_shift_cm1: 20.0
+  require_resolved_width: true
+
+noise:
+  # Robust, linearly detrended peak-free regions bracketing the target.
+  method: sidebands
+  region_cm1: null
+  sidebands_cm1:
+    - [1020.0, 1055.0]
+    - [1105.0, 1140.0]
+  minimum_points: 10
+
+sampling:
+  require_uniform_spacing: true
+  maximum_relative_spacing_deviation: 0.05
+
+normalization:
+  method: target_peak
+  target_value: 1.0
+  allow_invalid_target: false
+
+plots:
+  individual:
+    enabled: true
+    # null automatically includes label plus any known sample type and position.
+    # Or use placeholders: "{label} | {sample_type} | {spot}"
+    title_template: null
+    x_range_cm1: [1000.0, 1160.0]
+    y_range: null
+    mark_expected_peak: true
+    mark_detected_peak: true
+    show_grid: true
+    consistent_y_range: false
+
+  # Select files above with include_in_overlay: true. At least two valid
+  # normalized spectra are required.
+  overlay:
+    enabled: false
+    title: Selected spectra near 1080 cm^-1
+    x_range_cm1: [1000.0, 1160.0]
+    y_range: null
+    vertical_offset: 0.0
+    mark_expected_peak: true
+    mark_detected_peaks: false
+
+  # This example creates one overlay per selected column. To plot only A1-A8,
+  # use columns: [A]. To make A, B, and C group plots, use [A, B, C].
+  groups:
+    enabled: false
+    x_range_cm1: [1000.0, 1160.0]
+    y_range: null
+    vertical_offset: 0.0
+    selections:
+      - name: selected_columns_rows_1_to_8
+        title: Selected column
+        group_by: column
+        columns: [A]
+        rows: [1, 2, 3, 4, 5, 6, 7, 8]
+        sample_types: []
+
+  diagnostics:
+    enabled: true
+    title_template: null
+    full_spectrum: true
+    baseline_plot: true
+    target_region_baseline_plot: true
+
+  output:
+    dpi: 300
+    formats: [png]
+
+outputs:
+  save_processed_csv: true
+  save_peak_metrics_csv: true
+  save_overlay_data: true
+  save_run_summary_json: true
+  copy_plots_to_collections: true

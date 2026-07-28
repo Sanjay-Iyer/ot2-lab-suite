@@ -5,6 +5,7 @@ results/
 # The template scan is kept (see negation below) so the pipeline is testable.
 raw/*.csv
 !raw/Randomized_Scan_00649.csv
+raw/renamed/
 
 # Python noise
 __pycache__/

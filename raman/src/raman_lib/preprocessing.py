@@ -24,26 +24,55 @@ def baseline_arpls(y: np.ndarray, lam: float = 1e5, ratio: float = 1e-6,
     Robust, parameter-light baseline that handles Raman fluorescence well.
     `lam` controls smoothness (bigger = stiffer baseline).
     """
+    baseline, _ = baseline_arpls_with_diagnostics(y, lam, ratio, niter)
+    return baseline
+
+
+def baseline_arpls_with_diagnostics(
+    y: np.ndarray,
+    lam: float = 1e5,
+    ratio: float = 1e-6,
+    niter: int = 50,
+) -> tuple[np.ndarray, dict[str, float | int | bool]]:
+    """Return arPLS baseline plus convergence diagnostics."""
     y = np.asarray(y, dtype=float)
     lam, ratio, niter = float(lam), float(ratio), int(niter)
     n = y.size
     d = sparse.diags([1.0, -2.0, 1.0], [0, -1, -2], shape=(n, n - 2))
     h = lam * (d @ d.transpose())
     w = np.ones(n)
-    for _ in range(niter):
+    converged = False
+    relative_change = float("nan")
+    iterations_used = 0
+    z = y.copy()
+    for iteration in range(niter):
+        iterations_used = iteration + 1
         wmat = sparse.diags(w, 0, shape=(n, n))
         z = spsolve((wmat + h).tocsc(), w * y)
         dneg = y - z
         dn = dneg[dneg < 0]
         if dn.size == 0:
+            converged = True
+            relative_change = 0.0
             break
         m, s = np.mean(dn), np.std(dn)
-        wt = 1.0 / (1.0 + np.exp(2.0 * (dneg - (2 * s - m)) / (s + 1e-12)))
-        if np.linalg.norm(w - wt) / (np.linalg.norm(w) + 1e-12) < ratio:
+        exponent = 2.0 * (dneg - (2 * s - m)) / (s + 1e-12)
+        wt = 1.0 / (1.0 + np.exp(np.clip(exponent, -700.0, 700.0)))
+        relative_change = float(
+            np.linalg.norm(w - wt) / (np.linalg.norm(w) + 1e-12)
+        )
+        if relative_change < ratio:
             w = wt
+            converged = True
             break
         w = wt
-    return z
+    diagnostics: dict[str, float | int | bool] = {
+        "converged": converged,
+        "iterations_used": iterations_used,
+        "final_relative_weight_change": relative_change,
+        "baseline_finite": bool(np.all(np.isfinite(z))),
+    }
+    return z, diagnostics
 
 
 def baseline_als(y: np.ndarray, lam: float = 1e5, p: float = 0.01,

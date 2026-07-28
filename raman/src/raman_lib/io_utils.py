@@ -39,23 +39,63 @@ def _looks_like_header(first_line: str, delimiter: str) -> bool:
     return False
 
 
-def load_spectrum(path: str | Path, csv_cfg: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
-    """Load a two-column Raman CSV -> (wavelength, intensity), sorted ascending.
+def _select_column(df: pd.DataFrame, selector: int | str, role: str) -> pd.Series:
+    """Select a configured CSV column by zero-based index or exact header name."""
+    if isinstance(selector, str):
+        if selector not in df.columns:
+            available = ", ".join(map(str, df.columns))
+            raise ValueError(
+                f"Configured {role} column {selector!r} was not found. "
+                f"Available columns: {available}"
+            )
+        return df[selector]
+    try:
+        return df.iloc[:, int(selector)]
+    except (IndexError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"Configured {role} column index {selector!r} is outside the "
+            f"{df.shape[1]} parsed CSV columns."
+        ) from exc
+
+
+def load_spectrum(
+    path: str | Path,
+    csv_cfg: dict[str, Any],
+    *,
+    return_report: bool = False,
+) -> tuple[np.ndarray, np.ndarray] | tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Load a Raman CSV -> (Raman shift in cm^-1, intensity), sorted ascending.
 
     Robust to: optional header (auto-detected when has_header is None),
-    configurable columns/delimiter, and unsorted or duplicated x values.
+    configurable column names or indices/delimiter, and unsorted or duplicated
+    Raman-shift values. Non-finite rows are removed explicitly.
     """
     path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Raman spectrum file not found: {path}")
     delimiter = csv_cfg.get("delimiter", ",")
     has_header = csv_cfg.get("has_header", None)
     comment = csv_cfg.get("comment", None)
+    wcol = csv_cfg.get(
+        "raman_shift_column",
+        csv_cfg.get("wavelength_col", 0),
+    )
+    icol = csv_cfg.get(
+        "intensity_column",
+        csv_cfg.get("intensity_col", 1),
+    )
+    if wcol == icol:
+        raise ValueError("Raman-shift and intensity columns must be different.")
 
     if has_header is None:
-        with path.open("r", encoding="utf-8") as fh:
-            first = fh.readline()
-            while comment and first.startswith(comment):
+        if isinstance(wcol, str) or isinstance(icol, str):
+            has_header = True
+        else:
+            with path.open("r", encoding="utf-8") as fh:
                 first = fh.readline()
-        has_header = _looks_like_header(first, delimiter)
+                while comment and first.lstrip().startswith(comment):
+                    first = fh.readline()
+            has_header = _looks_like_header(first, delimiter)
 
     df = pd.read_csv(
         path,
@@ -65,27 +105,71 @@ def load_spectrum(path: str | Path, csv_cfg: dict[str, Any]) -> tuple[np.ndarray
         engine="python",
     )
 
-    wcol = csv_cfg.get("wavelength_col", 0)
-    icol = csv_cfg.get("intensity_col", 1)
-    x = pd.to_numeric(df.iloc[:, wcol], errors="coerce").to_numpy(dtype=float)
-    y = pd.to_numeric(df.iloc[:, icol], errors="coerce").to_numpy(dtype=float)
+    original_rows = int(df.shape[0])
+    x = pd.to_numeric(
+        _select_column(df, wcol, "Raman-shift"),
+        errors="coerce",
+    ).to_numpy(dtype=float)
+    y = pd.to_numeric(
+        _select_column(df, icol, "intensity"),
+        errors="coerce",
+    ).to_numpy(dtype=float)
 
     mask = np.isfinite(x) & np.isfinite(y)
+    removed_nonfinite = int((~mask).sum())
+    if not np.all(mask) and not csv_cfg.get("remove_nonfinite", True):
+        raise ValueError(
+            f"Spectrum {path} contains non-finite Raman-shift or intensity values "
+            "and preprocessing.remove_nonfinite is false."
+        )
     x, y = x[mask], y[mask]
-    if x.size == 0:
-        raise ValueError(f"No numeric data parsed from {path} (check csv column/delimiter config).")
+    if x.size < 5:
+        raise ValueError(
+            f"Fewer than five numeric rows were parsed from {path}; "
+            "check the CSV column and delimiter configuration."
+        )
 
-    order = np.argsort(x)
-    x, y = x[order], y[order]
+    was_sorted = bool(np.all(np.diff(x) >= 0))
+    if csv_cfg.get("sort_axis", True):
+        order = np.argsort(x)
+        x, y = x[order], y[order]
+    elif np.any(np.diff(x) < 0):
+        raise ValueError(
+            f"Spectrum {path} has an unsorted Raman-shift axis and "
+            "preprocessing.sort_axis is false."
+        )
     # Collapse duplicate x by averaging (rare, but keeps downstream math clean).
+    duplicate_rows_merged = 0
     if np.any(np.diff(x) == 0):
-        ux, inv = np.unique(x, return_inverse=True)
-        uy = np.zeros_like(ux)
-        counts = np.bincount(inv)
-        np.add.at(uy, inv, y)
-        y = uy / counts
-        x = ux
-    return x, y
+        if csv_cfg.get("merge_duplicate_shifts", True):
+            before_merge = int(x.size)
+            ux, inv = np.unique(x, return_inverse=True)
+            uy = np.zeros_like(ux)
+            counts = np.bincount(inv)
+            np.add.at(uy, inv, y)
+            y = uy / counts
+            x = ux
+            duplicate_rows_merged = before_merge - int(x.size)
+        else:
+            raise ValueError(
+                f"Spectrum {path} contains duplicate Raman shifts and "
+                "preprocessing.merge_duplicate_shifts is false."
+            )
+    if x.size < 5:
+        raise ValueError(f"Spectrum {path} contains fewer than five unique valid shifts.")
+    if not np.all(np.diff(x) > 0):
+        raise ValueError(f"Spectrum {path} could not be converted to a strictly increasing axis.")
+    report = {
+        "input_rows": original_rows,
+        "valid_numeric_rows": original_rows - removed_nonfinite,
+        "removed_nonfinite_rows": removed_nonfinite,
+        "axis_was_sorted": was_sorted,
+        "axis_sorted_by_workflow": not was_sorted,
+        "duplicate_rows_merged": duplicate_rows_merged,
+        "duplicate_aggregation": "mean" if duplicate_rows_merged else None,
+        "output_points": int(x.size),
+    }
+    return (x, y, report) if return_report else (x, y)
 
 
 def make_run_dir(output_dir: str | Path, label: str, config_name: str) -> Path:
