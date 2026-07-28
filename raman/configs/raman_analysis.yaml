@@ -4,7 +4,7 @@
 
 analysis:
   name: bp_columns_abc
-  input_root: raw/renamed
+  input_root: raw/bp_072826
   output_root: results
   timestamped_run_directory: true
 

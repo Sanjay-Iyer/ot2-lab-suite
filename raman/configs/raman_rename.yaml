@@ -7,11 +7,11 @@
 
 rename:
   input_root: raw
-  output_root: raw/renamed
-  file_glob: "*.csv"
+  output_root: raw/bp_072826
+  file_glob: "Scan *.csv"
   operation: copy              # copy | move
-  dry_run: true
-  overwrite: false
+  dry_run: false
+  overwrite: true
 
   # scan_number follows Randomized_Scan_00649 numerically. Use filename when
   # old names do not contain a scan number.
@@ -20,13 +20,13 @@ rename:
 
   start_sequence: 1
   zero_padding: 4
-  sample_type: change-me
+  sample_type: bp
   columns: [A, B, C]
   rows: [1, 2, 3, 4, 5, 6, 7, 8]
   order: column_major
   # Preserve physical positions across missing scans by using scan-start_scan.
   position_mapping: scan_number_offset
-  start_scan_number: 649
+  start_scan_number: 673
   allow_scan_gaps: false
 
   # Supported tokens: sequence, sample_type, column, row, spot, original_stem.
