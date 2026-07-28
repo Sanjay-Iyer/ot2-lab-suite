@@ -146,13 +146,15 @@ def plot_target_spectrum(
     *,
     title: str,
     ylabel: str,
+    series_label: str = "processed spectrum",
+    invalid_target_message: str | None = None,
     plot_cfg: dict[str, Any],
     output_cfg: dict[str, Any],
     base_path: Path,
 ) -> list[Path]:
     """Plot one processed spectrum focused on the configured target region."""
     fig, ax = plt.subplots(figsize=(7.5, 4.8))
-    ax.plot(x, y, color="tab:blue", lw=1.25, label="processed spectrum")
+    ax.plot(x, y, color="tab:blue", lw=1.25, label=series_label)
     if plot_cfg.get("mark_expected_peak", True):
         ax.axvline(
             metrics["expected_position_cm1"],
@@ -184,15 +186,16 @@ def plot_target_spectrum(
                     ms=8,
                     label="unvalidated candidate",
                 )
-                ax.text(
-                    0.02,
-                    0.97,
-                    "Target not validated; spectrum not normalized",
-                    transform=ax.transAxes,
-                    va="top",
-                    color="tab:red",
-                    fontsize=8,
-                )
+    if not metrics.get("peak_valid") and invalid_target_message:
+        ax.text(
+            0.02,
+            0.97,
+            invalid_target_message,
+            transform=ax.transAxes,
+            va="top",
+            color="tab:red",
+            fontsize=8,
+        )
     if plot_cfg.get("show_grid", True):
         ax.grid(True, alpha=0.2)
     y_range = plot_cfg.get("y_range")

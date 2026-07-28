@@ -53,20 +53,6 @@ class SpectrumResult:
     def title(self) -> str:
         return naming.display_title(self.metadata)
 
-    @property
-    def display_intensity(self) -> np.ndarray:
-        if self.normalization_valid and np.any(np.isfinite(self.scaled)):
-            return self.scaled
-        return self.corrected
-
-    @property
-    def display_ylabel(self) -> str:
-        return (
-            "Normalized intensity"
-            if self.normalization_valid
-            else "Baseline-corrected intensity (a.u.)"
-        )
-
 
 def _json_default(value: Any) -> Any:
     if isinstance(value, Path):
@@ -799,6 +785,27 @@ def _configured_title(
         raise ValueError(f"Invalid plot title_template {template!r}: {exc}") from exc
 
 
+def _normalization_plot_descriptor(
+    normalization: dict[str, Any],
+) -> dict[str, str]:
+    """Return scientifically explicit labels for one normalization method."""
+    method = str(normalization["method"])
+    target_value = float(normalization["target_value"])
+    method_label = {
+        "target_peak": "target-peak",
+        "global_max": "global-maximum",
+        "vector_norm": "vector-norm",
+        "area": "absolute-area",
+    }.get(method, method.replace("_", "-"))
+    detail = f"{method_label}; target={target_value:g}"
+    return {
+        "title_suffix": f"normalized ({detail})",
+        "ylabel": f"Normalized intensity ({detail})",
+        "series_label": f"{method_label} normalized spectrum",
+        "method_label": method_label,
+    }
+
+
 def _write_spectrum_outputs(
     result: SpectrumResult,
     run_dir: Path,
@@ -816,30 +823,101 @@ def _write_spectrum_outputs(
     copy_collections = cfg["outputs"]["copy_plots_to_collections"]
     target_slug = naming.slug(cfg["target_peak"]["name"])
 
-    if cfg["plots"]["individual"]["enabled"]:
+    individual = cfg["plots"]["individual"]
+    if individual["enabled"]:
         individual_title = _configured_title(
             result,
-            cfg["plots"]["individual"].get("title_template"),
+            individual.get("title_template"),
         )
-        paths = plotting.plot_target_spectrum(
-            result.x,
-            result.display_intensity,
-            result.metrics,
-            title=individual_title,
-            ylabel=result.display_ylabel,
-            plot_cfg=cfg["plots"]["individual"],
-            output_cfg=output_cfg,
-            base_path=spectrum_root / "individual" / f"{result.slug}_target",
-        )
-        generated.extend(str(path.relative_to(run_dir)) for path in paths)
-        if copy_collections:
-            _copy_collection(
-                paths,
-                [
-                    run_dir / "plots" / "by_type" / "individual",
-                    run_dir / "plots" / "by_peak" / target_slug,
-                ],
+        target_plots: list[dict[str, Any]] = []
+        if individual["baseline_corrected_enabled"]:
+            target_plots.append(
+                {
+                    "kind": "baseline_corrected",
+                    "intensity": result.corrected,
+                    "title": (
+                        f"{individual_title} — baseline-corrected "
+                        "(not normalized)"
+                    ),
+                    "ylabel": "Baseline-corrected intensity (a.u.)",
+                    "series_label": "baseline-corrected spectrum",
+                    "y_range": individual.get("baseline_corrected_y_range"),
+                    "invalid_target_message": (
+                        "Target peak not validated"
+                        if not result.metrics.get("peak_valid")
+                        else None
+                    ),
+                }
             )
+        normalization_method = result.normalization_method
+        normalized_ready = (
+            normalization_method != "none"
+            and result.normalization_valid
+            and np.any(np.isfinite(result.scaled))
+            and (
+                normalization_method != "target_peak"
+                or result.metrics.get("peak_valid")
+            )
+        )
+        if (
+            individual["normalized_enabled"]
+            and normalized_ready
+        ):
+            descriptor = _normalization_plot_descriptor(cfg["normalization"])
+            target_plots.append(
+                {
+                    "kind": "normalized",
+                    "intensity": result.scaled,
+                    "title": (
+                        f"{individual_title} — {descriptor['title_suffix']}"
+                    ),
+                    "ylabel": descriptor["ylabel"],
+                    "series_label": descriptor["series_label"],
+                    "y_range": individual.get("normalized_y_range"),
+                    "invalid_target_message": (
+                        "Target peak not validated; "
+                        f"{descriptor['method_label']} normalization applied"
+                        if not result.metrics.get("peak_valid")
+                        else None
+                    ),
+                }
+            )
+        for target_plot in target_plots:
+            plot_kind = target_plot["kind"]
+            plot_cfg = {
+                **individual,
+                "y_range": (
+                    target_plot["y_range"]
+                    if target_plot["y_range"] is not None
+                    else individual.get("y_range")
+                ),
+            }
+            paths = plotting.plot_target_spectrum(
+                result.x,
+                target_plot["intensity"],
+                result.metrics,
+                title=target_plot["title"],
+                ylabel=target_plot["ylabel"],
+                series_label=target_plot["series_label"],
+                invalid_target_message=target_plot["invalid_target_message"],
+                plot_cfg=plot_cfg,
+                output_cfg=output_cfg,
+                base_path=(
+                    spectrum_root
+                    / "individual"
+                    / plot_kind
+                    / f"{result.slug}_target_{plot_kind}"
+                ),
+            )
+            generated.extend(str(path.relative_to(run_dir)) for path in paths)
+            if copy_collections:
+                _copy_collection(
+                    paths,
+                    [
+                        run_dir / "plots" / "by_type" / "individual" / plot_kind,
+                        run_dir / "plots" / "by_peak" / target_slug / plot_kind,
+                    ],
+                )
 
     diagnostics = cfg["plots"]["diagnostics"]
     diagnostic_title = _configured_title(
@@ -1104,11 +1182,11 @@ def _run_dir(output_root: Path, analysis: dict[str, Any]) -> Path:
     return candidate
 
 
-def _set_consistent_individual_range(
+def _set_consistent_individual_ranges(
     results: list[SpectrumResult],
     cfg: dict[str, Any],
 ) -> None:
-    """Resolve a common automatic y-range when requested in YAML."""
+    """Resolve separate common y-ranges for corrected and normalized plots."""
     individual = cfg["plots"]["individual"]
     if (
         not individual.get("consistent_y_range", False)
@@ -1116,19 +1194,46 @@ def _set_consistent_individual_range(
     ):
         return
     x_min, x_max = map(float, individual["x_range_cm1"])
-    values = []
-    for result in results:
-        mask = (result.x >= x_min) & (result.x <= x_max)
-        visible = result.display_intensity[mask]
-        values.append(visible[np.isfinite(visible)])
-    values = [value for value in values if value.size]
-    if not values:
-        return
-    combined = np.concatenate(values)
-    low = float(np.min(combined))
-    high = float(np.max(combined))
-    padding = max((high - low) * 0.05, 1.0e-12)
-    individual["y_range"] = [low - padding, high + padding]
+
+    def combined_range(series: list[tuple[np.ndarray, np.ndarray]]) -> list[float] | None:
+        values = []
+        for x, intensity in series:
+            mask = (x >= x_min) & (x <= x_max)
+            visible = intensity[mask]
+            values.append(visible[np.isfinite(visible)])
+        values = [value for value in values if value.size]
+        if not values:
+            return None
+        combined = np.concatenate(values)
+        low = float(np.min(combined))
+        high = float(np.max(combined))
+        padding = max((high - low) * 0.05, 1.0e-12)
+        return [low - padding, high + padding]
+
+    if (
+        individual["baseline_corrected_enabled"]
+        and individual.get("baseline_corrected_y_range") is None
+    ):
+        individual["baseline_corrected_y_range"] = combined_range(
+            [(result.x, result.corrected) for result in results]
+        )
+    if (
+        individual["normalized_enabled"]
+        and cfg["normalization"]["method"] != "none"
+        and individual.get("normalized_y_range") is None
+    ):
+        individual["normalized_y_range"] = combined_range(
+            [
+                (result.x, result.scaled)
+                for result in results
+                if result.normalization_valid
+                and np.any(np.isfinite(result.scaled))
+                and (
+                    result.normalization_method != "target_peak"
+                    or result.metrics.get("peak_valid")
+                )
+            ]
+        )
 
 
 def _logger(run_dir: Path) -> logging.Logger:
@@ -1210,7 +1315,7 @@ def run_analysis(cfg: dict[str, Any], raman_root: Path) -> tuple[Path, dict[str,
             f"{run_dir}."
         )
 
-    _set_consistent_individual_range(results, cfg)
+    _set_consistent_individual_ranges(results, cfg)
     for result in results:
         generated[result.metadata["label"]] = _write_spectrum_outputs(
             result,

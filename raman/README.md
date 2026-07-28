@@ -118,6 +118,22 @@ type and position are included in plot titles. Leave
 `null` for that automatic title, or use placeholders such as
 `"{label} | {sample_type} | {spot}"`.
 
+Each target-region spectrum is written twice when normalization is valid:
+
+- `normalized/` contains only scaled intensity plots.
+- `baseline_corrected/` contains unscaled, baseline-corrected intensity in
+  instrument arbitrary units.
+
+The titles, y-axis labels, filenames, and directories state the intensity type.
+The baseline-corrected plot is written by default. A normalized plot is omitted
+when normalization is disabled or its denominator is invalid. Under
+`target_peak` normalization, a failed target validation therefore omits the
+normalized plot; alternate normalization methods can still produce a
+method-labeled normalized plot while visibly marking the target as unvalidated.
+Configure these independently with
+`plots.individual.normalized_enabled`, `baseline_corrected_enabled`,
+`normalized_y_range`, and `baseline_corrected_y_range`.
+
 To create one overlay for A1–A8:
 
 ```yaml
@@ -182,12 +198,18 @@ results/<timestamp>_<analysis_name>/
 ├── plots/
 │   ├── by_spectrum/<label>/
 │   │   ├── individual/
+│   │   │   ├── normalized/
+│   │   │   └── baseline_corrected/
 │   │   └── diagnostics/
 │   ├── by_type/
 │   │   ├── individual/
+│   │   │   ├── normalized/
+│   │   │   └── baseline_corrected/
 │   │   ├── diagnostics/
 │   │   └── full_spectrum/
 │   ├── by_peak/band_1080/
+│   │   ├── normalized/
+│   │   └── baseline_corrected/
 │   ├── overlay/
 │   └── groups/
 └── logs/
@@ -196,7 +218,17 @@ results/<timestamp>_<analysis_name>/
 
 `by_spectrum` preserves the organized per-sample folders. `by_type` and
 `by_peak` mirror the same plots so all individual target plots, baseline
-diagnostics, or 1080 plots are available in one place.
+diagnostics, or 1080 plots are available in one place. Target plots are kept
+separate at every level:
+
+```text
+plots/by_spectrum/<label>/individual/normalized/
+plots/by_spectrum/<label>/individual/baseline_corrected/
+plots/by_type/individual/normalized/
+plots/by_type/individual/baseline_corrected/
+plots/by_peak/band_1080/normalized/
+plots/by_peak/band_1080/baseline_corrected/
+```
 
 Processed CSV files preserve Raman shift, raw intensity, optional-smoothed
 intensity, baseline, unscaled baseline-corrected intensity, scaled intensity,

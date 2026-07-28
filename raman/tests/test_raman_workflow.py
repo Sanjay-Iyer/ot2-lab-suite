@@ -12,6 +12,8 @@ import yaml
 from raman_lib import io_utils, preprocessing
 from raman_lib.analysis_workflow import (
     _group_partitions,
+    _normalization_plot_descriptor,
+    _set_consistent_individual_ranges,
     characterize_target_peak,
     normalize_spectrum,
     process_spectrum,
@@ -88,6 +90,98 @@ def test_configuration_loading_and_validation(tmp_path: Path) -> None:
     path.write_text(yaml.safe_dump(bad), encoding="utf-8")
     with pytest.raises(WorkflowConfigError, match="Unknown configuration key"):
         load_analysis_config(path)
+
+
+def test_individual_plot_configuration_validation(tmp_path: Path) -> None:
+    path = minimal_config(tmp_path)
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    raw["plots"]["individual"] = {
+        "enabled": True,
+        "normalized_enabled": False,
+        "baseline_corrected_enabled": False,
+    }
+    path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(WorkflowConfigError, match="must enable normalized"):
+        load_analysis_config(path)
+
+    raw["normalization"] = {"method": "none"}
+    raw["plots"]["individual"] = {
+        "enabled": True,
+        "normalized_enabled": True,
+        "baseline_corrected_enabled": False,
+    }
+    path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    with pytest.raises(
+        WorkflowConfigError,
+        match="must be true when normalization.method is none",
+    ):
+        load_analysis_config(path)
+
+    raw["plots"]["individual"] = {
+        "enabled": True,
+        "normalized_enabled": False,
+        "baseline_corrected_enabled": True,
+    }
+    path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    corrected_only = load_analysis_config(path)
+    assert corrected_only["plots"]["individual"]["baseline_corrected_enabled"]
+
+    raw["normalization"] = {"method": "target_peak"}
+    raw["plots"]["individual"] = {
+        "enabled": True,
+        "normalized_enabled": True,
+        "baseline_corrected_enabled": False,
+    }
+    path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    normalized_only = load_analysis_config(path)
+    assert normalized_only["plots"]["individual"]["normalized_enabled"]
+
+
+def test_separate_consistent_y_ranges_and_normalization_labels() -> None:
+    x = np.array([1000.0, 1080.0, 1160.0])
+    results = [
+        SimpleNamespace(
+            x=x,
+            corrected=np.array([0.0, 100.0, 0.0]),
+            scaled=np.array([0.0, 1.0, 0.0]),
+            normalization_valid=True,
+            normalization_method="target_peak",
+            metrics={"peak_valid": True},
+        )
+    ]
+    cfg = {
+        "normalization": {"method": "target_peak", "target_value": 1.0},
+        "plots": {
+            "individual": {
+                "consistent_y_range": True,
+                "x_range_cm1": [1000.0, 1160.0],
+                "y_range": None,
+                "normalized_y_range": None,
+                "baseline_corrected_y_range": None,
+                "normalized_enabled": True,
+                "baseline_corrected_enabled": True,
+            }
+        },
+    }
+
+    _set_consistent_individual_ranges(results, cfg)
+
+    individual = cfg["plots"]["individual"]
+    assert individual["baseline_corrected_y_range"][1] > 100.0
+    assert individual["normalized_y_range"][1] < 2.0
+    descriptor = _normalization_plot_descriptor(
+        {"method": "global_max", "target_value": 2.0}
+    )
+    assert "global-maximum" in descriptor["title_suffix"]
+    assert "target=2" in descriptor["ylabel"]
+
+    individual["y_range"] = [-1.0, 2.0]
+    individual["normalized_y_range"] = None
+    individual["baseline_corrected_y_range"] = None
+    _set_consistent_individual_ranges(results, cfg)
+    assert individual["normalized_y_range"] is None
+    assert individual["baseline_corrected_y_range"] is None
 
 
 def test_directory_discovery_filters_metadata_and_skips_manifest(
@@ -565,6 +659,111 @@ def test_end_to_end_directory_discovery_records_resolved_selection(
     ]
 
 
+def test_invalid_target_writes_only_baseline_corrected_target_plot(
+    tmp_path: Path,
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    x, y, _ = synthetic_spectrum(target_amplitude=0.0)
+    filename = "0001__sample-bp__column-A__row-1.csv"
+    np.savetxt(data / filename, np.column_stack([x, y]), delimiter=",")
+    config_path = minimal_config(
+        tmp_path,
+        [{"file": filename, "include": True}],
+    )
+    raw_cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    raw_cfg["target_peak"] = {"minimum_snr": 1000.0}
+    raw_cfg["plots"]["diagnostics"] = {"enabled": False}
+    config_path.write_text(
+        yaml.safe_dump(raw_cfg, sort_keys=False),
+        encoding="utf-8",
+    )
+    cfg = load_analysis_config(config_path)
+
+    run_dir, summary = run_analysis(cfg, tmp_path)
+
+    assert summary["n_processed"] == 1
+    assert not summary["spectra"][0]["normalization_valid"]
+    corrected = (
+        run_dir
+        / "plots"
+        / "by_peak"
+        / "band_1080"
+        / "baseline_corrected"
+    )
+    normalized = run_dir / "plots" / "by_peak" / "band_1080" / "normalized"
+    assert len(list(corrected.glob("*.png"))) == 1
+    assert not normalized.exists()
+
+
+def test_none_normalization_does_not_create_normalized_plot(
+    tmp_path: Path,
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    x, y, _ = synthetic_spectrum()
+    filename = "0001__sample-bp__column-A__row-1.csv"
+    np.savetxt(data / filename, np.column_stack([x, y]), delimiter=",")
+    config_path = minimal_config(
+        tmp_path,
+        [{"file": filename, "include": True}],
+    )
+    raw_cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    raw_cfg["normalization"] = {"method": "none"}
+    raw_cfg["plots"]["diagnostics"] = {"enabled": False}
+    config_path.write_text(
+        yaml.safe_dump(raw_cfg, sort_keys=False),
+        encoding="utf-8",
+    )
+    cfg = load_analysis_config(config_path)
+
+    run_dir, summary = run_analysis(cfg, tmp_path)
+
+    assert summary["n_processed"] == 1
+    corrected = (
+        run_dir
+        / "plots"
+        / "by_peak"
+        / "band_1080"
+        / "baseline_corrected"
+    )
+    normalized = run_dir / "plots" / "by_peak" / "band_1080" / "normalized"
+    assert len(list(corrected.glob("*.png"))) == 1
+    assert not normalized.exists()
+
+
+def test_global_normalization_labels_unvalidated_target(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    x, y, _ = synthetic_spectrum(target_amplitude=0.0)
+    filename = "0001__sample-bp__column-A__row-1.csv"
+    np.savetxt(data / filename, np.column_stack([x, y]), delimiter=",")
+    config_path = minimal_config(
+        tmp_path,
+        [{"file": filename, "include": True}],
+    )
+    raw_cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    raw_cfg["normalization"] = {"method": "global_max", "target_value": 1.0}
+    raw_cfg["target_peak"] = {"minimum_snr": 1000.0}
+    raw_cfg["plots"]["diagnostics"] = {"enabled": False}
+    raw_cfg["plots"]["output"]["formats"] = ["svg"]
+    config_path.write_text(
+        yaml.safe_dump(raw_cfg, sort_keys=False),
+        encoding="utf-8",
+    )
+    cfg = load_analysis_config(config_path)
+
+    run_dir, summary = run_analysis(cfg, tmp_path)
+
+    assert not summary["spectra"][0]["metrics"]["peak_valid"]
+    normalized = run_dir / "plots" / "by_peak" / "band_1080" / "normalized"
+    plots = list(normalized.glob("*.svg"))
+    assert len(plots) == 1
+    svg = plots[0].read_text(encoding="utf-8")
+    assert "global-maximum" in svg
+    assert "Target peak not validated" in svg
+
+
 def test_end_to_end_overlay_groups_and_expected_outputs(tmp_path: Path) -> None:
     data = tmp_path / "data"
     data.mkdir()
@@ -619,8 +818,49 @@ def test_end_to_end_overlay_groups_and_expected_outputs(tmp_path: Path) -> None:
     assert (run_dir / "peak_metrics.csv").is_file()
     assert (run_dir / "logs" / "analysis.log").is_file()
     assert len(list((run_dir / "processed").glob("*_processed.csv"))) == 2
-    assert len(list((run_dir / "plots" / "by_type" / "individual").glob("*.png"))) == 2
-    assert len(list((run_dir / "plots" / "by_peak" / "band_1080").glob("*.png"))) == 2
+    assert len(
+        list(
+            (
+                run_dir / "plots" / "by_type" / "individual" / "normalized"
+            ).glob("*.png")
+        )
+    ) == 2
+    assert len(
+        list(
+            (
+                run_dir
+                / "plots"
+                / "by_type"
+                / "individual"
+                / "baseline_corrected"
+            ).glob("*.png")
+        )
+    ) == 2
+    assert len(
+        list(
+            (
+                run_dir
+                / "plots"
+                / "by_peak"
+                / "band_1080"
+                / "normalized"
+            ).glob("*.png")
+        )
+    ) == 2
+    assert len(
+        list(
+            (
+                run_dir
+                / "plots"
+                / "by_peak"
+                / "band_1080"
+                / "baseline_corrected"
+            ).glob("*.png")
+        )
+    ) == 2
+    assert not list(
+        (run_dir / "plots" / "by_peak" / "band_1080").glob("*.png")
+    )
     assert len(list((run_dir / "plots" / "overlay").glob("*.png"))) == 1
     assert len(list((run_dir / "plots" / "groups").glob("*.png"))) == 1
 

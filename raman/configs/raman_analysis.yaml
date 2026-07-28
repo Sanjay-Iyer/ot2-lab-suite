@@ -97,11 +97,19 @@ normalization:
 plots:
   individual:
     enabled: true
+    # Write target-region plots into separate normalized and actual-intensity
+    # directories. With target-peak normalization, an invalid target has no
+    # normalized plot.
+    normalized_enabled: true
+    baseline_corrected_enabled: true
     # null automatically includes label plus any known sample type and position.
     # Or use placeholders: "{label} | {sample_type} | {spot}"
     title_template: null
     x_range_cm1: [1000.0, 1160.0]
+    # y_range is a legacy shared override. Prefer the separate ranges below.
     y_range: null
+    normalized_y_range: null
+    baseline_corrected_y_range: null
     mark_expected_peak: true
     mark_detected_peak: true
     show_grid: true

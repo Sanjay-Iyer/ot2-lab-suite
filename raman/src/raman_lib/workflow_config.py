@@ -100,9 +100,13 @@ ANALYSIS_DEFAULTS: dict[str, Any] = {
     "plots": {
         "individual": {
             "enabled": True,
+            "normalized_enabled": True,
+            "baseline_corrected_enabled": True,
             "title_template": None,
             "x_range_cm1": [1000.0, 1160.0],
             "y_range": None,
+            "normalized_y_range": None,
+            "baseline_corrected_y_range": None,
             "mark_expected_peak": True,
             "mark_detected_peak": True,
             "show_grid": True,
@@ -494,6 +498,17 @@ def _validate_analysis(cfg: dict[str, Any]) -> None:
             raise WorkflowConfigError(f"plots.{name}.enabled must be true or false.")
         _pair(plot_cfg["x_range_cm1"], f"plots.{name}.x_range_cm1")
         _pair(plot_cfg.get("y_range"), f"plots.{name}.y_range", allow_none=True)
+        if name == "individual":
+            _pair(
+                plot_cfg.get("normalized_y_range"),
+                "plots.individual.normalized_y_range",
+                allow_none=True,
+            )
+            _pair(
+                plot_cfg.get("baseline_corrected_y_range"),
+                "plots.individual.baseline_corrected_y_range",
+                allow_none=True,
+            )
         if name != "individual" and float(plot_cfg.get("vertical_offset", 0.0)) < 0:
             raise WorkflowConfigError(f"plots.{name}.vertical_offset cannot be negative.")
     for name in ("individual", "diagnostics"):
@@ -526,6 +541,7 @@ def _validate_analysis(cfg: dict[str, Any]) -> None:
             raise WorkflowConfigError(f"plots.diagnostics.{key} must be true or false.")
     for section, keys in {
         "individual": (
+            "normalized_enabled", "baseline_corrected_enabled",
             "mark_expected_peak", "mark_detected_peak", "show_grid",
             "consistent_y_range",
         ),
@@ -536,6 +552,24 @@ def _validate_analysis(cfg: dict[str, Any]) -> None:
                 raise WorkflowConfigError(
                     f"plots.{section}.{key} must be true or false."
                 )
+    individual = cfg["plots"]["individual"]
+    if (
+        individual["enabled"]
+        and not individual["normalized_enabled"]
+        and not individual["baseline_corrected_enabled"]
+    ):
+        raise WorkflowConfigError(
+            "plots.individual must enable normalized or baseline-corrected plots."
+        )
+    if (
+        individual["enabled"]
+        and cfg["normalization"]["method"] == "none"
+        and not individual["baseline_corrected_enabled"]
+    ):
+        raise WorkflowConfigError(
+            "plots.individual.baseline_corrected_enabled must be true when "
+            "normalization.method is none."
+        )
     for key, value in cfg["outputs"].items():
         if not isinstance(value, bool):
             raise WorkflowConfigError(f"outputs.{key} must be true or false.")
