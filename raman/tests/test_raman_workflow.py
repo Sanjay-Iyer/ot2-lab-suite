@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -10,9 +11,11 @@ import yaml
 
 from raman_lib import io_utils, preprocessing
 from raman_lib.analysis_workflow import (
+    _group_partitions,
     characterize_target_peak,
     normalize_spectrum,
     process_spectrum,
+    resolve_spectra,
     run_analysis,
 )
 from raman_lib.workflow_config import WorkflowConfigError, load_analysis_config
@@ -85,6 +88,260 @@ def test_configuration_loading_and_validation(tmp_path: Path) -> None:
     path.write_text(yaml.safe_dump(bad), encoding="utf-8")
     with pytest.raises(WorkflowConfigError, match="Unknown configuration key"):
         load_analysis_config(path)
+
+
+def test_directory_discovery_filters_metadata_and_skips_manifest(
+    tmp_path: Path,
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    filenames = [
+        "0001__sample-bp__column-A__row-1.csv",
+        "0002__sample-bp__column-B__row-2.csv",
+        "0003__sample-bp__column-C__row-3.csv",
+        "0004__sample-bp__column-D__row-4.csv",
+        "0005__sample-bp__column-E__row-4.csv",
+        "0006__sample-control__column-A__row-8.csv",
+        "rename_manifest.csv",
+    ]
+    for filename in filenames:
+        (data / filename).touch()
+    config = {
+        "analysis": {
+            "name": "discovery",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {
+            "enabled": True,
+            "file_glob": "*.csv",
+            "canonical_filenames_only": True,
+            "include": {
+                "columns": ["A", "B", "C"],
+                "rows": [1, 2, 3, 4],
+                "sample_types": ["BP"],
+            },
+            "exclude": {
+                "columns": ["d"],
+                "rows": [],
+                "sample_types": [],
+            },
+        },
+        "spectra": [],
+    }
+    path = tmp_path / "discovery.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    cfg = load_analysis_config(path)
+
+    resolved, report = resolve_spectra(cfg, data)
+
+    assert [item["file"] for item in resolved] == filenames[:3]
+    assert all(item["include_in_groups"] for item in resolved)
+    assert report["matched_files"] == 7
+    assert report["selected_files"] == 3
+    assert report["filtered_out"] == [filenames[3], filenames[4], filenames[5]]
+    assert report["skipped_noncanonical"] == ["rename_manifest.csv"]
+
+
+def test_discovery_allows_explicit_per_file_override(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    filename = "0001__sample-bp__column-A__row-1.csv"
+    (data / filename).touch()
+    config = {
+        "analysis": {
+            "name": "override",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {"enabled": True},
+        "spectra": [
+            {
+                "file": filename,
+                "label": "Custom A1",
+                "include_in_overlay": True,
+            }
+        ],
+    }
+    path = tmp_path / "override.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    cfg = load_analysis_config(path)
+
+    resolved, report = resolve_spectra(cfg, data)
+
+    assert len(resolved) == 1
+    assert resolved[0]["label"] == "Custom A1"
+    assert resolved[0]["include_in_overlay"]
+    assert report["selected_files"] == 1
+    assert report["selected"][0]["source"] == "discovered+override"
+
+
+def test_explicit_entry_can_reinclude_filtered_file_without_report_conflict(
+    tmp_path: Path,
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    filename = "0001__sample-bp__column-D__row-1.csv"
+    (data / filename).touch()
+    config = {
+        "analysis": {
+            "name": "reinclude",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {
+            "enabled": True,
+            "include": {"columns": ["A", "B", "C"]},
+        },
+        "spectra": [{"file": filename, "include": True}],
+    }
+    path = tmp_path / "reinclude.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    cfg = load_analysis_config(path)
+
+    resolved, report = resolve_spectra(cfg, data)
+
+    assert [item["file"] for item in resolved] == [filename]
+    assert report["filtered_out"] == []
+    assert report["explicitly_reincluded"] == [filename]
+    assert report["selected"] == [
+        {"file": filename, "source": "explicit-reinclude"}
+    ]
+
+
+def test_duplicate_equivalent_explicit_paths_are_rejected(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    filename = "0001__sample-bp__column-A__row-1.csv"
+    (data / filename).touch()
+    config = {
+        "analysis": {
+            "name": "duplicates",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {"enabled": True},
+        "spectra": [
+            {"file": filename, "label": "first"},
+            {"file": f"unused/../{filename}", "label": "second"},
+        ],
+    }
+    path = tmp_path / "duplicates.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    cfg = load_analysis_config(path)
+
+    with pytest.raises(RuntimeError, match="Duplicate explicit spectrum paths"):
+        resolve_spectra(cfg, data)
+
+
+def test_discovery_fails_clearly_when_filters_select_nothing(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "0001__sample-bp__column-A__row-1.csv").touch()
+    config = {
+        "analysis": {
+            "name": "empty",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {
+            "enabled": True,
+            "include": {"columns": ["Z"]},
+        },
+        "spectra": [],
+    }
+    path = tmp_path / "empty.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    cfg = load_analysis_config(path)
+
+    with pytest.raises(RuntimeError, match="No spectra matched"):
+        resolve_spectra(cfg, data)
+
+
+def test_nonrecursive_discovery_rejects_recursive_glob(tmp_path: Path) -> None:
+    config = {
+        "analysis": {
+            "name": "bad-glob",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {
+            "enabled": True,
+            "recursive": False,
+            "file_glob": "**/*.csv",
+        },
+        "spectra": [],
+    }
+    path = tmp_path / "bad-glob.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(WorkflowConfigError, match="recursive is false"):
+        load_analysis_config(path)
+
+    config["discovery"] = {
+        "enabled": True,
+        "recursive": True,
+        "file_glob": "C:*.csv",
+    }
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    with pytest.raises(WorkflowConfigError, match="relative pattern"):
+        load_analysis_config(path)
+
+
+def test_recursive_discovery_controls_nested_files(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    nested = data / "nested"
+    nested.mkdir(parents=True)
+    top = "0001__sample-bp__column-A__row-1.csv"
+    child = "0002__sample-bp__column-A__row-2.csv"
+    (data / top).touch()
+    (nested / child).touch()
+    config = {
+        "analysis": {
+            "name": "recursion",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {
+            "enabled": True,
+            "recursive": False,
+        },
+        "spectra": [],
+    }
+    path = tmp_path / "recursion.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    flat_cfg = load_analysis_config(path)
+    flat, _ = resolve_spectra(flat_cfg, data)
+    assert [item["file"] for item in flat] == [top]
+
+    config["discovery"]["recursive"] = True
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    recursive_cfg = load_analysis_config(path)
+    recursive, _ = resolve_spectra(recursive_cfg, data)
+    assert [item["file"] for item in recursive] == [top, f"nested/{child}"]
+
+
+def test_group_filters_and_partitions_are_case_insensitive() -> None:
+    results = [
+        SimpleNamespace(
+            spec={"include_in_groups": True},
+            metadata={"column": value, "row": "1", "sample_type": "BP"},
+        )
+        for value in ("A", "a")
+    ]
+    selection = {
+        "name": "case",
+        "group_by": "column",
+        "columns": ["A"],
+        "rows": [1],
+        "sample_types": ["bp"],
+    }
+
+    partitions = _group_partitions(results, selection)
+
+    assert list(partitions) == ["case__column_A"]
+    assert len(partitions["case__column_A"]) == 2
 
 
 def test_missing_file_and_named_column_handling(tmp_path: Path) -> None:
@@ -219,7 +476,7 @@ def test_single_point_spike_is_an_unvalidated_candidate() -> None:
 
 def test_checked_in_randomized_template_is_not_normalized() -> None:
     cfg = load_analysis_config(RAMAN_ROOT / "configs" / "raman_analysis.yaml")
-    spec = cfg["spectra"][0]
+    spec = {"file": "Randomized_Scan_00649.csv", "include": True}
     result = process_spectrum(RAMAN_ROOT / "raw" / spec["file"], spec, cfg)
     assert result.metrics["candidate_found"]
     assert not result.metrics["peak_valid"]
@@ -250,6 +507,62 @@ def test_processing_preserves_all_scientific_arrays(tmp_path: Path) -> None:
             result.scaled,
         )
     )
+
+
+def test_end_to_end_directory_discovery_records_resolved_selection(
+    tmp_path: Path,
+) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    for column, sequence in (("A", 1), ("D", 2)):
+        x, y, _ = synthetic_spectrum(seed=sequence + 20)
+        filename = (
+            f"{sequence:04d}__sample-bp__column-{column}__row-1.csv"
+        )
+        np.savetxt(data / filename, np.column_stack([x, y]), delimiter=",")
+    config = {
+        "analysis": {
+            "name": "discovered",
+            "input_root": "data",
+            "output_root": "out",
+        },
+        "discovery": {
+            "enabled": True,
+            "include": {
+                "columns": ["A"],
+                "sample_types": ["bp"],
+            },
+        },
+        "spectra": [],
+        "plots": {
+            "individual": {"enabled": False},
+            "overlay": {"enabled": False},
+            "groups": {"enabled": False},
+            "diagnostics": {"enabled": False},
+            "output": {"dpi": 90, "formats": ["png"]},
+        },
+    }
+    config_path = tmp_path / "discovered.yaml"
+    config_path.write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+    cfg = load_analysis_config(config_path)
+
+    run_dir, summary = run_analysis(cfg, tmp_path)
+
+    assert summary["n_selected"] == 1
+    assert summary["n_processed"] == 1
+    assert summary["discovery"]["selected"][0]["source"] == "discovered"
+    assert summary["discovery"]["filtered_out"] == [
+        "0002__sample-bp__column-D__row-1.csv"
+    ]
+    resolved = yaml.safe_load(
+        (run_dir / "resolved_config.yaml").read_text(encoding="utf-8")
+    )
+    assert [item["file"] for item in resolved["spectra"]] == [
+        "0001__sample-bp__column-A__row-1.csv"
+    ]
 
 
 def test_end_to_end_overlay_groups_and_expected_outputs(tmp_path: Path) -> None:

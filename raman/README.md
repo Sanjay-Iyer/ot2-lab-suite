@@ -14,28 +14,47 @@ cd C:\code\opentrons_home\ot2-lab-suite
 python raman\analyze_raman.py
 ```
 
-Edit [`configs/raman_analysis.yaml`](configs/raman_analysis.yaml) to select
-files and change every processing or plotting option. Paths in that file are
-relative to `raman/`.
+Edit [`configs/raman_analysis.yaml`](configs/raman_analysis.yaml) to select an
+input directory and change every processing or plotting option. Paths in that
+file are relative to `raman/`.
 
 ```yaml
 analysis:
   input_root: raw/renamed
   output_root: results
 
-spectra:
-  - file: 0001__sample-bp__column-A__row-1.csv
-    label: BP A1
-    include: true
-    include_in_overlay: true
-    include_in_groups: true
+discovery:
+  enabled: true
+  file_glob: "*.csv"
+  recursive: false
+  canonical_filenames_only: true
+  include:
+    columns: [A, B, C]
+    rows: []
+    sample_types: [bp]
+  exclude:
+    columns: []
+    rows: []
+    sample_types: []
+  include_in_overlay: false
+  include_in_groups: true
 
-  - file: 0002__sample-bp__column-A__row-2.csv
-    label: BP A2
-    include: true
-    include_in_overlay: true
-    include_in_groups: true
+spectra: []
 ```
+
+Discovery processes every canonical Raman file in the directory except files
+removed by the metadata filters. Empty include or exclude lists mean no
+restriction. Filters are case-insensitive, and exclusions take priority. The
+example guarantees that only BP files in columns A-C are processed. To start
+with every column and remove D instead, use `include.columns: []` together with
+`exclude.columns: [D]`. `include.rows: [1, 2, 3, 4]` selects only those rows. With
+`canonical_filenames_only: true`, files such as `rename_manifest.csv` are
+ignored. Set `recursive: true` only when spectra are stored in nested
+directories.
+
+The optional `spectra:` list remains available for per-file overrides or files
+that do not use canonical names. An entry with the same relative file path as a
+discovered spectrum overrides its label, metadata, and overlay/group switches.
 
 The loader supports headerless or headered CSV files. Configure
 `csv.raman_shift_column` and `csv.intensity_column` with zero-based column
@@ -114,10 +133,11 @@ plots:
 
 Change `columns` to `[A, B, C]` to create a separate group plot for each
 selected column. `group_by` can also be `row`, `sample_type`, or `none`.
-Only spectra with `include_in_groups: true` are eligible. Groups and ordinary
-overlays require at least two spectra with valid normalized data; otherwise
-the log and run summary clearly record why the plot was skipped and the command
-returns a nonzero status. Vertical offset defaults to `0.0`.
+Only spectra with `include_in_groups: true` are eligible; discovered files use
+`discovery.include_in_groups`. Groups and ordinary overlays require at least
+two spectra with valid normalized data; otherwise the log and run summary
+clearly record why the plot was skipped and the command returns a nonzero
+status. Vertical offset defaults to `0.0`.
 
 ## Renaming old files
 

@@ -3,20 +3,33 @@
 #   python raman\analyze_raman.py
 
 analysis:
-  name: initial_1080_peak_test
-  input_root: raw
+  name: bp_columns_abc
+  input_root: raw/renamed
   output_root: results
   timestamped_run_directory: true
 
-# File paths are relative to analysis.input_root. Metadata written into a
-# canonical filename by rename_raman_files.py is read automatically. Explicit
-# label/sample_type/column/row values here override filename metadata.
-spectra:
-  - file: Randomized_Scan_00649.csv
-    label: Randomized scan 00649
-    include: true
-    include_in_overlay: false
-    include_in_groups: false
+# Automatically find spectra beneath analysis.input_root. Empty include lists
+# mean "include all." Exclusions take priority. Canonical-only mode ignores
+# rename_manifest.csv and other non-spectrum CSV files.
+discovery:
+  enabled: true
+  file_glob: "*.csv"
+  recursive: false
+  canonical_filenames_only: true
+  include:
+    columns: [A, B, C]
+    rows: []
+    sample_types: [bp]
+  exclude:
+    columns: []
+    rows: []
+    sample_types: []
+  include_in_overlay: false
+  include_in_groups: true
+
+# Optional per-file overrides. Usually this can stay empty when discovery is
+# enabled. An entry with the same file path overrides its discovered settings.
+spectra: []
 
 csv:
   has_header: null
@@ -108,7 +121,7 @@ plots:
   # This example creates one overlay per selected column. To plot only A1-A8,
   # use columns: [A]. To make A, B, and C group plots, use [A, B, C].
   groups:
-    enabled: false
+    enabled: true
     x_range_cm1: [1000.0, 1160.0]
     y_range: null
     vertical_offset: 0.0
@@ -116,9 +129,9 @@ plots:
       - name: selected_columns_rows_1_to_8
         title: Selected column
         group_by: column
-        columns: [A]
+        columns: [A, B, C]
         rows: [1, 2, 3, 4, 5, 6, 7, 8]
-        sample_types: []
+        sample_types: [bp]
 
   diagnostics:
     enabled: true

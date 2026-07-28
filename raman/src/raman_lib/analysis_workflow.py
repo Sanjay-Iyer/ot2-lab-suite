@@ -5,6 +5,7 @@ import copy
 import json
 import logging
 import math
+import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -82,6 +83,178 @@ def _json_default(value: Any) -> Any:
 def _resolve(root: Path, value: str | Path) -> Path:
     path = Path(value)
     return path if path.is_absolute() else root / path
+
+
+def _filter_value(value: Any, included: list[Any], excluded: list[Any]) -> bool:
+    """Apply case-insensitive include/exclude filters; exclusions win."""
+    normalized = "" if value is None else str(value).strip().casefold()
+    include_values = {str(item).strip().casefold() for item in included}
+    exclude_values = {str(item).strip().casefold() for item in excluded}
+    return (not include_values or normalized in include_values) and (
+        normalized not in exclude_values
+    )
+
+
+def _validate_resolved_spectra(spectra: list[dict[str, Any]]) -> None:
+    """Protect generated outputs from duplicate labels and filesystem slugs."""
+    selected = [item for item in spectra if item.get("include", True)]
+    if not selected:
+        raise RuntimeError(
+            "No spectra matched the discovery filters and explicit selections."
+        )
+    labels: set[str] = set()
+    slugs: set[str] = set()
+    for item in selected:
+        label = str(item.get("label") or Path(item["file"]).stem)
+        normalized_label = label.casefold()
+        output_slug = naming.slug(label).casefold()
+        if normalized_label in labels:
+            raise RuntimeError(
+                f"Selected spectra create the duplicate display label {label!r}."
+            )
+        if output_slug in slugs:
+            raise RuntimeError(
+                f"Selected spectra create the duplicate output slug {output_slug!r}."
+            )
+        labels.add(normalized_label)
+        slugs.add(output_slug)
+
+
+def resolve_spectra(
+    cfg: dict[str, Any],
+    input_root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Discover spectra, apply metadata filters, and merge explicit overrides."""
+    discovery = cfg["discovery"]
+    explicit = [copy.deepcopy(item) for item in cfg["spectra"]]
+    resolved: list[dict[str, Any]] = []
+    filtered_out: list[str] = []
+    skipped_noncanonical: list[str] = []
+    rejected: dict[str, tuple[str, str]] = {}
+    selection_sources: dict[str, str] = {}
+    matched_files = 0
+
+    def identity(value: str | Path) -> str:
+        return os.path.normcase(str(_resolve(input_root, value).resolve()))
+
+    if discovery["enabled"]:
+        if not input_root.is_dir():
+            raise FileNotFoundError(f"Analysis input directory not found: {input_root}")
+        pattern = str(discovery["file_glob"])
+        iterator = (
+            input_root.rglob(pattern)
+            if discovery["recursive"]
+            else input_root.glob(pattern)
+        )
+        paths = sorted(
+            (path for path in iterator if path.is_file()),
+            key=lambda path: path.relative_to(input_root).as_posix().casefold(),
+        )
+        matched_files = len(paths)
+        for path in paths:
+            relative = path.relative_to(input_root).as_posix()
+            metadata = naming.parse_filename_metadata(path)
+            if (
+                discovery["canonical_filenames_only"]
+                and not metadata["canonical_filename"]
+            ):
+                skipped_noncanonical.append(relative)
+                rejected[identity(path)] = (relative, "noncanonical")
+                continue
+            if not all(
+                (
+                    _filter_value(
+                        metadata.get("column"),
+                        discovery["include"]["columns"],
+                        discovery["exclude"]["columns"],
+                    ),
+                    _filter_value(
+                        metadata.get("row"),
+                        discovery["include"]["rows"],
+                        discovery["exclude"]["rows"],
+                    ),
+                    _filter_value(
+                        metadata.get("sample_type"),
+                        discovery["include"]["sample_types"],
+                        discovery["exclude"]["sample_types"],
+                    ),
+                )
+            ):
+                filtered_out.append(relative)
+                rejected[identity(path)] = (relative, "filtered")
+                continue
+            resolved.append(
+                {
+                    "file": relative,
+                    "include": True,
+                    "include_in_overlay": discovery["include_in_overlay"],
+                    "include_in_groups": discovery["include_in_groups"],
+                }
+            )
+            selection_sources[identity(path)] = "discovered"
+
+    positions = {
+        identity(item["file"]): index
+        for index, item in enumerate(resolved)
+    }
+    explicit_identities: set[str] = set()
+    explicitly_reincluded: list[str] = []
+    explicitly_excluded: list[str] = []
+    for item in explicit:
+        key = identity(item["file"])
+        if key in explicit_identities:
+            raise RuntimeError(
+                "Duplicate explicit spectrum paths resolve to the same file: "
+                f"{item['file']}"
+            )
+        explicit_identities.add(key)
+        if key in positions:
+            discovered_file = resolved[positions[key]]["file"]
+            resolved[positions[key]].update(
+                {name: value for name, value in item.items() if name != "file"}
+            )
+            resolved[positions[key]]["file"] = discovered_file
+            selection_sources[key] = "discovered+override"
+        else:
+            positions[key] = len(resolved)
+            resolved.append(item)
+            if key in rejected and item.get("include", True):
+                relative, reason = rejected[key]
+                explicitly_reincluded.append(relative)
+                if reason == "filtered":
+                    filtered_out.remove(relative)
+                else:
+                    skipped_noncanonical.remove(relative)
+                selection_sources[key] = "explicit-reinclude"
+            else:
+                selection_sources[key] = "explicit"
+        if not item.get("include", True):
+            explicitly_excluded.append(str(resolved[positions[key]]["file"]))
+
+    _validate_resolved_spectra(resolved)
+    selected = []
+    for item in resolved:
+        if not item.get("include", True):
+            continue
+        selected.append(
+            {
+                "file": item["file"],
+                "source": selection_sources[identity(item["file"])],
+            }
+        )
+    report = {
+        "enabled": discovery["enabled"],
+        "file_glob": discovery["file_glob"],
+        "matched_files": matched_files,
+        "selected_files": len(selected),
+        "selected": selected,
+        "filtered_out": filtered_out,
+        "skipped_noncanonical": skipped_noncanonical,
+        "explicit_entries": len(explicit),
+        "explicitly_reincluded": explicitly_reincluded,
+        "explicitly_excluded": explicitly_excluded,
+    }
+    return resolved, report
 
 
 def _invalid_metrics(target: dict[str, Any], warnings: list[str]) -> dict[str, Any]:
@@ -756,7 +929,11 @@ def _write_overlay_data(results: list[SpectrumResult], path: Path) -> Path:
 def _matches(value: Any, selected: list[Any] | None) -> bool:
     if not selected:
         return True
-    return str(value) in {str(item) for item in selected}
+    normalized = "" if value is None else str(value).strip().casefold()
+    return normalized in {
+        str(item).strip().casefold()
+        for item in selected
+    }
 
 
 def _group_partitions(
@@ -774,13 +951,33 @@ def _group_partitions(
     group_by = selection.get("group_by", "none")
     if group_by == "none":
         return {selection["name"]: filtered}
-    partitions: dict[str, list[SpectrumResult]] = {}
+    selected_field = {
+        "column": "columns",
+        "row": "rows",
+        "sample_type": "sample_types",
+    }[group_by]
+    configured_values = selection.get(selected_field) or []
+    configured_display = {
+        str(item).strip().casefold(): str(item)
+        for item in configured_values
+    }
+    normalized_partitions: dict[str, list[SpectrumResult]] = {}
+    display_values: dict[str, str] = {}
     for result in filtered:
         value = result.metadata.get(group_by)
         if value is None:
             continue
-        key = f"{selection['name']}__{group_by}_{value}"
-        partitions.setdefault(key, []).append(result)
+        normalized = str(value).strip().casefold()
+        display_values.setdefault(
+            normalized,
+            configured_display.get(normalized, str(value)),
+        )
+        normalized_partitions.setdefault(normalized, []).append(result)
+    partitions: dict[str, list[SpectrumResult]] = {}
+    for normalized, members in normalized_partitions.items():
+        display = display_values[normalized]
+        key = f"{selection['name']}__{group_by}_{display}"
+        partitions[key] = members
     return partitions
 
 
@@ -954,6 +1151,7 @@ def run_analysis(cfg: dict[str, Any], raman_root: Path) -> tuple[Path, dict[str,
     """Execute the configured analysis and return its run directory and summary."""
     cfg = copy.deepcopy(cfg)
     input_root = _resolve(raman_root, cfg["analysis"]["input_root"])
+    cfg["spectra"], discovery_report = resolve_spectra(cfg, input_root)
     output_root = _resolve(raman_root, cfg["analysis"]["output_root"])
     output_root.mkdir(parents=True, exist_ok=True)
     run_dir = _run_dir(output_root, cfg["analysis"])
@@ -964,6 +1162,14 @@ def run_analysis(cfg: dict[str, Any], raman_root: Path) -> tuple[Path, dict[str,
     logger.info("Analysis %s", cfg["analysis"]["name"])
     logger.info("Configuration: %s", source_config)
     logger.info("Input root: %s", input_root)
+    logger.info(
+        "File selection: %d matched, %d selected, %d filtered, "
+        "%d noncanonical skipped",
+        discovery_report["matched_files"],
+        discovery_report["selected_files"],
+        len(discovery_report["filtered_out"]),
+        len(discovery_report["skipped_noncanonical"]),
+    )
     logger.info("Output: %s", run_dir)
 
     results: list[SpectrumResult] = []
@@ -1047,6 +1253,7 @@ def run_analysis(cfg: dict[str, Any], raman_root: Path) -> tuple[Path, dict[str,
         "n_selected": sum(1 for item in cfg["spectra"] if item.get("include", True)),
         "n_processed": len(results),
         "n_failed": len(failures),
+        "discovery": discovery_report,
         "failures": failures,
         "warnings": batch_warnings,
         "batch_failures": batch_failures,

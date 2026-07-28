@@ -22,6 +22,24 @@ ANALYSIS_DEFAULTS: dict[str, Any] = {
         "output_root": "results",
         "timestamped_run_directory": True,
     },
+    "discovery": {
+        "enabled": False,
+        "file_glob": "*.csv",
+        "recursive": False,
+        "canonical_filenames_only": True,
+        "include": {
+            "columns": [],
+            "rows": [],
+            "sample_types": [],
+        },
+        "exclude": {
+            "columns": [],
+            "rows": [],
+            "sample_types": [],
+        },
+        "include_in_overlay": False,
+        "include_in_groups": True,
+    },
     "spectra": [],
     "csv": {
         "has_header": None,
@@ -262,11 +280,62 @@ def _validate_analysis(cfg: dict[str, Any]) -> None:
             "analysis.timestamped_run_directory must be true or false."
         )
 
-    spectra = cfg["spectra"]
-    if not isinstance(spectra, list) or not spectra:
+    discovery = cfg["discovery"]
+    for key in (
+        "enabled",
+        "recursive",
+        "canonical_filenames_only",
+        "include_in_overlay",
+        "include_in_groups",
+    ):
+        if not isinstance(discovery[key], bool):
+            raise WorkflowConfigError(f"discovery.{key} must be true or false.")
+    pattern = discovery["file_glob"]
+    if not isinstance(pattern, str) or not pattern.strip():
+        raise WorkflowConfigError("discovery.file_glob cannot be empty.")
+    if pattern != pattern.strip():
         raise WorkflowConfigError(
-            "spectra must contain at least one YAML entry with a file name."
+            "discovery.file_glob cannot have leading or trailing whitespace."
         )
+    pattern_path = Path(pattern)
+    if (
+        pattern_path.is_absolute()
+        or pattern_path.drive
+        or pattern_path.anchor
+        or (len(pattern) >= 2 and pattern[0].isalpha() and pattern[1] == ":")
+        or ".." in pattern_path.parts
+    ):
+        raise WorkflowConfigError(
+            "discovery.file_glob must be a relative pattern without '..'."
+        )
+    if not discovery["recursive"] and (
+        "**" in pattern or "/" in pattern or "\\" in pattern
+    ):
+        raise WorkflowConfigError(
+            "discovery.file_glob cannot contain directories or '**' when "
+            "discovery.recursive is false."
+        )
+    for section in ("include", "exclude"):
+        for key in ("columns", "rows", "sample_types"):
+            values = discovery[section][key]
+            if not isinstance(values, list):
+                raise WorkflowConfigError(
+                    f"discovery.{section}.{key} must be a YAML list."
+                )
+            if any(
+                isinstance(item, bool)
+                or not isinstance(item, (str, int))
+                or not str(item).strip()
+                for item in values
+            ):
+                raise WorkflowConfigError(
+                    f"discovery.{section}.{key} values must be nonempty text "
+                    "or integers."
+                )
+
+    spectra = cfg["spectra"]
+    if not isinstance(spectra, list):
+        raise WorkflowConfigError("spectra must be a YAML list.")
     selected = 0
     selected_labels: set[str] = set()
     selected_slugs: set[str] = set()
@@ -291,8 +360,10 @@ def _validate_analysis(cfg: dict[str, Any]) -> None:
         for key in ("include", "include_in_overlay", "include_in_groups"):
             if key in item and not isinstance(item[key], bool):
                 raise WorkflowConfigError(f"spectra[{index}].{key} must be true or false.")
-    if selected == 0:
-        raise WorkflowConfigError("At least one spectrum must have include: true.")
+    if selected == 0 and not discovery["enabled"]:
+        raise WorkflowConfigError(
+            "Enable discovery or provide at least one spectrum with include: true."
+        )
 
     csv_cfg = cfg["csv"]
     if csv_cfg["raman_shift_units"] not in {"cm^-1", "cm-1", "1/cm"}:
