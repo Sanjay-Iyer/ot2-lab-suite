@@ -1,0 +1,51 @@
+# v10bV2: DMMP one-drop coverage test with no configured delays.
+#
+# Source: slot-4 96-well plate, A1.
+# Destination: one 5 uL drop at every A-C x 1-3 paper location.
+# Total: 9 deposits, 45 uL DMMP. Load 200 uL initially so at least 150 uL
+# remains available for the full v10b run immediately afterward.
+#
+# This test uses tip A2. The full v10b uses tip A1, so running this first does
+# not consume or reuse the full-run tip.
+protocol_version: 14            # internal builder ID for v10bV2
+protocol_label: v10bV2
+destination_config: configs/printing/complementary_v10_locations.yaml
+
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  source:      {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+source:
+  kind: 96-well plate
+  well: A1
+  material: DMMP
+  loaded_volume_ul: 200.0
+  minimum_remaining_ul: 150.0  # reserve for the subsequent full v10b run
+  aspirate_height_mm: 1.0
+  park_height_mm: 5.0
+
+print:
+  volume_ul: 5.0
+  layer_mode: initial_plus_extra
+  layers: {}                    # unused in this mode; retained for schema consistency
+  initial_layers: 1
+  extra_layers: {}              # no additional drops in the coverage test
+  rest_minutes: 0.0
+  z_mm: 4.0
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  post_dispense_delay_s: 0.0
+
+tips:
+  return_tips: true
+  p20: {print_tip: A2}
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+safety: {p20_max_volume_ul: 20.0, expected_source_slot: 4}

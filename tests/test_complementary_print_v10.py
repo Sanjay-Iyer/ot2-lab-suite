@@ -13,6 +13,7 @@ LOCATIONS = REPO / "configs/printing/complementary_v10_locations.yaml"
 V10A = REPO / "configs/printing/complementary_bp_print_v10a.yaml"
 V10B = REPO / "configs/printing/complementary_dmmp_print_v10b.yaml"
 V10C = REPO / "configs/printing/complementary_bp_quick_print_v10c.yaml"
+V10BV2 = REPO / "configs/printing/complementary_dmmp_spot_test_v10bv2.yaml"
 
 
 def _module():
@@ -84,6 +85,27 @@ def test_v10c_prints_once_everywhere_then_ten_extra_at_a3_without_delays():
     assert module.CONFIG["print"]["post_dispense_delay_s"] == 0.0
 
 
+def test_v10bv2_prints_dmmp_once_everywhere_without_delays():
+    module = _module()
+    module.CONFIG = _resolved_config(V10BV2)
+    rows, columns, spots, passes = module._layer_plan()
+
+    assert rows == ["A", "B", "C"]
+    assert columns == [1, 2, 3]
+    assert len(spots) == 9
+    assert set(spots.values()) == {1}
+    assert sum(spots.values()) == 9
+    assert len(passes) == 1
+    assert set(passes[0]["spots"]) == set(spots)
+    assert passes[0]["rest_minutes"] == 0.0
+    assert module.CONFIG["source"]["well"].upper() == "A1"
+    assert module.CONFIG["source"]["material"] == "DMMP"
+    assert module.CONFIG["source"]["loaded_volume_ul"] == 200.0
+    assert module.CONFIG["source"]["minimum_remaining_ul"] == 150.0
+    assert module.CONFIG["tips"]["p20"]["print_tip"] == "A2"
+    assert module.CONFIG["print"]["post_dispense_delay_s"] == 0.0
+
+
 def test_builder_and_runner_register_both_variants():
     from scripts.build_vial_dilution_print import PROTOCOL_VERSIONS
     import scripts.run_vial_print_robot as runner
@@ -91,10 +113,12 @@ def test_builder_and_runner_register_both_variants():
     assert PROTOCOL_VERSIONS[10] == (PROTOCOL, "complementary_bp_print_v10a")
     assert PROTOCOL_VERSIONS[11] == (PROTOCOL, "complementary_dmmp_print_v10b")
     assert PROTOCOL_VERSIONS[13] == (PROTOCOL, "complementary_bp_quick_print_v10c")
+    assert PROTOCOL_VERSIONS[14] == (PROTOCOL, "complementary_dmmp_spot_test_v10bv2")
     assert runner._PROTOCOL_BY_VERSION[10].name == "complementary_bp_print_v10a_latest.py"
     assert runner._PROTOCOL_BY_VERSION[11].name == "complementary_dmmp_print_v10b_latest.py"
     assert runner._PROTOCOL_BY_VERSION[13].name == "complementary_bp_quick_print_v10c_latest.py"
-    for version in (10, 11, 13):
+    assert runner._PROTOCOL_BY_VERSION[14].name == "complementary_dmmp_spot_test_v10bv2_latest.py"
+    for version in (10, 11, 13, 14):
         assert version in runner.API_215_VERSIONS
         assert version in runner.IMAGELESS_VERSIONS
         assert version in runner.NO_MATRIX_VERSIONS
