@@ -1,0 +1,67 @@
+# Combined v11: run the complete BP + DMMP overlay in one OT-2 protocol.
+#
+# Sequence:
+#   1. Part A: BP from the 20 mL vial, columns 1/2/3 = 1x/3x/10x.
+#      Rows A/B/C are three identical replicates (42 deposits, 210 uL).
+#   2. Release the BP tip and wait 20 minutes.
+#   3. Part B: DMMP from plate well A1, rows A/B/C = 1x/2x/3x in
+#      every shared column (18 deposits, 90 uL).
+#
+# The internal builder ID is 12; the workflow and generated protocol are v11.
+protocol_version: 12
+protocol_label: v11
+destination_config: configs/printing/complementary_v10_locations.yaml
+
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  bp_source:   {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  dmmp_source: {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+between_parts_delay_minutes: 20.0
+
+parts:
+  - label: Part A
+    material: BP
+    source_kind: 20 mL vial
+    source_role: bp_source
+    source_well: A2             # EDIT if BP is in another vial-rack position
+    loaded_volume_ul: 5000.0
+    minimum_remaining_ul: 100.0
+    aspirate_height_mm: 4.0
+    park_height_mm: 5.0
+    print_tip: A1               # dedicated BP tip
+    layer_mode: by_column
+    layers: {1: 1, 2: 3, 3: 10}
+    rest_minutes: 5.0
+
+  - label: Part B
+    material: DMMP
+    source_kind: 96-well plate
+    source_role: dmmp_source
+    source_well: A1             # EDITABLE; lowercase a1 is accepted
+    loaded_volume_ul: 150.0
+    minimum_remaining_ul: 20.0
+    aspirate_height_mm: 1.0
+    park_height_mm: 5.0
+    print_tip: A2               # separate tip prevents BP/DMMP cross-contamination
+    layer_mode: by_row
+    layers: {A: 1, B: 2, C: 3}
+    rest_minutes: 5.0
+
+print:
+  volume_ul: 5.0
+  z_mm: 4.0
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  post_dispense_delay_s: 2.0
+
+tips: {return_tips: true}
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+safety: {p20_max_volume_ul: 20.0}

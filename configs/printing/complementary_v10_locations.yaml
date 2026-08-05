@@ -2,4 +2,4 @@
 # Edit this one file when both v10a and v10b should move together.
 destination:
   rows: [A, B, C]              # three replicate/response rows
-  columns: [9, 10, 11]         # shared paper columns
+  columns: [1, 2, 3]           # shared paper columns

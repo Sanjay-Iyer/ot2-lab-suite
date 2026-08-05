@@ -1,7 +1,7 @@
 # v10a: BP from a 20 mL vial -> shared 3 x 3 paper grid.
 #
 # Columns encode BP layers; each of rows A/B/C is an identical replicate:
-#   column 9 = 1 x 5 uL, column 10 = 3 x 5 uL, column 11 = 10 x 5 uL.
+#   column 1 = 1 x 5 uL, column 2 = 3 x 5 uL, column 3 = 10 x 5 uL.
 # Total: 9 locations, 42 deposits, 210 uL BP.
 protocol_version: 10            # internal builder ID for the v10a variant
 protocol_label: v10a
@@ -28,7 +28,7 @@ source:
 print:
   volume_ul: 5.0
   layer_mode: by_column
-  layers: {9: 1, 10: 3, 11: 10}  # EDITABLE BP layer count per shared column
+  layers: {1: 1, 2: 3, 3: 10}  # EDITABLE BP layer count per shared column
   rest_minutes: 5.0
   z_mm: 4.0
   air_gap_ul: 1.5

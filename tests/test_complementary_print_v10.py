@@ -38,11 +38,11 @@ def test_v10a_bp_plan_is_three_replicates_of_1_3_10():
     rows, columns, spots, passes = module._layer_plan()
 
     assert rows == ["A", "B", "C"]
-    assert columns == [9, 10, 11]
+    assert columns == [1, 2, 3]
     assert len(spots) == 9
-    assert {spots[f"{row}9"] for row in rows} == {1}
-    assert {spots[f"{row}10"] for row in rows} == {3}
-    assert {spots[f"{row}11"] for row in rows} == {10}
+    assert {spots[f"{row}1"] for row in rows} == {1}
+    assert {spots[f"{row}2"] for row in rows} == {3}
+    assert {spots[f"{row}3"] for row in rows} == {10}
     assert sum(spots.values()) == 42
     assert module.CONFIG["source"]["loaded_volume_ul"] == 5000.0
     assert len(passes) == 10
@@ -55,7 +55,7 @@ def test_v10b_dmmp_plan_uses_same_nine_locations_and_1_2_3_rows():
     rows, columns, spots, passes = module._layer_plan()
 
     assert rows == ["A", "B", "C"]
-    assert columns == [9, 10, 11]
+    assert columns == [1, 2, 3]
     assert len(spots) == 9
     assert {spots[f"A{column}"] for column in columns} == {1}
     assert {spots[f"B{column}"] for column in columns} == {2}

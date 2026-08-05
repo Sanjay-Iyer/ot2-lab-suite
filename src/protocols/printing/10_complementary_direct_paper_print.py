@@ -2,7 +2,7 @@
 
 This standalone-compatible template powers two complementary generated scripts:
 
-* v10a prints BP from one 20 mL vial. Columns 9/10/11 receive 1/3/10
+* v10a prints BP from one 20 mL vial. Columns 1/2/3 receive 1/3/10
   layers, with rows A/B/C acting as three identical replicates.
 * v10b prints DMMP from one 96-well plate location (default A1) onto the same
   3 x 3 paper grid. Rows A/B/C receive 1/2/3 layers in every column.
@@ -64,11 +64,11 @@ CONFIG = {
         "aspirate_height_mm": 4.0,
         "park_height_mm": 5.0,
     },
-    "destination": {"rows": ["A", "B", "C"], "columns": [9, 10, 11]},
+    "destination": {"rows": ["A", "B", "C"], "columns": [1, 2, 3]},
     "print": {
         "volume_ul": 5.0,
         "layer_mode": "by_column",
-        "layers": {9: 1, 10: 3, 11: 10},
+        "layers": {1: 1, 2: 3, 3: 10},
         "rest_minutes": 5.0,
         "z_mm": 4.0,
         "air_gap_ul": 1.5,

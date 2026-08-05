@@ -2,7 +2,7 @@
 
 This standalone-compatible template powers two complementary generated scripts:
 
-* v10a prints BP from one 20 mL vial. Columns 9/10/11 receive 1/3/10
+* v10a prints BP from one 20 mL vial. Columns 1/2/3 receive 1/3/10
   layers, with rows A/B/C acting as three identical replicates.
 * v10b prints DMMP from one 96-well plate location (default A1) onto the same
   3 x 3 paper grid. Rows A/B/C receive 1/2/3 layers in every column.
@@ -67,7 +67,7 @@ CONFIG = { 'protocol_label': 'v10b',
   'tips': {'return_tips': True, 'p20': {'print_tip': 'A1'}},
   'flow_rates': {'p20': {'aspirate': 3.0, 'dispense': 3.0}},
   'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 4},
-  'destination': {'rows': ['A', 'B', 'C'], 'columns': [9, 10, 11]},
+  'destination': {'rows': ['A', 'B', 'C'], 'columns': [1, 2, 3]},
   'protocol_version': 11}
 # <<< CONFIG END <<<
 
