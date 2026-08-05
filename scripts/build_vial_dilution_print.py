@@ -66,6 +66,8 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
          "complementary_dmmp_print_v10b"),
     12: (PRINTING_DIR / "11_combined_bp_dmmp_paper_print.py",
          "combined_bp_dmmp_print_v11"),
+    13: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
+         "complementary_bp_quick_print_v10c"),
 }
 
 # Versions whose YAML IS the embedded CONFIG (self-validating protocols that skip the
@@ -73,7 +75,7 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
 # v7 = print-only from an already-prepared plate; v8 = direct vial -> paper,
 # layered; v9 = direct single plate well -> paper, layered and triplicated;
 # v10a/v10b = complementary direct-source overlays sharing one destination grid.
-EMBED_RAW_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12}
+EMBED_RAW_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13}
 
 # Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
 # needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately

@@ -32,57 +32,47 @@ metadata = {
 requirements = {"robotType": "OT-2", "apiLevel": "2.15"}
 
 
-DEFAULT_DRY_RUN = True
+DEFAULT_DRY_RUN     = True
 DEFAULT_DO_DILUTION = False
-DEFAULT_DO_PRINT = True
+DEFAULT_DO_PRINT    = True
 
 
-# >>> CONFIG START >>>
-CONFIG = {
-    "protocol_version": 10,
-    "protocol_label": "v10a",
-    "deck": {
-        "source": {
-            "slot": 7,
-            "load_name": "tuberack_3dprint_20ml_8vials_v2",
-            "namespace": "custom_beta",
-            "version": 1,
-        },
-        "paper": {
-            "slot": 5,
-            "load_name": "paper_print_96_flat",
-            "namespace": "custom_beta",
-            "version": 1,
-        },
-        "tiprack_p20": {"slot": 9, "load_name": "opentrons_96_tiprack_20ul"},
-    },
-    "pipette": {"name": "p20_single_gen2", "mount": "left"},
-    "source": {
-        "kind": "20 mL vial",
-        "well": "A2",
-        "material": "BP",
-        "loaded_volume_ul": 5000.0,
-        "minimum_remaining_ul": 100.0,
-        "aspirate_height_mm": 4.0,
-        "park_height_mm": 5.0,
-    },
-    "destination": {"rows": ["A", "B", "C"], "columns": [1, 2, 3]},
-    "print": {
-        "volume_ul": 5.0,
-        "layer_mode": "by_column",
-        "layers": {1: 1, 2: 3, 3: 10},
-        "rest_minutes": 5.0,
-        "z_mm": 4.0,
-        "air_gap_ul": 1.5,
-        "air_gap_height_mm": 5.0,
-        "push_out_ul": 3.0,
-        "blow_out": True,
-        "post_dispense_delay_s": 2.0,
-    },
-    "tips": {"return_tips": True, "p20": {"print_tip": "A1"}},
-    "flow_rates": {"p20": {"aspirate": 3.0, "dispense": 3.0}},
-    "safety": {"p20_max_volume_ul": 20.0, "expected_source_slot": 7},
-}
+# >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
+CONFIG = { 'protocol_label': 'v10c',
+  'deck': { 'source': { 'slot': 7,
+                        'load_name': 'tuberack_3dprint_20ml_8vials_v2',
+                        'namespace': 'custom_beta',
+                        'version': 1},
+            'paper': { 'slot': 5,
+                       'load_name': 'paper_print_96_flat',
+                       'namespace': 'custom_beta',
+                       'version': 1},
+            'tiprack_p20': {'slot': 9, 'load_name': 'opentrons_96_tiprack_20ul'}},
+  'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
+  'source': { 'kind': '20 mL vial',
+              'well': 'A2',
+              'material': 'BP',
+              'loaded_volume_ul': 5000.0,
+              'minimum_remaining_ul': 100.0,
+              'aspirate_height_mm': 4.0,
+              'park_height_mm': 5.0},
+  'print': { 'volume_ul': 5.0,
+             'layer_mode': 'initial_plus_extra',
+             'layers': {},
+             'initial_layers': 1,
+             'extra_layers': {'A3': 10},
+             'rest_minutes': 0.0,
+             'z_mm': 4.0,
+             'air_gap_ul': 1.5,
+             'air_gap_height_mm': 5.0,
+             'push_out_ul': 3.0,
+             'blow_out': True,
+             'post_dispense_delay_s': 0.0},
+  'tips': {'return_tips': True, 'p20': {'print_tip': 'A1'}},
+  'flow_rates': {'p20': {'aspirate': 3.0, 'dispense': 3.0}},
+  'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 7},
+  'destination': {'rows': ['A', 'B', 'C'], 'columns': [1, 2, 3]},
+  'protocol_version': 13}
 # <<< CONFIG END <<<
 
 

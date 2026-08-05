@@ -12,6 +12,7 @@ PROTOCOL = REPO / "src/protocols/printing/10_complementary_direct_paper_print.py
 LOCATIONS = REPO / "configs/printing/complementary_v10_locations.yaml"
 V10A = REPO / "configs/printing/complementary_bp_print_v10a.yaml"
 V10B = REPO / "configs/printing/complementary_dmmp_print_v10b.yaml"
+V10C = REPO / "configs/printing/complementary_bp_quick_print_v10c.yaml"
 
 
 def _module():
@@ -65,15 +66,35 @@ def test_v10b_dmmp_plan_uses_same_nine_locations_and_1_2_3_rows():
     assert [item["rest_minutes"] for item in passes] == [5.0, 5.0, 0.0]
 
 
+def test_v10c_prints_once_everywhere_then_ten_extra_at_a3_without_delays():
+    module = _module()
+    module.CONFIG = _resolved_config(V10C)
+    rows, columns, spots, passes = module._layer_plan()
+
+    assert rows == ["A", "B", "C"]
+    assert columns == [1, 2, 3]
+    assert len(spots) == 9
+    assert spots["A3"] == 11
+    assert all(count == 1 for name, count in spots.items() if name != "A3")
+    assert sum(spots.values()) == 19
+    assert len(passes) == 11
+    assert set(passes[0]["spots"]) == set(spots)
+    assert all(item["spots"] == ["A3"] for item in passes[1:])
+    assert all(item["rest_minutes"] == 0.0 for item in passes)
+    assert module.CONFIG["print"]["post_dispense_delay_s"] == 0.0
+
+
 def test_builder_and_runner_register_both_variants():
     from scripts.build_vial_dilution_print import PROTOCOL_VERSIONS
     import scripts.run_vial_print_robot as runner
 
     assert PROTOCOL_VERSIONS[10] == (PROTOCOL, "complementary_bp_print_v10a")
     assert PROTOCOL_VERSIONS[11] == (PROTOCOL, "complementary_dmmp_print_v10b")
+    assert PROTOCOL_VERSIONS[13] == (PROTOCOL, "complementary_bp_quick_print_v10c")
     assert runner._PROTOCOL_BY_VERSION[10].name == "complementary_bp_print_v10a_latest.py"
     assert runner._PROTOCOL_BY_VERSION[11].name == "complementary_dmmp_print_v10b_latest.py"
-    for version in (10, 11):
+    assert runner._PROTOCOL_BY_VERSION[13].name == "complementary_bp_quick_print_v10c_latest.py"
+    for version in (10, 11, 13):
         assert version in runner.API_215_VERSIONS
         assert version in runner.IMAGELESS_VERSIONS
         assert version in runner.NO_MATRIX_VERSIONS
