@@ -1,0 +1,61 @@
+# Direct 96-well plate -> paper print (protocol v9, OT-2 API 2.15)
+#
+# No dilution. The P20 draws every 5 uL deposit from one source well in the
+# slot-4 plate and prints a 1x/3x/10x pattern in three replicate paper columns.
+# A five-minute drying rest separates successive layer passes.
+#
+# Deck:
+#   slot 4  corning_96_wellplate_360ul_custom  <- source plate
+#   slot 5  paper_print_96_flat                <- printing surface
+#   slot 9  opentrons_96_tiprack_20ul          <- P20 tips
+#
+# Default output:
+#   paper row A:  1 x 5 uL in columns 7, 8, 9
+#   paper row B:  3 x 5 uL in columns 7, 8, 9
+#   paper row C: 10 x 5 uL in columns 7, 8, 9
+#   42 deposits / 210 uL total, with 9 x 5-minute rests (45 minutes)
+#
+# Simulation-only build on this laptop:
+#   conda activate ai
+#   python scripts/build_vial_dilution_print.py --config configs/printing/plate_well_direct_print_v9.yaml
+
+protocol_version: 9
+
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  plate:       {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+source:
+  well: A1                     # EDIT THIS: A1, B1, C4, etc.; lowercase a1 also works
+  material: sample             # label shown in the robot run log
+  loaded_volume_ul: 300.0      # must cover 210 uL printed + minimum_remaining_ul
+  minimum_remaining_ul: 20.0   # reserve that the plan is not allowed to consume
+  aspirate_height_mm: 1.0      # height above the modeled well bottom
+  park_height_mm: 5.0          # tip parking height above the source-well top during rests
+
+print:
+  volume_ul: 5.0
+  replicate_columns: [7, 8, 9]
+  layers_by_row: {A: 1, B: 3, C: 10}
+  rest_minutes: 5.0
+
+  # Print-release controls copied from the direct-vial v8 workflow.
+  z_mm: 4.0
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  post_dispense_delay_s: 2.0
+
+tips:
+  return_tips: true
+  p20: {print_tip: A1}
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+
+safety: {p20_max_volume_ul: 20.0}

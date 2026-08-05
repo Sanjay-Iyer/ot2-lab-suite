@@ -54,18 +54,21 @@ _PROTOCOL_BY_VERSION = {
     6: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v6_latest.py",
     7: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v7_latest.py",
     8: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v8_latest.py",
+    9: REPO / "src" / "protocols" / "generated" / "plate_well_direct_print_v9_latest.py",
+    10: REPO / "src" / "protocols" / "generated" / "complementary_bp_print_v10a_latest.py",
+    11: REPO / "src" / "protocols" / "generated" / "complementary_dmmp_print_v10b_latest.py",
 }
 
 # Versions that target API 2.15 on the robot: run modes are baked into the generated
 # file at build time and no runtime parameters are sent.
-API_215_VERSIONS = {3, 4, 6, 7, 8}
+API_215_VERSIONS = {3, 4, 6, 7, 8, 9, 10, 11}
 
 # Versions with no camera step — skip all before/after image handling (and the SSH
 # it needs) for these.
-IMAGELESS_VERSIONS = {4, 6, 7, 8}
+IMAGELESS_VERSIONS = {4, 6, 7, 8, 9, 10, 11}
 
 # Versions with no run-mode matrix; the build's own simulation is the whole check.
-NO_MATRIX_VERSIONS = {4, 6, 7, 8}
+NO_MATRIX_VERSIONS = {4, 6, 7, 8, 9, 10, 11}
 
 
 def _config_version(config_path: str | None) -> int:

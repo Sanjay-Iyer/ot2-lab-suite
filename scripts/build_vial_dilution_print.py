@@ -58,12 +58,20 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
         "vial_dilution_print_v7"),
     8: (PRINTING_DIR / "08_vial_direct_paper_print_v8.py",
         "vial_dilution_print_v8"),
+    9: (PRINTING_DIR / "09_plate_well_direct_paper_print_v9.py",
+        "plate_well_direct_print_v9"),
+    10: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
+         "complementary_bp_print_v10a"),
+    11: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
+         "complementary_dmmp_print_v10b"),
 }
 
 # Versions whose YAML IS the embedded CONFIG (self-validating protocols that skip the
 # dilution normalizer). v4 = quick test; v6 = P20-only dilute/mix/print workflow;
-# v7 = print-only from an already-prepared plate; v8 = direct vial -> paper, layered.
-EMBED_RAW_VERSIONS = {4, 6, 7, 8}
+# v7 = print-only from an already-prepared plate; v8 = direct vial -> paper,
+# layered; v9 = direct single plate well -> paper, layered and triplicated;
+# v10a/v10b = complementary direct-source overlays sharing one destination grid.
+EMBED_RAW_VERSIONS = {4, 6, 7, 8, 9, 10, 11}
 
 # Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
 # needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately
@@ -685,6 +693,30 @@ def main() -> int:
         print(f"ERROR: config not found: {cfg_path}")
         return 1
     full      = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+    destination_ref = full.pop("destination_config", None)
+    if destination_ref:
+        destination_path = Path(destination_ref)
+        if not destination_path.is_absolute():
+            destination_path = REPO / destination_path
+        destination_path = destination_path.resolve()
+        try:
+            destination_path.relative_to(REPO.resolve())
+        except ValueError:
+            print(
+                "ERROR: destination_config must resolve inside the repository: "
+                f"{destination_path}"
+            )
+            return 1
+        if not destination_path.exists():
+            print(f"ERROR: destination_config not found: {destination_path}")
+            return 1
+        shared = yaml.safe_load(destination_path.read_text(encoding="utf-8")) or {}
+        destination = shared.get("destination", shared)
+        if not isinstance(destination, dict):
+            print("ERROR: destination_config must contain a destination mapping")
+            return 1
+        full["destination"] = destination
+        print(f"Shared destination: {destination_path.relative_to(REPO)}")
     run_modes = full.pop("run_modes", {})   # not part of CONFIG
     for key, value in (
         ("dry_run", args.set_dry_run),

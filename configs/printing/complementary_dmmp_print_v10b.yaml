@@ -1,0 +1,45 @@
+# v10b: DMMP from source-plate well A1 -> the exact v10a paper grid.
+#
+# Rows encode DMMP layers in every shared column:
+#   row A = 1 x 5 uL, row B = 2 x 5 uL, row C = 3 x 5 uL.
+# Total: 9 locations, 18 deposits, 90 uL DMMP.
+protocol_version: 11            # internal builder ID for the v10b variant
+protocol_label: v10b
+destination_config: configs/printing/complementary_v10_locations.yaml
+
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  source:      {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+source:
+  kind: 96-well plate
+  well: A1                     # EDITABLE; lowercase a1 is also accepted
+  material: DMMP
+  loaded_volume_ul: 150.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 1.0
+  park_height_mm: 5.0
+
+print:
+  volume_ul: 5.0
+  layer_mode: by_row
+  layers: {A: 1, B: 2, C: 3}  # EDITABLE DMMP layer count per shared row
+  rest_minutes: 5.0
+  z_mm: 4.0
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  post_dispense_delay_s: 2.0
+
+tips:
+  return_tips: true
+  p20: {print_tip: A1}
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+safety: {p20_max_volume_ul: 20.0, expected_source_slot: 4}
