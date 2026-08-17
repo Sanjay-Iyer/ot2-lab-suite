@@ -55,12 +55,19 @@ printing:
   push_out_ul: 3.0              # unchanged; extra plunger travel inside the same
                                 # dispense command (API 2.15 accepts up to 20 uL)
 
-  blow_out: false               # OFF for this test. blow_out is a separate forceful
-                                # pulse that could smear or splatter the droplet and
-                                # would confound the chase result. Bonus: with no
-                                # blow_out the plunger stays prepared, so the API 2.15
-                                # "double suck" on later drops cannot occur either.
-                                # Set true to restore the v10/v11 behaviour.
+  blow_out: true                # ON: every expulsion aid stacked together, since the
+                                # actual problem is liquid not leaving the tip at all.
+                                # TRADE-OFF: blow_out leaves the plunger unprepared, so
+                                # the API re-primes (drives to bottom, then draws back
+                                # up) before the NEXT aspirate -- on EVERY droplet, not
+                                # just the first. That priming stroke is what looked
+                                # like "suck air then push it out" earlier; with
+                                # blow_out: true it will now show up before every one
+                                # of the 4 droplets, and could pull a slightly larger
+                                # first "air" aspirate on drops 2-4 than drop 1. Watch
+                                # for growing droplet size across the run; if you see
+                                # it, that is this effect and push_out_ul alone
+                                # (with blow_out: false) avoids it.
 
   inter_drop_delay_s: 2.0
   inter_layer_delay_s: 0.0

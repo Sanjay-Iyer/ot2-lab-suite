@@ -81,7 +81,7 @@ metadata = {
 requirements = {"robotType": "OT-2", "apiLevel": "2.15"}
 
 
-DEFAULT_DRY_RUN     = True
+DEFAULT_DRY_RUN     = False
 DEFAULT_DO_DILUTION = False
 DEFAULT_DO_PRINT    = True
 
@@ -113,7 +113,7 @@ CONFIG = { 'protocol_label': 'v12-airchase',
                 'air_gap_ul': 1.5,
                 'air_gap_height_mm': 5.0,
                 'push_out_ul': 3.0,
-                'blow_out': False,
+                'blow_out': True,
                 'inter_drop_delay_s': 2.0,
                 'inter_layer_delay_s': 0.0,
                 'inter_clover_delay_s': 0.0,
