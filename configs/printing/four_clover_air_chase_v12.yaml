@@ -13,8 +13,7 @@ protocol_version: 16            # own builder ID -> four_clover_air_chase_v12_la
 protocol_label: v12-airchase
 destination_config: configs/printing/four_clover_air_chase_locations.yaml
 
-# Stays TRUE. Flip to false (or --set-dry-run false) only for the real print.
-run_modes: {dry_run: true, do_dilution: false, do_print: true}
+run_modes: {dry_run: false, do_dilution: false, do_print: true}
 
 deck:
   source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
