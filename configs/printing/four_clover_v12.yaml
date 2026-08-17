@@ -36,11 +36,18 @@ source:
   park_height_mm: 5.0           # tip parks this far above the source during rests
 
 printing:
-  droplet_volume_ul: 5.0        # per droplet; 4 droplets per clover per layer
+  droplet_volume_ul: 5.0        # LIQUID per droplet; 4 droplets per clover per layer
+  pre_air_chase_ul: 0.0         # AIR aspirated BEFORE the liquid, ending up behind it
+                                # so it chases the drop off the tip on dispense. 0.0
+                                # keeps this config on the original path. See
+                                # four_clover_air_chase_v12.yaml for the test of this.
+                                # NOT the same as air_gap_ul below.
   dispense_height_mm: 4.0       # above the paper surface
                                 # aspiration height is a property of the source
                                 # labware: see source.aspirate_height_mm above
-  air_gap_ul: 1.5
+  air_gap_ul: 1.5               # aspirated AFTER the liquid; sits between liquid and
+                                # tip opening and exits FIRST. Anti-drip in transit
+                                # only -- it cannot help the droplet detach.
   air_gap_height_mm: 5.0
   push_out_ul: 3.0
   blow_out: true                # matches v10/v11. At API 2.15 blow_out leaves the

@@ -81,87 +81,65 @@ metadata = {
 requirements = {"robotType": "OT-2", "apiLevel": "2.15"}
 
 
-DEFAULT_DRY_RUN = True
+DEFAULT_DRY_RUN     = False
 DEFAULT_DO_DILUTION = False
-DEFAULT_DO_PRINT = True
+DEFAULT_DO_PRINT    = True
 
 DROPLET_KEYS = ("d1", "d2", "d3", "d4")
 
 
-# >>> CONFIG START >>>
-CONFIG = {
-    "protocol_version": 15,
-    "protocol_label": "v12",
-    "deck": {
-        "source": {
-            "slot": 7,
-            "load_name": "tuberack_3dprint_20ml_8vials_v2",
-            "namespace": "custom_beta",
-            "version": 1,
-        },
-        "paper": {
-            "slot": 5,
-            "load_name": "paper_print_96_flat",
-            "namespace": "custom_beta",
-            "version": 1,
-        },
-        "tiprack_p20": {"slot": 9, "load_name": "opentrons_96_tiprack_20ul"},
-    },
-    "pipette": {"name": "p20_single_gen2", "mount": "left"},
-    "source": {
-        "kind": "20 mL vial",
-        "well": "A2",
-        "material": "BP",
-        "loaded_volume_ul": 5000.0,
-        "minimum_remaining_ul": 100.0,
-        "aspirate_height_mm": 4.0,
-        "park_height_mm": 5.0,
-    },
-    "destination": {
-        "default_clover_geometry": {"half_width_mm": 2.0, "half_height_mm": 2.0},
-        "clover_grid": {"enabled": False},
-        "manual_clover_centers": [
-            {
-                "name": "sep_4mm",
-                "reference_well": "C3",
-                "x_offset_mm": 0.0,
-                "y_offset_mm": 0.0,
-            },
-        ],
-        "paper_bounds": {
-            "x_dimension_mm": 127.76,
-            "y_dimension_mm": 85.48,
-            "grid_inset_x_mm": 14.38,
-            "grid_inset_y_mm": 11.24,
-            "boundary_mode": "grid",
-            "edge_margin_mm": 4.5,
-        },
-    },
-    "printing": {
-        "droplet_volume_ul": 5.0,
-        "pre_air_chase_ul": 0.0,
-        "dispense_height_mm": 4.0,
-        "air_gap_ul": 1.5,
-        "air_gap_height_mm": 5.0,
-        "push_out_ul": 3.0,
-        "blow_out": True,
-        "inter_drop_delay_s": 2.0,
-        "inter_layer_delay_s": 0.0,
-        "inter_clover_delay_s": 0.0,
-        "layers": 1,
-    },
-    "order": {"mode": "clover_by_clover"},
-    "validation": {
-        "mode": "warn",
-        "min_intra_clover_distance_mm": 1.0,
-        "min_inter_clover_distance_mm": 8.0,
-        "droplet_radius_mm": 1.5,
-        "allow_duplicate_droplet_positions": False,
-    },
-    "tips": {"return_tips": True, "p20": {"print_tip": "A1"}},
-    "flow_rates": {"p20": {"aspirate": 3.0, "dispense": 3.0}},
-    "safety": {"p20_max_volume_ul": 20.0, "expected_source_slot": 7},
-}
+# >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
+CONFIG = { 'protocol_label': 'v12-airchase',
+  'deck': { 'source': { 'slot': 7,
+                        'load_name': 'tuberack_3dprint_20ml_8vials_v2',
+                        'namespace': 'custom_beta',
+                        'version': 1},
+            'paper': { 'slot': 5,
+                       'load_name': 'paper_print_96_flat',
+                       'namespace': 'custom_beta',
+                       'version': 1},
+            'tiprack_p20': {'slot': 9, 'load_name': 'opentrons_96_tiprack_20ul'}},
+  'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
+  'source': { 'kind': '20 mL vial',
+              'well': 'A2',
+              'material': 'BP',
+              'loaded_volume_ul': 5000.0,
+              'minimum_remaining_ul': 100.0,
+              'aspirate_height_mm': 4.0,
+              'park_height_mm': 5.0},
+  'printing': { 'droplet_volume_ul': 5.0,
+                'pre_air_chase_ul': 5.0,
+                'dispense_height_mm': 4.0,
+                'air_gap_ul': 1.5,
+                'air_gap_height_mm': 5.0,
+                'push_out_ul': 3.0,
+                'blow_out': False,
+                'inter_drop_delay_s': 2.0,
+                'inter_layer_delay_s': 0.0,
+                'inter_clover_delay_s': 0.0,
+                'layers': 1},
+  'order': {'mode': 'clover_by_clover'},
+  'validation': { 'mode': 'warn',
+                  'min_intra_clover_distance_mm': 1.0,
+                  'min_inter_clover_distance_mm': 8.0,
+                  'droplet_radius_mm': 1.5,
+                  'allow_duplicate_droplet_positions': False},
+  'tips': {'return_tips': True, 'p20': {'print_tip': 'A1'}},
+  'flow_rates': {'p20': {'aspirate': 3.0, 'dispense': 3.0}},
+  'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 7},
+  'destination': { 'default_clover_geometry': {'half_width_mm': 2.0, 'half_height_mm': 2.0},
+                   'clover_grid': {'enabled': False},
+                   'manual_clover_centers': [ { 'name': 'air_chase_5ul',
+                                                'reference_well': 'E6',
+                                                'x_offset_mm': 4.5,
+                                                'y_offset_mm': 4.5}],
+                   'paper_bounds': { 'x_dimension_mm': 127.76,
+                                     'y_dimension_mm': 85.48,
+                                     'grid_inset_x_mm': 14.38,
+                                     'grid_inset_y_mm': 11.24,
+                                     'boundary_mode': 'grid',
+                                     'edge_margin_mm': 4.5}},
+  'protocol_version': 16}
 # <<< CONFIG END <<<
 
 
@@ -950,46 +928,91 @@ def _preflight(protocol, labware, p20):
 # ── Reporting ─────────────────────────────────────────────────────────────────────
 
 def _report_drop_sequence(protocol, resolved):
-    """Concise per-drop liquid-handling summary, printed before any motion."""
+    """Spell out the resolved per-drop liquid-handling sequence before any motion."""
     pr = CONFIG["printing"]
+    src = CONFIG["source"]
     volume = float(pr["droplet_volume_ul"])
     air_gap = float(pr.get("air_gap_ul", 0.0) or 0.0)
+    air_gap_height = float(pr.get("air_gap_height_mm", 5.0))
     push_out = float(pr.get("push_out_ul", 0.0) or 0.0)
     blow_out = bool(pr.get("blow_out", True))
-    clovers = resolved["clovers"]
+    z = float(pr["dispense_height_mm"])
+    aspirate_height = float(src["aspirate_height_mm"])
+    park_height = float(src.get("park_height_mm", 5.0))
 
-    protocol.comment("FOUR CLOVER TEST")
-    protocol.comment(f"Clovers: {len(clovers)}")
-    protocol.comment(f"Locations: {len(clovers) * len(DROPLET_KEYS)}")
-    protocol.comment(
-        f"Layers: {', '.join(str(clover['layers']) for clover in clovers)}"
-    )
-    protocol.comment(f"Liquid/drop: {volume:.1f} uL")
+    groups = {}
+    for clover in resolved["clovers"]:
+        groups.setdefault(clover["pre_air_chase_ul"], []).append(clover["name"])
 
-    for chase in sorted({clover["pre_air_chase_ul"] for clover in clovers}):
+    protocol.comment("=== FOUR CLOVER DROP SEQUENCE ===")
+    for chase in sorted(groups):
         load = _piston_load(chase, volume, air_gap)
-        protocol.comment(f"Pre-air chase: {load['pre_air_chase']:.1f} uL")
-        protocol.comment(
-            f"Piston load/drop: {load['total']:.1f} uL"
-            + (f" (includes {air_gap:.1f} uL air gap)" if air_gap > 0 else "")
-        )
+        names = ", ".join(sorted(groups[chase]))
+        protocol.comment(f"--- clovers: {names} ---")
+        protocol.comment(f"    Pre-air chase:      {load['pre_air_chase']:.1f} uL")
+        protocol.comment(f"    Liquid aspiration:  {load['liquid']:.1f} uL")
+        protocol.comment(f"    Trailing air gap:   {load['air_gap']:.1f} uL")
+        protocol.comment(f"    Total piston load:  {load['total']:.1f} uL")
+        protocol.comment("    Sequence:")
+        step = 1
         if chase > 0:
             protocol.comment(
-                f"Sequence: air {chase:g} uL -> liquid {volume:g} uL -> "
-                f"dispense {load['total']:g} uL"
+                f"      {step}. Move above source, aspirate {chase:.1f} uL AIR "
+                f"(pre-air chase, {park_height:g} mm over the source top)"
+            )
+            step += 1
+        protocol.comment(
+            f"      {step}. Aspirate {volume:.1f} uL LIQUID at "
+            f"{aspirate_height:g} mm above the source bottom"
+        )
+        step += 1
+        if air_gap > 0:
+            protocol.comment(
+                f"      {step}. Aspirate {air_gap:.1f} uL air gap at "
+                f"{air_gap_height:g} mm over the source top (anti-drip in transit)"
+            )
+            step += 1
+        protocol.comment(f"      {step}. Move to the destination droplet coordinate")
+        step += 1
+        protocol.comment(
+            f"      {step}. Dispense {load['total']:.1f} uL piston volume at "
+            f"{z:g} mm above the paper"
+        )
+        step += 1
+        if push_out > 0:
+            protocol.comment(
+                f"      {step}. push_out {push_out:g} uL (extra plunger travel, "
+                "part of the same dispense command)"
+            )
+            step += 1
+        if blow_out:
+            protocol.comment(
+                f"      {step}. blow_out at the droplet -- SEPARATE forceful air "
+                "pulse, additional to the pre-air chase"
+            )
+            step += 1
+        if chase > 0:
+            protocol.comment(
+                "    Tip order (piston side -> tip opening): "
+                f"[{chase:.1f} uL chase air][{volume:.1f} uL liquid]"
+                + (f"[{air_gap:.1f} uL gap air]" if air_gap > 0 else "")
+                + " so liquid exits first and the chase air follows it out."
             )
         else:
             protocol.comment(
-                f"Sequence: liquid {volume:g} uL -> dispense {load['total']:g} uL "
-                "(no pre-air chase)"
+                "    No pre-air chase: normal liquid aspiration path."
             )
     protocol.comment(
-        f"Total liquid consumption: {resolved['deposits'] * volume:.1f} uL "
-        "(liquid only; air is not deposited)"
+        f"    Liquid deposited per spot: {volume:g} uL "
+        "(air volumes are NOT deposited and do not count against the source)"
     )
-    protocol.comment(
-        f"Also active: push_out {push_out:g} uL, blow_out {blow_out}"
-    )
+    if blow_out:
+        protocol.comment(
+            "    NOTE: blow_out is enabled. It is independent of the pre-air chase "
+            "and adds a forceful pulse that can disturb the deposited droplet. Set "
+            "printing.blow_out to false to test the chase on its own."
+        )
+    protocol.comment("=== END FOUR CLOVER DROP SEQUENCE ===")
 
 
 def _report_plan(protocol, resolved):

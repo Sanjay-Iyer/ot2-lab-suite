@@ -72,6 +72,10 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
          "complementary_dmmp_spot_test_v10bv2"),
     15: (PRINTING_DIR / "12_four_clover_paper_print.py",
          "four_clover_print_v12"),
+    16: (PRINTING_DIR / "12_four_clover_paper_print.py",
+         "four_clover_air_chase_v12"),
+    17: (PRINTING_DIR / "12_four_clover_paper_print.py",
+         "four_clover_grid_v12"),
 }
 
 # Versions whose YAML IS the embedded CONFIG (self-validating protocols that skip the
@@ -79,8 +83,9 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
 # v7 = print-only from an already-prepared plate; v8 = direct vial -> paper,
 # layered; v9 = direct single plate well -> paper, layered and triplicated;
 # v10a/v10b = complementary direct-source overlays sharing one destination grid;
-# v12 = four-droplet clover printing at arbitrary XY offsets from a paper well.
-EMBED_RAW_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+# v12 = four-droplet clover printing at arbitrary XY offsets from a paper well
+# (15 spacing sweep, 16 pre-air-chase test, 17 generated grid).
+EMBED_RAW_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}
 
 # Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
 # needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately

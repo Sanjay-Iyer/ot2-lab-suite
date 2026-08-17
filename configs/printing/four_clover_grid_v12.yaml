@@ -5,7 +5,7 @@
 #
 #   python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_grid_v12.yaml
 #   python scripts/plot_four_clover_layout.py  --config configs/printing/four_clover_grid_v12.yaml
-protocol_version: 15
+protocol_version: 17            # own builder ID -> four_clover_grid_v12_latest.py
 protocol_label: v12-grid
 destination_config: configs/printing/four_clover_grid_locations.yaml
 
@@ -28,9 +28,11 @@ source:
   park_height_mm: 5.0
 
 printing:
-  droplet_volume_ul: 5.0
+  droplet_volume_ul: 5.0        # LIQUID per droplet
+  pre_air_chase_ul: 0.0         # AIR before the liquid (chases the drop off the tip);
+                                # 0.0 keeps the original path. Not the same as air_gap_ul.
   dispense_height_mm: 4.0
-  air_gap_ul: 1.5
+  air_gap_ul: 1.5               # air AFTER the liquid; exits first, anti-drip only
   air_gap_height_mm: 5.0
   push_out_ul: 3.0
   blow_out: true

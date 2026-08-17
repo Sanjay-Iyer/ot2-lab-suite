@@ -1,0 +1,85 @@
+# v12 PRE-AIR CHASE TEST: does air behind the liquid detach the droplet?
+#
+# Deliberately tiny: 1 clover, 4 spots, 1 layer, 5 uL liquid each.
+#   4 liquid deposits, 20 uL liquid consumed.
+# Each drop also carries 5 uL of chase air, which is NOT deposited and does NOT
+# count against the source.
+#
+#   BUILD (dry run):
+#     python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_air_chase_v12.yaml
+#   PLOT:
+#     python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_air_chase_v12.yaml
+protocol_version: 16            # own builder ID -> four_clover_air_chase_v12_latest.py
+protocol_label: v12-airchase
+destination_config: configs/printing/four_clover_air_chase_locations.yaml
+
+# Stays TRUE. Flip to false (or --set-dry-run false) only for the real print.
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+source:
+  kind: 20 mL vial
+  well: A2
+  material: BP
+  loaded_volume_ul: 5000.0      # must be >= ~2.55 mL to keep the 4 mm aspiration
+                                # height submerged; declare what you actually pour
+  minimum_remaining_ul: 100.0
+  aspirate_height_mm: 4.0
+  park_height_mm: 5.0           # the pre-air chase is aspirated at this height
+
+printing:
+  droplet_volume_ul: 5.0        # LIQUID per spot -- the only volume deposited
+  pre_air_chase_ul: 5.0         # AIR aspirated BEFORE the liquid, so it ends up
+                                # behind the liquid and chases it off the tip.
+                                # Test ladder: 0.0 / 1.5 / 3.0 / 5.0
+                                # Piston load = 5.0 + 5.0 + 1.5 = 11.5 uL of 20 uL.
+
+  dispense_height_mm: 4.0       # UNCHANGED from the original runs, on purpose, so
+                                # the air chase is the only variable being tested.
+                                # Worth knowing: a 5 uL drop is a 2.12 mm sphere, so
+                                # hanging from 4.0 mm it stops 1.88 mm short of the
+                                # paper and cannot wick off by contact. If the chase
+                                # alone does not release it, test 3.0 then 2.0 mm.
+
+  air_gap_ul: 1.5               # DIFFERENT THING from pre_air_chase_ul: aspirated
+                                # AFTER the liquid, sits between liquid and tip
+                                # opening, exits FIRST. Anti-drip during travel only;
+                                # it cannot assist detachment.
+  air_gap_height_mm: 5.0
+
+  push_out_ul: 3.0              # unchanged; extra plunger travel inside the same
+                                # dispense command (API 2.15 accepts up to 20 uL)
+
+  blow_out: false               # OFF for this test. blow_out is a separate forceful
+                                # pulse that could smear or splatter the droplet and
+                                # would confound the chase result. Bonus: with no
+                                # blow_out the plunger stays prepared, so the API 2.15
+                                # "double suck" on later drops cannot occur either.
+                                # Set true to restore the v10/v11 behaviour.
+
+  inter_drop_delay_s: 2.0
+  inter_layer_delay_s: 0.0
+  inter_clover_delay_s: 0.0
+  layers: 1
+
+order: {mode: clover_by_clover}
+
+validation:
+  mode: warn
+  min_intra_clover_distance_mm: 1.0
+  min_inter_clover_distance_mm: 8.0
+  droplet_radius_mm: 1.5        # ASSUMED; no measured ring diameter in this repo
+  allow_duplicate_droplet_positions: false
+
+tips:
+  return_tips: true
+  p20: {print_tip: A1}
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+safety: {p20_max_volume_ul: 20.0, expected_source_slot: 7}

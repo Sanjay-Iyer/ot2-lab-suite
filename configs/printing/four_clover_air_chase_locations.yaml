@@ -1,0 +1,42 @@
+# Minimal layout for the PRE-AIR CHASE physical test: ONE clover, four spots,
+# parked in the middle of the paper.
+#
+# E6 center is (59.38, 38.24) in labware coordinates; the +4.50 / +4.50 offset
+# lands the clover center on (63.88, 42.74), which is the exact geometric center
+# of the 127.76 x 85.48 mm paper. Plenty of clean paper on every side for the
+# follow-up runs of this same test at other chase volumes.
+#
+# See four_clover_locations.yaml for the half_width_mm / half_height_mm
+# terminology note: those are half-offsets FROM THE CENTER, so half 2.0 mm means
+# opposing droplets are 4.0 mm apart.
+destination:
+
+  default_clover_geometry:
+    half_width_mm: 2.0            # -> 4.0 mm between opposing droplets
+    half_height_mm: 2.0
+
+  clover_grid:
+    enabled: false
+
+  manual_clover_centers:
+    - name: air_chase_5ul
+      reference_well: E6
+      x_offset_mm: 4.5            # -> clover center at the paper's exact middle
+      y_offset_mm: 4.5
+      # pre_air_chase_ul is inherited from printing.pre_air_chase_ul (5.0).
+      # To compare chase volumes in ONE run, add more centers with their own
+      # per-clover override, e.g.:
+      #   - name: air_0
+      #     reference_well: E3
+      #     pre_air_chase_ul: 0.0
+      #   - name: air_3
+      #     reference_well: E9
+      #     pre_air_chase_ul: 3.0
+
+  paper_bounds:
+    x_dimension_mm: 127.76
+    y_dimension_mm: 85.48
+    grid_inset_x_mm: 14.38
+    grid_inset_y_mm: 11.24
+    boundary_mode: grid
+    edge_margin_mm: 4.5
