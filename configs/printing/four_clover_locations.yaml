@@ -1,0 +1,108 @@
+# Shared four-clover layout. Edit THIS file to move clovers or change spacing;
+# four_clover_v12.yaml (and any future source/material variant) points at it, so
+# there is exactly one source of truth for geometry. The layout plotter reads the
+# same file: scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
+#
+# ---------------------------------------------------------------------------
+# TERMINOLOGY -- read this before changing numbers
+# ---------------------------------------------------------------------------
+# half_width_mm / half_height_mm are the offset of EACH DROPLET FROM THE CENTER.
+# The center-to-center separation between two opposing droplets is TWICE that:
+#
+#     half_width_mm: 2.0  ->  d1/d3 sit 2.0 mm left of center
+#                             d2/d4 sit 2.0 mm right of center
+#                             horizontal droplet separation = 4.0 mm
+#
+# The word "spacing" is never used as a key because it is ambiguous. Every number
+# below is either a half-offset from the center or an explicit droplet offset.
+#
+# Droplet layout (+y is toward plate row A, +x toward column 12):
+#
+#     d1 ....... d2
+#        .  C  .
+#     d3 ....... d4
+#
+# ---------------------------------------------------------------------------
+# THIS CONFIGURATION: first physical spacing sweep, not a throughput run
+# ---------------------------------------------------------------------------
+# Four clovers on one row, 27 mm apart (every 3rd well of the 9 mm paper grid),
+# each with a different half-offset so one run brackets the useful range:
+#
+#   sep_2mm  half 1.00 mm  ->  2.0 mm between opposing droplets
+#   sep_3mm  half 1.50 mm  ->  3.0 mm
+#   sep_4mm  half 2.00 mm  ->  4.0 mm
+#   sep_5mm  half 2.50 mm  ->  5.0 mm
+#
+# 27 mm clover pitch is deliberately generous: the dried coffee-ring diameter is
+# NOT known for this ink/paper combination (no measurement exists in this repo),
+# so neighbouring clovers are kept far enough apart that they cannot possibly
+# merge and confuse the read-out. Tighten the pitch once ring diameter is known.
+destination:
+
+  # Applied to any clover that does not carry its own `geometry:` block.
+  default_clover_geometry:
+    half_width_mm: 2.0
+    half_height_mm: 2.0
+
+  # Grid mode off for this sweep: each clover needs a different geometry, which
+  # reads better as an explicit list. See four_clover_grid_locations.yaml for the
+  # generated-grid alternative.
+  clover_grid:
+    enabled: false
+
+  manual_clover_centers:
+    - name: sep_2mm
+      reference_well: B2          # paper well supplying the origin
+      x_offset_mm: 0.0            # nudge the whole clover without changing its shape
+      y_offset_mm: 0.0
+      geometry:
+        half_width_mm: 1.0
+        half_height_mm: 1.0
+
+    - name: sep_3mm
+      reference_well: B5
+      x_offset_mm: 0.0
+      y_offset_mm: 0.0
+      geometry:
+        half_width_mm: 1.5
+        half_height_mm: 1.5
+
+    - name: sep_4mm
+      reference_well: B8
+      x_offset_mm: 0.0
+      y_offset_mm: 0.0
+      geometry:
+        half_width_mm: 2.0
+        half_height_mm: 2.0
+
+    - name: sep_5mm
+      reference_well: B11
+      x_offset_mm: 0.0
+      y_offset_mm: 0.0
+      geometry:
+        half_width_mm: 2.5
+        half_height_mm: 2.5
+
+  # ---------------------------------------------------------------------------
+  # Paper boundary. Values come from labware/paper_print_96_flat.json:
+  #   footprint 127.76 x 85.48 mm, 8 x 12 wells on an exact 9.00 mm pitch,
+  #   A1 center (14.38, 74.24), H12 center (113.38, 11.24) in labware coordinates.
+  # grid_inset_* is the distance from the outermost well centers to the labware
+  # edge; the protocol cross-checks 2 x inset + grid span against the dimension.
+  #
+  # boundary_mode: grid    -> usable box = well-center bounding box grown by
+  #                           edge_margin_mm. At 4.5 mm (half the well pitch) that
+  #                           is exactly the 96 nominal print cells: conservative,
+  #                           and guaranteed to be paper the v10 protocols already
+  #                           print on. This is the default.
+  # boundary_mode: labware -> usable box = full 127.76 x 85.48 footprint shrunk by
+  #                           edge_margin_mm. Only switch to this once the paper
+  #                           sheet is confirmed to cover the whole labware.
+  # ---------------------------------------------------------------------------
+  paper_bounds:
+    x_dimension_mm: 127.76
+    y_dimension_mm: 85.48
+    grid_inset_x_mm: 14.38
+    grid_inset_y_mm: 11.24
+    boundary_mode: grid
+    edge_margin_mm: 4.5

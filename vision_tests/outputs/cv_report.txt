@@ -1,7 +1,7 @@
 ============================================================
   PRINTED-DROPLET CV VERIFICATION REPORT
 ============================================================
-Generated      : 2026-07-23T21:22:30.528411+00:00
+Generated      : 2026-08-17T15:53:21.477022+00:00
 Workflow YAML  : vial_dilution_print.yaml
 Dest column    : 9
 Fold series    : [1, 2, 5, 10, 20, 30, 40, 50]

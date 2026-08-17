@@ -1,0 +1,56 @@
+# v12 (grid variant): replicate one chosen clover geometry across a generated grid.
+#
+# Identical to four_clover_v12.yaml except that it points at the grid layout.
+# 12 clovers x 4 droplets x 1 layer = 48 deposits, 240 uL BP.
+#
+#   python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_grid_v12.yaml
+#   python scripts/plot_four_clover_layout.py  --config configs/printing/four_clover_grid_v12.yaml
+protocol_version: 15
+protocol_label: v12-grid
+destination_config: configs/printing/four_clover_grid_locations.yaml
+
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
+
+deck:
+  source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}
+
+source:
+  kind: 20 mL vial
+  well: A2
+  material: BP
+  loaded_volume_ul: 5000.0
+  minimum_remaining_ul: 100.0
+  aspirate_height_mm: 4.0
+  park_height_mm: 5.0
+
+printing:
+  droplet_volume_ul: 5.0
+  dispense_height_mm: 4.0
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  inter_drop_delay_s: 2.0
+  inter_layer_delay_s: 0.0
+  inter_clover_delay_s: 0.0
+  layers: 1
+
+order: {mode: clover_by_clover}
+
+validation:
+  mode: warn
+  min_intra_clover_distance_mm: 1.0
+  min_inter_clover_distance_mm: 8.0
+  droplet_radius_mm: 1.5        # ASSUMED; no measured ring diameter in this repo
+  allow_duplicate_droplet_positions: false
+
+tips:
+  return_tips: true
+  p20: {print_tip: A1}
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}
+safety: {p20_max_volume_ul: 20.0, expected_source_slot: 7}

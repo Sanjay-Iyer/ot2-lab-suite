@@ -103,6 +103,79 @@ items kept active: `docs/printing/ARCHIVE_REVIEW_REQUIRED.md`.
 
 ---
 
+## Workflow 12 — Four-Clover Paper Printing (coffee-ring overlap)
+**Status: Active, awaiting first physical iteration.**
+
+Print groups of four droplets clustered around a configurable center point so their
+dried coffee rings can overlap toward the middle. Built for repeated physical
+iteration: **all** geometry lives in YAML, none in the Python.
+
+### Protocol (entry point)
+`src/protocols/printing/12_four_clover_paper_print.py` — builder ID `protocol_version: 15`,
+generates `generated/four_clover_print_v12_latest.py`. OT-2 API 2.15, P20 single GEN2,
+one tip for the whole run, no dilution. Same deck as v10/v11: source=7, paper=5,
+tiprack_p20=9.
+
+### Configurations
+| config | layout file | contents |
+|---|---|---|
+| `configs/printing/four_clover_v12.yaml` | `four_clover_locations.yaml` | initial spacing sweep: 4 clovers at 2/3/4/5 mm droplet separation, 16 deposits, 80 µL |
+| `configs/printing/four_clover_grid_v12.yaml` | `four_clover_grid_locations.yaml` | generated 3×4 grid at 27 mm pitch, 12 clovers, 48 deposits, 240 µL |
+
+Geometry lives in the `*_locations.yaml` files, pulled in through the builder's
+existing `destination_config:` mechanism, so several run configs can share one layout.
+
+### Coordinate model
+```
+droplet position = reference_well center + clover center offset + droplet offset
+```
+Droplets are always `d1..d4`. Two equivalent geometry forms; the compact one always
+resolves to the explicit one internally:
+- explicit — `d1: {x_mm:, y_mm:}` ... all four (any asymmetric shape)
+- symmetric — `half_width_mm` / `half_height_mm`, optional `droplet_overrides:`
+
+**`half_width_mm` is the offset from the center, so opposing droplets are `2 ×` that
+far apart.** The ambiguous word "spacing" is not a config key anywhere.
+
+### Boundary checking
+The labware JSON has no printable-area field, so the usable box is derived from the
+well grid — the only geometry the OT-2 knows. `boundary_mode: grid` (default) grows the
+well-center bounding box by `edge_margin_mm` (4.5 mm = half the 9 mm pitch), which is
+exactly the 96 nominal print cells. `boundary_mode: labware` reconstructs the full
+127.76 × 85.48 mm footprint from `grid_inset_*`, cross-checked against the declared
+dimensions. Each droplet must fit **center ± `validation.droplet_radius_mm`**, and a
+boundary violation always hard-fails regardless of `validation.mode`.
+
+### Packing (paper_print_96_flat: 8×12 wells, exact 9.00 mm pitch, 99.00 × 63.00 mm grid)
+| clover pitch | wells skipped | columns × rows | clovers | droplets |
+|---|---|---|---|---|
+| 18 mm | every 2nd | 6 × 4 | 24 | 96 |
+| 27 mm | every 3rd | 4 × 3 | 12 | 48 |
+| 36 mm | every 4th | 3 × 2 | 6 | 24 |
+
+27 mm is the shipped default. These are geometric capacities only — the dried ring
+diameter for this ink/paper pair has never been measured, so tighten only with data.
+
+### Builder / plotter / tests
+```bash
+# build: validate -> embed -> generate -> simulate (dry run)
+python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_v12.yaml
+# offline layout map + coordinate report (no robot, reads the same YAML)
+python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
+# geometry unit tests (no OT-2, no simulation)
+python -m pytest tests/test_four_clover_geometry_v12.py
+```
+`scripts/plot_four_clover_layout.py` imports the protocol's own resolvers, so a plot
+can never disagree with what the robot will do.
+
+### Validation status
+- **Done here:** unit tests (35), build, Opentrons simulation of both the dry-run and
+  the live motion path, layout plots for both shipped configs.
+- **Requires the physical OT-2:** droplet placement accuracy at these millimetre
+  offsets, actual dried-ring diameter, and whether the ring overlap is usable.
+
+---
+
 ## Deferred (not this pass)
 - Physical relocation of `src/core` / `src/protocols` into a `src/printing/` package
   (large reference blast radius) — the numbered SOURCE files + this index provide

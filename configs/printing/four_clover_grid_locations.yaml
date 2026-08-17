@@ -1,0 +1,68 @@
+# Alternative four-clover layout: AUTO-GENERATED GRID of clover centers.
+#
+# Use this once a spacing has been chosen and many replicates of the same
+# geometry are wanted. Pair it with four_clover_grid_v12.yaml.
+#
+# See four_clover_locations.yaml for the half_width_mm / half_height_mm
+# terminology note -- half-offsets from the center, NOT droplet separation.
+#
+# ---------------------------------------------------------------------------
+# PACKING MATH (paper_print_96_flat: 8 x 12 wells, exact 9.00 mm pitch,
+# well-center bounding box 99.00 x 63.00 mm)
+# ---------------------------------------------------------------------------
+# Clover centers placed on every k-th well give floor(11/k)+1 columns and
+# floor(7/k)+1 rows:
+#
+#   k=2 -> 18 mm pitch -> 6 columns x 4 rows = 24 clovers ( 96 droplets)
+#   k=3 -> 27 mm pitch -> 4 columns x 3 rows = 12 clovers ( 48 droplets)
+#   k=4 -> 36 mm pitch -> 3 columns x 2 rows =  6 clovers ( 24 droplets)
+#
+# The clover pitch only has to clear the clover's own footprint plus two ring
+# radii, so 18 mm is geometrically comfortable for any half-offset up to ~5 mm.
+# It is NOT recommended as a starting point: the dried ring diameter for this
+# ink/paper pair has not been measured, so 27 mm is used below to guarantee no
+# cross-talk between neighbouring clovers on the first runs.
+destination:
+
+  default_clover_geometry:
+    half_width_mm: 2.0          # -> 4.0 mm between opposing droplets
+    half_height_mm: 2.0
+
+  clover_grid:
+    enabled: true
+    anchor_well: B2             # center of the top-left clover
+    rows: 3
+    columns: 4
+    x_pitch_mm: 27.0            # clover-to-clover center distance, X
+    y_pitch_mm: 27.0            # clover-to-clover center distance, Y
+    x_offset_mm: 0.0            # shifts the WHOLE grid without changing pitch
+    y_offset_mm: 0.0
+    name_prefix: clover         # generated names: clover_r1c1 ... clover_r3c4
+    row_direction: "-y"         # rows march from the anchor toward plate row H
+    column_direction: "+x"      # columns march toward plate column 12
+
+    # Optional per-clover escapes from the generated uniformity. Keys are the
+    # generated names above.
+    geometry_overrides: {}
+    #   clover_r1c1: {half_width_mm: 1.5, half_height_mm: 1.5}
+    #   clover_r1c2:                      # fully asymmetric example
+    #     d1: {x_mm: -1.5, y_mm:  2.0}
+    #     d2: {x_mm:  2.5, y_mm:  2.0}
+    #     d3: {x_mm: -1.5, y_mm: -2.0}
+    #     d4: {x_mm:  2.5, y_mm: -2.0}
+    layer_overrides: {}
+    #   clover_r1c1: 1
+    #   clover_r1c2: 2
+    #   clover_r1c3: 3
+
+  # Ignored while clover_grid.enabled is true; kept so flipping the switch back
+  # does not require re-typing the manual layout.
+  manual_clover_centers: []
+
+  paper_bounds:
+    x_dimension_mm: 127.76
+    y_dimension_mm: 85.48
+    grid_inset_x_mm: 14.38
+    grid_inset_y_mm: 11.24
+    boundary_mode: grid
+    edge_margin_mm: 4.5
