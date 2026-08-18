@@ -63,18 +63,19 @@ _PROTOCOL_BY_VERSION = {
     15: REPO / "src" / "protocols" / "generated" / "four_clover_print_v12_latest.py",
     16: REPO / "src" / "protocols" / "generated" / "four_clover_air_chase_v12_latest.py",
     17: REPO / "src" / "protocols" / "generated" / "four_clover_grid_v12_latest.py",
+    18: REPO / "src" / "protocols" / "generated" / "four_clover_spacing_v13_latest.py",
 }
 
 # Versions that target API 2.15 on the robot: run modes are baked into the generated
 # file at build time and no runtime parameters are sent.
-API_215_VERSIONS = {3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}
+API_215_VERSIONS = {3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
 
 # Versions with no camera step — skip all before/after image handling (and the SSH
 # it needs) for these.
-IMAGELESS_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}
+IMAGELESS_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
 
 # Versions with no run-mode matrix; the build's own simulation is the whole check.
-NO_MATRIX_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17}
+NO_MATRIX_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
 
 
 def _config_version(config_path: str | None) -> int:
