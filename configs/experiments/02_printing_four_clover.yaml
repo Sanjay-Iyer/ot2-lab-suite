@@ -41,7 +41,7 @@ run_modes: {dry_run: false, do_dilution: false, do_print: true}
 # slot = OT-2 deck position 1-11. Each slot may be used once.
 deck:
   source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
-  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  paper:       {slot: 11, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}   # slot 5 or 11
   tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
 
 pipette: {name: p20_single_gen2, mount: left}   # 1-20 uL, left mount
@@ -50,7 +50,7 @@ pipette: {name: p20_single_gen2, mount: left}   # 1-20 uL, left mount
 source:
   kind: 20 mL vial
   well: A1                      # vial position in the slot-7 rack (A1-A4 / B1-B4)
-  material: print test liquid (diluent)   # free-text liquid ID, appears in the run log
+  material: water (print test liquid)   # free-text liquid ID, appears in the run log
   loaded_volume_ul: 5000.0      # what you actually pour in; keep >= ~2.55 mL so
                                 # the 4 mm aspiration height stays submerged
   minimum_remaining_ul: 100.0   # refuse to plan a run that would drain below this

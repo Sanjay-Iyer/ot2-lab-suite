@@ -141,7 +141,13 @@ def _preflight(protocol, labware, p20):
     safety = CONFIG["safety"]
     p20_max = float(safety["p20_max_volume_ul"])
 
-    for role, expected in (("paper", 5), ("tiprack_p20", 9)):
+    # The paper slot is chosen by configuration (slot 5 and slot 11 both hold a
+    # paper substrate today), so only its legality is checked here. Slot
+    # uniqueness is enforced just below.
+    paper_slot = int(deck["paper"]["slot"])
+    if not (1 <= paper_slot <= 11):
+        errors.append(f"deck.paper slot must be 1-11, got {paper_slot}")
+    for role, expected in (("tiprack_p20", 9),):
         actual = int(deck[role]["slot"])
         if actual != expected:
             errors.append(f"deck.{role} must be slot {expected}, got {actual}")

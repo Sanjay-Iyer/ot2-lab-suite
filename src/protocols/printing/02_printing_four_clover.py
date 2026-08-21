@@ -790,8 +790,14 @@ def _preflight(protocol, labware, p20):
 
     # ── Deck ──────────────────────────────────────────────────────────────────────
     expected_source_slot = int(safety["expected_source_slot"])
+    # The paper slot is chosen by configuration (slot 5 and slot 11 both hold a
+    # paper substrate today), so only its legality is checked here. Slot
+    # uniqueness is enforced just below.
+    paper_slot = int(deck["paper"]["slot"])
+    if not (1 <= paper_slot <= 11):
+        errors.append(f"deck.paper slot must be 1-11, got {paper_slot}")
     for role, expected in (
-        ("source", expected_source_slot), ("paper", 5), ("tiprack_p20", 9)
+        ("source", expected_source_slot), ("tiprack_p20", 9)
     ):
         actual = int(deck[role]["slot"])
         if actual != expected:

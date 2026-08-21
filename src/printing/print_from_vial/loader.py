@@ -75,6 +75,10 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
     printing = loaded.pop("printing", {}) or {}
     tips = loaded.pop("tips", {}) or {}
     print_groups = loaded.pop("print_groups", None)
+    # Optional destination override: the machine profile supplies the paper
+    # labware, but more than one deck slot can hold a paper substrate, so an
+    # experiment may pick which one without editing the profile.
+    substrate = loaded.pop("substrate", {}) or {}
     # `targets:` remains accepted as the one-group shorthand.
     legacy_targets = loaded.pop("targets", None)
 
@@ -129,8 +133,8 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         "deck": {
             "source": resolved_source["deck_spec"],
             "paper": {
-                "slot": int(paper["slot"]),
-                "load_name": paper["load_name"],
+                "slot": int(substrate.get("slot", paper["slot"])),
+                "load_name": substrate.get("labware", paper["load_name"]),
                 "namespace": paper.get("namespace"),
                 "version": paper.get("version"),
             },

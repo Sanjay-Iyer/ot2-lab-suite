@@ -27,9 +27,16 @@ run_modes: {dry_run: false}
 source:
   type: vial_rack
   wells: [A1]                 # any vial(s); print groups pick from this list
-  material: print test liquid (diluent)
+  material: water (print test liquid)
   loaded_volume_ul: 5000.0
   minimum_remaining_ul: 100.0
+
+# --- destination substrate ------------------------------------------------------
+# The machine profile supplies the paper labware; this picks WHICH deck slot holds
+# it. Slot 5 and slot 11 both carry the same 96-position paper format. Remove this
+# block to fall back to the machine profile's slot 5.
+substrate:
+  slot: 11
 
 # To use the BRAND plate instead, replace the block above with:
 # source:
