@@ -1,0 +1,43 @@
+{
+  "schema_version": "print-job/v1",
+  "job_id": "b7dd8754631fb2abf77af7cd559cec51322207024b37ba1349992c7adb759b2e",
+  "name": "Stage 1 standard golden experiment",
+  "description": "Print 5 uL into rows A-B and replicate columns 1-2 with one and two layers.",
+  "substrate": {
+    "load_name": "paper_print_96_flat",
+    "namespace": "custom_beta",
+    "version": 1,
+    "definition_sha256": "ce43384fdcd35e10b0e5b8d66313326c510705383c41bed2573c8dd86fad0666",
+    "template_id": "well_plate_96/paper_print_96_flat_v1"
+  },
+  "materials": [
+    {
+      "material_id": "sample",
+      "display_name": "Sample"
+    }
+  ],
+  "pattern": {
+    "type": "well_selection",
+    "rows": ["A", "B"],
+    "columns": [1, 2],
+    "layers_by_row": {
+      "A": 1,
+      "B": 2
+    }
+  },
+  "deposition": {
+    "material_id": "sample",
+    "volume_ul": 5.0
+  },
+  "replication": {
+    "kind": "well_replicates",
+    "replicates": 2
+  },
+  "ordering_intent": {
+    "mode": "layer_then_row_then_column",
+    "inter_layer_rest_minutes": 0.25
+  },
+  "metadata": {
+    "fixture": "stage1-standard-golden"
+  }
+}

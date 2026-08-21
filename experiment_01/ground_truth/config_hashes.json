@@ -1,0 +1,12 @@
+{
+  "config_reference": "configs/experiments/01_printing_standard.yaml",
+  "machine_profile": "configs/machines/ot2_standard_printing_p20_v1.yaml",
+  "job_sha256": "2d290f38abca6a6a8e1c908e1d643e29d16a5db7c2c4c81a86570fdd3ae78a49",
+  "plan_canonical_sha256": "6f2c68045a956b67cd004f3115368691ee631ff0714e80261298a9d9d70b39f3",
+  "plan_physical_sha256": "3ce809a8133a95207da62fce7bea44977cf4b134490478559c903b6b77e77313",
+  "plan_setup_sha256": "5ca13fa16f2e4302f109bb69518e4593955465d3ddeca48d1619ecdd1bf02c34",
+  "plan_structural_sha256": "43f483f270f1db93dacf46c640b97a162b9c4d716d5489599ddd631bdc30b864",
+  "static_physical_sha256": "3ce809a8133a95207da62fce7bea44977cf4b134490478559c903b6b77e77313",
+  "static_setup_sha256": "5ca13fa16f2e4302f109bb69518e4593955465d3ddeca48d1619ecdd1bf02c34",
+  "static_structural_sha256": "43f483f270f1db93dacf46c640b97a162b9c4d716d5489599ddd631bdc30b864"
+}

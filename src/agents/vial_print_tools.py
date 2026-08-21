@@ -49,6 +49,7 @@ from src.utils.paths import (
 )
 from src.core.config_loader import merge_user_updates
 from src.utils.hashing import hash_file
+from src.printing.workflows.registry import builder_protocol_versions
 
 # ── Pipeline locations ────────────────────────────────────────────────────────────
 WORKFLOW_NAME    = "vial_dilution_print"
@@ -557,6 +558,16 @@ def update_vial_print_params(
         advanced_updates,
     )):
         return "No changes requested. Current config:\n\n" + _summary(_WORKING)
+    if advanced_updates:
+        allowed_roots = {"dilution", "color_series", "printing", "camera", "cv"}
+        forbidden = sorted(set(advanced_updates) - allowed_roots)
+        if forbidden:
+            return (
+                "REFUSED: advanced_updates may change only scientific vial-workflow "
+                f"fields ({', '.join(sorted(allowed_roots))}); blocked: "
+                f"{', '.join(forbidden)}. Hardware, run modes, and protocol version "
+                "are not AI-selectable."
+            )
     cfg, warnings = _apply_params(
         _WORKING, num_dilutions, droplet_volume_ul, num_replicates,
         paper_start_column, orange_plate_column, blue_plate_column,
@@ -643,15 +654,23 @@ def build_vial_print_protocol() -> str:
         return (f"BUILD/SIMULATION FAILED.\nUser YAML: "
                 f"{user_yaml.relative_to(PROJECT_ROOT)}\n\n{output[-1500:]}")
 
-    sha = hash_file(GENERATED_LATEST)
+    version = int(_WORKING.get("protocol_version", 1))
+    try:
+        _, generated_stem = builder_protocol_versions()[version]
+    except KeyError:
+        return f"BUILD FAILED — unknown protocol_version {version}."
+    generated_latest = GENERATED_PROTOCOL_DIR / f"{generated_stem}_latest.py"
+    if not generated_latest.is_file():
+        return f"BUILD FAILED — expected generated artifact is missing: {generated_latest}"
+    sha = hash_file(generated_latest)
     _LAST_SHA = sha
-    _record_pass(GENERATED_LATEST, sha, output)
+    _record_pass(generated_latest, sha, output)
     key = "\n".join(l for l in output.splitlines()
                     if any(k in l for k in ("Series:", "Printing", "Returned", "WARNING")))
     return (
         "SIMULATION OK.\n"
         f"  User YAML : {user_yaml.relative_to(PROJECT_ROOT)}\n"
-        f"  Protocol  : {GENERATED_LATEST.relative_to(PROJECT_ROOT)}\n"
+        f"  Protocol  : {generated_latest.relative_to(PROJECT_ROOT)}\n"
         f"  SHA256    : {sha}\n\n{key}"
     )
 

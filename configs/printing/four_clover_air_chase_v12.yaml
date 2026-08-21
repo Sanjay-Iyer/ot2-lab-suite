@@ -13,7 +13,7 @@ protocol_version: 16            # own builder ID -> four_clover_air_chase_v12_la
 protocol_label: v12-airchase
 destination_config: configs/printing/four_clover_air_chase_locations.yaml
 
-run_modes: {dry_run: false, do_dilution: false, do_print: true}
+run_modes: {dry_run: true, do_dilution: false, do_print: true}
 
 deck:
   source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
@@ -55,19 +55,9 @@ printing:
   push_out_ul: 3.0              # unchanged; extra plunger travel inside the same
                                 # dispense command (API 2.15 accepts up to 20 uL)
 
-  blow_out: true                # ON: every expulsion aid stacked together, since the
-                                # actual problem is liquid not leaving the tip at all.
-                                # TRADE-OFF: blow_out leaves the plunger unprepared, so
-                                # the API re-primes (drives to bottom, then draws back
-                                # up) before the NEXT aspirate -- on EVERY droplet, not
-                                # just the first. That priming stroke is what looked
-                                # like "suck air then push it out" earlier; with
-                                # blow_out: true it will now show up before every one
-                                # of the 4 droplets, and could pull a slightly larger
-                                # first "air" aspirate on drops 2-4 than drop 1. Watch
-                                # for growing droplet size across the run; if you see
-                                # it, that is this effect and push_out_ul alone
-                                # (with blow_out: false) avoids it.
+  blow_out: false               # OFF so the air chase is the only new expulsion
+                                # variable and the plunger is not re-primed before
+                                # every subsequent aspiration.
 
   inter_drop_delay_s: 2.0
   inter_layer_delay_s: 0.0

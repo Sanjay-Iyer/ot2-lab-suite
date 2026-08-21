@@ -1,0 +1,72 @@
+{
+  "fixture_version": 1,
+  "case_id": "four_clover_air_chase_v12_center_reference",
+  "reference_protocol": "src/protocols/printing/12_four_clover_paper_print.py",
+  "request": {
+    "family": "design",
+    "workflow_name": "four_clover_air_chase",
+    "design_name": "four_clover",
+    "parameters": {}
+  },
+  "resolved_config_sha256": "4400f4c3ebdb190110ba8af01d0bed10e220478fc5a43b435121d44f8102bae4",
+  "behavior": {
+    "source": {
+      "labware_role": "source",
+      "slot": 7,
+      "well": "A2",
+      "material": "BP",
+      "aspirate_height_mm": 4.0
+    },
+    "destination": {
+      "labware": "paper_print_96_flat",
+      "slot": 5,
+      "dispense_height_mm": 4.0
+    },
+    "pipette": {"name": "p20_single_gen2", "mount": "left"},
+    "tip": {"well": "A1", "return_tip": true, "held_for_complete_run": true},
+    "clovers": [
+      {
+        "clover_index": 1,
+        "name": "air_chase_5ul",
+        "reference_well": "E6",
+        "center_offset_mm": [4.5, 4.5],
+        "paper_center_xy_mm": [63.88, 42.74],
+        "deck_center_xy_mm": [196.38, 133.24],
+        "layers": 1,
+        "pre_air_chase_ul": 5.0
+      }
+    ],
+    "droplet_offsets_mm": {
+      "d1": [-2.0, 2.0],
+      "d2": [2.0, 2.0],
+      "d3": [-2.0, -2.0],
+      "d4": [2.0, -2.0]
+    },
+    "order_mode": "clover_by_clover",
+    "liquid_handling": {
+      "droplet_volume_ul": 5.0,
+      "pre_air_chase_ul": 5.0,
+      "trailing_air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 11.5,
+      "push_out_ul": 3.0,
+      "blow_out": false,
+      "aspirate_flow_ul_s": 3.0,
+      "dispense_flow_ul_s": 3.0
+    },
+    "delays": {
+      "inter_drop_s": 2.0,
+      "inter_layer_s": 0.0,
+      "inter_clover_s": 0.0
+    },
+    "total_clovers": 1,
+    "total_deposits": 4,
+    "total_liquid_ul": 20.0,
+    "deposits": [
+      {"sequence": 1, "clover_index": 1, "clover_name": "air_chase_5ul", "layer": 1, "droplet": "d1", "offset_xy_mm": [-2.0, 2.0], "paper_xy_mm": [61.88, 44.74], "deck_xy_mm": [194.38, 135.24], "liquid_volume_ul": 5.0},
+      {"sequence": 2, "clover_index": 1, "clover_name": "air_chase_5ul", "layer": 1, "droplet": "d2", "offset_xy_mm": [2.0, 2.0], "paper_xy_mm": [65.88, 44.74], "deck_xy_mm": [198.38, 135.24], "liquid_volume_ul": 5.0},
+      {"sequence": 3, "clover_index": 1, "clover_name": "air_chase_5ul", "layer": 1, "droplet": "d3", "offset_xy_mm": [-2.0, -2.0], "paper_xy_mm": [61.88, 40.74], "deck_xy_mm": [194.38, 131.24], "liquid_volume_ul": 5.0},
+      {"sequence": 4, "clover_index": 1, "clover_name": "air_chase_5ul", "layer": 1, "droplet": "d4", "offset_xy_mm": [2.0, -2.0], "paper_xy_mm": [65.88, 40.74], "deck_xy_mm": [198.38, 131.24], "liquid_volume_ul": 5.0}
+    ]
+  }
+}

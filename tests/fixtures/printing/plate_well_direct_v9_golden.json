@@ -1,0 +1,60 @@
+{
+  "fixture_version": 1,
+  "case_id": "plate_well_direct_v9_small_reference",
+  "reference_protocol": "src/protocols/printing/09_plate_well_direct_paper_print_v9.py",
+  "request": {
+    "family": "standard",
+    "workflow_name": "plate_well_direct_v9",
+    "parameters": {
+      "droplet_volume_ul": 5.0,
+      "replicate_columns": [1, 2],
+      "layers_by_row": {"A": 1, "B": 2},
+      "rest_minutes": 0.25
+    }
+  },
+  "resolved_config_sha256": "d68425ca164804da9f101647f867a9816e979d7b63ffa52a3885023479037300",
+  "behavior": {
+    "source": {
+      "labware_role": "plate",
+      "slot": 4,
+      "well": "A1",
+      "material": "sample",
+      "aspirate_height_mm": 1.0
+    },
+    "destination": {
+      "labware": "paper_print_96_flat",
+      "slot": 5,
+      "dispense_height_mm": 4.0
+    },
+    "pipette": {"name": "p20_single_gen2", "mount": "left"},
+    "tip": {"well": "A1", "return_tip": true, "held_for_complete_run": true},
+    "layers_by_row": {"A": 1, "B": 2},
+    "replicate_columns": [1, 2],
+    "order_mode": "layer_then_row_then_column",
+    "liquid_handling": {
+      "droplet_volume_ul": 5.0,
+      "trailing_air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "aspirate_flow_ul_s": 3.0,
+      "dispense_flow_ul_s": 3.0
+    },
+    "delays": {
+      "post_dispense_s": 2.0,
+      "rest_minutes_between_nonfinal_layer_passes": 0.25,
+      "total_rest_minutes": 0.25
+    },
+    "total_deposits": 6,
+    "total_liquid_ul": 30.0,
+    "deposits": [
+      {"sequence": 1, "layer": 1, "source_well": "A1", "destination_well": "A1", "destination_xy_mm": [14.38, 74.24], "liquid_volume_ul": 5.0},
+      {"sequence": 2, "layer": 1, "source_well": "A1", "destination_well": "A2", "destination_xy_mm": [23.38, 74.24], "liquid_volume_ul": 5.0},
+      {"sequence": 3, "layer": 1, "source_well": "A1", "destination_well": "B1", "destination_xy_mm": [14.38, 65.24], "liquid_volume_ul": 5.0},
+      {"sequence": 4, "layer": 1, "source_well": "A1", "destination_well": "B2", "destination_xy_mm": [23.38, 65.24], "liquid_volume_ul": 5.0},
+      {"sequence": 5, "layer": 2, "source_well": "A1", "destination_well": "B1", "destination_xy_mm": [14.38, 65.24], "liquid_volume_ul": 5.0},
+      {"sequence": 6, "layer": 2, "source_well": "A1", "destination_well": "B2", "destination_xy_mm": [23.38, 65.24], "liquid_volume_ul": 5.0}
+    ]
+  }
+}

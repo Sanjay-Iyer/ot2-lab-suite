@@ -1,0 +1,26 @@
+family: well_plate_96
+schema_version: 1
+identity:
+  load_name: paper_print_96_spacing_8_v1
+  display_name: Paper Print Surface 96 (8 mm pitch)
+  version: 1
+  namespace: custom_beta
+  description: Paper reference geometry with 8 mm center pitch.
+  manufacturer: custom
+regularity:
+  same_well_shape_and_size: true
+  evenly_spaced_rows: true
+  evenly_spaced_columns: true
+  exclude_from_position_check: false
+footprint: {length_mm: 127.76, width_mm: 85.48, height_mm: 14.0}
+grid: {rows: 8, columns: 12}
+well:
+  shape: circular
+  volume_ul: 360
+  diameter_mm: 6.86
+  bottom_shape: flat
+  depth_mm: 0.1
+  well_bottom_z_mm: 6.0
+spacing: {x_spacing_mm: 8.0, y_spacing_mm: 8.0}
+offset: {x_offset_mm: 14.38, y_offset_mm: 74.24}
+stacking: {mode: none}

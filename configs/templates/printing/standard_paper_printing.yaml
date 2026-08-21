@@ -1,0 +1,17 @@
+schema_version: printing-experiment-template/v1
+template_id: standard_paper_printing/v1
+description: Scientist-facing exact-well paper printing backed by trusted v9 behavior.
+workflow:
+  family: standard
+  name: plate_well_direct_v9
+capability_config_reference: configs/printing/plate_well_direct_print_v9.yaml
+defaults:
+  substrate_id: paper_print_96_flat
+  material_id: sample
+  material_display_name: Sample
+  droplet_volume_ul: 5.0
+  ordering_mode: layer_then_row_then_column
+  inter_layer_rest_minutes: 5.0
+constraints:
+  allowed_layout: well_conditions
+  maximum_positions: 96

@@ -1,0 +1,192 @@
+# =============================================================================
+# TEMPLATE - four-clover paper-printing experiment
+# =============================================================================
+#
+# This file teaches the LANGUAGE of the four-clover printing workflow. It is not
+# a physically approved experiment. It is a simulation-safe worked example whose
+# neutral placeholder values are unrelated to any study in this repository.
+#
+# Copy it, delete what you do not need, and replace the placeholders with your
+# own science.
+#
+# THE ONE RULE
+#   You describe WHAT you want printed and WHERE. Deterministic Python decides
+#   HOW the robot does it. Nothing in this file is a robot instruction. There are
+#   no aspirate, dispense, move, or tip commands here, and no place to put one.
+#
+# WHAT THIS FILE MAY CONTAIN            WHAT IT MAY NEVER CONTAIN
+#   the liquid and which vial             deck slot numbers
+#   which paper positions to print on     calibrated aspiration heights
+#   how far apart the four droplets are   the validated dispense standoff
+#   the droplet volume                    air gap / pre-air chase / push out
+#   how many layers, and the rests        blow out, flow rates
+#   the print order                       pipette identity or tip choice
+#                                         labware load names or namespaces
+#                                         D1..D4 absolute XY coordinates
+#                                         Python of any kind
+#
+# Everything in the right-hand column lives in a machine profile, is owned by the
+# laboratory, and has been physically validated. Reference one; never restate or
+# invent those values.
+#
+# =============================================================================
+
+schema_version: four-clover-experiment-job/v1
+
+# -----------------------------------------------------------------------------
+# MACHINE  (laboratory-owned; reference it, do not inline it)
+# -----------------------------------------------------------------------------
+# The profile owns the deck (source vial rack, paper substrate, tip rack), the
+# pipette, the aspiration and park heights, the validated droplet release profile
+# (0.5 mm standoff above a 6.0 mm paper surface = 6.5 mm absolute), the printable
+# area, the spacing checks, and tip handling.
+#
+# If no registered profile matches your hardware, stop and ask. Do not edit a
+# profile to fit an experiment.
+machine_profile: configs/machines/ot2_four_clover_printing_p20_v1.yaml
+
+experiment:
+
+  # ---------------------------------------------------------------------------
+  # METADATA
+  # ---------------------------------------------------------------------------
+  metadata:
+    experiment_id: template_placeholder_clover      # lowercase, snake_case
+    title: Placeholder title - replace with your experiment
+    description: >-
+      One or two sentences a colleague could read to understand the point of the
+      experiment. This text is shown in the review before approval.
+    notes:
+      # Free-form record of any judgement call you made, especially a value the
+      # request did not state outright. Anything you had to decide rather than
+      # read belongs here, so a reviewer can challenge it.
+      example_note: >-
+        Record here why an unstated parameter was resolved the way it was.
+
+  # ---------------------------------------------------------------------------
+  # SOURCE  (the single liquid a human pours into the vial rack before the run)
+  # ---------------------------------------------------------------------------
+  # This workflow prints one liquid. It performs no dilution and no mixing - if
+  # the material settles, agitate the vial by hand before starting, or prepare it
+  # with the standard printing workflow instead.
+  #
+  #   well                  a vial position in the registered rack: A1-A4, B1-B4
+  #   loaded_volume_ul      how much you will actually pour in
+  #   minimum_remaining_ul  how much must still be there at the end. The resolver
+  #                         also enforces a separate, stricter rule: enough liquid
+  #                         must remain to keep the tip submerged at the profile's
+  #                         aspiration height, which on a wide 20 mL vial is a far
+  #                         larger number than a naive volume budget suggests.
+  source:
+    liquid_id: material_1                 # lowercase, snake_case
+    display_name: Placeholder material 1
+    well: A2
+    loaded_volume_ul: 5000.0
+    minimum_remaining_ul: 100.0
+
+  # ---------------------------------------------------------------------------
+  # PRINTING  (how the droplets are laid down)
+  # ---------------------------------------------------------------------------
+  #   droplet_volume_ul     liquid per droplet; the only volume actually
+  #                         deposited. Air handling is machine-owned and never
+  #                         counts against the source.
+  #
+  #   layers                repeated depositions of the WHOLE four-droplet
+  #                         pattern. 1 = print each clover once. 3 = print all
+  #                         four droplets, then do it twice more on the same
+  #                         coordinates. A per-clover override is available below.
+  #
+  #   inter_drop_delay_s    rest after every individual droplet
+  #   inter_layer_delay_s   rest between repeated depositions of a pattern,
+  #                         e.g. 300.0 to let a layer dry before the next
+  #   inter_clover_delay_s  rest when moving on to the next pattern
+  #                         Omit any of these, or set 0, for no rest.
+  #
+  #   order                 clover_by_clover      finish one pattern (all its
+  #                                               layers, D1..D4) before starting
+  #                                               the next
+  #                         position_by_position  all D1s across every pattern,
+  #                                               then all D2s, and so on. Use it
+  #                                               to maximise drying time within
+  #                                               a single pattern.
+  printing:
+    droplet_volume_ul: 4.0
+    layers: 1
+    inter_drop_delay_s: 2.0
+    inter_layer_delay_s: 0.0
+    inter_clover_delay_s: 0.0
+    order: clover_by_clover
+
+  # ---------------------------------------------------------------------------
+  # PATTERN GEOMETRY
+  # ---------------------------------------------------------------------------
+  # A clover is four droplets around a centre point:
+  #
+  #     D1 ....... D2      +y is toward paper row A
+  #        .  C  .         +x is toward paper column 12
+  #     D3 ....... D4
+  #
+  # half_width_mm and half_height_mm are offsets FROM THE CENTRE, so two opposing
+  # droplets end up TWICE that far apart:
+  #
+  #     half 1.0 mm -> 2.0 mm between opposing droplets
+  #     half 2.5 mm -> 5.0 mm between opposing droplets
+  #
+  # If a request says "3 mm separation", that is half_width_mm: 1.5. Never write
+  # the separation itself into these fields.
+  #
+  # Deterministic Python turns the centre and these half-offsets into the four
+  # absolute D1-D4 coordinates. Do not compute them here; there is nowhere to put
+  # them and they would be ignored.
+  default_geometry:
+    half_width_mm: 2.0        # -> 4.0 mm between opposing droplets
+    half_height_mm: 2.0
+
+  # ---------------------------------------------------------------------------
+  # CLOVERS  (one entry per printed pattern)
+  # ---------------------------------------------------------------------------
+  # The number of entries IS the number of clover patterns.
+  #
+  #   name              lowercase, snake_case, unique within the experiment
+  #   reference_well    any paper position A1-H12; its centre is the anchor
+  #   x_offset_mm       optional shift of the pattern centre off that well, for
+  #   y_offset_mm       placing a pattern between wells. Omit for 0.
+  #   geometry          optional per-clover override of default_geometry, which
+  #                     is how a spacing comparison is expressed
+  #   layers            optional per-clover override of printing.layers
+  clovers:
+    - name: placeholder_a
+      reference_well: C3
+
+    - name: placeholder_b
+      reference_well: C6
+      geometry: {half_width_mm: 1.5, half_height_mm: 1.5}   # 3.0 mm apart
+
+    # A pattern placed off-well, printed three times with its own rest:
+    # - name: placeholder_c
+    #   reference_well: E6
+    #   x_offset_mm: 4.5
+    #   y_offset_mm: 4.5
+    #   layers: 3
+
+# =============================================================================
+# WHAT HAPPENS NEXT
+# =============================================================================
+#
+#   this YAML
+#     -> FourCloverExperimentJobV1    strict schema; unknown keys are rejected
+#     -> deterministic resolution     the frozen geometry engine computes every
+#                                     D1-D4 coordinate, then the plan is checked
+#                                     for pipette capacity, droplets leaving the
+#                                     paper, droplet collisions, and a source
+#                                     that would uncover the tip
+#     -> ResolvedCloverPlanV1         every coordinate, fully determined
+#     -> human review                 you read the resolved patterns
+#     -> 02_printing_four_clover.py   the frozen executor, never rewritten
+#     -> OT-2 simulation              forced motion, locally
+#
+# If validation rejects this file, fix the SCIENCE it describes. Do not work
+# around a rejection by editing the machine profile, the resolver, or the
+# executor - those exist precisely to stop an unsafe experiment reaching
+# hardware.
+# =============================================================================

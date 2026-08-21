@@ -1,0 +1,295 @@
+EXPERIMENT: Standard SERS paper printing - nanoparticle and crystal violet series
+  experiment_id : experiment_01_standard_printing
+  job_id        : 2d290f38abca6a6a8e1c908e1d643e29d16a5db7c2c4c81a86570fdd3ae78a49
+  plan_id       : 6f2c68045a956b67cd004f3115368691ee631ff0714e80261298a9d9d70b39f3
+  description   : Four printed columns on one 96-position paper substrate. Column 1 pairs an eight-point twofold nanoparticle series with stock crystal violet. Column 2 repeats the nanoparticle deposition three times per position with five minutes between layers before the same stock crystal violet. Column 3 is a matched stock-crystal-violet-only control column. Column 4 is an eight-point twofold crystal violet dilution series with no nanoparticles.
+
+DECK
+  slot  7  vial_rack    custom_beta/tuberack_3dprint_20ml_8vials_v2 v1
+  slot  4  plate        custom_beta/corning_96_wellplate_360ul_custom v1
+  slot  5  paper        custom_beta/paper_print_96_flat v1
+  slot  9  tiprack      opentrons/opentrons_96_tiprack_20ul v1
+  pipette   p20_single_gen2 on left mount (1-20 uL)
+
+LIQUIDS LOADED BY THE OPERATOR
+  vial_rack:A1   np_stock       Plasmonic nanoparticle stock - load 5000 uL, experiment consumes 59.7656 uL
+  vial_rack:A2   np_diluent     Nanoparticle diluent - load 5000 uL, experiment consumes 180.234 uL
+  vial_rack:A3   cv_stock       Crystal violet stock - load 5000 uL, experiment consumes 179.766 uL
+  vial_rack:A4   cv_diluent     Crystal violet diluent - load 5000 uL, experiment consumes 180.234 uL
+
+PREPARATION
+  np (back_calculated_serial_cascade)
+    A1   np_stock       1/1 - stock 59.7656 uL
+    B1   np_1_2x        1/2 - diluent 29.7656 uL, carried in 29.7656 uL
+    C1   np_1_4x        1/4 - diluent 29.5312 uL, carried in 29.5312 uL
+    D1   np_1_8x        1/8 - diluent 29.0625 uL, carried in 29.0625 uL
+    E1   np_1_16x       1/16 - diluent 28.125 uL, carried in 28.125 uL
+    F1   np_1_32x       1/32 - diluent 26.25 uL, carried in 26.25 uL
+    G1   np_1_64x       1/64 - diluent 22.5 uL, carried in 22.5 uL
+    H1   np_1_128x      1/128 - diluent 15 uL, carried in 15 uL
+  cv (back_calculated_serial_cascade)
+    A2   cv_stock       1/1 - stock 59.7656 uL
+    B2   cv_1_2x        1/2 - diluent 29.7656 uL, carried in 29.7656 uL
+    C2   cv_1_4x        1/4 - diluent 29.5312 uL, carried in 29.5312 uL
+    D2   cv_1_8x        1/8 - diluent 29.0625 uL, carried in 29.0625 uL
+    E2   cv_1_16x       1/16 - diluent 28.125 uL, carried in 28.125 uL
+    F2   cv_1_32x       1/32 - diluent 26.25 uL, carried in 26.25 uL
+    G2   cv_1_64x       1/64 - diluent 22.5 uL, carried in 22.5 uL
+    H2   cv_1_128x      1/128 - diluent 15 uL, carried in 15 uL
+
+RESOLVED LIQUID OPERATIONS
+  prepare_np_stock [transfer] np_stock vial_rack:A1 -> plate:A1, 59.7656 uL total in 3 chunk(s), result=np_stock
+  prepare_np_diluent_2 [transfer] np_diluent vial_rack:A2 -> plate:B1, 29.7656 uL total in 2 chunk(s), result=np_diluent
+  prepare_np_diluent_3 [transfer] np_diluent vial_rack:A2 -> plate:C1, 29.5312 uL total in 2 chunk(s), result=np_diluent
+  prepare_np_diluent_4 [transfer] np_diluent vial_rack:A2 -> plate:D1, 29.0625 uL total in 2 chunk(s), result=np_diluent
+  prepare_np_diluent_5 [transfer] np_diluent vial_rack:A2 -> plate:E1, 28.125 uL total in 2 chunk(s), result=np_diluent
+  prepare_np_diluent_6 [transfer] np_diluent vial_rack:A2 -> plate:F1, 26.25 uL total in 2 chunk(s), result=np_diluent
+  prepare_np_diluent_7 [transfer] np_diluent vial_rack:A2 -> plate:G1, 22.5 uL total in 2 chunk(s), result=np_diluent
+  prepare_np_diluent_8 [transfer] np_diluent vial_rack:A2 -> plate:H1, 15 uL total in 1 chunk(s), result=np_diluent
+  serial_np_1_to_2 [transfer] np_stock plate:A1 -> plate:B1, 29.7656 uL total in 2 chunk(s), result=np_1_2x
+  serial_np_2_to_3 [transfer] np_1_2x plate:B1 -> plate:C1, 29.5312 uL total in 2 chunk(s), result=np_1_4x
+  serial_np_3_to_4 [transfer] np_1_4x plate:C1 -> plate:D1, 29.0625 uL total in 2 chunk(s), result=np_1_8x
+  serial_np_4_to_5 [transfer] np_1_8x plate:D1 -> plate:E1, 28.125 uL total in 2 chunk(s), result=np_1_16x
+  serial_np_5_to_6 [transfer] np_1_16x plate:E1 -> plate:F1, 26.25 uL total in 2 chunk(s), result=np_1_32x
+  serial_np_6_to_7 [transfer] np_1_32x plate:F1 -> plate:G1, 22.5 uL total in 2 chunk(s), result=np_1_64x
+  serial_np_7_to_8 [transfer] np_1_64x plate:G1 -> plate:H1, 15 uL total in 1 chunk(s), result=np_1_128x
+  prepare_cv_stock [transfer] cv_stock vial_rack:A3 -> plate:A2, 59.7656 uL total in 3 chunk(s), result=cv_stock
+  prepare_cv_diluent_2 [transfer] cv_diluent vial_rack:A4 -> plate:B2, 29.7656 uL total in 2 chunk(s), result=cv_diluent
+  prepare_cv_diluent_3 [transfer] cv_diluent vial_rack:A4 -> plate:C2, 29.5312 uL total in 2 chunk(s), result=cv_diluent
+  prepare_cv_diluent_4 [transfer] cv_diluent vial_rack:A4 -> plate:D2, 29.0625 uL total in 2 chunk(s), result=cv_diluent
+  prepare_cv_diluent_5 [transfer] cv_diluent vial_rack:A4 -> plate:E2, 28.125 uL total in 2 chunk(s), result=cv_diluent
+  prepare_cv_diluent_6 [transfer] cv_diluent vial_rack:A4 -> plate:F2, 26.25 uL total in 2 chunk(s), result=cv_diluent
+  prepare_cv_diluent_7 [transfer] cv_diluent vial_rack:A4 -> plate:G2, 22.5 uL total in 2 chunk(s), result=cv_diluent
+  prepare_cv_diluent_8 [transfer] cv_diluent vial_rack:A4 -> plate:H2, 15 uL total in 1 chunk(s), result=cv_diluent
+  serial_cv_1_to_2 [transfer] cv_stock plate:A2 -> plate:B2, 29.7656 uL total in 2 chunk(s), result=cv_1_2x
+  serial_cv_2_to_3 [transfer] cv_1_2x plate:B2 -> plate:C2, 29.5312 uL total in 2 chunk(s), result=cv_1_4x
+  serial_cv_3_to_4 [transfer] cv_1_4x plate:C2 -> plate:D2, 29.0625 uL total in 2 chunk(s), result=cv_1_8x
+  serial_cv_4_to_5 [transfer] cv_1_8x plate:D2 -> plate:E2, 28.125 uL total in 2 chunk(s), result=cv_1_16x
+  serial_cv_5_to_6 [transfer] cv_1_16x plate:E2 -> plate:F2, 26.25 uL total in 2 chunk(s), result=cv_1_32x
+  serial_cv_6_to_7 [transfer] cv_1_32x plate:F2 -> plate:G2, 22.5 uL total in 2 chunk(s), result=cv_1_64x
+  serial_cv_7_to_8 [transfer] cv_1_64x plate:G2 -> plate:H2, 15 uL total in 1 chunk(s), result=cv_1_128x
+  mix_np_stock [mix] np_stock at plate:A1, 3 x 3 uL
+  mix_np_2 [mix] np_1_2x at plate:B1, 3 x 3 uL
+  mix_np_3 [mix] np_1_4x at plate:C1, 3 x 3 uL
+  mix_np_4 [mix] np_1_8x at plate:D1, 3 x 3 uL
+  mix_np_5 [mix] np_1_16x at plate:E1, 3 x 3 uL
+  mix_np_6 [mix] np_1_32x at plate:F1, 3 x 3 uL
+  mix_np_7 [mix] np_1_64x at plate:G1, 3 x 3 uL
+  mix_np_8 [mix] np_1_128x at plate:H1, 3 x 3 uL
+  mix_cv_stock [mix] cv_stock at plate:A2, 3 x 3 uL
+  mix_cv_2 [mix] cv_1_2x at plate:B2, 3 x 3 uL
+  mix_cv_3 [mix] cv_1_4x at plate:C2, 3 x 3 uL
+  mix_cv_4 [mix] cv_1_8x at plate:D2, 3 x 3 uL
+  mix_cv_5 [mix] cv_1_16x at plate:E2, 3 x 3 uL
+  mix_cv_6 [mix] cv_1_32x at plate:F2, 3 x 3 uL
+  mix_cv_7 [mix] cv_1_64x at plate:G2, 3 x 3 uL
+  mix_cv_8 [mix] cv_1_128x at plate:H2, 3 x 3 uL
+  mix_before_column1_np_A1 [mix] np_stock at plate:A1, 3 x 3 uL
+  mix_before_column1_np_B1 [mix] np_1_2x at plate:B1, 3 x 3 uL
+  mix_before_column1_np_C1 [mix] np_1_4x at plate:C1, 3 x 3 uL
+  mix_before_column1_np_D1 [mix] np_1_8x at plate:D1, 3 x 3 uL
+  mix_before_column1_np_E1 [mix] np_1_16x at plate:E1, 3 x 3 uL
+  mix_before_column1_np_F1 [mix] np_1_32x at plate:F1, 3 x 3 uL
+  mix_before_column1_np_G1 [mix] np_1_64x at plate:G1, 3 x 3 uL
+  mix_before_column1_np_H1 [mix] np_1_128x at plate:H1, 3 x 3 uL
+  mix_before_column2_np_drop_1_A2 [mix] np_stock at plate:A1, 3 x 3 uL
+  mix_before_column2_np_drop_1_B2 [mix] np_1_2x at plate:B1, 3 x 3 uL
+  mix_before_column2_np_drop_1_C2 [mix] np_1_4x at plate:C1, 3 x 3 uL
+  mix_before_column2_np_drop_1_D2 [mix] np_1_8x at plate:D1, 3 x 3 uL
+  mix_before_column2_np_drop_1_E2 [mix] np_1_16x at plate:E1, 3 x 3 uL
+  mix_before_column2_np_drop_1_F2 [mix] np_1_32x at plate:F1, 3 x 3 uL
+  mix_before_column2_np_drop_1_G2 [mix] np_1_64x at plate:G1, 3 x 3 uL
+  mix_before_column2_np_drop_1_H2 [mix] np_1_128x at plate:H1, 3 x 3 uL
+  mix_before_column2_np_drop_2_A2 [mix] np_stock at plate:A1, 3 x 3 uL
+  mix_before_column2_np_drop_2_B2 [mix] np_1_2x at plate:B1, 3 x 3 uL
+  mix_before_column2_np_drop_2_C2 [mix] np_1_4x at plate:C1, 3 x 3 uL
+  mix_before_column2_np_drop_2_D2 [mix] np_1_8x at plate:D1, 3 x 3 uL
+  mix_before_column2_np_drop_2_E2 [mix] np_1_16x at plate:E1, 3 x 3 uL
+  mix_before_column2_np_drop_2_F2 [mix] np_1_32x at plate:F1, 3 x 3 uL
+  mix_before_column2_np_drop_2_G2 [mix] np_1_64x at plate:G1, 3 x 3 uL
+  mix_before_column2_np_drop_2_H2 [mix] np_1_128x at plate:H1, 3 x 3 uL
+  mix_before_column2_np_drop_3_A2 [mix] np_stock at plate:A1, 3 x 3 uL
+  mix_before_column2_np_drop_3_B2 [mix] np_1_2x at plate:B1, 3 x 3 uL
+  mix_before_column2_np_drop_3_C2 [mix] np_1_4x at plate:C1, 3 x 3 uL
+  mix_before_column2_np_drop_3_D2 [mix] np_1_8x at plate:D1, 3 x 3 uL
+  mix_before_column2_np_drop_3_E2 [mix] np_1_16x at plate:E1, 3 x 3 uL
+  mix_before_column2_np_drop_3_F2 [mix] np_1_32x at plate:F1, 3 x 3 uL
+  mix_before_column2_np_drop_3_G2 [mix] np_1_64x at plate:G1, 3 x 3 uL
+  mix_before_column2_np_drop_3_H2 [mix] np_1_128x at plate:H1, 3 x 3 uL
+  mix_before_column4_cv_A4 [mix] cv_stock at plate:A2, 3 x 3 uL
+  mix_before_column4_cv_B4 [mix] cv_1_2x at plate:B2, 3 x 3 uL
+  mix_before_column4_cv_C4 [mix] cv_1_4x at plate:C2, 3 x 3 uL
+  mix_before_column4_cv_D4 [mix] cv_1_8x at plate:D2, 3 x 3 uL
+  mix_before_column4_cv_E4 [mix] cv_1_16x at plate:E2, 3 x 3 uL
+  mix_before_column4_cv_F4 [mix] cv_1_32x at plate:F2, 3 x 3 uL
+  mix_before_column4_cv_G4 [mix] cv_1_64x at plate:G2, 3 x 3 uL
+  mix_before_column4_cv_H4 [mix] cv_1_128x at plate:H2, 3 x 3 uL
+
+SUBSTRATE LAYOUT
+Substrate 'paper' - 32 printed positions
+  Row A
+    A1: np_stock 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    A2: np_stock 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    A3: cv_stock 1 x 5 uL
+    A4: cv_stock 1 x 5 uL
+  Row B
+    B1: np_1_2x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    B2: np_1_2x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    B3: cv_stock 1 x 5 uL
+    B4: cv_1_2x 1 x 5 uL
+  Row C
+    C1: np_1_4x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    C2: np_1_4x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    C3: cv_stock 1 x 5 uL
+    C4: cv_1_4x 1 x 5 uL
+  Row D
+    D1: np_1_8x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    D2: np_1_8x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    D3: cv_stock 1 x 5 uL
+    D4: cv_1_8x 1 x 5 uL
+  Row E
+    E1: np_1_16x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    E2: np_1_16x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    E3: cv_stock 1 x 5 uL
+    E4: cv_1_16x 1 x 5 uL
+  Row F
+    F1: np_1_32x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    F2: np_1_32x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    F3: cv_stock 1 x 5 uL
+    F4: cv_1_32x 1 x 5 uL
+  Row G
+    G1: np_1_64x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    G2: np_1_64x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    G3: cv_stock 1 x 5 uL
+    G4: cv_1_64x 1 x 5 uL
+  Row H
+    H1: np_1_128x 1 x 5 uL; then [after 300 s rest] cv_stock 1 x 5 uL
+    H2: np_1_128x 3 x 5 uL at 300 s spacing; then [after 300 s rest] cv_stock 1 x 5 uL
+    H3: cv_stock 1 x 5 uL
+    H4: cv_1_128x 1 x 5 uL
+
+PRINT SOURCES AND DESTINATIONS
+  np_stock: plate:A1 -> paper:A1
+  np_1_2x: plate:B1 -> paper:B1
+  np_1_4x: plate:C1 -> paper:C1
+  np_1_8x: plate:D1 -> paper:D1
+  np_1_16x: plate:E1 -> paper:E1
+  np_1_32x: plate:F1 -> paper:F1
+  np_1_64x: plate:G1 -> paper:G1
+  np_1_128x: plate:H1 -> paper:H1
+  cv_stock: vial_rack:A3 -> paper:A1
+  cv_stock: vial_rack:A3 -> paper:B1
+  cv_stock: vial_rack:A3 -> paper:C1
+  cv_stock: vial_rack:A3 -> paper:D1
+  cv_stock: vial_rack:A3 -> paper:E1
+  cv_stock: vial_rack:A3 -> paper:F1
+  cv_stock: vial_rack:A3 -> paper:G1
+  cv_stock: vial_rack:A3 -> paper:H1
+  np_stock: plate:A1 -> paper:A2
+  np_1_2x: plate:B1 -> paper:B2
+  np_1_4x: plate:C1 -> paper:C2
+  np_1_8x: plate:D1 -> paper:D2
+  np_1_16x: plate:E1 -> paper:E2
+  np_1_32x: plate:F1 -> paper:F2
+  np_1_64x: plate:G1 -> paper:G2
+  np_1_128x: plate:H1 -> paper:H2
+  cv_stock: vial_rack:A3 -> paper:A2
+  cv_stock: vial_rack:A3 -> paper:B2
+  cv_stock: vial_rack:A3 -> paper:C2
+  cv_stock: vial_rack:A3 -> paper:D2
+  cv_stock: vial_rack:A3 -> paper:E2
+  cv_stock: vial_rack:A3 -> paper:F2
+  cv_stock: vial_rack:A3 -> paper:G2
+  cv_stock: vial_rack:A3 -> paper:H2
+  cv_stock: vial_rack:A3 -> paper:A3
+  cv_stock: vial_rack:A3 -> paper:B3
+  cv_stock: vial_rack:A3 -> paper:C3
+  cv_stock: vial_rack:A3 -> paper:D3
+  cv_stock: vial_rack:A3 -> paper:E3
+  cv_stock: vial_rack:A3 -> paper:F3
+  cv_stock: vial_rack:A3 -> paper:G3
+  cv_stock: vial_rack:A3 -> paper:H3
+  cv_stock: plate:A2 -> paper:A4
+  cv_1_2x: plate:B2 -> paper:B4
+  cv_1_4x: plate:C2 -> paper:C4
+  cv_1_8x: plate:D2 -> paper:D4
+  cv_1_16x: plate:E2 -> paper:E4
+  cv_1_32x: plate:F2 -> paper:F4
+  cv_1_64x: plate:G2 -> paper:G4
+  cv_1_128x: plate:H2 -> paper:H4
+
+CONDITIONS, CONTROLS, AND REPLICATES
+  paper:A1 condition=column1_np purpose=sample series point 1/8
+  paper:B1 condition=column1_np purpose=sample series point 2/8
+  paper:C1 condition=column1_np purpose=sample series point 3/8
+  paper:D1 condition=column1_np purpose=sample series point 4/8
+  paper:E1 condition=column1_np purpose=sample series point 5/8
+  paper:F1 condition=column1_np purpose=sample series point 6/8
+  paper:G1 condition=column1_np purpose=sample series point 7/8
+  paper:H1 condition=column1_np purpose=sample series point 8/8
+  paper:A1 condition=column1_cv purpose=sample replicate 1/8
+  paper:B1 condition=column1_cv purpose=sample replicate 2/8
+  paper:C1 condition=column1_cv purpose=sample replicate 3/8
+  paper:D1 condition=column1_cv purpose=sample replicate 4/8
+  paper:E1 condition=column1_cv purpose=sample replicate 5/8
+  paper:F1 condition=column1_cv purpose=sample replicate 6/8
+  paper:G1 condition=column1_cv purpose=sample replicate 7/8
+  paper:H1 condition=column1_cv purpose=sample replicate 8/8
+  paper:A2 condition=column2_np purpose=sample series point 1/8
+  paper:B2 condition=column2_np purpose=sample series point 2/8
+  paper:C2 condition=column2_np purpose=sample series point 3/8
+  paper:D2 condition=column2_np purpose=sample series point 4/8
+  paper:E2 condition=column2_np purpose=sample series point 5/8
+  paper:F2 condition=column2_np purpose=sample series point 6/8
+  paper:G2 condition=column2_np purpose=sample series point 7/8
+  paper:H2 condition=column2_np purpose=sample series point 8/8
+  paper:A2 condition=column2_cv purpose=sample replicate 1/8
+  paper:B2 condition=column2_cv purpose=sample replicate 2/8
+  paper:C2 condition=column2_cv purpose=sample replicate 3/8
+  paper:D2 condition=column2_cv purpose=sample replicate 4/8
+  paper:E2 condition=column2_cv purpose=sample replicate 5/8
+  paper:F2 condition=column2_cv purpose=sample replicate 6/8
+  paper:G2 condition=column2_cv purpose=sample replicate 7/8
+  paper:H2 condition=column2_cv purpose=sample replicate 8/8
+  paper:A3 condition=column3_cv_control purpose=control replicate 1/8
+  paper:B3 condition=column3_cv_control purpose=control replicate 2/8
+  paper:C3 condition=column3_cv_control purpose=control replicate 3/8
+  paper:D3 condition=column3_cv_control purpose=control replicate 4/8
+  paper:E3 condition=column3_cv_control purpose=control replicate 5/8
+  paper:F3 condition=column3_cv_control purpose=control replicate 6/8
+  paper:G3 condition=column3_cv_control purpose=control replicate 7/8
+  paper:H3 condition=column3_cv_control purpose=control replicate 8/8
+  paper:A4 condition=column4_cv purpose=control series point 1/8
+  paper:B4 condition=column4_cv purpose=control series point 2/8
+  paper:C4 condition=column4_cv purpose=control series point 3/8
+  paper:D4 condition=column4_cv purpose=control series point 4/8
+  paper:E4 condition=column4_cv purpose=control series point 5/8
+  paper:F4 condition=column4_cv purpose=control series point 6/8
+  paper:G4 condition=column4_cv purpose=control series point 7/8
+  paper:H4 condition=column4_cv purpose=control series point 8/8
+
+PROCEDURE AS REQUESTED
+  np [serial_dilution] - 8 points, 1/2 steps, 30 uL usable each
+      Eight twofold nanoparticle conditions from stock through 1/128, each retaining 30 uL of usable volume for printing.
+  cv [serial_dilution] - 8 points, 1/2 steps, 30 uL usable each
+      Eight twofold crystal violet conditions from stock through 1/128 for the nanoparticle-free dilution column.
+  column1_np [print] - targets=['A1', 'B1', 'C1', 'D1', 'E1', 'F1', 'G1', 'H1'], 1 x 5 uL, purpose=sample, 300 s rest after each pass, mix 3x3 uL before aspirating
+      dry all column-1 nanoparticle deposits before stock CV
+  column1_cv [print] - targets=['A1', 'B1', 'C1', 'D1', 'E1', 'F1', 'G1', 'H1'], 1 x 5 uL, purpose=sample
+      stock crystal violet over the single nanoparticle deposit
+  column2_np [print] - targets=['A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2'], 3 x 5 uL, purpose=sample, 300 s rest after each pass, mix 3x3 uL before aspirating
+      dry each column-2 nanoparticle layer before the next
+  column2_cv [print] - targets=['A2', 'B2', 'C2', 'D2', 'E2', 'F2', 'G2', 'H2'], 1 x 5 uL, purpose=sample
+      stock crystal violet over the three nanoparticle layers
+  column3_cv_control [print] - targets=['A3', 'B3', 'C3', 'D3', 'E3', 'F3', 'G3', 'H3'], 1 x 5 uL, purpose=control
+      Eight replicate paper-plus-stock-crystal-violet controls at the same volume and concentration as the nanoparticle conditions.
+  column4_cv [print] - targets=['A4', 'B4', 'C4', 'D4', 'E4', 'F4', 'G4', 'H4'], 1 x 5 uL, purpose=control, mix 3x3 uL before aspirating
+      Nanoparticle-free crystal violet dilution series, reported as relative dilution factors.
+
+TOTALS
+  physical actions          : 187
+  transfers / mixes / prints: 58 / 56 / 64
+  printed liquid            : 320 uL
+  configured rests          : 4 totalling 1200 s
+  tips consumed             : 61
+  source accessibility      : PASS over 178 checked actions (minimum margin 2.608 uL)

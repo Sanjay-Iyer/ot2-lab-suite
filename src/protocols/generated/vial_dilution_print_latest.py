@@ -69,7 +69,7 @@ metadata = {
 }
 
 # ── Runtime-parameter DEFAULTS (operator overrides in the App per run) ──────────
-DEFAULT_DRY_RUN     = False
+DEFAULT_DRY_RUN     = True
 DEFAULT_DO_DILUTION = True
 DEFAULT_DO_PRINT    = True
 

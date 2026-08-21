@@ -69,7 +69,7 @@ metadata = {
 }
 
 # ── Runtime-parameter DEFAULTS (operator overrides in the App per run) ──────────
-DEFAULT_DRY_RUN     = False   # load + pre-flight + comments only (no liquid motion)
+DEFAULT_DRY_RUN     = True    # load + pre-flight + comments only (no liquid motion)
 DEFAULT_DO_DILUTION = True    # run the dilution phase
 DEFAULT_DO_PRINT    = True    # run the 8-channel print phase
 

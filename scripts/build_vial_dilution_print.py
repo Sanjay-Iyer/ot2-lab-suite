@@ -36,49 +36,14 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from src.lab.robot_connection import max_api_level
+from src.printing.workflows.registry import builder_protocol_versions, embed_raw_versions
 
 PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
 BASE_PROTOCOL = PRINTING_DIR / "01_vial_dilution_paper_print.py"
 
-# Protocol versions. v1 = P300-only dilution; v2 additionally routes dilution
-# transfers at/below dilution.small_volume.threshold_ul to the P20. A config selects
-# one with `protocol_version: 2` (or --protocol-version 2); each version generates
-# under its own basename so the two never overwrite each other.
-PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
-    1: (BASE_PROTOCOL, "vial_dilution_print"),
-    2: (PRINTING_DIR / "02_vial_dilution_paper_print_p20_dilution.py",
-        "vial_dilution_print_v2"),
-    3: (PRINTING_DIR / "03_vial_dilution_paper_print_v3.py",
-        "vial_dilution_print_v3"),
-    4: (PRINTING_DIR / "04_vial_dilution_paper_print_v4_quicktest.py",
-        "vial_dilution_print_v4"),
-    6: (PRINTING_DIR / "06_vial_dilution_paper_print_v6_p20only.py",
-        "vial_dilution_print_v6"),
-    7: (PRINTING_DIR / "07_paper_print_v7_print_only.py",
-        "vial_dilution_print_v7"),
-    8: (PRINTING_DIR / "08_vial_direct_paper_print_v8.py",
-        "vial_dilution_print_v8"),
-    9: (PRINTING_DIR / "09_plate_well_direct_paper_print_v9.py",
-        "plate_well_direct_print_v9"),
-    10: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
-         "complementary_bp_print_v10a"),
-    11: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
-         "complementary_dmmp_print_v10b"),
-    12: (PRINTING_DIR / "11_combined_bp_dmmp_paper_print.py",
-         "combined_bp_dmmp_print_v11"),
-    13: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
-         "complementary_bp_quick_print_v10c"),
-    14: (PRINTING_DIR / "10_complementary_direct_paper_print.py",
-         "complementary_dmmp_spot_test_v10bv2"),
-    15: (PRINTING_DIR / "12_four_clover_paper_print.py",
-         "four_clover_print_v12"),
-    16: (PRINTING_DIR / "12_four_clover_paper_print.py",
-         "four_clover_air_chase_v12"),
-    17: (PRINTING_DIR / "12_four_clover_paper_print.py",
-         "four_clover_grid_v12"),
-    18: (PRINTING_DIR / "12_four_clover_paper_print.py",
-         "four_clover_spacing_v13"),
-}
+# Historical integer IDs remain builder-compatible, while the registry supplies
+# agent-visible family/design metadata and hides legacy entries from discovery.
+PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = builder_protocol_versions()
 
 # Versions whose YAML IS the embedded CONFIG (self-validating protocols that skip the
 # dilution normalizer). v4 = quick test; v6 = P20-only dilute/mix/print workflow;
@@ -87,7 +52,7 @@ PROTOCOL_VERSIONS: dict[int, tuple[Path, str]] = {
 # v10a/v10b = complementary direct-source overlays sharing one destination grid;
 # v12 = four-droplet clover printing at arbitrary XY offsets from a paper well
 # (15 spacing sweep, 16 pre-air-chase test, 17 generated grid).
-EMBED_RAW_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
+EMBED_RAW_VERSIONS = embed_raw_versions()
 
 # Versions that require the PINNED opentrons==7.0.2 interpreter to simulate. Only v3
 # needs exact-version fidelity (nozzle-layout subtleties). v4 is a deliberately

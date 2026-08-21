@@ -1,0 +1,17 @@
+schema_version: printing-experiment-template/v1
+template_id: four_clover_printing/v1
+description: Scientist-facing four-clover design printing backed by trusted v12 behavior.
+workflow:
+  family: design
+  name: four_clover_air_chase
+  design_name: four_clover
+capability_config_reference: configs/printing/four_clover_air_chase_v12.yaml
+defaults:
+  substrate_id: paper_print_96_flat
+  material_id: BP
+  material_display_name: BP
+  droplet_volume_ul: 5.0
+  ordering_mode: clover_by_clover
+constraints:
+  allowed_layout: four_clover
+  maximum_positions: 384

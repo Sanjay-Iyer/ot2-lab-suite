@@ -1,0 +1,296 @@
+# =============================================================================
+# TEMPLATE - standard paper-printing experiment
+# =============================================================================
+#
+# This file teaches the LANGUAGE of the standard printing workflow. It is not a
+# physically approved experiment. It is a simulation-safe worked example whose
+# neutral placeholder values are unrelated to any study in this repository.
+#
+# Copy it to configs/experiments/<your_experiment>.yaml, delete what you do not
+# need, and replace the placeholders with your own science.
+#
+# THE ONE RULE
+#   You describe WHAT you want. Deterministic Python decides HOW the robot does
+#   it. Nothing in this file is a robot instruction. There are no aspirate,
+#   dispense, move, or tip commands here, and there is no place to put one.
+#
+# WHAT THIS FILE MAY CONTAIN            WHAT IT MAY NEVER CONTAIN
+#   liquids you load by hand              deck slot numbers
+#   dilutions you want prepared           calibrated aspiration heights
+#   mixing you want performed             air-gap / push-out / blow-out settings
+#   where droplets should land            flow rates
+#   how many droplets, and how far apart  pipette identity or tip choices
+#   how long to rest                      labware load names or namespaces
+#   which conditions are controls         chunked sub-transfer volumes
+#                                         Python of any kind
+#
+# Everything in the right-hand column lives in a machine profile, is owned by the
+# laboratory, and has been physically validated. Reference one; never restate or
+# invent those values.
+#
+# =============================================================================
+
+schema_version: print-experiment-job/v1
+
+# -----------------------------------------------------------------------------
+# MACHINE  (laboratory-owned; reference it, do not inline it)
+# -----------------------------------------------------------------------------
+# List the available profiles with the generalized standard-printing capability
+# discovery tool. Pick the one whose deck matches what is physically set up. If none matches your
+# hardware, stop and ask - do not edit a profile to fit an experiment.
+#
+# Each profile defines named labware ROLES. Your experiment refers to liquids and
+# destinations by those role names, never by slot. Typical roles are:
+#
+#   a `source` role       vials or reservoirs you load by hand
+#   a `preparation` role  a plate where dilutions are made during the run
+#   a `substrate` role    what you actually print onto
+#   a `tiprack` role      handled entirely by the executor
+#
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+experiment:
+
+  # ---------------------------------------------------------------------------
+  # METADATA
+  # ---------------------------------------------------------------------------
+  metadata:
+    experiment_id: template_placeholder_experiment   # lowercase, snake_case
+    title: Placeholder title - replace with your experiment
+    description: >-
+      One or two sentences a colleague could read to understand the point of the
+      experiment. This text is shown in the review before approval.
+    notes:
+      # Free-form key/value record of any judgement call you made, especially a
+      # value the request did not state outright. Anything you had to decide
+      # rather than read belongs here, so a reviewer can challenge it.
+      example_note: >-
+        Record here why an unstated parameter was resolved the way it was.
+
+  # ---------------------------------------------------------------------------
+  # POLICIES  (safety rules; the defaults are the conservative choice)
+  # ---------------------------------------------------------------------------
+  policies:
+    # Refuse a second droplet onto a substrate position that has not been given a
+    # drying rest. Turn this off only when deliberately printing wet-on-wet, and
+    # say why in metadata.notes.
+    require_drying_delay_between_deposits: true
+
+  # ---------------------------------------------------------------------------
+  # LIQUIDS  (what a human physically puts on the deck before the run)
+  # ---------------------------------------------------------------------------
+  # Declare only what you load by hand. Anything the robot makes during the run
+  # is produced by a preparation step and must NOT be listed here.
+  #
+  #   loaded_volume_ul      how much you will actually pipette into that well
+  #   minimum_remaining_ul  how much must still be there at the end, so the tip
+  #                         stays submerged at the profile's aspiration height.
+  #                         Set it to 0 only for a shallow well you may empty.
+  #
+  # The resolver replays the whole run against these numbers and refuses any plan
+  # that would aspirate from a nominally dry location.
+  liquids:
+    - liquid_id: solution_a                    # lowercase, snake_case, unique
+      display_name: Placeholder solution A
+      location: {labware: vial_rack, well: A1} # `labware` is a ROLE, not a slot
+      loaded_volume_ul: 4000.0
+      minimum_remaining_ul: 2600.0
+
+    - liquid_id: solvent
+      display_name: Placeholder solvent
+      location: {labware: vial_rack, well: A2}
+      loaded_volume_ul: 4000.0
+      minimum_remaining_ul: 2600.0
+
+    # A liquid may equally sit in a well of the preparation plate rather than a
+    # vial - use whichever role the machine profile provides.
+    # - liquid_id: solution_b
+    #   display_name: Placeholder solution B
+    #   location: {labware: plate, well: H12}
+    #   loaded_volume_ul: 150.0
+    #   minimum_remaining_ul: 0.0
+
+  # ---------------------------------------------------------------------------
+  # PROCEDURE  (one ordered list; steps happen in the order written)
+  # ---------------------------------------------------------------------------
+  # Six step types exist. Use only the ones your experiment needs - omitting a
+  # step type means that operation simply never happens. There is no hidden
+  # default preparation, no implicit mixing, and no implicit rest.
+  #
+  #   serial_dilution   a geometric ladder, each point made from the previous one
+  #   direct_dilution   independent points, each made from the undiluted stock
+  #   transfer          move one liquid into one well
+  #   mix               mix one well in place
+  #   print             deposit droplets onto a substrate
+  #   delay             wait
+  #
+  procedure:
+
+    # -- serial_dilution -----------------------------------------------------
+    # A ladder of `len(destination_wells)` points at ratios
+    # 1, 1/fold, 1/fold^2, ... The volumes are back-calculated so that EVERY well
+    # still holds `target_usable_volume_ul` after its own aliquot has been passed
+    # down the chain. You therefore state the usable volume you need, not the
+    # volume to start with - how much stock the ladder consumes is derived.
+    #
+    # Products are named `<id>_stock`, `<id>_1_<factor>x` unless you override
+    # them with `product_liquid_ids`. Override when the first well is genuinely
+    # an aliquot of a liquid you already declared, so it keeps that identity.
+    - id: ladder
+      type: serial_dilution
+      description: Placeholder dilution ladder.
+      source_liquid_id: solution_a
+      diluent_liquid_id: solvent
+      destination_labware: plate
+      destination_wells: [A1, B1, C1]      # one well per point; any wells you like
+      fold: 3                              # 3 -> 1, 1/3, 1/9
+      target_usable_volume_ul: 25.0        # usable volume left in every well
+      mix: {cycles: 2, volume_ul: 5.0}     # OMIT this key for no mixing at all
+      # product_liquid_ids: [solution_a, ladder_1_3x, ladder_1_9x]
+
+    # -- direct_dilution -----------------------------------------------------
+    # Independent points made straight from the undiluted stock, so an error in
+    # one point cannot propagate. Use it when the ratios are not geometric, or
+    # when carry-over between points is unacceptable.
+    #
+    # - id: spot_points
+    #   type: direct_dilution
+    #   source_liquid_id: solution_a
+    #   diluent_liquid_id: solvent
+    #   destination_labware: plate
+    #   points:
+    #     - {well: A2, factor: 1,  total_volume_ul: 25.0}
+    #     - {well: B2, factor: 4,  total_volume_ul: 25.0}
+    #     - {well: C2, factor: 10, total_volume_ul: 25.0}
+    #   mix: {cycles: 2, volume_ul: 5.0}
+
+    # -- transfer ------------------------------------------------------------
+    # Move one liquid into one well. The volume you write is the LOGICAL volume;
+    # the resolver splits it into as many pipette-sized sub-transfers as the
+    # mounted pipette requires. Never pre-split it yourself.
+    #
+    # - id: working_aliquot
+    #   type: transfer
+    #   liquid_id: solution_a
+    #   destination: {labware: plate, well: D1}
+    #   volume_ul: 55.0            # split automatically; 55 is not a tip volume
+    #   result_liquid_id: working_solution
+    #   mix_after: {cycles: 2, volume_ul: 5.0}
+
+    # -- mix -----------------------------------------------------------------
+    # Mix a well in place, e.g. to resuspend something that has settled while an
+    # earlier rest elapsed.
+    #
+    # - id: resuspend
+    #   type: mix
+    #   liquid_id: working_solution
+    #   location: {labware: plate, well: D1}
+    #   cycles: 3
+    #   volume_ul: 5.0
+
+    # -- print ---------------------------------------------------------------
+    # Deposit droplets onto substrate positions.
+    #
+    #   source        {kind: series, preparation_id: <a preparation step id>}
+    #                   prints that preparation's products, one product per
+    #                   target, in order. The counts must match exactly.
+    #                 {kind: liquid, liquid_id: <a liquid id>}
+    #                   prints the SAME liquid onto every target. Listing several
+    #                   targets here is how REPLICATES are expressed.
+    #
+    #   targets       substrate wells, e.g. [A1, B1, C1]
+    #   volume_ul     droplet volume
+    #
+    #   repeats       droplets per target per position. 1 = a single deposit.
+    #                 3 = three separate deposits at the same position.
+    #
+    #   delay_after_pass_s
+    #                 rest after EVERY complete pass over the targets, including
+    #                 the last one. With repeats: 3 this gives
+    #                   pass, rest, pass, rest, pass, rest
+    #                 With repeats: 1 it is simply a rest after the pass, which
+    #                 is how you let a layer dry before a later step prints on
+    #                 top of it. Omit or set 0 for no rest.
+    #
+    #   mix_before_aspirate
+    #                 mix the SOURCE well before each droplet is drawn. Use it
+    #                 for anything that settles. Omit for no mixing.
+    #
+    #   tip_policy    per_step   one tip for the whole step - correct when every
+    #                            target gets the identical liquid
+    #                 per_pass   a fresh tip for each pass
+    #                 per_target a fresh tip for each target - correct when
+    #                            targets get DIFFERENT liquids, so concentrations
+    #                            cannot cross-contaminate
+    #
+    #   purpose       sample | control. Annotation only; it changes nothing
+    #                 physical, but it is shown in the review and lets a reader
+    #                 see which positions are controls.
+    - id: ladder_row
+      type: print
+      description: Placeholder print of the ladder, one droplet per point.
+      source: {kind: series, preparation_id: ladder}
+      substrate: paper
+      targets: [A1, B1, C1]                  # must match the ladder's 3 points
+      volume_ul: 4.0
+      repeats: 1
+      delay_after_pass_s: 60.0               # let this layer dry before the next
+      mix_before_aspirate: {cycles: 2, volume_ul: 5.0}
+      tip_policy: per_target
+      purpose: sample
+
+    # Replicates of a single liquid, used here as controls, look like this:
+    - id: replicate_controls
+      type: print
+      description: Placeholder replicate controls - same liquid at every target.
+      source: {kind: liquid, liquid_id: solution_a}
+      substrate: paper
+      targets: [A2, B2, C2]                  # three replicates
+      volume_ul: 4.0
+      repeats: 1
+      tip_policy: per_step                   # identical liquid, so one tip is fine
+      purpose: control
+
+    # Repeated deposition onto the same positions, with a rest between layers:
+    #
+    # - id: layered_row
+    #   type: print
+    #   source: {kind: series, preparation_id: ladder}
+    #   substrate: paper
+    #   targets: [A3, B3, C3]
+    #   volume_ul: 4.0
+    #   repeats: 2                 # two droplets per position
+    #   delay_after_pass_s: 60.0   # rest between them, and after the last one
+    #   mix_before_aspirate: {cycles: 2, volume_ul: 5.0}
+    #   tip_policy: per_target
+    #   purpose: sample
+
+    # -- delay ---------------------------------------------------------------
+    # An explicit rest between steps, when `delay_after_pass_s` is not the right
+    # place to express it.
+    #
+    # - id: bench_rest
+    #   type: delay
+    #   duration_s: 120.0
+    #   reason: allow the previous deposits to dry before the next print
+
+# =============================================================================
+# WHAT HAPPENS NEXT
+# =============================================================================
+#
+#   this YAML
+#     -> PrintExperimentJobV1        strict schema; unknown keys are rejected
+#     -> semantic validation         wells exist, liquids exist, volumes are
+#                                    pipettable, no well is aspirated dry, no
+#                                    position is printed twice without a rest
+#     -> ResolvedExperimentPlanV1    every physical action, fully determined
+#     -> human review + approval     you read a plain-language summary
+#     -> 01_printing_standard.py     the trusted executor, never rewritten
+#     -> OT-2 simulation             forced motion, locally
+#     -> READY FOR EXECUTION
+#
+# If validation rejects this file, fix the SCIENCE it describes. Do not work
+# around a rejection by editing the machine profile, the resolver, or the
+# executor - those exist precisely to stop an unsafe experiment reaching
+# hardware.
+# =============================================================================

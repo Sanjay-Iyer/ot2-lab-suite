@@ -1,0 +1,9 @@
+{
+  "protocol_path": "src/protocols/printing/01_printing_standard_ground_truth.py",
+  "protocol_sha256": "fe44eedfe0c9937a276b94c49b13899d52015ef6951f7e16137c79ed82614950",
+  "canonical_trace_path": "experiment_01/ground_truth/static_canonical_trace.json",
+  "canonical_trace_sha256": "60200e8560266da9f8c7cf059c6a001c4f632b5f2557631bc41f44ed0346cd87",
+  "action_count": 187,
+  "print_count": 64,
+  "status": "FROZEN_AFTER_STAGE_1_ARCHITECTURE_AUDIT"
+}

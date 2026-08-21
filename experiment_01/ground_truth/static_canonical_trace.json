@@ -1,0 +1,4446 @@
+{
+  "schema_version": "static-ground-truth-actions/v1",
+  "experiment_id": "experiment_01_standard_sers_print",
+  "architecture_role": "independent_static_reference",
+  "initial_liquids": [
+    {
+      "liquid_id": "np_stock",
+      "display_name": "Nanoparticle stock",
+      "location": {
+        "labware": "vial_rack",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "loaded_volume_ul": 5000.0,
+      "minimum_remaining_ul": 2600.0,
+      "scientific_allocation_ul": 59.765625
+    },
+    {
+      "liquid_id": "np_diluent",
+      "display_name": "Nanoparticle diluent",
+      "location": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "loaded_volume_ul": 5000.0,
+      "minimum_remaining_ul": 2600.0,
+      "scientific_allocation_ul": 180.234375
+    },
+    {
+      "liquid_id": "cv_stock",
+      "display_name": "Crystal violet stock",
+      "location": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "loaded_volume_ul": 5000.0,
+      "minimum_remaining_ul": 2600.0,
+      "scientific_allocation_ul": 179.765625
+    },
+    {
+      "liquid_id": "cv_diluent",
+      "display_name": "Crystal violet diluent",
+      "location": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "loaded_volume_ul": 5000.0,
+      "minimum_remaining_ul": 2600.0,
+      "scientific_allocation_ul": 180.234375
+    }
+  ],
+  "dilution_math": {
+    "method": "back_calculated_serial_cascade",
+    "target_usable_ul": 30.0,
+    "factors": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64,
+      128
+    ],
+    "stock_allocation_ul_per_series": 59.765625,
+    "total_diluent_ul_per_series": 180.234375,
+    "pre_transfer_ul": [
+      59.765625,
+      59.53125,
+      59.0625,
+      58.125,
+      56.25,
+      52.5,
+      45.0,
+      30.0
+    ],
+    "outgoing_ul": [
+      29.765625,
+      29.53125,
+      29.0625,
+      28.125,
+      26.25,
+      22.5,
+      15.0,
+      0.0
+    ],
+    "diluent_ul": [
+      0.0,
+      29.765625,
+      29.53125,
+      29.0625,
+      28.125,
+      26.25,
+      22.5,
+      15.0
+    ],
+    "retained_usable_ul": [
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0,
+      30.0
+    ]
+  },
+  "actions": [
+    {
+      "sequence_index": 1,
+      "action": "LOAD_LABWARE",
+      "role": "vial_rack",
+      "slot": 7,
+      "load_name": "tuberack_3dprint_20ml_8vials_v2",
+      "namespace": "custom_beta",
+      "version": 1
+    },
+    {
+      "sequence_index": 2,
+      "action": "LOAD_LABWARE",
+      "role": "plate",
+      "slot": 4,
+      "load_name": "corning_96_wellplate_360ul_custom",
+      "namespace": "custom_beta",
+      "version": 1
+    },
+    {
+      "sequence_index": 3,
+      "action": "LOAD_LABWARE",
+      "role": "paper",
+      "slot": 5,
+      "load_name": "paper_print_96_flat",
+      "namespace": "custom_beta",
+      "version": 1
+    },
+    {
+      "sequence_index": 4,
+      "action": "LOAD_LABWARE",
+      "role": "tiprack",
+      "slot": 9,
+      "load_name": "opentrons_96_tiprack_20ul",
+      "namespace": "opentrons",
+      "version": 1
+    },
+    {
+      "sequence_index": 5,
+      "action": "LOAD_PIPETTE",
+      "pipette": "p20_single_gen2",
+      "mount": "left",
+      "tiprack_role": "tiprack",
+      "minimum_volume_ul": 1.0,
+      "maximum_volume_ul": 20.0,
+      "flow_rates": {
+        "aspirate_ul_s": 3.0,
+        "dispense_ul_s": 3.0
+      }
+    },
+    {
+      "sequence_index": 6,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_stock",
+      "liquid_id": "np_stock",
+      "result_liquid_id": "np_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 3,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_stock_setup"
+    },
+    {
+      "sequence_index": 7,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_stock",
+      "liquid_id": "np_stock",
+      "result_liquid_id": "np_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 2,
+      "chunk_count": 3,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_stock_setup"
+    },
+    {
+      "sequence_index": 8,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_stock",
+      "liquid_id": "np_stock",
+      "result_liquid_id": "np_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 19.765625,
+      "chunk_index": 3,
+      "chunk_count": 3,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_stock_setup"
+    },
+    {
+      "sequence_index": 9,
+      "action": "MIX",
+      "operation_id": "mix_np_stock",
+      "liquid_id": "np_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_stock_setup"
+    },
+    {
+      "sequence_index": 10,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_2",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 11,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_2",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.765625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 12,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_3",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 13,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_3",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.53125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 14,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_4",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 15,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_4",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.0625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 16,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_5",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 17,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_5",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 8.125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 18,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_6",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 19,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_6",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 6.25,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 20,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_7",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 21,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_7",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 2.5,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 22,
+      "action": "TRANSFER",
+      "operation_id": "prepare_np_diluent_8",
+      "liquid_id": "np_diluent",
+      "result_liquid_id": "np_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 15.0,
+      "chunk_index": 1,
+      "chunk_count": 1,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_diluent_setup"
+    },
+    {
+      "sequence_index": 23,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_1_to_2",
+      "liquid_id": "np_stock",
+      "result_liquid_id": "np_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_1_to_2"
+    },
+    {
+      "sequence_index": 24,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_1_to_2",
+      "liquid_id": "np_stock",
+      "result_liquid_id": "np_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.765625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_1_to_2"
+    },
+    {
+      "sequence_index": 25,
+      "action": "MIX",
+      "operation_id": "mix_np_2",
+      "liquid_id": "np_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_1_to_2"
+    },
+    {
+      "sequence_index": 26,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_2_to_3",
+      "liquid_id": "np_1_2x",
+      "result_liquid_id": "np_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_2_to_3"
+    },
+    {
+      "sequence_index": 27,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_2_to_3",
+      "liquid_id": "np_1_2x",
+      "result_liquid_id": "np_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.53125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_2_to_3"
+    },
+    {
+      "sequence_index": 28,
+      "action": "MIX",
+      "operation_id": "mix_np_3",
+      "liquid_id": "np_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_2_to_3"
+    },
+    {
+      "sequence_index": 29,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_3_to_4",
+      "liquid_id": "np_1_4x",
+      "result_liquid_id": "np_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_3_to_4"
+    },
+    {
+      "sequence_index": 30,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_3_to_4",
+      "liquid_id": "np_1_4x",
+      "result_liquid_id": "np_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.0625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_3_to_4"
+    },
+    {
+      "sequence_index": 31,
+      "action": "MIX",
+      "operation_id": "mix_np_4",
+      "liquid_id": "np_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_3_to_4"
+    },
+    {
+      "sequence_index": 32,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_4_to_5",
+      "liquid_id": "np_1_8x",
+      "result_liquid_id": "np_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_4_to_5"
+    },
+    {
+      "sequence_index": 33,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_4_to_5",
+      "liquid_id": "np_1_8x",
+      "result_liquid_id": "np_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 8.125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_4_to_5"
+    },
+    {
+      "sequence_index": 34,
+      "action": "MIX",
+      "operation_id": "mix_np_5",
+      "liquid_id": "np_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_4_to_5"
+    },
+    {
+      "sequence_index": 35,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_5_to_6",
+      "liquid_id": "np_1_16x",
+      "result_liquid_id": "np_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_5_to_6"
+    },
+    {
+      "sequence_index": 36,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_5_to_6",
+      "liquid_id": "np_1_16x",
+      "result_liquid_id": "np_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 6.25,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_5_to_6"
+    },
+    {
+      "sequence_index": 37,
+      "action": "MIX",
+      "operation_id": "mix_np_6",
+      "liquid_id": "np_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_5_to_6"
+    },
+    {
+      "sequence_index": 38,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_6_to_7",
+      "liquid_id": "np_1_32x",
+      "result_liquid_id": "np_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_6_to_7"
+    },
+    {
+      "sequence_index": 39,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_6_to_7",
+      "liquid_id": "np_1_32x",
+      "result_liquid_id": "np_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 2.5,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_6_to_7"
+    },
+    {
+      "sequence_index": 40,
+      "action": "MIX",
+      "operation_id": "mix_np_7",
+      "liquid_id": "np_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_6_to_7"
+    },
+    {
+      "sequence_index": 41,
+      "action": "TRANSFER",
+      "operation_id": "serial_np_7_to_8",
+      "liquid_id": "np_1_64x",
+      "result_liquid_id": "np_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 15.0,
+      "chunk_index": 1,
+      "chunk_count": 1,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_7_to_8"
+    },
+    {
+      "sequence_index": 42,
+      "action": "MIX",
+      "operation_id": "mix_np_8",
+      "liquid_id": "np_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "np_serial_7_to_8"
+    },
+    {
+      "sequence_index": 43,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_stock",
+      "liquid_id": "cv_stock",
+      "result_liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 3,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_stock_setup"
+    },
+    {
+      "sequence_index": 44,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_stock",
+      "liquid_id": "cv_stock",
+      "result_liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 2,
+      "chunk_count": 3,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_stock_setup"
+    },
+    {
+      "sequence_index": 45,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_stock",
+      "liquid_id": "cv_stock",
+      "result_liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 19.765625,
+      "chunk_index": 3,
+      "chunk_count": 3,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_stock_setup"
+    },
+    {
+      "sequence_index": 46,
+      "action": "MIX",
+      "operation_id": "mix_cv_stock",
+      "liquid_id": "cv_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_stock_setup"
+    },
+    {
+      "sequence_index": 47,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_2",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 48,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_2",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.765625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 49,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_3",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 50,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_3",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.53125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 51,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_4",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 52,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_4",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.0625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 53,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_5",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 54,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_5",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 8.125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 55,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_6",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 56,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_6",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 6.25,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 57,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_7",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 58,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_7",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 2.5,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 59,
+      "action": "TRANSFER",
+      "operation_id": "prepare_cv_diluent_8",
+      "liquid_id": "cv_diluent",
+      "result_liquid_id": "cv_diluent",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "H2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 15.0,
+      "chunk_index": 1,
+      "chunk_count": 1,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_diluent_setup"
+    },
+    {
+      "sequence_index": 60,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_1_to_2",
+      "liquid_id": "cv_stock",
+      "result_liquid_id": "cv_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_1_to_2"
+    },
+    {
+      "sequence_index": 61,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_1_to_2",
+      "liquid_id": "cv_stock",
+      "result_liquid_id": "cv_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.765625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_1_to_2"
+    },
+    {
+      "sequence_index": 62,
+      "action": "MIX",
+      "operation_id": "mix_cv_2",
+      "liquid_id": "cv_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_1_to_2"
+    },
+    {
+      "sequence_index": 63,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_2_to_3",
+      "liquid_id": "cv_1_2x",
+      "result_liquid_id": "cv_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_2_to_3"
+    },
+    {
+      "sequence_index": 64,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_2_to_3",
+      "liquid_id": "cv_1_2x",
+      "result_liquid_id": "cv_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.53125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_2_to_3"
+    },
+    {
+      "sequence_index": 65,
+      "action": "MIX",
+      "operation_id": "mix_cv_3",
+      "liquid_id": "cv_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_2_to_3"
+    },
+    {
+      "sequence_index": 66,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_3_to_4",
+      "liquid_id": "cv_1_4x",
+      "result_liquid_id": "cv_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_3_to_4"
+    },
+    {
+      "sequence_index": 67,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_3_to_4",
+      "liquid_id": "cv_1_4x",
+      "result_liquid_id": "cv_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 9.0625,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_3_to_4"
+    },
+    {
+      "sequence_index": 68,
+      "action": "MIX",
+      "operation_id": "mix_cv_4",
+      "liquid_id": "cv_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_3_to_4"
+    },
+    {
+      "sequence_index": 69,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_4_to_5",
+      "liquid_id": "cv_1_8x",
+      "result_liquid_id": "cv_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_4_to_5"
+    },
+    {
+      "sequence_index": 70,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_4_to_5",
+      "liquid_id": "cv_1_8x",
+      "result_liquid_id": "cv_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 8.125,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_4_to_5"
+    },
+    {
+      "sequence_index": 71,
+      "action": "MIX",
+      "operation_id": "mix_cv_5",
+      "liquid_id": "cv_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_4_to_5"
+    },
+    {
+      "sequence_index": 72,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_5_to_6",
+      "liquid_id": "cv_1_16x",
+      "result_liquid_id": "cv_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_5_to_6"
+    },
+    {
+      "sequence_index": 73,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_5_to_6",
+      "liquid_id": "cv_1_16x",
+      "result_liquid_id": "cv_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 6.25,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_5_to_6"
+    },
+    {
+      "sequence_index": 74,
+      "action": "MIX",
+      "operation_id": "mix_cv_6",
+      "liquid_id": "cv_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_5_to_6"
+    },
+    {
+      "sequence_index": 75,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_6_to_7",
+      "liquid_id": "cv_1_32x",
+      "result_liquid_id": "cv_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 20.0,
+      "chunk_index": 1,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_6_to_7"
+    },
+    {
+      "sequence_index": 76,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_6_to_7",
+      "liquid_id": "cv_1_32x",
+      "result_liquid_id": "cv_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 2.5,
+      "chunk_index": 2,
+      "chunk_count": 2,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_6_to_7"
+    },
+    {
+      "sequence_index": 77,
+      "action": "MIX",
+      "operation_id": "mix_cv_7",
+      "liquid_id": "cv_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_6_to_7"
+    },
+    {
+      "sequence_index": 78,
+      "action": "TRANSFER",
+      "operation_id": "serial_cv_7_to_8",
+      "liquid_id": "cv_1_64x",
+      "result_liquid_id": "cv_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "plate",
+        "well": "H2",
+        "reference": "top",
+        "z_mm": -2.0
+      },
+      "volume_ul": 15.0,
+      "chunk_index": 1,
+      "chunk_count": 1,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_7_to_8"
+    },
+    {
+      "sequence_index": 79,
+      "action": "MIX",
+      "operation_id": "mix_cv_8",
+      "liquid_id": "cv_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "cv_serial_7_to_8"
+    },
+    {
+      "sequence_index": 80,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_A",
+      "liquid_id": "np_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_A"
+    },
+    {
+      "sequence_index": 81,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_A",
+      "condition_id": "paper_A1",
+      "liquid_id": "np_stock",
+      "source": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_A"
+    },
+    {
+      "sequence_index": 82,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_B",
+      "liquid_id": "np_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_B"
+    },
+    {
+      "sequence_index": 83,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_B",
+      "condition_id": "paper_B1",
+      "liquid_id": "np_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_B"
+    },
+    {
+      "sequence_index": 84,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_C",
+      "liquid_id": "np_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_C"
+    },
+    {
+      "sequence_index": 85,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_C",
+      "condition_id": "paper_C1",
+      "liquid_id": "np_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_C"
+    },
+    {
+      "sequence_index": 86,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_D",
+      "liquid_id": "np_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_D"
+    },
+    {
+      "sequence_index": 87,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_D",
+      "condition_id": "paper_D1",
+      "liquid_id": "np_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_D"
+    },
+    {
+      "sequence_index": 88,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_E",
+      "liquid_id": "np_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_E"
+    },
+    {
+      "sequence_index": 89,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_E",
+      "condition_id": "paper_E1",
+      "liquid_id": "np_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_E"
+    },
+    {
+      "sequence_index": 90,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_F",
+      "liquid_id": "np_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_F"
+    },
+    {
+      "sequence_index": 91,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_F",
+      "condition_id": "paper_F1",
+      "liquid_id": "np_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_F"
+    },
+    {
+      "sequence_index": 92,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_G",
+      "liquid_id": "np_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_G"
+    },
+    {
+      "sequence_index": 93,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_G",
+      "condition_id": "paper_G1",
+      "liquid_id": "np_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_G"
+    },
+    {
+      "sequence_index": 94,
+      "action": "MIX",
+      "operation_id": "mix_before_column1_np_H",
+      "liquid_id": "np_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column1_np_H"
+    },
+    {
+      "sequence_index": 95,
+      "action": "PRINT",
+      "operation_id": "print_column1_np_H",
+      "condition_id": "paper_H1",
+      "liquid_id": "np_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_np_H"
+    },
+    {
+      "sequence_index": 96,
+      "action": "DELAY",
+      "operation_id": "column1_np_drying",
+      "duration_s": 300.0,
+      "reason": "dry all column-1 nanoparticle deposits before stock CV"
+    },
+    {
+      "sequence_index": 97,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_A",
+      "condition_id": "paper_A1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 98,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_B",
+      "condition_id": "paper_B1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 99,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_C",
+      "condition_id": "paper_C1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 100,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_D",
+      "condition_id": "paper_D1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 101,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_E",
+      "condition_id": "paper_E1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 102,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_F",
+      "condition_id": "paper_F1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 103,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_G",
+      "condition_id": "paper_G1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 104,
+      "action": "PRINT",
+      "operation_id": "print_column1_cv_H",
+      "condition_id": "paper_H1",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column1_cv_stock_cv"
+    },
+    {
+      "sequence_index": 105,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_A",
+      "liquid_id": "np_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_A"
+    },
+    {
+      "sequence_index": 106,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_A",
+      "condition_id": "paper_A2",
+      "liquid_id": "np_stock",
+      "source": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_A"
+    },
+    {
+      "sequence_index": 107,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_B",
+      "liquid_id": "np_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_B"
+    },
+    {
+      "sequence_index": 108,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_B",
+      "condition_id": "paper_B2",
+      "liquid_id": "np_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_B"
+    },
+    {
+      "sequence_index": 109,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_C",
+      "liquid_id": "np_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_C"
+    },
+    {
+      "sequence_index": 110,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_C",
+      "condition_id": "paper_C2",
+      "liquid_id": "np_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_C"
+    },
+    {
+      "sequence_index": 111,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_D",
+      "liquid_id": "np_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_D"
+    },
+    {
+      "sequence_index": 112,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_D",
+      "condition_id": "paper_D2",
+      "liquid_id": "np_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_D"
+    },
+    {
+      "sequence_index": 113,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_E",
+      "liquid_id": "np_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_E"
+    },
+    {
+      "sequence_index": 114,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_E",
+      "condition_id": "paper_E2",
+      "liquid_id": "np_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_E"
+    },
+    {
+      "sequence_index": 115,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_F",
+      "liquid_id": "np_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_F"
+    },
+    {
+      "sequence_index": 116,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_F",
+      "condition_id": "paper_F2",
+      "liquid_id": "np_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_F"
+    },
+    {
+      "sequence_index": 117,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_G",
+      "liquid_id": "np_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_G"
+    },
+    {
+      "sequence_index": 118,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_G",
+      "condition_id": "paper_G2",
+      "liquid_id": "np_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_G"
+    },
+    {
+      "sequence_index": 119,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_1_H",
+      "liquid_id": "np_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_1_H"
+    },
+    {
+      "sequence_index": 120,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_1_H",
+      "condition_id": "paper_H2",
+      "liquid_id": "np_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_1_H"
+    },
+    {
+      "sequence_index": 121,
+      "action": "DELAY",
+      "operation_id": "column2_np_drop_1_drying",
+      "duration_s": 300.0,
+      "reason": "dry column-2 nanoparticle layer 1 before the next layer"
+    },
+    {
+      "sequence_index": 122,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_A",
+      "liquid_id": "np_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_A"
+    },
+    {
+      "sequence_index": 123,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_A",
+      "condition_id": "paper_A2",
+      "liquid_id": "np_stock",
+      "source": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_A"
+    },
+    {
+      "sequence_index": 124,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_B",
+      "liquid_id": "np_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_B"
+    },
+    {
+      "sequence_index": 125,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_B",
+      "condition_id": "paper_B2",
+      "liquid_id": "np_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_B"
+    },
+    {
+      "sequence_index": 126,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_C",
+      "liquid_id": "np_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_C"
+    },
+    {
+      "sequence_index": 127,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_C",
+      "condition_id": "paper_C2",
+      "liquid_id": "np_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_C"
+    },
+    {
+      "sequence_index": 128,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_D",
+      "liquid_id": "np_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_D"
+    },
+    {
+      "sequence_index": 129,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_D",
+      "condition_id": "paper_D2",
+      "liquid_id": "np_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_D"
+    },
+    {
+      "sequence_index": 130,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_E",
+      "liquid_id": "np_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_E"
+    },
+    {
+      "sequence_index": 131,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_E",
+      "condition_id": "paper_E2",
+      "liquid_id": "np_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_E"
+    },
+    {
+      "sequence_index": 132,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_F",
+      "liquid_id": "np_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_F"
+    },
+    {
+      "sequence_index": 133,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_F",
+      "condition_id": "paper_F2",
+      "liquid_id": "np_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_F"
+    },
+    {
+      "sequence_index": 134,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_G",
+      "liquid_id": "np_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_G"
+    },
+    {
+      "sequence_index": 135,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_G",
+      "condition_id": "paper_G2",
+      "liquid_id": "np_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_G"
+    },
+    {
+      "sequence_index": 136,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_2_H",
+      "liquid_id": "np_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_2_H"
+    },
+    {
+      "sequence_index": 137,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_2_H",
+      "condition_id": "paper_H2",
+      "liquid_id": "np_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 2,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_2_H"
+    },
+    {
+      "sequence_index": 138,
+      "action": "DELAY",
+      "operation_id": "column2_np_drop_2_drying",
+      "duration_s": 300.0,
+      "reason": "dry column-2 nanoparticle layer 2 before the next layer"
+    },
+    {
+      "sequence_index": 139,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_A",
+      "liquid_id": "np_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_A"
+    },
+    {
+      "sequence_index": 140,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_A",
+      "condition_id": "paper_A2",
+      "liquid_id": "np_stock",
+      "source": {
+        "labware": "plate",
+        "well": "A1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_A"
+    },
+    {
+      "sequence_index": 141,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_B",
+      "liquid_id": "np_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_B"
+    },
+    {
+      "sequence_index": 142,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_B",
+      "condition_id": "paper_B2",
+      "liquid_id": "np_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "B1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_B"
+    },
+    {
+      "sequence_index": 143,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_C",
+      "liquid_id": "np_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_C"
+    },
+    {
+      "sequence_index": 144,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_C",
+      "condition_id": "paper_C2",
+      "liquid_id": "np_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "C1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_C"
+    },
+    {
+      "sequence_index": 145,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_D",
+      "liquid_id": "np_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_D"
+    },
+    {
+      "sequence_index": 146,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_D",
+      "condition_id": "paper_D2",
+      "liquid_id": "np_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "D1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_D"
+    },
+    {
+      "sequence_index": 147,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_E",
+      "liquid_id": "np_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_E"
+    },
+    {
+      "sequence_index": 148,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_E",
+      "condition_id": "paper_E2",
+      "liquid_id": "np_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "E1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_E"
+    },
+    {
+      "sequence_index": 149,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_F",
+      "liquid_id": "np_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_F"
+    },
+    {
+      "sequence_index": 150,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_F",
+      "condition_id": "paper_F2",
+      "liquid_id": "np_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "F1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_F"
+    },
+    {
+      "sequence_index": 151,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_G",
+      "liquid_id": "np_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_G"
+    },
+    {
+      "sequence_index": 152,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_G",
+      "condition_id": "paper_G2",
+      "liquid_id": "np_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "G1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_G"
+    },
+    {
+      "sequence_index": 153,
+      "action": "MIX",
+      "operation_id": "mix_before_column2_np_drop_3_H",
+      "liquid_id": "np_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column2_np_drop_3_H"
+    },
+    {
+      "sequence_index": 154,
+      "action": "PRINT",
+      "operation_id": "print_column2_np_drop_3_H",
+      "condition_id": "paper_H2",
+      "liquid_id": "np_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "H1",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 3,
+      "repeat_count": 3,
+      "tip_group": "column2_np_drop_3_H"
+    },
+    {
+      "sequence_index": 155,
+      "action": "DELAY",
+      "operation_id": "column2_np_drop_3_drying",
+      "duration_s": 300.0,
+      "reason": "dry column-2 nanoparticle layer 3 before the next layer"
+    },
+    {
+      "sequence_index": 156,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_A",
+      "condition_id": "paper_A2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 157,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_B",
+      "condition_id": "paper_B2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 158,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_C",
+      "condition_id": "paper_C2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 159,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_D",
+      "condition_id": "paper_D2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 160,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_E",
+      "condition_id": "paper_E2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 161,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_F",
+      "condition_id": "paper_F2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 162,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_G",
+      "condition_id": "paper_G2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 163,
+      "action": "PRINT",
+      "operation_id": "print_column2_cv_H",
+      "condition_id": "paper_H2",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column2_cv_stock_cv"
+    },
+    {
+      "sequence_index": 164,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_A",
+      "condition_id": "paper_A3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 165,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_B",
+      "condition_id": "paper_B3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 166,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_C",
+      "condition_id": "paper_C3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 167,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_D",
+      "condition_id": "paper_D3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 168,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_E",
+      "condition_id": "paper_E3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 169,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_F",
+      "condition_id": "paper_F3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 170,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_G",
+      "condition_id": "paper_G3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 171,
+      "action": "PRINT",
+      "operation_id": "print_column3_cv_control_H",
+      "condition_id": "paper_H3",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "vial_rack",
+        "well": "A3",
+        "reference": "bottom",
+        "z_mm": 4.0
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H3",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column3_cv_control_stock_cv"
+    },
+    {
+      "sequence_index": 172,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_A",
+      "liquid_id": "cv_stock",
+      "location": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_A"
+    },
+    {
+      "sequence_index": 173,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_A",
+      "condition_id": "paper_A4",
+      "liquid_id": "cv_stock",
+      "source": {
+        "labware": "plate",
+        "well": "A2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "A4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_A"
+    },
+    {
+      "sequence_index": 174,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_B",
+      "liquid_id": "cv_1_2x",
+      "location": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_B"
+    },
+    {
+      "sequence_index": 175,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_B",
+      "condition_id": "paper_B4",
+      "liquid_id": "cv_1_2x",
+      "source": {
+        "labware": "plate",
+        "well": "B2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "B4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_B"
+    },
+    {
+      "sequence_index": 176,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_C",
+      "liquid_id": "cv_1_4x",
+      "location": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_C"
+    },
+    {
+      "sequence_index": 177,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_C",
+      "condition_id": "paper_C4",
+      "liquid_id": "cv_1_4x",
+      "source": {
+        "labware": "plate",
+        "well": "C2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "C4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_C"
+    },
+    {
+      "sequence_index": 178,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_D",
+      "liquid_id": "cv_1_8x",
+      "location": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_D"
+    },
+    {
+      "sequence_index": 179,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_D",
+      "condition_id": "paper_D4",
+      "liquid_id": "cv_1_8x",
+      "source": {
+        "labware": "plate",
+        "well": "D2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "D4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_D"
+    },
+    {
+      "sequence_index": 180,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_E",
+      "liquid_id": "cv_1_16x",
+      "location": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_E"
+    },
+    {
+      "sequence_index": 181,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_E",
+      "condition_id": "paper_E4",
+      "liquid_id": "cv_1_16x",
+      "source": {
+        "labware": "plate",
+        "well": "E2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "E4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_E"
+    },
+    {
+      "sequence_index": 182,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_F",
+      "liquid_id": "cv_1_32x",
+      "location": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_F"
+    },
+    {
+      "sequence_index": 183,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_F",
+      "condition_id": "paper_F4",
+      "liquid_id": "cv_1_32x",
+      "source": {
+        "labware": "plate",
+        "well": "F2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "F4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_F"
+    },
+    {
+      "sequence_index": 184,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_G",
+      "liquid_id": "cv_1_64x",
+      "location": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_G"
+    },
+    {
+      "sequence_index": 185,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_G",
+      "condition_id": "paper_G4",
+      "liquid_id": "cv_1_64x",
+      "source": {
+        "labware": "plate",
+        "well": "G2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "G4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_G"
+    },
+    {
+      "sequence_index": 186,
+      "action": "MIX",
+      "operation_id": "mix_before_column4_cv_H",
+      "liquid_id": "cv_1_128x",
+      "location": {
+        "labware": "plate",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "cycles": 3,
+      "volume_ul": 3.0,
+      "pipette": "p20_single_gen2",
+      "tip_group": "column4_cv_H"
+    },
+    {
+      "sequence_index": 187,
+      "action": "PRINT",
+      "operation_id": "print_column4_cv_H",
+      "condition_id": "paper_H4",
+      "liquid_id": "cv_1_128x",
+      "source": {
+        "labware": "plate",
+        "well": "H2",
+        "reference": "bottom",
+        "z_mm": 0.2
+      },
+      "destination": {
+        "labware": "paper",
+        "well": "H4",
+        "reference": "bottom",
+        "z_mm": 0.5
+      },
+      "volume_ul": 5.0,
+      "air_gap_ul": 1.5,
+      "air_gap_height_mm": 5.0,
+      "piston_dispense_ul": 6.5,
+      "push_out_ul": 3.0,
+      "blow_out": true,
+      "post_dispense_delay_s": 2.0,
+      "pipette": "p20_single_gen2",
+      "drop_index": 1,
+      "repeat_count": 1,
+      "tip_group": "column4_cv_H"
+    }
+  ],
+  "totals": {
+    "action_count": 187,
+    "transfer_count": 58,
+    "mix_count": 56,
+    "print_count": 64,
+    "delay_count": 4,
+    "configured_experimental_delay_s": 1200.0,
+    "printed_liquid_ul": 320.0,
+    "tip_count": 61
+  },
+  "source_accessibility": {
+    "status": "PASS",
+    "checked_aspirate_or_mix_actions": 178,
+    "minimum_nominal_submerged_margin_ul": 2.607895317956288,
+    "ending_volumes_ul": {
+      "plate:A1": 10.0,
+      "plate:A2": 25.0,
+      "plate:B1": 10.0,
+      "plate:B2": 25.0,
+      "plate:C1": 10.0,
+      "plate:C2": 25.0,
+      "plate:D1": 10.0,
+      "plate:D2": 25.0,
+      "plate:E1": 10.0,
+      "plate:E2": 25.0,
+      "plate:F1": 10.0,
+      "plate:F2": 25.0,
+      "plate:G1": 10.0,
+      "plate:G2": 25.0,
+      "plate:H1": 10.0,
+      "plate:H2": 25.0,
+      "vial_rack:A1": 4940.234375,
+      "vial_rack:A2": 4819.765625,
+      "vial_rack:A3": 4820.234375,
+      "vial_rack:A4": 4819.765625
+    },
+    "geometry": {
+      "plate_well_diameter_mm": 6.86,
+      "plate_aspirate_height_mm": 0.2,
+      "vial_diameter_mm": 28.0,
+      "vial_aspirate_height_mm": 4.0
+    }
+  },
+  "canonical_sha256": "60200e8560266da9f8c7cf059c6a001c4f632b5f2557631bc41f44ed0346cd87"
+}

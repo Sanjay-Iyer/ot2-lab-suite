@@ -1,0 +1,52 @@
+Create a proposed standard-printing experiment configuration for this study. Use
+the registered standard OT-2 printing capability; do not write protocol Python or
+invent hardware, labware geometry, calibration, deck slots, pipette behavior, or
+robot motions.
+
+The operator will load four liquids into the registered 20 mL vial-rack source:
+
+- `np_stock` (Plasmonic nanoparticle stock) in A1;
+- `np_diluent` (Nanoparticle diluent) in A2;
+- `cv_stock` (Crystal violet stock) in A3;
+- `cv_diluent` (Crystal violet diluent) in A4.
+
+Each vial contains 5000 uL, and at least 2600 uL must remain. Absolute crystal
+violet concentration is unknown, so describe concentrations only by relative
+dilution factor.
+
+Prepare two independent eight-point, twofold serial dilution ladders on the
+registered 96-well preparation plate. The nanoparticle ladder uses A1 through H1;
+the crystal-violet ladder uses A2 through H2. Each point must retain 30 uL usable
+volume. Mix each prepared point for 3 cycles at 3 uL. Keep the undiluted first
+point's source identity. Use these stable product liquid ids:
+
+- nanoparticle: `np_stock`, `np_1_2x`, `np_1_4x`, `np_1_8x`, `np_1_16x`,
+  `np_1_32x`, `np_1_64x`, `np_1_128x`;
+- crystal violet: `cv_stock`, `cv_1_2x`, `cv_1_4x`, `cv_1_8x`, `cv_1_16x`,
+  `cv_1_32x`, `cv_1_64x`, `cv_1_128x`.
+
+Print four paper columns across rows A through H. Every deposit is 5 uL.
+
+1. Column 1: print one nanoparticle-ladder deposit at each row, matching stock
+   through 1/128 from A1 through H1. Mix the source for 3 cycles at 3 uL before
+   each nanoparticle aspiration. After the full nanoparticle pass, allow the
+   standardized drying interval, then put one `cv_stock` deposit on each same
+   position. If the standardized interval is not numerically determined by this
+   request, stop and ask for clarification rather than inventing it.
+2. Column 2: print three nanoparticle-ladder deposits at each row, with five
+   minutes after every complete layer, including after the third layer before
+   crystal violet. Mix 3 cycles at 3 uL before each nanoparticle aspiration. Then
+   put one `cv_stock` deposit on every same position.
+3. Column 3: print one `cv_stock` deposit at A3 through H3 as eight matched
+   nanoparticle-free control replicates.
+4. Column 4: print the crystal-violet ladder from stock through 1/128 at A4
+   through H4 as nanoparticle-free controls. Mix 3 cycles at 3 uL before each
+   aspiration.
+
+Different liquids in a series must not share tips. Reusing a tip across targets is
+acceptable only when every target receives the identical stock liquid. Require a
+drying delay between repeated deposits. Mark Columns 1 and 2 as samples and
+Columns 3 and 4 as controls.
+
+Produce a human-reviewable proposed YAML, validate and resolve it with the
+generalized high-level tools, and stop before approval or simulation.

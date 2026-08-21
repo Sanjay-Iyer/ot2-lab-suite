@@ -1,28 +1,53 @@
+# ──────────────────────────────────────────────────────────────────
+# 15 × 15 mL Falcon conical tubes in a 3 × 5 rack
+# ──────────────────────────────────────────────────────────────────
+#     python scripts/generate_labware.py configs/labware/tube_rack_15ml_15tubes.yaml
+#
+# Geometry is taken from Opentrons' own published definition
+# (opentrons_15_tuberack_falcon_15ml_conical, schema 2, v1) rather than
+# estimated. The earlier values in this file (x_offset 20.75, diameter 15.16)
+# put column 5 at x = 120.75 with a 7.58 mm radius = 128.33 mm, which
+# overhangs the 127.76 mm SBS footprint by 0.57 mm; the footprint check in
+# src/labware/validation.py rejects that.
+#
+# well_z is left null: 124.35 - 117.5 = 6.85, which matches the published
+# definition exactly, so there is nothing to pin by hand.
+# ──────────────────────────────────────────────────────────────────
+
 load_name: tube_rack_15ml_15tubes
-display_name: 15 mL Falcon Tube Rack (3×5)
+display_name: 15 mL Falcon Tube Rack (3x5)
 brand: Generic
 brand_ids: []
 namespace: custom_beta
 version: 1
 display_category: tubeRack
 plate_format: irregular
+
+# 3 rows (A-C) × 5 columns = 15 tubes
 rows: 3
 cols: 5
-x_offset: 20.75
-y_offset: 68.63
+
+# Tube centres (mm) from the rack's front-left corner; 25 mm pitch both axes.
+x_offset: 13.88
+y_offset: 67.74
 x_spacing: 25.0
 y_spacing: 25.0
 well_z: null
+
+# Falcon 15 mL conical: 14.9 mm mouth, 117.5 mm deep, v-bottom.
 shape: circular
-diameter: 15.16
+diameter: 14.9
 x_length: null
 y_length: null
-depth: 117.97
+depth: 117.5
 total_liquid_volume: 15000
 well_bottom_shape: v
+
+# SBS footprint; 124.35 mm overall height = tube top.
 x_dimension: 127.76
 y_dimension: 85.48
-z_dimension: 130.0
+z_dimension: 124.35
+
 is_tiprack: false
 tip_length: null
 tip_overlap: null

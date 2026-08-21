@@ -940,7 +940,7 @@ def _preflight(protocol, labware, p20):
 # ── Reporting ─────────────────────────────────────────────────────────────────────
 
 def _report_drop_sequence(protocol, resolved):
-    """Concise per-drop liquid-handling summary, printed before any motion."""
+    """Explain the per-drop piston contents and exit order before any motion."""
     pr = CONFIG["printing"]
     volume = float(pr["droplet_volume_ul"])
     air_gap = float(pr.get("air_gap_ul", 0.0) or 0.0)
@@ -948,7 +948,7 @@ def _report_drop_sequence(protocol, resolved):
     blow_out = bool(pr.get("blow_out", True))
     clovers = resolved["clovers"]
 
-    protocol.comment("FOUR CLOVER TEST")
+    protocol.comment("=== FOUR CLOVER DROP SEQUENCE ===")
     protocol.comment(f"Clovers: {len(clovers)}")
     protocol.comment(f"Locations: {len(clovers) * len(DROPLET_KEYS)}")
     protocol.comment(
@@ -958,28 +958,58 @@ def _report_drop_sequence(protocol, resolved):
 
     for chase in sorted({clover["pre_air_chase_ul"] for clover in clovers}):
         load = _piston_load(chase, volume, air_gap)
-        protocol.comment(f"Pre-air chase: {load['pre_air_chase']:.1f} uL")
-        protocol.comment(
-            f"Piston load/drop: {load['total']:.1f} uL"
-            + (f" (includes {air_gap:.1f} uL air gap)" if air_gap > 0 else "")
-        )
+        protocol.comment(f"Pre-air chase:      {load['pre_air_chase']:.1f} uL")
+        protocol.comment(f"Liquid aspiration:  {load['liquid']:.1f} uL")
+        protocol.comment(f"Trailing air gap:   {air_gap:.1f} uL")
+        protocol.comment(f"Total piston load:  {load['total']:.1f} uL")
         if chase > 0:
             protocol.comment(
-                f"Sequence: air {chase:g} uL -> liquid {volume:g} uL -> "
-                f"dispense {load['total']:g} uL"
+                f"1. aspirate {chase:.1f} uL AIR above the source "
+                "(pre-air chase)."
+            )
+            protocol.comment(
+                f"2. Aspirate {volume:.1f} uL LIQUID from the source."
+            )
+            if air_gap > 0:
+                protocol.comment(
+                    f"3. Aspirate {air_gap:.1f} uL trailing gap AIR for "
+                    "anti-drip in transit."
+                )
+            protocol.comment(
+                "Tip contents, piston to opening: "
+                f"[{chase:.1f} uL chase air]"
+                f"[{volume:.1f} uL liquid]"
+                f"[{air_gap:.1f} uL gap air]"
+            )
+            protocol.comment(
+                "After the anti-drip gap exits, liquid exits first and the chase "
+                "air follows it out."
+            )
+            protocol.comment(
+                f"Dispense {load['total']:.1f} uL piston volume; "
+                f"Liquid deposited per spot: {volume:g} uL."
             )
         else:
             protocol.comment(
-                f"Sequence: liquid {volume:g} uL -> dispense {load['total']:g} uL "
-                "(no pre-air chase)"
+                "No pre-air chase: normal liquid aspiration path."
+            )
+            protocol.comment(
+                f"Aspirate {volume:.1f} uL LIQUID, then dispense "
+                f"{load['total']:.1f} uL piston volume; "
+                f"Liquid deposited per spot: {volume:g} uL."
             )
     protocol.comment(
         f"Total liquid consumption: {resolved['deposits'] * volume:.1f} uL "
         "(liquid only; air is not deposited)"
     )
-    protocol.comment(
-        f"Also active: push_out {push_out:g} uL, blow_out {blow_out}"
-    )
+    protocol.comment(f"Push-out in dispense command: {push_out:g} uL.")
+    if blow_out:
+        protocol.comment(
+            "blow_out is enabled: a SEPARATE forceful air pulse follows the "
+            "metered dispense."
+        )
+    else:
+        protocol.comment("blow_out is disabled: no separate forceful air pulse.")
 
 
 def _report_plan(protocol, resolved):

@@ -1,0 +1,19 @@
+{
+  "left_label": "static",
+  "right_label": "config",
+  "left_action_count": 187,
+  "right_action_count": 187,
+  "physical_match": true,
+  "setup_match": true,
+  "execution_match": true,
+  "structural_match": true,
+  "left_physical_sha256": "3ce809a8133a95207da62fce7bea44977cf4b134490478559c903b6b77e77313",
+  "right_physical_sha256": "3ce809a8133a95207da62fce7bea44977cf4b134490478559c903b6b77e77313",
+  "left_setup_sha256": "5ca13fa16f2e4302f109bb69518e4593955465d3ddeca48d1619ecdd1bf02c34",
+  "right_setup_sha256": "5ca13fa16f2e4302f109bb69518e4593955465d3ddeca48d1619ecdd1bf02c34",
+  "left_structural_sha256": "43f483f270f1db93dacf46c640b97a162b9c4d716d5489599ddd631bdc30b864",
+  "right_structural_sha256": "43f483f270f1db93dacf46c640b97a162b9c4d716d5489599ddd631bdc30b864",
+  "physical_differences": [],
+  "setup_differences": [],
+  "structural_differences": []
+}

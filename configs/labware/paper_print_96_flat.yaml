@@ -1,0 +1,77 @@
+# ──────────────────────────────────────────────────────────────────
+# Paper print surface — 96 printable positions on a flat substrate
+# ──────────────────────────────────────────────────────────────────
+# BASELINE CONFIG. Reverse-engineered from the known-working, hand-made
+# labware/paper_print_96_flat.json (created in the Opentrons Labware
+# Creator before this pipeline existed). Regenerating from this config
+# reproduces that file exactly — tests/test_labware_baseline.py asserts it.
+#
+#     python scripts/generate_labware.py configs/labware/paper_print_96_flat.yaml
+#
+# NOTE: generation refuses to overwrite labware/paper_print_96_flat.json.
+# It is the golden reference for the whole labware subsystem. To make a
+# variant, inherit from this config instead of editing it:
+#
+#     python -m scripts.derive_labware --template paper_print_96_flat \
+#         --load-name my_variant --display-name "My Variant"
+#
+# ── What this labware actually is ─────────────────────────────────
+# A flat piece of paper is not a well plate. This definition borrows the
+# 96-well SBS coordinate framework purely as an addressing grid, so the
+# protocol can say "print at D6" and get a deterministic (x, y). The
+# geometry below is the Corning 96-well grid (same 9 mm pitch, same A1
+# origin, same 6.86 mm position diameter); only the z-axis fields differ.
+#
+#   depth: 0.1     — there is no cavity. 0.1 mm is the smallest non-zero
+#                    depth the schema tolerates; it makes well.top() and
+#                    well.bottom() effectively the same plane. Real print
+#                    standoff is set by the protocol's dispense_z, NOT here.
+#   well_z: 6.0    — measured height of the paper surface above the deck
+#                    slot floor (paper on its support). This is NOT the
+#                    usual z_dimension - depth (= 13.9); it is a physical
+#                    measurement and must stay pinned.
+#   z_dimension:14.0 — overall stack height (support + paper + clearance).
+#
+# total_liquid_volume: 360 is vestigial (inherited from the Corning plate).
+# Nothing holds 360 µL; it exists only because the schema requires the key.
+# ──────────────────────────────────────────────────────────────────
+
+# ─── Identity ─────────────────────────────────────────────────────
+load_name: paper_print_96_flat
+display_name: Paper Print Surface 96 (flat, custom)
+brand: custom
+brand_ids: [custom]
+namespace: custom_beta
+version: 1
+display_category: wellPlate
+
+# 96Standard keeps 8-channel column addressing available on the grid.
+plate_format: 96Standard
+
+# ─── Grid layout: 8 rows (A-H) × 12 columns = 96 positions ────────
+rows: 8
+cols: 12
+
+# ─── Position of the grid (mm, from the front-left corner) ────────
+# A1 centre at (14.38, 74.24); 9 mm pitch. Row A is the BACK row, so y
+# decreases A→H: 74.24 … 11.24. Column 1 is leftmost, x increases 1→12.
+x_offset: 14.38
+y_offset: 74.24
+x_spacing: 9.0
+y_spacing: 9.0
+
+# Measured paper-surface height. Do NOT leave null — the auto-computed
+# value (z_dimension - depth = 13.9) is wrong for this labware.
+well_z: 6.0
+
+# ─── Printable position geometry ──────────────────────────────────
+shape: circular
+diameter: 6.86
+depth: 0.1
+total_liquid_volume: 360
+well_bottom_shape: flat
+
+# ─── Outer footprint (standard SBS deck slot) ─────────────────────
+x_dimension: 127.76
+y_dimension: 85.48
+z_dimension: 14.0

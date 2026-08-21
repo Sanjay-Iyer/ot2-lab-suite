@@ -1,0 +1,49 @@
+{
+  "schema_version": "print-job/v1",
+  "job_id": "2984d6180d8832059043336f45223ffef7c0f5b9716beaaf05729e6a72ea5be6",
+  "name": "Stage 1 four-clover golden experiment",
+  "description": "Print one four-point clover at the center of the standard paper substrate.",
+  "substrate": {
+    "load_name": "paper_print_96_flat",
+    "namespace": "custom_beta",
+    "version": 1,
+    "definition_sha256": "ce43384fdcd35e10b0e5b8d66313326c510705383c41bed2573c8dd86fad0666",
+    "template_id": "well_plate_96/paper_print_96_flat_v1"
+  },
+  "materials": [
+    {
+      "material_id": "BP",
+      "display_name": "BP"
+    }
+  ],
+  "pattern": {
+    "type": "four_clover",
+    "geometry": {
+      "half_width_mm": 2.0,
+      "half_height_mm": 2.0
+    },
+    "centers": [
+      {
+        "name": "air_chase_5ul",
+        "reference_well": "E6",
+        "x_offset_mm": 4.5,
+        "y_offset_mm": 4.5
+      }
+    ],
+    "layers": 1
+  },
+  "deposition": {
+    "material_id": "BP",
+    "volume_ul": 5.0
+  },
+  "replication": {
+    "kind": "design_replicates",
+    "replicates": 1
+  },
+  "ordering_intent": {
+    "mode": "clover_by_clover"
+  },
+  "metadata": {
+    "fixture": "stage1-clover-golden"
+  }
+}

@@ -1,0 +1,74 @@
+# Registered machine profile for four-clover paper printing on the OT-2.
+#
+# This file is laboratory-owned. It carries deck slots, labware identities,
+# calibrated heights, the physically validated droplet release behaviour, tip
+# handling, and the printable-area bounds. It contains no scientific meaning: no
+# liquids, no clover placements, no droplet volume, no delays.
+#
+# Four-clover experiment configurations reference this profile by path
+# (`machine_profile: configs/machines/ot2_four_clover_printing_p20_v1.yaml`)
+# instead of restating it. An agent proposing an experiment must never invent or
+# alter these values; changing calibrated geometry is a laboratory decision that
+# requires physical revalidation.
+#
+# Provenance: every value below is copied verbatim from the manually validated
+# ground truth configs/experiments/02_printing_four_clover.yaml, which in turn
+# comes from configs/printing/four_clover_spacing_v13.yaml. The paper surface sits
+# at well z = 6.0 mm and dispense_height_mm is 0.5 mm above it, so droplets are
+# released from an absolute 6.5 mm with a 0.5 mm standoff. 0.5 mm is the height
+# physically confirmed to detach the droplet (it replaced an earlier 4.0 mm).
+
+profile_id: ot2_four_clover_printing_p20_v1
+
+machine:
+  robot_type: OT-2
+  api_level: "2.15"
+
+  # Builder version of the validated executor these values were qualified against.
+  protocol_version: 18
+
+  deck:
+    source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+    paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+    tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+  pipette: {name: p20_single_gen2, mount: left}
+
+  # How the tip meets the source vial. Owned by the laboratory, not the experiment.
+  source_handling:
+    kind: 20 mL vial
+    aspirate_height_mm: 4.0
+    park_height_mm: 5.0
+
+  # The physically validated droplet release profile.
+  print_release:
+    dispense_height_mm: 0.5
+    pre_air_chase_ul: 0.0
+    air_gap_ul: 1.5
+    air_gap_height_mm: 5.0
+    push_out_ul: 3.0
+    blow_out: true
+
+  # Printable area, derived from the paper well grid plus a margin.
+  paper_bounds:
+    x_dimension_mm: 127.76
+    y_dimension_mm: 85.48
+    grid_inset_x_mm: 14.38
+    grid_inset_y_mm: 11.24
+    boundary_mode: grid
+    edge_margin_mm: 4.5
+
+  validation:
+    mode: warn
+    min_intra_clover_distance_mm: 1.0
+    min_inter_clover_distance_mm: 8.0
+    droplet_radius_mm: 1.5
+    allow_duplicate_droplet_positions: false
+
+  tips:
+    return_tips: true
+    print_tip: A1
+
+  flow_rates: {aspirate_ul_s: 3.0, dispense_ul_s: 3.0}
+
+  safety: {p20_max_volume_ul: 20.0, expected_source_slot: 7}

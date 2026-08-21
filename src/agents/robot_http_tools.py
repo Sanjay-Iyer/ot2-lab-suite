@@ -89,9 +89,8 @@ def check_robot_http_api(robot_ip: Optional[str] = None) -> str:
 
 @tool
 def run_vial_print_robot_http(
-    confirmation: str,
     robot_ip: Optional[str] = None,
-    live: bool = True,
+    live: bool = False,
     paper_start_column: Optional[int] = None,
     do_dilution: bool = True,
     do_print: bool = True,
@@ -101,13 +100,17 @@ def run_vial_print_robot_http(
     """Run the vial-dilution-print protocol through scripts/run_vial_print_robot.py.
 
     Safety:
-    - confirmation must be exactly RUN ROBOT.
+    - Agent tools cannot authorize live liquid handling; live=True is refused.
+    - Real runs must use the manual work-laptop CLI after human readiness checks.
     - The exact generated protocol must have a PASS simulation record.
     - The wrapper always uses --skip-build --skip-validate so the agent's
       previously built user-YAML artifact is what gets uploaded.
     """
-    if confirmation != "RUN ROBOT":
-        return "REFUSED: confirmation must be exactly RUN ROBOT."
+    if live:
+        return (
+            "REFUSED: AI tools cannot authorize live OT-2 motion. Use the manual "
+            "work-laptop CLI after the operator confirms physical readiness."
+        )
 
     auth_error = Config.live_robot_llm_auth_error()
     if auth_error:
@@ -147,8 +150,6 @@ def run_vial_print_robot_http(
         "--poll-seconds",
         str(poll_seconds),
     ]
-    if live:
-        cmd.append("--live")
     if not do_dilution:
         cmd.append("--no-dilution")
     if not do_print:

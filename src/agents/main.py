@@ -36,8 +36,6 @@ from .tools import (
     generate_protocol,
     simulate_protocol,
     check_robot_connection,
-    deploy_protocol_to_robot,
-    execute_protocol_on_robot,
     validate_config,
     show_full_config,
     get_robot_hardware_status
@@ -46,16 +44,44 @@ from .labware_tools import (
     list_labware_configs,
     list_generated_labware,
     list_labware_presets,
+    list_labware_families,
     describe_labware_config,
     create_labware_config,
     generate_labware_from_config,
+    generate_custom_labware,
+    derive_custom_labware,
+    validate_labware_definition,
 )
 
 # Rate limiter is OFF by default. Pass --rate-limit to enable.
 _rate_limit_enabled = "--rate-limit" in sys.argv
 rate_guard = RateLimitGuard(enabled=_rate_limit_enabled)
 
-# ... (MockToolCallingLLM logic unchanged) ...
+class MockToolCallingLLM(BaseChatModel):
+    """Deprecated compatibility model for the historical ``--mock`` flag.
+
+    The former implementation was removed but callers still imported the symbol,
+    leaving the generic agent's mock path as a NameError. It now fails closed with
+    a deterministic migration message and never calls a tool, network, or robot.
+    Production Printing Agent routing is tested with injected fake models instead.
+    """
+
+    @property
+    def _llm_type(self) -> str:
+        return "deprecated-ot2-mock"
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        message = AIMessage(
+            content=(
+                "The generic --mock agent is deprecated. Use the deterministic "
+                "printing CLI or the production Printing Agent tests with an "
+                "injected fake tool-calling model. No tools were called."
+            )
+        )
+        return ChatResult(generations=[ChatGeneration(message=message)])
 
 # --- Agent Factory ---
 def create_opentrons_agent(use_mock: bool = False):
@@ -65,7 +91,8 @@ def create_opentrons_agent(use_mock: bool = False):
         llm = Config.get_llm(temperature=0)
 
     tools = [
-        # Workflow execution tools
+        # Local planning/simulation tools. Live deploy/execute functions remain
+        # available to manual code paths but are intentionally not AI-facing.
         list_available_workflows,
         load_workflow_defaults,
         update_workflow_config,
@@ -73,8 +100,6 @@ def create_opentrons_agent(use_mock: bool = False):
         generate_protocol,
         simulate_protocol,
         check_robot_connection,
-        deploy_protocol_to_robot,
-        execute_protocol_on_robot,
         validate_config,
         show_full_config,
         get_robot_hardware_status,
@@ -82,9 +107,13 @@ def create_opentrons_agent(use_mock: bool = False):
         list_labware_configs,
         list_generated_labware,
         list_labware_presets,
+        list_labware_families,
         describe_labware_config,
         create_labware_config,
         generate_labware_from_config,
+        generate_custom_labware,
+        derive_custom_labware,
+        validate_labware_definition,
     ]
     
     system_prompt = (
@@ -96,38 +125,50 @@ def create_opentrons_agent(use_mock: bool = False):
         "4. ALWAYS run 'validate_current_workflow' before generating a protocol.\n"
         "5. Generate the protocol using 'generate_protocol'.\n"
         "6. ALWAYS run 'simulate_protocol' on the generated file and verify it PASSES.\n"
-        "7. Before any physical execution, run 'check_robot_connection'.\n\n"
-        "PHYSICAL EXECUTION SAFETY (STRICT):\n"
-        "To run on the physical robot, you must follow this sequence:\n"
-        "A. The live robot laptop must use Vertex AI / gcloud ADC auth "
-        "(LLM_PROVIDER=vertexai and GOOGLE_CLOUD_PROJECT in .env). "
-        "GOOGLE_API_KEY is only allowed for simulation-laptop testing.\n"
-        "B. Ensure 'simulate_protocol' passed for the current protocol SHA256 hash.\n"
-        "C. Run 'get_robot_hardware_status' to verify the pipette matches your config.\n"
-        "D. Run 'check_robot_connection' to verify the instrument is online.\n"
-        "E. Present a PRE-RUN SUMMARY to the user containing:\n"
+        "7. Stop after local simulation and report the exact artifact SHA256.\n\n"
+        "PHYSICAL EXECUTION HANDOFF (STRICT):\n"
+        "Agent tools cannot deploy or execute protocols on the physical robot. "
+        "For later work-laptop execution, present a HANDOFF SUMMARY containing:\n"
         "   - Protocol Name & SHA256 Hash (from tool output).\n"
-        "   - Robot IP.\n"
         "   - Deck Layout Summary (labware in which slots).\n"
-        "   - Pipette(s) and Mount(s) (ACTUAL vs CONFIG).\n"
+        "   - Configured pipette(s) and mount(s).\n"
         "   - Estimated number of liquid transfers.\n"
-        "F. MANDATORY CONFIRMATION: Ask the user to reply with exactly 'RUN ROBOT' to proceed.\n"
-        "G. Only after the user says 'RUN ROBOT', call 'deploy_protocol_to_robot' followed by 'execute_protocol_on_robot'.\n\n"
+        "Then stop. A human operator must follow the documented manual work-laptop "
+        "procedure and confirm physical readiness outside this agent.\n\n"
         "IMPORTANT:\n"
-        "- Use non-interactive SSH (BatchMode). If it fails, inform the user to check their SSH keys.\n"
         "- All paths are relative to the project root.\n"
         "- TRUST TOOLS OVER MEMORY: If a tool output (like show_full_config or generate_protocol) says a pipette is 'p300_multi_gen2', DO NOT report it as 'p300_single_gen2' in your chat, even if you thought it was single-channel earlier.\n\n"
         "LABWARE CREATION PROTOCOL:\n"
         "When the user asks you to create, define, or generate custom labware:\n"
-        "1. If the user describes a standard plate type (96-well, 24-well, reservoir, tube rack, etc.), call list_labware_presets() to identify the best matching preset.\n"
-        "2. Call create_labware_config() with the preset name and any custom overrides (load_name, display_name, depth, volume, dimensions, etc.).\n"
-        "   - load_name MUST be lowercase letters, digits, underscores, or dots only — no spaces, hyphens, or capitals.\n"
-        "   - display_name can be any human-readable string.\n"
-        "   - If the user specifies custom well dimensions or a non-standard grid, calculate the parameters from their description before calling the tool.\n"
-        "3. Call describe_labware_config() on the new config to show the user a summary for review.\n"
-        "4. After the user confirms the config is correct, call generate_labware_from_config() to produce the JSON.\n"
-        "5. Inform the user: the JSON in labware/<load_name>.json can be imported into the Opentrons App, and the load_name/namespace/version needed for protocol code.\n"
-        "If the user only wants to view or list existing labware, use list_labware_configs(), list_generated_labware(), or describe_labware_config() as appropriate.\n"
+        "0. Call list_labware_families() to see what can actually be built. Never offer a labware "
+        "family that is not in that list.\n"
+        "1. Decide which path fits the request:\n"
+        "   a. BASED ON AN EXISTING LABWARE ('another one like X', 'same as my paper template but ...') "
+        "→ derive_custom_labware(). Use mode='copy' when only the name/metadata changes, and "
+        "mode='regenerate' when the user asked for different physical geometry.\n"
+        "   b. FULLY SPECIFIED NEW LABWARE → generate_custom_labware() with the complete parameters.\n"
+        "   c. A STANDARD PLATE TYPE the user wants as a starting point → list_labware_presets(), then "
+        "create_labware_config(), then generate_labware_from_config().\n"
+        "2. NEVER invent a physical dimension. Well diameter, depth, spacing, offsets and the outer "
+        "footprint come from the user, from a named template, or from a preset. If a dimension is "
+        "missing and no template or preset supplies it, say exactly which values you need and ask — "
+        "do not choose a plausible number to make generation succeed. A wrong dimension here is a tip "
+        "driven into glass.\n"
+        "3. load_name MUST be lowercase letters, digits, underscores, or dots only — no spaces, hyphens, "
+        "or capitals. display_name can be any human-readable string. The output filename always follows "
+        "load_name.\n"
+        "4. You never write well coordinates. The tools compute all of them from rows/cols/offsets/"
+        "spacing. Do not attempt to list x/y values yourself.\n"
+        "5. Show the user the parameters (describe_labware_config(), or the summary the tool returns) "
+        "and confirm before generating when anything was inferred.\n"
+        "6. Report the validation line the tool returns verbatim — schema/geometry/json/opentrons. If a "
+        "layer FAILED, no file was written; fix the parameters rather than retrying unchanged.\n"
+        "7. NEVER pass overwrite=True unless the user explicitly asked to replace an existing definition. "
+        "The default refusal protects labware the robot is already calibrated against.\n"
+        "8. Local validation is not physical verification. Never tell the user a definition has been "
+        "checked on the OT-2 unless it actually has.\n"
+        "If the user only wants to view or list existing labware, use list_labware_configs(), "
+        "list_generated_labware(), describe_labware_config(), or validate_labware_definition().\n"
     )
     
     return create_react_agent(model=llm, tools=tools, prompt=system_prompt)

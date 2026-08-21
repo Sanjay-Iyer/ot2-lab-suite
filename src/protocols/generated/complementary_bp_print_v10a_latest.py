@@ -1,11 +1,15 @@
 """Complementary direct-source paper print, v10a/v10b (OT-2 API 2.15).
 
-This standalone-compatible template powers two complementary generated scripts:
+This standalone-compatible template powers four complementary generated scripts:
 
 * v10a prints BP from one 20 mL vial. Columns 1/2/3 receive 1/3/10
   layers, with rows A/B/C acting as three identical replicates.
 * v10b prints DMMP from one 96-well plate location (default A1) onto the same
   3 x 3 paper grid. Rows A/B/C receive 1/2/3 layers in every column.
+* v10c prints BP once on all nine grid locations, then adds ten more drops to
+  A3 with no configured layer or post-dispense delays.
+* v10bV2 is a DMMP coverage test that prints once on every grid location with
+  no configured delays before the full v10b layered run.
 
 There is no dilution. One P20 tip serves each entire protocol. Deposits are made
 in layer passes so one configurable drying rest separates successive layers.
@@ -111,8 +115,21 @@ def _spot_layers():
             for row in rows:
                 if row in layers:
                     spots[f"{row}{column}"] = layers[row]
+    elif mode == "initial_plus_extra":
+        initial = int(pr.get("initial_layers", 1))
+        extras = {
+            str(key).upper(): int(value)
+            for key, value in pr.get("extra_layers", {}).items()
+        }
+        for column in columns:
+            for row in rows:
+                name = f"{row}{column}"
+                spots[name] = initial + extras.get(name, 0)
     else:
-        raise ValueError(f"print.layer_mode must be by_column or by_row, got {mode!r}")
+        raise ValueError(
+            "print.layer_mode must be by_column, by_row, or initial_plus_extra, "
+            f"got {mode!r}"
+        )
     return rows, columns, spots
 
 

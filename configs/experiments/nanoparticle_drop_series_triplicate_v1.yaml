@@ -1,0 +1,30 @@
+schema_version: printing-experiment/v1
+experiment:
+  name: Nanoparticle droplet-number series
+  description: 1, 2, and 3 drops in triplicate.
+  version: 1
+  template_id: standard_paper_printing/v1
+workflow:
+  family: standard
+  name: plate_well_direct_v9
+substrate:
+  labware_id: paper_print_96_flat
+material:
+  material_id: sample
+  display_name: nanoparticle_A
+printing:
+  droplet_volume_ul: 5.0
+  layout:
+    kind: well_conditions
+    conditions:
+    - name: 1_drop
+      drops_per_position: 1
+      wells: [A1, A2, A3]
+    - name: 2_drops
+      drops_per_position: 2
+      wells: [B1, B2, B3]
+    - name: 3_drops
+      drops_per_position: 3
+      wells: [C1, C2, C3]
+  ordering_mode: layer_then_row_then_column
+  inter_layer_rest_minutes: 5.0

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+import yaml
 
 if __name__ == "__main__" and not __package__:
     repo = Path(__file__).resolve().parent.parent
@@ -36,57 +37,58 @@ from src.lab.robot_connection import (
 )
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 from src.utils.ot2_ssh import OT2SSHSettings
+from src.printing.workflows.registry import (
+    api_215_versions,
+    builder_protocol_versions,
+    imageless_versions,
+    no_matrix_versions,
+)
 
 
 REPO = Path(__file__).resolve().parent.parent
-DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "vial_dilution_print_latest.py"
+GENERATED_PROTOCOL_DIR = REPO / "src" / "protocols" / "generated"
 
 # Markers the builder writes around the embedded CONFIG dict (keep in sync with
 # scripts/build_vial_dilution_print.py).
 CONFIG_START_SENTINEL = "# >>> CONFIG START >>>"
 CONFIG_END_SENTINEL   = "# <<< CONFIG END <<<"
-# Generated artifact per protocol version (see scripts/build_vial_dilution_print.py).
+# Exact generated artifact per version, derived from the same registry as the builder.
 _PROTOCOL_BY_VERSION = {
-    1: DEFAULT_PROTOCOL,
-    2: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v2_latest.py",
-    3: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v3_latest.py",
-    4: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v4_latest.py",
-    6: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v6_latest.py",
-    7: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v7_latest.py",
-    8: REPO / "src" / "protocols" / "generated" / "vial_dilution_print_v8_latest.py",
-    9: REPO / "src" / "protocols" / "generated" / "plate_well_direct_print_v9_latest.py",
-    10: REPO / "src" / "protocols" / "generated" / "complementary_bp_print_v10a_latest.py",
-    11: REPO / "src" / "protocols" / "generated" / "complementary_dmmp_print_v10b_latest.py",
-    12: REPO / "src" / "protocols" / "generated" / "combined_bp_dmmp_print_v11_latest.py",
-    13: REPO / "src" / "protocols" / "generated" / "complementary_bp_quick_print_v10c_latest.py",
-    14: REPO / "src" / "protocols" / "generated" / "complementary_dmmp_spot_test_v10bv2_latest.py",
-    15: REPO / "src" / "protocols" / "generated" / "four_clover_print_v12_latest.py",
-    16: REPO / "src" / "protocols" / "generated" / "four_clover_air_chase_v12_latest.py",
-    17: REPO / "src" / "protocols" / "generated" / "four_clover_grid_v12_latest.py",
-    18: REPO / "src" / "protocols" / "generated" / "four_clover_spacing_v13_latest.py",
+    version: GENERATED_PROTOCOL_DIR / f"{generated_stem}_latest.py"
+    for version, (_, generated_stem) in builder_protocol_versions().items()
 }
+DEFAULT_PROTOCOL = _PROTOCOL_BY_VERSION[1]
 
 # Versions that target API 2.15 on the robot: run modes are baked into the generated
 # file at build time and no runtime parameters are sent.
-API_215_VERSIONS = {3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
+API_215_VERSIONS = api_215_versions()
 
 # Versions with no camera step — skip all before/after image handling (and the SSH
 # it needs) for these.
-IMAGELESS_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
+IMAGELESS_VERSIONS = imageless_versions()
 
 # Versions with no run-mode matrix; the build's own simulation is the whole check.
-NO_MATRIX_VERSIONS = {4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
+NO_MATRIX_VERSIONS = no_matrix_versions()
 
 
 def _config_version(config_path: str | None) -> int:
     if not config_path:
         return 1
     try:
-        import yaml
-        raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8")) or {}
-        return int(raw.get("protocol_version", 1))
-    except (OSError, ValueError, TypeError, ImportError):
-        return 1
+        raw = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ValueError(f"cannot read printing config {config_path!r}: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"printing config {config_path!r} must contain a YAML mapping")
+    try:
+        version = int(raw["protocol_version"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            f"printing config {config_path!r} needs a valid protocol_version"
+        ) from exc
+    if version not in _PROTOCOL_BY_VERSION:
+        raise ValueError(f"unknown protocol_version {version}; refusing artifact fallback")
+    return version
 
 
 def _protocol_for_config(config_path: str | None) -> Path:
@@ -99,7 +101,12 @@ def _protocol_for_config(config_path: str | None) -> Path:
     if not config_path:
         return DEFAULT_PROTOCOL
     version = _config_version(config_path)
-    return _PROTOCOL_BY_VERSION.get(version, DEFAULT_PROTOCOL)
+    try:
+        return _PROTOCOL_BY_VERSION[version]
+    except KeyError as exc:
+        raise ValueError(
+            f"unknown protocol_version {version}; refusing artifact fallback"
+        ) from exc
 REMOTE_VISION_DIR = "/data/vision/vial_dilution_print"
 LOCAL_VISION_BASE = REPO / "vision_runs" / "vial_dilution_print"
 DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"

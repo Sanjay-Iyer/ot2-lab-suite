@@ -237,6 +237,6 @@ safety:
 # NOT part of CONFIG — the builder writes these into the DEFAULT_* constants so a
 # simulation/headless run uses them. In the Opentrons App you override per run.
 run_modes:
-  dry_run: false            # load + pre-flight + comments only, no liquid motion
+  dry_run: true             # load + pre-flight + comments only, no liquid motion
   do_dilution: true
   do_print: true

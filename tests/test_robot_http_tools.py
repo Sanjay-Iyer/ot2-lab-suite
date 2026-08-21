@@ -52,18 +52,18 @@ def test_protocol_registry_lists_vial_print():
     assert "http_api" in out
 
 
-def test_vial_print_http_requires_exact_run_robot_confirmation(monkeypatch, workspace_tmp):
+def test_vial_print_http_refuses_live_without_an_ai_confirmation_escape_hatch(monkeypatch, workspace_tmp):
     _patch_vial_protocol(monkeypatch, workspace_tmp)
 
     def fail_run(*args, **kwargs):
-        raise AssertionError("runner should not be called without exact confirmation")
+        raise AssertionError("runner should not be called for AI-requested live motion")
 
     monkeypatch.setattr(rht.subprocess, "run", fail_run)
     out = rht.run_vial_print_robot_http.invoke(
-        {"confirmation": "yes", "robot_ip": "169.254.46.57"}
+        {"robot_ip": "169.254.46.57", "live": True}
     )
     assert "REFUSED" in out
-    assert "exactly RUN ROBOT" in out
+    assert "AI tools cannot authorize live OT-2 motion" in out
 
 
 def test_vial_print_http_refuses_without_passing_simulation(monkeypatch, workspace_tmp):
@@ -71,24 +71,26 @@ def test_vial_print_http_refuses_without_passing_simulation(monkeypatch, workspa
     sim_path = workspace_tmp / "simulations.json"
     sim_path.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(rht, "SIMULATION_RECORDS_PATH", sim_path)
+    monkeypatch.setattr(rht.Config, "live_robot_llm_auth_error", lambda: None)
 
     def fail_run(*args, **kwargs):
         raise AssertionError("runner should not be called without a PASS simulation")
 
     monkeypatch.setattr(rht.subprocess, "run", fail_run)
     out = rht.run_vial_print_robot_http.invoke(
-        {"confirmation": "RUN ROBOT", "robot_ip": "169.254.46.57"}
+        {"robot_ip": "169.254.46.57"}
     )
     assert "REFUSED" in out
     assert "No PASS simulation record" in out
 
 
-def test_vial_print_http_builds_expected_runner_command(monkeypatch, workspace_tmp):
+def test_vial_print_http_builds_nonlive_runner_command(monkeypatch, workspace_tmp):
     entry = _patch_vial_protocol(monkeypatch, workspace_tmp)
     sha = hash_file(entry.protocol_path)
     sim_path = workspace_tmp / "simulations.json"
     sim_path.write_text(json.dumps({sha: {"status": "PASS"}}), encoding="utf-8")
     monkeypatch.setattr(rht, "SIMULATION_RECORDS_PATH", sim_path)
+    monkeypatch.setattr(rht.Config, "live_robot_llm_auth_error", lambda: None)
 
     captured = {}
 
@@ -102,9 +104,8 @@ def test_vial_print_http_builds_expected_runner_command(monkeypatch, workspace_t
     monkeypatch.setattr(rht.subprocess, "run", fake_run)
     out = rht.run_vial_print_robot_http.invoke(
         {
-            "confirmation": "RUN ROBOT",
             "robot_ip": "169.254.46.57",
-            "live": True,
+            "live": False,
             "paper_start_column": 3,
             "do_dilution": False,
             "do_print": True,
@@ -118,7 +119,7 @@ def test_vial_print_http_builds_expected_runner_command(monkeypatch, workspace_t
     assert str(entry.runner_script) in cmd
     assert "--robot-host" in cmd and "169.254.46.57" in cmd
     assert "--protocol" in cmd and str(entry.protocol_path) in cmd
-    assert "--live" in cmd
+    assert "--live" not in cmd
     assert "--skip-build" in cmd
     assert "--skip-validate" in cmd
     assert "--no-dilution" in cmd
@@ -129,7 +130,7 @@ def test_vial_print_http_builds_expected_runner_command(monkeypatch, workspace_t
     assert captured["text"] is True
 
 
-def test_vial_print_agent_prompt_points_to_http_runner_not_ssh_execute():
-    assert "run_vial_print_robot_http" in SYSTEM_PROMPT
-    assert "check_robot_http_api" in SYSTEM_PROMPT
-    assert "do not use deploy_protocol_to_robot()" in SYSTEM_PROMPT
+def test_vial_print_agent_prompt_requires_manual_live_handoff():
+    assert "Agent tools cannot authorize or start live liquid handling" in SYSTEM_PROMPT
+    assert "Stop at the handoff" in SYSTEM_PROMPT
+    assert "deploy_protocol_to_robot() or execute_protocol_on_robot()" in SYSTEM_PROMPT

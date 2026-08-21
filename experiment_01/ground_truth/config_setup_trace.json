@@ -1,0 +1,54 @@
+[
+  {
+    "action": "SETUP_LIQUID",
+    "liquid_id": "np_stock",
+    "location": {
+      "labware": "vial_rack",
+      "well": "A1",
+      "reference": "bottom",
+      "z_mm": 4.0
+    },
+    "loaded_volume_ul": 5000.0,
+    "minimum_remaining_ul": 2600.0,
+    "scientific_allocation_ul": 59.765625
+  },
+  {
+    "action": "SETUP_LIQUID",
+    "liquid_id": "np_diluent",
+    "location": {
+      "labware": "vial_rack",
+      "well": "A2",
+      "reference": "bottom",
+      "z_mm": 4.0
+    },
+    "loaded_volume_ul": 5000.0,
+    "minimum_remaining_ul": 2600.0,
+    "scientific_allocation_ul": 180.234375
+  },
+  {
+    "action": "SETUP_LIQUID",
+    "liquid_id": "cv_stock",
+    "location": {
+      "labware": "vial_rack",
+      "well": "A3",
+      "reference": "bottom",
+      "z_mm": 4.0
+    },
+    "loaded_volume_ul": 5000.0,
+    "minimum_remaining_ul": 2600.0,
+    "scientific_allocation_ul": 179.765625
+  },
+  {
+    "action": "SETUP_LIQUID",
+    "liquid_id": "cv_diluent",
+    "location": {
+      "labware": "vial_rack",
+      "well": "A4",
+      "reference": "bottom",
+      "z_mm": 4.0
+    },
+    "loaded_volume_ul": 5000.0,
+    "minimum_remaining_ul": 2600.0,
+    "scientific_allocation_ul": 180.234375
+  }
+]

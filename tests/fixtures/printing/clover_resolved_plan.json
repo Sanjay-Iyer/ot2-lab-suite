@@ -1,0 +1,321 @@
+{
+  "schema_version": "resolved-print-plan/v1",
+  "plan_id": "664c92e97743239aadb677566c673a0e8d63fa3b8fb5e34a86f16da7c7695ab7",
+  "workflow_id": "four_clover_air_chase",
+  "provenance": {
+    "resolved_config_sha256": "4400f4c3ebdb190110ba8af01d0bed10e220478fc5a43b435121d44f8102bae4",
+    "source_request_sha256": "a210d74ac3ed48f658cd7786aa70276c9015a3cc425f3f42d60be8d2e067852c",
+    "source_config_reference": "configs/printing/four_clover_air_chase_v12.yaml",
+    "source_protocol": "src/protocols/printing/12_four_clover_paper_print.py",
+    "source_protocol_family": "four_clover_v12",
+    "source_builder_version": 16,
+    "adapter_id": "four-clover-v12-to-plan/v1"
+  },
+  "machine": {
+    "robot_type": "OT-2",
+    "api_level": "2.15",
+    "pipette": {
+      "name": "p20_single_gen2",
+      "mount": "left",
+      "max_volume_ul": 20.0
+    },
+    "tip_strategy": {
+      "rack_labware_name": "opentrons_96_tiprack_20ul",
+      "rack_deck_slot": 9,
+      "tip_well": "A1",
+      "return_tip": true,
+      "held_for_complete_run": true
+    },
+    "flow_rates": {
+      "aspirate_ul_s": 3.0,
+      "dispense_ul_s": 3.0
+    },
+    "sources": [
+      {
+        "source_id": "primary_source",
+        "material_id": "BP",
+        "labware_role": "source",
+        "labware_name": "tuberack_3dprint_20ml_8vials_v2",
+        "deck_slot": 7,
+        "well": "A2",
+        "aspirate_height_mm": 4.0,
+        "park_height_mm": 5.0
+      }
+    ],
+    "destination_labware": {
+      "destination_labware_id": "paper",
+      "labware_role": "paper",
+      "labware_name": "paper_print_96_flat",
+      "deck_slot": 5,
+      "dispense_height_mm": 4.0
+    }
+  },
+  "order_mode": "clover_by_clover",
+  "timing": {
+    "kind": "four_clover",
+    "inter_drop_delay_s": 2.0,
+    "inter_layer_delay_s": 0.0,
+    "inter_clover_delay_s": 0.0
+  },
+  "deposits": [
+    {
+      "sequence_index": 1,
+      "source_id": "primary_source",
+      "destination_labware_id": "paper",
+      "destination": {
+        "kind": "coordinate",
+        "reference_well": "E6",
+        "reference_well_paper_xy_mm": {
+          "x_mm": 59.38,
+          "y_mm": 38.24
+        },
+        "reference_well_deck_xy_mm": {
+          "x_mm": 191.88,
+          "y_mm": 128.74
+        },
+        "center_translation_mm": {
+          "x_mm": 4.5,
+          "y_mm": 4.5
+        },
+        "paper_center_xy_mm": {
+          "x_mm": 63.88,
+          "y_mm": 42.74
+        },
+        "deck_center_xy_mm": {
+          "x_mm": 196.38,
+          "y_mm": 133.24
+        },
+        "point_offset_mm": {
+          "x_mm": -2.0,
+          "y_mm": 2.0
+        },
+        "paper_xy_mm": {
+          "x_mm": 61.88,
+          "y_mm": 44.74
+        },
+        "deck_xy_mm": {
+          "x_mm": 194.38,
+          "y_mm": 135.24
+        }
+      },
+      "deposition": {
+        "liquid_volume_ul": 5.0,
+        "pre_air_chase_ul": 5.0,
+        "trailing_air_gap_ul": 1.5,
+        "air_gap_height_mm": 5.0,
+        "piston_dispense_ul": 11.5,
+        "push_out_ul": 3.0,
+        "blow_out": false
+      },
+      "provenance": {
+        "kind": "four_clover",
+        "layer_index": 1,
+        "clover_index": 1,
+        "clover_name": "air_chase_5ul",
+        "design_point": "D1"
+      },
+      "timing": {
+        "delay_before_s": 0.0,
+        "post_dispense_delay_s": 2.0,
+        "rest_after_s": 0.0
+      }
+    },
+    {
+      "sequence_index": 2,
+      "source_id": "primary_source",
+      "destination_labware_id": "paper",
+      "destination": {
+        "kind": "coordinate",
+        "reference_well": "E6",
+        "reference_well_paper_xy_mm": {
+          "x_mm": 59.38,
+          "y_mm": 38.24
+        },
+        "reference_well_deck_xy_mm": {
+          "x_mm": 191.88,
+          "y_mm": 128.74
+        },
+        "center_translation_mm": {
+          "x_mm": 4.5,
+          "y_mm": 4.5
+        },
+        "paper_center_xy_mm": {
+          "x_mm": 63.88,
+          "y_mm": 42.74
+        },
+        "deck_center_xy_mm": {
+          "x_mm": 196.38,
+          "y_mm": 133.24
+        },
+        "point_offset_mm": {
+          "x_mm": 2.0,
+          "y_mm": 2.0
+        },
+        "paper_xy_mm": {
+          "x_mm": 65.88,
+          "y_mm": 44.74
+        },
+        "deck_xy_mm": {
+          "x_mm": 198.38,
+          "y_mm": 135.24
+        }
+      },
+      "deposition": {
+        "liquid_volume_ul": 5.0,
+        "pre_air_chase_ul": 5.0,
+        "trailing_air_gap_ul": 1.5,
+        "air_gap_height_mm": 5.0,
+        "piston_dispense_ul": 11.5,
+        "push_out_ul": 3.0,
+        "blow_out": false
+      },
+      "provenance": {
+        "kind": "four_clover",
+        "layer_index": 1,
+        "clover_index": 1,
+        "clover_name": "air_chase_5ul",
+        "design_point": "D2"
+      },
+      "timing": {
+        "delay_before_s": 0.0,
+        "post_dispense_delay_s": 2.0,
+        "rest_after_s": 0.0
+      }
+    },
+    {
+      "sequence_index": 3,
+      "source_id": "primary_source",
+      "destination_labware_id": "paper",
+      "destination": {
+        "kind": "coordinate",
+        "reference_well": "E6",
+        "reference_well_paper_xy_mm": {
+          "x_mm": 59.38,
+          "y_mm": 38.24
+        },
+        "reference_well_deck_xy_mm": {
+          "x_mm": 191.88,
+          "y_mm": 128.74
+        },
+        "center_translation_mm": {
+          "x_mm": 4.5,
+          "y_mm": 4.5
+        },
+        "paper_center_xy_mm": {
+          "x_mm": 63.88,
+          "y_mm": 42.74
+        },
+        "deck_center_xy_mm": {
+          "x_mm": 196.38,
+          "y_mm": 133.24
+        },
+        "point_offset_mm": {
+          "x_mm": -2.0,
+          "y_mm": -2.0
+        },
+        "paper_xy_mm": {
+          "x_mm": 61.88,
+          "y_mm": 40.74
+        },
+        "deck_xy_mm": {
+          "x_mm": 194.38,
+          "y_mm": 131.24
+        }
+      },
+      "deposition": {
+        "liquid_volume_ul": 5.0,
+        "pre_air_chase_ul": 5.0,
+        "trailing_air_gap_ul": 1.5,
+        "air_gap_height_mm": 5.0,
+        "piston_dispense_ul": 11.5,
+        "push_out_ul": 3.0,
+        "blow_out": false
+      },
+      "provenance": {
+        "kind": "four_clover",
+        "layer_index": 1,
+        "clover_index": 1,
+        "clover_name": "air_chase_5ul",
+        "design_point": "D3"
+      },
+      "timing": {
+        "delay_before_s": 0.0,
+        "post_dispense_delay_s": 2.0,
+        "rest_after_s": 0.0
+      }
+    },
+    {
+      "sequence_index": 4,
+      "source_id": "primary_source",
+      "destination_labware_id": "paper",
+      "destination": {
+        "kind": "coordinate",
+        "reference_well": "E6",
+        "reference_well_paper_xy_mm": {
+          "x_mm": 59.38,
+          "y_mm": 38.24
+        },
+        "reference_well_deck_xy_mm": {
+          "x_mm": 191.88,
+          "y_mm": 128.74
+        },
+        "center_translation_mm": {
+          "x_mm": 4.5,
+          "y_mm": 4.5
+        },
+        "paper_center_xy_mm": {
+          "x_mm": 63.88,
+          "y_mm": 42.74
+        },
+        "deck_center_xy_mm": {
+          "x_mm": 196.38,
+          "y_mm": 133.24
+        },
+        "point_offset_mm": {
+          "x_mm": 2.0,
+          "y_mm": -2.0
+        },
+        "paper_xy_mm": {
+          "x_mm": 65.88,
+          "y_mm": 40.74
+        },
+        "deck_xy_mm": {
+          "x_mm": 198.38,
+          "y_mm": 131.24
+        }
+      },
+      "deposition": {
+        "liquid_volume_ul": 5.0,
+        "pre_air_chase_ul": 5.0,
+        "trailing_air_gap_ul": 1.5,
+        "air_gap_height_mm": 5.0,
+        "piston_dispense_ul": 11.5,
+        "push_out_ul": 3.0,
+        "blow_out": false
+      },
+      "provenance": {
+        "kind": "four_clover",
+        "layer_index": 1,
+        "clover_index": 1,
+        "clover_name": "air_chase_5ul",
+        "design_point": "D4"
+      },
+      "timing": {
+        "delay_before_s": 0.0,
+        "post_dispense_delay_s": 2.0,
+        "rest_after_s": 0.0
+      }
+    }
+  ],
+  "totals": {
+    "deposit_count": 4,
+    "total_liquid_ul": 20.0,
+    "total_air_ul": 26.0,
+    "total_piston_dispense_ul": 46.0,
+    "total_delay_s": 8.0,
+    "source_count": 1,
+    "layer_count": 1,
+    "replicate_count": null,
+    "clover_count": 1
+  }
+}
