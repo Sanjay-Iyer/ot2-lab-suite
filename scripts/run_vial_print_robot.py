@@ -145,16 +145,8 @@ def _custom_labware_files(protocol_path: Path) -> list[Path]:
     is built in and has no file here, so it is skipped. Uploading the referenced
     custom defs makes a run self-contained: a brand-new labware like the flat paper
     surface works without a manual App import first."""
-    cfg = _embedded_config(protocol_path) or {}
     files: list[Path] = []
-    seen: set[str] = set()
-    for spec in cfg.get("deck", {}).values():
-        if not isinstance(spec, dict):
-            continue
-        name = spec.get("load_name")
-        if not name or name in seen:
-            continue
-        seen.add(name)
+    for name in _embedded_load_names(protocol_path):
         path = REPO / "labware" / f"{name}.json"
         if path.exists():
             files.append(path)
@@ -253,6 +245,60 @@ def _embedded_config(protocol_path: Path) -> dict | None:
         return ast.literal_eval(text[start:end].rstrip().rstrip("\n"))
     except (OSError, ValueError, SyntaxError):
         return None
+
+
+# The Experiment-01 standard-printing executor (src/printing/standard/builder.py)
+# embeds a ResolvedExperimentPlanV1 between PLAN sentinels instead of a CONFIG
+# dict: a flat `actions` list rather than a `deck` mapping. Same idea (the exact
+# bytes uploaded to the robot are the only description that cannot drift), just a
+# different shape, so it gets its own sentinel pair and its own reader.
+PLAN_START_SENTINEL = "# >>> PLAN START >>>"
+PLAN_END_SENTINEL = "# <<< PLAN END <<<"
+
+
+def _embedded_plan(protocol_path: Path) -> dict | None:
+    """Extract the PLAN dict embedded in a generated standard-printing protocol."""
+    try:
+        text = protocol_path.read_text(encoding="utf-8")
+        start = text.index(PLAN_START_SENTINEL)
+        start = text.index("PLAN = {", start) + len("PLAN = ")
+        end = text.index(PLAN_END_SENTINEL)
+        return ast.literal_eval(text[start:end].rstrip().rstrip("\n"))
+    except (OSError, ValueError, SyntaxError):
+        return None
+
+
+def _embedded_load_names(protocol_path: Path) -> list[str]:
+    """Custom labware ``load_name`` values referenced by any generated artifact.
+
+    Reads whichever embedded structure the file actually has (CONFIG/deck for the
+    vial-dilution and four-clover executors, PLAN/actions for the Experiment-01
+    standard executor) and returns the load names in the order first seen.
+    """
+    names: list[str] = []
+    seen: set[str] = set()
+
+    cfg = _embedded_config(protocol_path)
+    if cfg is not None:
+        for spec in cfg.get("deck", {}).values():
+            if isinstance(spec, dict):
+                name = spec.get("load_name")
+                if name and name not in seen:
+                    seen.add(name)
+                    names.append(name)
+        return names
+
+    plan = _embedded_plan(protocol_path)
+    if plan is not None:
+        for action in plan.get("actions", []):
+            if isinstance(action, dict) and action.get("action") == "LOAD_LABWARE":
+                name = action.get("load_name")
+                if name and name not in seen:
+                    seen.add(name)
+                    names.append(name)
+        return names
+
+    return names
 
 
 def _describe_deck(config: dict) -> None:
