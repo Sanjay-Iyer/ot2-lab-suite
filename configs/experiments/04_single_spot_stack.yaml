@@ -1,0 +1,67 @@
+# 04 - SINGLE SPOT STACK: 5 droplets on top of each other at paper D3
+#
+#   BRAND plate B11 (diluted dye) -> paper D3, five 5 uL droplets stacked,
+#   one minute of drying between each.
+#
+#   configs/experiments/04_single_spot_stack.yaml   <- edit this
+#        |  build (validate + flatten with the referenced machine profile)
+#        v
+#   src/protocols/generated/01_print_from_vial_latest.py  <- uploaded
+#
+# Real run (rebuilds fresh from this file, then uploads + plays):
+#   python scripts/run_printing_experiment_robot.py single-spot
+#
+# Runs on the existing standard printing executor
+# (src/protocols/printing/01_print_from_vial.py). Its layer-major loop is what
+# produces the stack: with a single target and droplets: 5, it prints one drop,
+# waits inter_layer_delay_s, prints the next on the same spot, and so on.
+
+# Laboratory-owned paper/tiprack geometry, calibrated heights, and the validated
+# print-release air handling (including the anti-drip air gap on EVERY cycle).
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: single_spot_stack_d3
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: diluted dye in the BRAND plate, slot 1 -----------------------------
+source:
+  type: well_plate            # brand_96_wellplate_350ul_flat_781662, slot 1
+  slot: 1
+  wells: [B11]                # the hand-prepared diluted dye
+  material: diluted dye (5x)
+  loaded_volume_ul: 300.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 1.0     # B11 holds ~300 uL (~7.9 mm deep)
+
+# --- destination substrate ------------------------------------------------------
+substrate:
+  slot: 11
+
+# --- printing behaviour ---------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no extra pause after each individual droplet
+  inter_layer_delay_s: 60.0   # ONE MINUTE of drying between stacked droplets
+
+# --- what to print ---------------------------------------------------------
+# One target, five droplets: the layer-major loop prints them one per layer, so
+# each drop lands on the previous one after a full 60 s dry.
+#
+#   layer 1: D3 drop 1  -> wait 60 s
+#   layer 2: D3 drop 2  -> wait 60 s
+#   layer 3: D3 drop 3  -> wait 60 s
+#   layer 4: D3 drop 4  -> wait 60 s
+#   layer 5: D3 drop 5
+print_groups:
+  - source_well: B11
+    targets: [D3]
+    droplets: 5
+
+# --- tip behaviour ---------------------------------------------------------
+# One source well, so one tip is held for all five droplets.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

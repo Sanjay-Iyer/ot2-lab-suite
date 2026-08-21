@@ -83,6 +83,7 @@ WORKFLOWS = {
     "clover-from-brand-plate": (
         "clover", "configs/experiments/02_clover_from_brand_plate.yaml"),
     "dye-demo": ("dye-demo", "configs/experiments/03_dye_dilution_print_demo.yaml"),
+    "single-spot": ("standard", "configs/experiments/04_single_spot_stack.yaml"),
     "standard": ("legacy-standard", None),
     "four-clover": ("clover", None),
 }

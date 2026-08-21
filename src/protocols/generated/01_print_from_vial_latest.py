@@ -69,23 +69,23 @@ DEFAULT_DO_PRINT = True
 
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'protocol_label': 'standard_print_test',
-  'deck': { 'source': { 'slot': 7,
-                        'load_name': 'tuberack_3dprint_20ml_8vials_v2',
+CONFIG = { 'protocol_label': 'single_spot_stack_d3',
+  'deck': { 'source': { 'slot': 1,
+                        'load_name': 'brand_96_wellplate_350ul_flat_781662',
                         'namespace': 'custom_beta',
                         'version': 1},
-            'paper': { 'slot': 5,
+            'paper': { 'slot': 11,
                        'load_name': 'paper_print_96_flat',
                        'namespace': 'custom_beta',
                        'version': 1},
             'tiprack_p20': {'slot': 9, 'load_name': 'opentrons_96_tiprack_20ul'}},
   'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
-  'source': { 'type': 'vial_rack',
-              'wells': ['A1'],
-              'material': 'print test liquid (diluent)',
-              'loaded_volume_ul': 5000.0,
-              'minimum_remaining_ul': 100.0,
-              'aspirate_height_mm': 4.0},
+  'source': { 'type': 'well_plate',
+              'wells': ['B11'],
+              'material': 'diluted dye (5x)',
+              'loaded_volume_ul': 300.0,
+              'minimum_remaining_ul': 20.0,
+              'aspirate_height_mm': 1.0},
   'printing': { 'droplet_volume_ul': 5.0,
                 'dispense_height_mm': 0.5,
                 'pre_air_chase_ul': 0.0,
@@ -94,9 +94,8 @@ CONFIG = { 'protocol_label': 'standard_print_test',
                 'push_out_ul': 3.0,
                 'blow_out': True,
                 'inter_drop_delay_s': 0.0,
-                'inter_layer_delay_s': 5.0},
-  'print_groups': [ {'source_well': 'A1', 'targets': ['A1', 'B1', 'C1'], 'droplets': 1},
-                    {'source_well': 'A1', 'targets': ['A2', 'B2', 'C2'], 'droplets': 3}],
+                'inter_layer_delay_s': 60.0},
+  'print_groups': [{'source_well': 'B11', 'targets': ['D3'], 'droplets': 5}],
   'tips': {'print_tip': 'A1', 'return_tips': True, 'pipette_tip_reuse': True},
   'flow_rates': {'p20': {'aspirate_ul_s': 3.0, 'dispense_ul_s': 3.0}},
   'safety': {'p20_max_volume_ul': 20.0}}
@@ -141,7 +140,13 @@ def _preflight(protocol, labware, p20):
     safety = CONFIG["safety"]
     p20_max = float(safety["p20_max_volume_ul"])
 
-    for role, expected in (("paper", 5), ("tiprack_p20", 9)):
+    # The paper slot is chosen by configuration (slot 5 and slot 11 both hold a
+    # paper substrate today), so only its legality is checked here. Slot
+    # uniqueness is enforced just below.
+    paper_slot = int(deck["paper"]["slot"])
+    if not (1 <= paper_slot <= 11):
+        errors.append(f"deck.paper slot must be 1-11, got {paper_slot}")
+    for role, expected in (("tiprack_p20", 9),):
         actual = int(deck[role]["slot"])
         if actual != expected:
             errors.append(f"deck.{role} must be slot {expected}, got {actual}")
