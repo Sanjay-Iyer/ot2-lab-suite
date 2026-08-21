@@ -89,9 +89,9 @@ clover_print:
   reference: D3               # lower in column 3; B3 already has a spot on it
   clovers: 1
   # These are offsets FROM THE CENTRE, so opposing droplets end up TWICE this
-  # far apart: 1.0 -> 2.0 mm horizontal and 2.0 mm vertical separation.
-  half_width_mm: 1.0
-  half_height_mm: 1.0
+  # far apart: 2.5 -> 5.0 mm horizontal and 5.0 mm vertical separation.
+  half_width_mm: 2.5
+  half_height_mm: 2.5
   x_offset_mm: 0.0
   y_offset_mm: 0.0
 
