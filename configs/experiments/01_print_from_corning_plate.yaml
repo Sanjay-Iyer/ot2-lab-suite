@@ -22,7 +22,7 @@ run_modes: {dry_run: false}
 
 # --- source liquid -------------------------------------------------------------
 # type: vial_rack  -> tuberack_3dprint_20ml_8vials_v2, default slot 7 (A1-A4/B1-B4)
-# type: well_plate -> brand_96_wellplate_350ul_flat_781662, default slot 4 (A1-H12)
+# type: well_plate -> brand_96_wellplate_350ul_flat_781662, default slot 1 (A1-H12)
 # `slot` and `aspirate_height_mm` may be overridden; labware identity may not.
 source:
   type: corning_plate         # corning_96_wellplate_360ul_custom, slot 4

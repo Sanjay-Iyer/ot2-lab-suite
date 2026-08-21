@@ -12,11 +12,13 @@ This is not a new robot connection or transport. It reuses, unchanged:
     upload step (generalized in that file to also read the standard executor's
     PLAN/actions shape, not just the CONFIG/deck shape).
 
-What this script adds is only the front half: build + locally simulate the
+What this script adds is only the front half: BUILD ONLY. It regenerates the
 requested Experiment-01 workflow from its YAML (via scripts/run_printing_workflow.py,
-the existing no-agent builder), then hand the resulting upload artifact to that
-existing HTTP execution path. Nothing here talks to the robot except through the
-functions above.
+the existing no-agent builder) and hands the resulting upload artifact to that
+existing HTTP execution path. It never invokes opentrons.simulate -- the robot is
+the executor. For a local simulation, use the standalone builder instead:
+    python scripts/run_printing_workflow.py four-clover
+Nothing here talks to the robot except through the functions above.
 
     python scripts/run_printing_experiment_robot.py four-clover
     python scripts/run_printing_experiment_robot.py standard --live
@@ -29,7 +31,7 @@ Safety -- READ BEFORE YOU RUN THIS:
   - The standard executor has NO dry_run gate at all -- once uploaded and
     played, it always prints for real. --live is required here as an explicit
     local confirmation before this script will play a standard run; without
-    it, the script builds, simulates, and stops before touching the robot.
+    it, the script builds and stops before touching the robot.
 """
 from __future__ import annotations
 
@@ -58,7 +60,6 @@ from scripts.run_vial_print_robot import (
 from src.printing.print_from_vial.builder import (
     GENERATED_PATH as PRINT_FROM_VIAL_UPLOAD,
     build_print_from_vial_protocol,
-    simulate_print_from_vial_protocol,
 )
 from src.printing.print_from_vial.loader import load_print_from_vial_config
 
@@ -84,14 +85,14 @@ PRINT_FROM_VIAL_CONFIG = WORKFLOWS["print-from-vial"][1]
 
 def _build_standard(config: str | None) -> tuple[Path, bool]:
     ok = workflow.run_standard(
-        config or workflow.STANDARD_CONFIG, summary_only=False, simulate=True
+        config or workflow.STANDARD_CONFIG, summary_only=False, simulate=False
     )
     return workflow.STANDARD_UPLOAD, ok
 
 
 def _build_four_clover(config: str | None) -> tuple[Path, bool]:
     ok = workflow.run_four_clover(
-        config or workflow.CLOVER_CONFIG, summary_only=False, simulate=True
+        config or workflow.CLOVER_CONFIG, summary_only=False, simulate=False
     )
     return workflow.CLOVER_UPLOAD, ok
 
@@ -107,13 +108,8 @@ def _build_print_from_vial(config: str | None) -> tuple[Path, bool]:
     built = build_print_from_vial_protocol(cfg, run_modes=run_modes)
     PRINT_FROM_VIAL_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
     PRINT_FROM_VIAL_UPLOAD.write_bytes(built.protocol_path.read_bytes())
-    passed, output = simulate_print_from_vial_protocol(
-        PRINT_FROM_VIAL_UPLOAD,
-        expected_sha256=None,
-    )
-    if not passed:
-        print(output[-4000:], file=sys.stderr)
-    return PRINT_FROM_VIAL_UPLOAD, passed
+    # Build only -- no local opentrons.simulate pass. The robot is the executor.
+    return PRINT_FROM_VIAL_UPLOAD, True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -153,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             protocol_path, ok = _build_print_from_vial(config)
         if not ok:
-            print("\nBuild/local-simulation failed; refusing to contact the robot.",
+            print("\nBuild failed; refusing to contact the robot.",
                   file=sys.stderr)
             run_log.finish("build_failed", exit_code=1)
             return 1

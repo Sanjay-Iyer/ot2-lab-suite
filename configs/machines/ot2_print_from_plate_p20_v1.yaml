@@ -45,7 +45,9 @@ machine:
       load_name: brand_96_wellplate_350ul_flat_781662
       namespace: custom_beta
       version: 1
-      slot: 4
+      # Slot 1: the BRAND plate stays here permanently so it never has to be
+      # swapped with the Corning plate in slot 4.
+      slot: 1
       well_diameter_mm: 6.94
       aspirate_reference: bottom
       aspirate_height_mm: 0.2

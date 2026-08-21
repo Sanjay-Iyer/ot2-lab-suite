@@ -47,7 +47,7 @@ Return ONLY a JSON object (no prose, no code fence) with these keys:
   "source_type":    one of {sorted(SOURCE_TYPES)}
                     - "vial_rack"     = the 20 mL vial rack (slot 7)
                     - "corning_plate" = the existing/normal/regular 96-well plate (slot 4)
-                    - "well_plate"    = the BRAND (Ref. 781662) 96-well plate (slot 4)
+                    - "well_plate"    = the BRAND (Ref. 781662) 96-well plate (slot 1)
   "source_wells":   list of source wells, e.g. ["A1"] or ["B3"]
   "droplet_volume_ul": number, default 5.0
   "inter_layer_delay_s": number, seconds to dry between layers, default 5.0

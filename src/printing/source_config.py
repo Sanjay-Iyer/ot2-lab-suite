@@ -10,7 +10,7 @@ WHICH slot, and WHICH well(s) does the liquid come from.
       wells: [A1]
 
     source:
-      type: well_plate       # BRAND Ref. 781662 96-well plate, default slot 4
+      type: well_plate       # BRAND Ref. 781662 96-well plate, default slot 1
       wells: [A1, B4]
 
 `slot` and `aspirate_height_mm` may be overridden per experiment; everything else
@@ -53,7 +53,9 @@ SOURCE_TYPES: dict[str, dict[str, Any]] = {
         "load_name": "brand_96_wellplate_350ul_flat_781662",
         "namespace": "custom_beta",
         "version": 1,
-        "default_slot": 4,
+        # Slot 1: the BRAND plate lives here permanently, so it never has to be
+        # swapped with the Corning plate in slot 4.
+        "default_slot": 1,
         # 10.65 mm deep flat-bottom well: stay low so a small working volume is
         # still reachable, but clear of the bottom.
         "default_aspirate_height_mm": 1.0,

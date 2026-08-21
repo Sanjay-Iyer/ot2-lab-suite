@@ -117,9 +117,9 @@ DROPLET_KEYS = ("d1", "d2", "d3", "d4")
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
 CONFIG = { 'protocol_version': 18,
-  'protocol_label': 'exp02-clover',
-  'deck': { 'source': { 'slot': 7,
-                        'load_name': 'tuberack_3dprint_20ml_8vials_v2',
+  'protocol_label': 'exp02-clover-brand',
+  'deck': { 'source': { 'slot': 1,
+                        'load_name': 'brand_96_wellplate_350ul_flat_781662',
                         'namespace': 'custom_beta',
                         'version': 1},
             'paper': { 'slot': 5,
@@ -128,12 +128,14 @@ CONFIG = { 'protocol_version': 18,
                        'version': 1},
             'tiprack_p20': {'slot': 9, 'load_name': 'opentrons_96_tiprack_20ul'}},
   'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
-  'source': { 'kind': '20 mL vial',
-              'well': 'A2',
+  'source': { 'type': 'well_plate',
+              'slot': 1,
+              'wells': ['A1'],
               'material': 'BP',
-              'loaded_volume_ul': 5000.0,
-              'minimum_remaining_ul': 100.0,
-              'aspirate_height_mm': 4.0,
+              'loaded_volume_ul': 300.0,
+              'minimum_remaining_ul': 20.0,
+              'well': 'A1',
+              'aspirate_height_mm': 1.0,
               'park_height_mm': 5.0},
   'printing': { 'droplet_volume_ul': 5.0,
                 'dispense_height_mm': 0.5,
@@ -176,9 +178,9 @@ CONFIG = { 'protocol_version': 18,
                   'min_inter_clover_distance_mm': 8.0,
                   'droplet_radius_mm': 1.5,
                   'allow_duplicate_droplet_positions': False},
-  'tips': {'return_tips': True, 'p20': {'print_tip': 'A1'}},
+  'tips': {'pipette_tip_reuse': True, 'return_tips': True, 'p20': {'print_tip': 'A1'}},
   'flow_rates': {'p20': {'aspirate': 3.0, 'dispense': 3.0}},
-  'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 7}}
+  'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 1}}
 # <<< CONFIG END <<<
 
 
@@ -1067,7 +1069,7 @@ def _report_plan(protocol, resolved):
     loaded = float(src["loaded_volume_ul"])
     reserve = float(src.get("minimum_remaining_ul", 0.0) or 0.0)
     protocol.comment(
-        f"Source {src['kind']} well {resolved['source_name']}: loaded {loaded:g} uL, "
+        f"Source well {resolved['source_name']}: loaded {loaded:g} uL, "
         f"consumed {resolved['deposits'] * volume:g} uL, remaining "
         f"{loaded - resolved['deposits'] * volume:g} uL, reserve {reserve:g} uL"
     )
