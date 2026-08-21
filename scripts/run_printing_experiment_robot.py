@@ -63,7 +63,23 @@ from src.printing.print_from_vial.builder import (
 from src.printing.print_from_vial.loader import load_print_from_vial_config
 
 REPO = Path(__file__).resolve().parent.parent
-PRINT_FROM_VIAL_CONFIG = "configs/experiments/01_print_from_vial.yaml"
+
+#: workflow name -> (family, default config). All rebuild fresh from the YAML.
+WORKFLOWS = {
+    "print-from-vial": ("standard", "configs/experiments/01_print_from_vial.yaml"),
+    "print-from-corning-plate": (
+        "standard", "configs/experiments/01_print_from_corning_plate.yaml"),
+    "print-from-brand-plate": (
+        "standard", "configs/experiments/01_print_from_brand_plate.yaml"),
+    "clover": ("clover", "configs/experiments/02_printing_four_clover.yaml"),
+    "clover-from-corning-plate": (
+        "clover", "configs/experiments/02_clover_from_corning_plate.yaml"),
+    "clover-from-brand-plate": (
+        "clover", "configs/experiments/02_clover_from_brand_plate.yaml"),
+    "standard": ("legacy-standard", None),
+    "four-clover": ("clover", None),
+}
+PRINT_FROM_VIAL_CONFIG = WORKFLOWS["print-from-vial"][1]
 
 
 def _build_standard(config: str | None) -> tuple[Path, bool]:
@@ -104,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("workflow", choices=("standard", "four-clover", "print-from-vial"))
+    parser.add_argument("workflow", choices=tuple(WORKFLOWS))
     parser.add_argument(
         "--config", default=None,
         help="Override the default YAML for the selected workflow.",
@@ -128,19 +144,21 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Run log   : {run_log.path}")
 
     try:
-        if args.workflow == "standard":
-            protocol_path, ok = _build_standard(args.config)
-        elif args.workflow == "four-clover":
-            protocol_path, ok = _build_four_clover(args.config)
+        family, default_config = WORKFLOWS[args.workflow]
+        config = args.config or default_config
+        if family == "legacy-standard":
+            protocol_path, ok = _build_standard(config)
+        elif family == "clover":
+            protocol_path, ok = _build_four_clover(config)
         else:
-            protocol_path, ok = _build_print_from_vial(args.config)
+            protocol_path, ok = _build_print_from_vial(config)
         if not ok:
             print("\nBuild/local-simulation failed; refusing to contact the robot.",
                   file=sys.stderr)
             run_log.finish("build_failed", exit_code=1)
             return 1
 
-        if args.workflow == "standard" and not args.no_start and not args.live:
+        if family == "legacy-standard" and not args.no_start and not args.live:
             print(
                 "\nREFUSED: the standard executor has no dry_run gate -- playing "
                 "this run moves real liquid. Pass --live to confirm, or --no-start "

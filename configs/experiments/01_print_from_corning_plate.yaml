@@ -1,21 +1,21 @@
-# 01a - STANDARD PRINT (simple printing family)
+# 01a - STANDARD PRINT from the EXISTING Corning 96-well plate
 #
 # source liquid -> aspirate -> air gap -> paper target -> dispense.
 # No dilution, no intermediate plate preparation.
 #
-#   configs/experiments/01_print_from_vial.yaml   <- edit this
+#   configs/experiments/01_print_from_corning_plate.yaml   <- edit this
 #        |  build (validate + flatten with the referenced machine profile)
 #        v
 #   src/protocols/generated/01_print_from_vial_latest.py  <- uploaded to the OT-2
 #
 # Real run (rebuilds fresh from this file, then uploads + plays):
-#   python scripts/run_printing_experiment_robot.py print-from-vial
+#   python scripts/run_printing_experiment_robot.py print-from-corning-plate
 
 # Laboratory-owned paper/tiprack geometry, calibrated heights, and the validated
 # print-release air handling (including the anti-drip air gap on EVERY cycle).
 machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
 
-protocol_label: standard_print_test
+protocol_label: standard_print_corning_plate
 
 # DEFAULT IS LIVE. These configs are for real physical instrument tests.
 run_modes: {dry_run: false}
@@ -25,11 +25,12 @@ run_modes: {dry_run: false}
 # type: well_plate -> brand_96_wellplate_350ul_flat_781662, default slot 4 (A1-H12)
 # `slot` and `aspirate_height_mm` may be overridden; labware identity may not.
 source:
-  type: vial_rack
-  wells: [A1]                 # any vial(s); print groups pick from this list
-  material: print test liquid (diluent)
-  loaded_volume_ul: 5000.0
-  minimum_remaining_ul: 100.0
+  type: corning_plate         # corning_96_wellplate_360ul_custom, slot 4
+  slot: 4
+  wells: [A1]                 # any well A1-H12; change freely
+  material: print test liquid
+  loaded_volume_ul: 300.0
+  minimum_remaining_ul: 20.0
 
 # To use the BRAND plate instead, replace the block above with:
 # source:

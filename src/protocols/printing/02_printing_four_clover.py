@@ -354,6 +354,12 @@ def _center_specs():
                     # chase is overridable today; the same slot is where any future
                     # per-clover volume/height override would hang.
                     "pre_air_chase_ul": entry.get("pre_air_chase_ul"),
+                    # Optional per-clover source well. Defaults to the run's single
+                    # source well; a different well gets its own tip.
+                    "source_well": (
+                        str(entry["source_well"]).upper()
+                        if entry.get("source_well") else None
+                    ),
                     "source": "manual",
                 }
             )
@@ -494,6 +500,7 @@ def _resolve_clovers(well_xy):
                 "layers": layers,
                 "pre_air_chase_ul": chase,
                 "pre_air_chase_source": chase_source,
+                "source_well": spec.get("source_well"),
                 "droplets": droplets,
                 "extents": {
                     "min_x": min(xs),
@@ -1175,6 +1182,35 @@ def _print_clovers(protocol, labware, p20, resolved):
     clover_delay = float(pr.get("inter_clover_delay_s", 0.0) or 0.0)
     tip_name = str(CONFIG["tips"]["p20"]["print_tip"]).upper()
 
+    # One tip per distinct source well. With a single source (the normal case)
+    # this is exactly the previous behaviour: one tip held for the whole run.
+    tiprack = labware["tiprack_p20"]
+    tip_names = list(tiprack.wells_by_name())
+    start_index = tip_names.index(tip_name)
+    ordered_sources = []
+    for clover in resolved["clovers"]:
+        well = clover.get("source_well") or resolved["source_name"]
+        if well not in ordered_sources:
+            ordered_sources.append(well)
+    tip_for_source = {
+        well: tip_names[start_index + offset]
+        for offset, well in enumerate(ordered_sources)
+    }
+    active_source = None
+    return_tips = bool(CONFIG["tips"].get("return_tips", True))
+
+    def use_source(well_name):
+        """Ensure the tip on the pipette is the one dedicated to this source."""
+        nonlocal active_source
+        if active_source == well_name:
+            return labware["source"][well_name]
+        _release_tip(p20, return_tips)
+        chosen_tip = tip_for_source[well_name]
+        p20.pick_up_tip(tiprack[chosen_tip])
+        protocol.comment(f"P20 tip {chosen_tip} picked for source well {well_name}.")
+        active_source = well_name
+        return labware["source"][well_name]
+
     # NOTE on blow_out in a loop. blow_out leaves the plunger unprepared, so the
     # next aspirate re-prepares it and can pull a small extra slug on every
     # iteration after the first. The usual fix, prepare_to_aspirate() in air, is
@@ -1182,8 +1218,6 @@ def _print_clovers(protocol, labware, p20, resolved):
     # behaviour here is deliberately identical to the v10/v11 protocols already
     # in physical use. If the first prints show growing droplet volume down the
     # run, set printing.blow_out to false and rely on push_out_ul alone.
-    p20.pick_up_tip(labware["tiprack_p20"][tip_name])
-    protocol.comment(f"P20 tip {tip_name} picked and held for the complete run.")
 
     previous = None
     for clover, layer, key in resolved["plan"]:
@@ -1204,6 +1238,7 @@ def _print_clovers(protocol, labware, p20, resolved):
                 )
                 protocol.delay(seconds=layer_delay)
 
+        source_well = use_source(clover.get("source_well") or resolved["source_name"])
         destination = _droplet_location(paper, clover, key, z)
         chase = float(clover["pre_air_chase_ul"])
 
@@ -1235,7 +1270,7 @@ def _print_clovers(protocol, labware, p20, resolved):
             protocol.delay(seconds=drop_delay)
         previous = (clover, layer)
 
-    _release_tip(p20, bool(CONFIG["tips"].get("return_tips", True)))
+    _release_tip(p20, return_tips)
     protocol.comment(
         f"Print complete: {len(resolved['clovers'])} clovers, "
         f"{resolved['deposits']} deposits, {resolved['deposits'] * volume:g} uL total."

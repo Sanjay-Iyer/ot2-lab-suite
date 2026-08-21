@@ -17,6 +17,7 @@ from typing import Any
 import yaml
 
 from ..config import resolve_repo_path
+from ..source_config import SourceConfigError, resolve_source
 from ..standard.loader import ExperimentJobLoadError, load_machine_profile
 
 
@@ -24,7 +25,7 @@ class PrintFromVialLoadError(ValueError):
     """A print-from-vial configuration file is not valid."""
 
 
-REQUIRED_LABWARE_ROLES = ("vial_rack", "paper", "tiprack")
+REQUIRED_LABWARE_ROLES = ("paper", "tiprack")
 
 
 def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -58,7 +59,6 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         raise PrintFromVialLoadError(
             f"machine profile {machine_profile_ref} has no {missing_roles} labware role(s)"
         )
-    vial_rack = labware_by_role["vial_rack"]
     paper = labware_by_role["paper"]
     tiprack = labware_by_role["tiprack"]
     try:
@@ -69,31 +69,65 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             f"machine profile {machine_profile_ref} is missing {exc}"
         ) from exc
 
-    protocol_label = loaded.pop("protocol_label", "print_from_vial")
+    protocol_label = loaded.pop("protocol_label", "standard_print")
     run_modes = loaded.pop("run_modes", {}) or {}
     source = loaded.pop("source", {}) or {}
     printing = loaded.pop("printing", {}) or {}
-    targets = loaded.pop("targets", None)
     tips = loaded.pop("tips", {}) or {}
+    print_groups = loaded.pop("print_groups", None)
+    # `targets:` remains accepted as the one-group shorthand.
+    legacy_targets = loaded.pop("targets", None)
 
     if loaded:
         raise PrintFromVialLoadError(
             f"{path} has unexpected top-level key(s): {sorted(loaded)}"
         )
-    if "well" not in source:
-        raise PrintFromVialLoadError(f"{path}: source must declare a 'well'")
-    if not targets:
-        raise PrintFromVialLoadError(f"{path}: targets must list at least one paper well")
+
+    try:
+        resolved_source = resolve_source(source)
+    except SourceConfigError as exc:
+        raise PrintFromVialLoadError(f"{path}: {exc}") from exc
+
+    if print_groups is None:
+        if not legacy_targets:
+            raise PrintFromVialLoadError(
+                f"{path}: declare print_groups (or a plain targets list)"
+            )
+        print_groups = [
+            {
+                "targets": legacy_targets,
+                "droplets": int(printing.get("droplets_per_target", 1)),
+            }
+        ]
+    if not print_groups:
+        raise PrintFromVialLoadError(f"{path}: print_groups must not be empty")
+
+    default_source_well = resolved_source["wells"][0]
+    normalized_groups = []
+    for index, group in enumerate(print_groups, start=1):
+        if not isinstance(group, dict):
+            raise PrintFromVialLoadError(
+                f"{path}: print_groups[{index}] must be a mapping"
+            )
+        targets = group.get("targets") or group.get("wells")
+        if not targets:
+            raise PrintFromVialLoadError(
+                f"{path}: print_groups[{index}] must declare targets"
+            )
+        normalized_groups.append(
+            {
+                "source_well": str(
+                    group.get("source_well") or default_source_well
+                ).upper(),
+                "targets": [str(t).upper() for t in targets],
+                "droplets": int(group.get("droplets", 1)),
+            }
+        )
 
     config: dict[str, Any] = {
         "protocol_label": str(protocol_label),
         "deck": {
-            "source": {
-                "slot": int(vial_rack["slot"]),
-                "load_name": vial_rack["load_name"],
-                "namespace": vial_rack.get("namespace"),
-                "version": vial_rack.get("version"),
-            },
+            "source": resolved_source["deck_spec"],
             "paper": {
                 "slot": int(paper["slot"]),
                 "load_name": paper["load_name"],
@@ -107,15 +141,15 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         },
         "pipette": {"name": pipette["name"], "mount": pipette["mount"]},
         "source": {
-            "well": str(source["well"]).upper(),
-            "material": str(source.get("material", "unlabeled liquid")),
-            "loaded_volume_ul": float(source.get("loaded_volume_ul", 0.0)),
-            "minimum_remaining_ul": float(source.get("minimum_remaining_ul", 0.0)),
-            "aspirate_height_mm": float(vial_rack.get("aspirate_height_mm") or 4.0),
+            "type": resolved_source["type"],
+            "wells": resolved_source["wells"],
+            "material": resolved_source["material"],
+            "loaded_volume_ul": resolved_source["loaded_volume_ul"],
+            "minimum_remaining_ul": resolved_source["minimum_remaining_ul"],
+            "aspirate_height_mm": resolved_source["aspirate_height_mm"],
         },
         "printing": {
             "droplet_volume_ul": float(printing.get("droplet_volume_ul", 5.0)),
-            "droplets_per_target": int(printing.get("droplets_per_target", 1)),
             "dispense_height_mm": float(release["dispense_height_mm"]),
             "pre_air_chase_ul": float(release.get("pre_air_chase_ul", 0.0) or 0.0),
             "air_gap_ul": float(release.get("trailing_air_gap_ul", 0.0) or 0.0),
@@ -123,16 +157,16 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "push_out_ul": float(release.get("push_out_ul", 0.0) or 0.0),
             "blow_out": bool(release.get("blow_out", True)),
             "inter_drop_delay_s": float(printing.get("inter_drop_delay_s", 0.0) or 0.0),
+            "inter_layer_delay_s": float(
+                printing.get("inter_layer_delay_s", 0.0) or 0.0
+            ),
         },
-        "targets": [str(t).upper() for t in targets],
+        "print_groups": normalized_groups,
         "tips": {
             "print_tip": str(tips.get("print_tip", "A1")).upper(),
             "return_tips": bool(tips.get("return_tips", True)),
         },
         "flow_rates": {"p20": pipette.get("flow_rates", {})},
-        "safety": {
-            "p20_max_volume_ul": float(pipette["maximum_volume_ul"]),
-            "expected_source_slot": int(vial_rack["slot"]),
-        },
+        "safety": {"p20_max_volume_ul": float(pipette["maximum_volume_ul"])},
     }
     return config, run_modes

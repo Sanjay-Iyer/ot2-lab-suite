@@ -1,0 +1,165 @@
+# =============================================================================
+# Experiment 02 - FOUR-CLOVER PAPER PRINTING (manual fallback config)
+# =============================================================================
+# EDIT THIS FILE, NOT THE PYTHON.
+#
+#   configs/experiments/02_printing_four_clover.yaml   <- you edit this
+#        |  validation + coordinate resolution
+#        v
+#   src/protocols/printing/02_printing_four_clover.py  <- regenerated, then simulated
+#
+# Build + validate + simulate (nothing touches the robot):
+#   python scripts/run_printing_workflow.py four-clover
+#
+# Resolved coordinates only, no simulation:
+#   python scripts/run_printing_workflow.py four-clover --summary
+#
+# This path needs no agent, no LLM, no skill and no approval workflow.
+#
+# -----------------------------------------------------------------------------
+# GEOMETRY YOU SHOULD NOT CHANGE WITHOUT REVALIDATING ON THE INSTRUMENT
+# -----------------------------------------------------------------------------
+#   paper surface (labware well z) = 6.0 mm above the slot floor
+#   printing.dispense_height_mm    = 0.5 mm above that surface
+#   => absolute dispense height    = 6.5 mm, i.e. a 0.5 mm standoff
+# 0.5 mm is the height physically confirmed to release the droplet (it replaced
+# the earlier 4.0 mm, at which drops stayed on the tip). Provenance:
+# configs/printing/four_clover_spacing_v13.yaml.
+# =============================================================================
+
+protocol_version: 18            # validated four-clover executor
+                                # (src/protocols/printing/12_four_clover_paper_print.py)
+protocol_label: exp02-clover-corning
+
+# --- run modes ---------------------------------------------------------------
+# dry_run: true  -> plan + validation only, the arm never moves (safe rehearsal)
+# dry_run: false -> real liquid handling when uploaded to the OT-2
+#                   (in local simulation it is still only simulated)
+run_modes: {dry_run: false, do_dilution: false, do_print: true}
+
+# --- deck layout -------------------------------------------------------------
+# slot = OT-2 deck position 1-11. Each slot may be used once.
+deck:
+  source:      {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  paper:       {slot: 5, load_name: paper_print_96_flat, namespace: custom_beta, version: 1}
+  tiprack_p20: {slot: 9, load_name: opentrons_96_tiprack_20ul}
+
+pipette: {name: p20_single_gen2, mount: left}   # 1-20 uL, left mount
+
+# --- source liquid -----------------------------------------------------------
+source:
+  type: corning_plate                 # corning_96_wellplate_360ul_custom
+  slot: 4
+  wells: [A1]                   # any well A1-H12; change freely
+  material: BP
+  loaded_volume_ul: 300.0
+  minimum_remaining_ul: 20.0
+
+# --- printing behaviour ------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0        # LIQUID deposited per droplet. Only this is liquid;
+                                # the air volumes below are never deposited.
+  dispense_height_mm: 0.5       # VALIDATED - see the header before changing
+
+  pre_air_chase_ul: 0.0         # air aspirated BEFORE the liquid; tested at 1.5/3/5,
+                                # did not help release, left off
+  air_gap_ul: 1.5               # air aspirated AFTER the liquid; anti-drip in transit
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0              # extra plunger travel inside the dispense command
+  blow_out: true                # this is what actually releases the droplet at 0.5 mm
+
+  layers: 1                     # repeated depositions of the WHOLE clover pattern
+  inter_drop_delay_s: 2.0       # pause after each droplet
+  inter_layer_delay_s: 0.0      # pause between repeated pattern depositions,
+                                # e.g. 300.0 for a 5 min dry between layers
+  inter_clover_delay_s: 0.0     # pause when moving to the next clover
+
+# clover_by_clover     -> finish one clover (all layers, d1..d4) before the next
+# position_by_position -> all d1s, then all d2s, ... maximises drying within a clover
+order: {mode: clover_by_clover}
+
+# --- where the clovers go ----------------------------------------------------
+# Absolute droplet position =
+#     paper well centre (reference_well)
+#   + clover centre offset (x_offset_mm, y_offset_mm)
+#   + droplet offset from the symmetric geometry
+#
+# half_width_mm / half_height_mm are offsets FROM THE CENTRE, so opposing
+# droplets end up TWICE that far apart:
+#     half 1.0 mm -> 2.0 mm between opposing droplets
+#     half 2.5 mm -> 5.0 mm between opposing droplets
+#
+#     d1 ....... d2      +y is toward paper row A
+#        .  C  .         +x is toward paper column 12
+#     d3 ....... d4
+destination:
+
+  default_clover_geometry:      # used by any clover without its own `geometry`
+    half_width_mm: 2.0          # -> 4.0 mm between opposing droplets
+    half_height_mm: 2.0
+
+  clover_grid:
+    enabled: false              # true generates centres from an anchor well + pitch
+                                # instead of the manual list below
+
+  # One entry per clover pattern. Add or delete entries to change how many
+  # patterns are printed. reference_well is any paper position A1-H12.
+  manual_clover_centers:
+    - name: sep_2mm
+      reference_well: B2
+      geometry: {half_width_mm: 1.0, half_height_mm: 1.0}   # 2.0 mm apart
+
+    - name: sep_3mm
+      reference_well: B5
+      geometry: {half_width_mm: 1.5, half_height_mm: 1.5}   # 3.0 mm apart
+
+    - name: sep_4mm
+      reference_well: B8
+      geometry: {half_width_mm: 2.0, half_height_mm: 2.0}   # 4.0 mm apart
+
+    - name: sep_5mm
+      reference_well: B11
+      geometry: {half_width_mm: 2.5, half_height_mm: 2.5}   # 5.0 mm apart
+
+    # Optional per-clover overrides, each independent of the entries above:
+    #   x_offset_mm / y_offset_mm  shift the centre off the reference well
+    #   layers                     repeat this clover a different number of times
+    #   pre_air_chase_ul           per-clover air chase
+    # - name: centre_of_paper
+    #   reference_well: E6
+    #   x_offset_mm: 4.5
+    #   y_offset_mm: 4.5
+    #   layers: 3
+
+  # Printable area, derived from the well grid plus a margin.
+  paper_bounds:
+    x_dimension_mm: 127.76
+    y_dimension_mm: 85.48
+    grid_inset_x_mm: 14.38
+    grid_inset_y_mm: 11.24
+    boundary_mode: grid
+    edge_margin_mm: 4.5
+
+# --- pre-flight validation ---------------------------------------------------
+# mode: warn  -> report spacing problems and continue
+# mode: error -> refuse to run
+validation:
+  mode: warn
+  min_intra_clover_distance_mm: 1.0   # droplets within one clover
+  min_inter_clover_distance_mm: 8.0   # droplets of different clovers
+  droplet_radius_mm: 1.5              # assumed dried ring radius
+  allow_duplicate_droplet_positions: false
+
+# --- tips --------------------------------------------------------------------
+# One tip is picked up and held for the whole print.
+tips:
+  return_tips: true             # true returns it to the rack, false drops it in trash
+  p20: {print_tip: A1}          # which tip to take
+
+flow_rates: {p20: {aspirate: 3.0, dispense: 3.0}}   # uL/s
+safety: {p20_max_volume_ul: 20.0, expected_source_slot: 7}
+
+# NOTE: mix-before-print is NOT supported by this validated clover executor and is
+# deliberately not faked here. The clover workflow aspirates straight from the vial.
+# If the source needs resuspending, use workflow 01 (which does support
+# mix_before_aspirate) or agitate the vial by hand before the run.

@@ -119,5 +119,28 @@ def load_manual_executor_config(reference: str | Path) -> tuple[dict[str, Any], 
     if "destination" not in loaded:
         raise CloverJobLoadError(f"{path} has no 'destination' section")
 
+    # Shared source selection: a `source.type` of vial_rack / well_plate resolves
+    # the deck labware, slot and aspiration height from src.printing.source_config,
+    # exactly as the standard printing workflow does. Configs that still spell the
+    # source out by hand (deck.source + source.well) keep working untouched.
+    source = loaded.get("source") or {}
+    if isinstance(source, dict) and source.get("type"):
+        from ..source_config import SourceConfigError, resolve_source
+
+        try:
+            resolved_source = resolve_source(source)
+        except SourceConfigError as exc:
+            raise CloverJobLoadError(f"{path}: {exc}") from exc
+        loaded.setdefault("deck", {})["source"] = resolved_source["deck_spec"]
+        source = dict(source)
+        source["wells"] = resolved_source["wells"]
+        source["well"] = resolved_source["wells"][0]
+        source["aspirate_height_mm"] = resolved_source["aspirate_height_mm"]
+        source.setdefault("park_height_mm", 5.0)
+        loaded["source"] = source
+        loaded.setdefault("safety", {})["expected_source_slot"] = (
+            resolved_source["deck_spec"]["slot"]
+        )
+
     run_modes = loaded.pop("run_modes", {}) or {}
     return loaded, run_modes
