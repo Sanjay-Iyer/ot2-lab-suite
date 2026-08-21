@@ -1,0 +1,85 @@
+# 03 - DYE DILUTION + STANDARD PRINT + ONE CLOVER (first real dye experiment)
+#
+#   5x dye dilution in the BRAND plate, then print from the diluted well.
+#
+#   configs/experiments/03_dye_dilution_print_demo.yaml   <- edit this
+#        |  build (validate + flatten with the referenced machine profile)
+#        v
+#   src/protocols/generated/03_dye_dilution_print_demo_latest.py  <- uploaded
+#
+# Real run (rebuilds fresh from this file, then uploads + plays):
+#   python scripts/run_printing_experiment_robot.py dye-demo
+
+# Laboratory-owned pipette, paper labware identity, tiprack, and the validated
+# print-release air handling. Deck slots below override where things sit today.
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: dye_dilution_print_demo
+
+# DEFAULT IS LIVE. This is a real physical instrument test.
+run_modes: {dry_run: false}
+
+# Fresh tip for every transfer, the mix, and every printed droplet.
+pipette_tip_reuse: false
+
+# --- dye source: BRAND 781662 plate, slot 1 ------------------------------------
+dye_source:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: A11
+  loaded_volume_ul: 300
+  aspirate_height_mm: 1.0
+
+# --- water source: 20 mL vial rack, slot 7 -------------------------------------
+water_source:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- the 5x dilution ------------------------------------------------------------
+# 20 uL dye + 80 uL water -> 100 uL in B11 of the SAME BRAND plate.
+# The P20 holds 20 uL, so the water goes in as 4 x 20 uL, each with a fresh tip.
+dilution:
+  destination_well: B11
+  dye_volume_ul: 20
+  water_volume_ul: 80
+  total_volume_ul: 100
+  transfer_chunk_ul: 20       # P20 maximum per water transfer
+  mix_cycles: 5
+  mix_volume_ul: 15
+  dispense_height_mm: 2.0
+  minimum_remaining_ul: 10    # keep this much in B11 after printing
+
+# --- paper substrate ------------------------------------------------------------
+paper:
+  slot: 11
+
+# --- printing behaviour ---------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+
+# --- standard print: 8 spots down paper column 1 --------------------------------
+standard_print:
+  source_well: B11
+  targets: [A1, B1, C1, D1, E1, F1, G1, H1]
+  droplets_per_target: 1
+
+# --- clover print: one four-droplet clover near column 3 ------------------------
+# Existing d1..d4 geometry: half_width/half_height are offsets FROM the centre,
+# so opposing droplets end up twice that far apart (2.0 -> 4.0 mm apart).
+clover_print:
+  source_well: B11
+  reference: B3               # change this to move the clover
+  clovers: 1
+  half_width_mm: 2.0
+  half_height_mm: 2.0
+  x_offset_mm: 0.0
+  y_offset_mm: 0.0
+
+# --- tips -----------------------------------------------------------------------
+tips:
+  start_tip: A1               # first P20 tiprack position to consume
+  return_tips: false           # false -> drop used tips in the trash

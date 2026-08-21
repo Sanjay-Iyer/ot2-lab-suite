@@ -62,6 +62,11 @@ from src.printing.print_from_vial.builder import (
     build_print_from_vial_protocol,
 )
 from src.printing.print_from_vial.loader import load_print_from_vial_config
+from src.printing.dye_demo.builder import (
+    GENERATED_PATH as DYE_DEMO_UPLOAD,
+    build_dye_demo_protocol,
+)
+from src.printing.dye_demo.loader import load_dye_demo_config
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -77,6 +82,7 @@ WORKFLOWS = {
         "clover", "configs/experiments/02_clover_from_corning_plate.yaml"),
     "clover-from-brand-plate": (
         "clover", "configs/experiments/02_clover_from_brand_plate.yaml"),
+    "dye-demo": ("dye-demo", "configs/experiments/03_dye_dilution_print_demo.yaml"),
     "standard": ("legacy-standard", None),
     "four-clover": ("clover", None),
 }
@@ -110,6 +116,25 @@ def _build_print_from_vial(config: str | None) -> tuple[Path, bool]:
     PRINT_FROM_VIAL_UPLOAD.write_bytes(built.protocol_path.read_bytes())
     # Build only -- no local opentrons.simulate pass. The robot is the executor.
     return PRINT_FROM_VIAL_UPLOAD, True
+
+
+def _build_dye_demo(config: str | None) -> tuple[Path, bool]:
+    cfg, run_modes = load_dye_demo_config(
+        config or WORKFLOWS["dye-demo"][1]
+    )
+    dry_run = bool(run_modes.get("dry_run", True))
+    print(
+        f"run_modes.dry_run = {dry_run} "
+        + ("(PLAN ONLY -- the arm will NOT move)"
+           if dry_run else "(LIVE -- this WILL move liquid and print)")
+    )
+    print(
+        f"pipette_tip_reuse = {cfg['tips']['pipette_tip_reuse']}"
+    )
+    built = build_dye_demo_protocol(cfg, run_modes=run_modes)
+    DYE_DEMO_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
+    DYE_DEMO_UPLOAD.write_bytes(built.protocol_path.read_bytes())
+    return DYE_DEMO_UPLOAD, True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -146,6 +171,8 @@ def main(argv: list[str] | None = None) -> int:
             protocol_path, ok = _build_standard(config)
         elif family == "clover":
             protocol_path, ok = _build_four_clover(config)
+        elif family == "dye-demo":
+            protocol_path, ok = _build_dye_demo(config)
         else:
             protocol_path, ok = _build_print_from_vial(config)
         if not ok:
