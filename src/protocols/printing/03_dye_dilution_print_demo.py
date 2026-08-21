@@ -73,7 +73,8 @@ CONFIG = { 'protocol_label': 'dye_dilution_print_demo',
   'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
   'dye_source': {'well': 'A11', 'loaded_volume_ul': 300.0, 'aspirate_height_mm': 1.0},
   'water_source': {'well': 'A1', 'material': 'water', 'aspirate_height_mm': 4.0},
-  'dilution': { 'destination_well': 'B11',
+  'dilution': { 'enabled': False,
+                'destination_well': 'C11',
                 'dye_volume_ul': 20.0,
                 'water_volume_ul': 80.0,
                 'total_volume_ul': 100.0,
@@ -82,6 +83,7 @@ CONFIG = { 'protocol_label': 'dye_dilution_print_demo',
                 'mix_volume_ul': 15.0,
                 'dispense_height_mm': 2.0},
   'printing': { 'droplet_volume_ul': 5.0,
+                'source_aspirate_height_mm': 0.5,
                 'dispense_height_mm': 0.5,
                 'pre_air_chase_ul': 0.0,
                 'air_gap_ul': 1.5,
@@ -189,20 +191,29 @@ def _preflight(protocol, labware, p20):
     if water_well not in vial_names:
         errors.append(f"water_source.well {water_well} is not on the vial rack")
 
+    # dilution.enabled false: the diluted well is prepared BY HAND before the run,
+    # so the robot only prints from it and no transfer/mix step is emitted.
+    dilution_enabled = bool(dil.get("enabled", True))
     dye_volume = float(dil["dye_volume_ul"])
     water_volume = float(dil["water_volume_ul"])
     chunk = float(dil.get("transfer_chunk_ul", p20_max))
-    if not (0 < dye_volume <= p20_max):
-        errors.append(f"dilution.dye_volume_ul must be in (0, {p20_max:g}]")
-    if water_volume < 0:
-        errors.append("dilution.water_volume_ul must be >= 0")
-    if not (0 < chunk <= p20_max):
-        errors.append(f"dilution.transfer_chunk_ul must be in (0, {p20_max:g}]")
     total = float(dil.get("total_volume_ul", dye_volume + water_volume))
-    if abs((dye_volume + water_volume) - total) > 1e-6:
+    if dilution_enabled:
+        if not (0 < dye_volume <= p20_max):
+            errors.append(f"dilution.dye_volume_ul must be in (0, {p20_max:g}]")
+        if water_volume < 0:
+            errors.append("dilution.water_volume_ul must be >= 0")
+        if not (0 < chunk <= p20_max):
+            errors.append(f"dilution.transfer_chunk_ul must be in (0, {p20_max:g}]")
+        if abs((dye_volume + water_volume) - total) > 1e-6:
+            errors.append(
+                f"dilution: dye {dye_volume:g} + water {water_volume:g} does not equal "
+                f"total_volume_ul {total:g}"
+            )
+    elif total <= 0:
         errors.append(
-            f"dilution: dye {dye_volume:g} + water {water_volume:g} does not equal "
-            f"total_volume_ul {total:g}"
+            "dilution.enabled is false, so dilution.total_volume_ul must state how "
+            "much liquid was prepared by hand"
         )
     dest_max = plate_names[dest_well].max_volume if dest_well in plate_names else None
     if dest_max is not None and total > dest_max + 1e-9:
@@ -232,6 +243,15 @@ def _preflight(protocol, labware, p20):
         if well not in plate_names:
             errors.append(f"{label}.source_well {well} is not on the plate")
 
+    print_source_height = float(pr.get("source_aspirate_height_mm", 0.5))
+    if std_source in plate_names:
+        depth = plate_names[std_source].depth
+        if not (0 < print_source_height < depth):
+            errors.append(
+                f"printing.source_aspirate_height_mm must be > 0 and < {depth:g} mm, "
+                f"got {print_source_height:g}"
+            )
+
     targets = [str(t).upper() for t in (std.get("targets") or [])]
     missing = sorted({t for t in targets if t not in paper_names})
     if missing:
@@ -256,21 +276,25 @@ def _preflight(protocol, labware, p20):
         )
 
     dye_loaded = float(CONFIG["dye_source"].get("loaded_volume_ul", 0.0) or 0.0)
-    if dye_loaded and dye_volume > dye_loaded:
+    if dilution_enabled and dye_loaded and dye_volume > dye_loaded:
         errors.append(
             f"dye_source holds {dye_loaded:g} uL but the dilution needs {dye_volume:g} uL"
         )
 
     # Tip budget.
-    water_transfers = int(math.ceil(water_volume / chunk)) if water_volume > 0 else 0
+    if dilution_enabled:
+        water_transfers = (
+            int(math.ceil(water_volume / chunk)) if water_volume > 0 else 0
+        )
+        dilution_tips = 1 + water_transfers + (1 if mix_cycles else 0)
+    else:
+        water_transfers = 0
+        dilution_tips = 0
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", False))
     if tip_reuse:
         tips_needed = 3  # dye, water, mix+print share where possible
     else:
-        tips_needed = (
-            1 + water_transfers + (1 if mix_cycles else 0)
-            + standard_deposits + clover_deposits
-        )
+        tips_needed = dilution_tips + standard_deposits + clover_deposits
     tip_names = list(labware["tiprack_p20"].wells_by_name())
     start_tip = str(CONFIG["tips"].get("start_tip", "A1")).upper()
     if start_tip not in tip_names:
@@ -288,6 +312,7 @@ def _preflight(protocol, labware, p20):
 
     protocol.comment("Pre-flight validation passed.")
     return {
+        "dilution_enabled": dilution_enabled,
         "dye_well": dye_well,
         "water_well": water_well,
         "dest_well": dest_well,
@@ -308,15 +333,22 @@ def _report_plan(protocol, resolved):
     dil = CONFIG["dilution"]
     volume = float(CONFIG["printing"]["droplet_volume_ul"])
     protocol.comment("=== DYE DILUTION + PRINT DEMO ===")
-    protocol.comment(
-        f"Dilution: {dil['dye_volume_ul']:g} uL dye ({resolved['dye_well']}) + "
-        f"{dil['water_volume_ul']:g} uL water ({resolved['water_well']}) in "
-        f"{resolved['water_transfers']} x {resolved['chunk']:g} uL "
-        f"-> {resolved['dest_well']} ({resolved['total']:g} uL total)"
-    )
-    protocol.comment(
-        f"Mix: {dil.get('mix_cycles', 0)} cycles x {dil.get('mix_volume_ul', 0):g} uL"
-    )
+    if resolved["dilution_enabled"]:
+        protocol.comment(
+            f"Dilution: {dil['dye_volume_ul']:g} uL dye ({resolved['dye_well']}) + "
+            f"{dil['water_volume_ul']:g} uL water ({resolved['water_well']}) in "
+            f"{resolved['water_transfers']} x {resolved['chunk']:g} uL "
+            f"-> {resolved['dest_well']} ({resolved['total']:g} uL total)"
+        )
+        protocol.comment(
+            f"Mix: {dil.get('mix_cycles', 0)} cycles x {dil.get('mix_volume_ul', 0):g} uL"
+        )
+    else:
+        protocol.comment(
+            f"Dilution: PREPARED BY HAND. {resolved['dest_well']} must already hold "
+            f"{resolved['total']:g} uL of diluted dye. The robot performs no "
+            "transfer and no mix."
+        )
     protocol.comment(
         f"Standard print: {', '.join(resolved['targets'])} x "
         f"{resolved['droplets_per_target']} droplet(s) = "
@@ -395,32 +427,39 @@ def _run_demo(protocol, labware, p20, resolved):
         p20.blow_out(dest_well.bottom(dispense_height))
         protocol.comment(f"{label}: {volume:g} uL -> {resolved['dest_well']}")
 
-    # 1. dye
-    protocol.comment("--- STEP 1: dye transfer ---")
-    transfer(dye_well, dye_height, float(dil["dye_volume_ul"]),
-             f"dye {resolved['dye_well']}")
+    if resolved["dilution_enabled"]:
+        # 1. dye
+        protocol.comment("--- STEP 1: dye transfer ---")
+        transfer(dye_well, dye_height, float(dil["dye_volume_ul"]),
+                 f"dye {resolved['dye_well']}")
 
-    # 2. water, in P20-sized chunks
-    protocol.comment("--- STEP 2: water transfers ---")
-    remaining = float(dil["water_volume_ul"])
-    chunk = resolved["chunk"]
-    index = 0
-    while remaining > 1e-9:
-        index += 1
-        this = min(chunk, remaining)
-        transfer(water_well, water_height, this,
-                 f"water {resolved['water_well']} ({index}/{resolved['water_transfers']})")
-        remaining -= this
+        # 2. water, in P20-sized chunks
+        protocol.comment("--- STEP 2: water transfers ---")
+        remaining = float(dil["water_volume_ul"])
+        chunk = resolved["chunk"]
+        index = 0
+        while remaining > 1e-9:
+            index += 1
+            this = min(chunk, remaining)
+            transfer(
+                water_well, water_height, this,
+                f"water {resolved['water_well']} ({index}/{resolved['water_transfers']})",
+            )
+            remaining -= this
 
-    # 3. mix
-    mix_cycles = int(dil.get("mix_cycles", 0) or 0)
-    mix_volume = float(dil.get("mix_volume_ul", 0.0) or 0.0)
-    if mix_cycles and mix_volume > 0:
-        protocol.comment("--- STEP 3: mix ---")
-        ensure_tip(f"mix {resolved['dest_well']}")
-        p20.mix(mix_cycles, mix_volume, dest_well.bottom(dispense_height))
+        # 3. mix
+        mix_cycles = int(dil.get("mix_cycles", 0) or 0)
+        mix_volume = float(dil.get("mix_volume_ul", 0.0) or 0.0)
+        if mix_cycles and mix_volume > 0:
+            protocol.comment("--- STEP 3: mix ---")
+            ensure_tip(f"mix {resolved['dest_well']}")
+            p20.mix(mix_cycles, mix_volume, dest_well.bottom(dispense_height))
+            protocol.comment(
+                f"mixed {resolved['dest_well']}: {mix_cycles} x {mix_volume:g} uL"
+            )
+    else:
         protocol.comment(
-            f"mixed {resolved['dest_well']}: {mix_cycles} x {mix_volume:g} uL"
+            f"--- STEPS 1-3 SKIPPED: {resolved['dest_well']} was diluted by hand ---"
         )
 
     if not DEFAULT_DO_PRINT:
@@ -453,11 +492,19 @@ def _run_demo(protocol, labware, p20, resolved):
         if drop_delay > 0:
             protocol.delay(seconds=drop_delay)
 
+    # Aspiration height inside the diluted well. It starts at 100 uL and finishes
+    # near 40 uL (~1.06 mm of liquid in a 6.94 mm well), so this stays low enough
+    # to keep the tip submerged for the last deposits.
+    print_source_height = float(pr.get("source_aspirate_height_mm", 0.5))
+
     std_source = deck_plate[str(std["source_well"]).upper()]
     protocol.comment("--- STEP 4: standard print ---")
+    protocol.comment(
+        f"aspirating from {std['source_well']} at {print_source_height:g} mm"
+    )
     for layer in range(1, resolved["droplets_per_target"] + 1):
         for target in resolved["targets"]:
-            deposit(std_source, dispense_height, paper[target].bottom(z),
+            deposit(std_source, print_source_height, paper[target].bottom(z),
                     f"standard print {target} (drop {layer})")
 
     protocol.comment("--- STEP 5: clover print ---")
@@ -471,7 +518,7 @@ def _run_demo(protocol, labware, p20, resolved):
         destination = reference.bottom(z).move(
             Point(x=center_x + dx, y=center_y + dy, z=0)
         )
-        deposit(clover_source, dispense_height, destination,
+        deposit(clover_source, print_source_height, destination,
                 f"clover {resolved['reference']} {key.upper()}")
 
     _release_tip(p20, return_tips)

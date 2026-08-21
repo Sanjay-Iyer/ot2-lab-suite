@@ -122,6 +122,8 @@ def load_dye_demo_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
             ),
         },
         "dilution": {
+            # false -> the destination well is prepared by hand; the robot only prints
+            "enabled": bool(dilution.get("enabled", True)),
             "destination_well": str(dilution["destination_well"]).upper(),
             "dye_volume_ul": dye_volume,
             "water_volume_ul": water_volume,
@@ -137,6 +139,11 @@ def load_dye_demo_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
         },
         "printing": {
             "droplet_volume_ul": float(printing.get("droplet_volume_ul", 5.0)),
+            # Aspiration height inside the diluted well during printing. Kept low
+            # because that well drains from 100 uL to ~40 uL over the run.
+            "source_aspirate_height_mm": float(
+                printing.get("source_aspirate_height_mm", 0.5)
+            ),
             "dispense_height_mm": float(release["dispense_height_mm"]),
             "pre_air_chase_ul": float(release.get("pre_air_chase_ul", 0.0) or 0.0),
             "air_gap_ul": float(release.get("trailing_air_gap_ul", 0.0) or 0.0),
