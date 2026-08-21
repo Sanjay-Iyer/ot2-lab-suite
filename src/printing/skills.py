@@ -135,6 +135,28 @@ def select_standard_experiment_skills() -> tuple[str, ...]:
     return (name,)
 
 
+#: The generalized experiment skill for each workflow family. Only one is ever
+#: loaded, so a clover request never sees dilution vocabulary and a standard
+#: request never sees clover geometry.
+PRINTING_EXPERIMENT_SKILLS = {
+    "standard": "standard-printing-experiment",
+    "four_clover": "four-clover-experiment",
+}
+
+
+def select_printing_experiment_skills(family: str) -> tuple[str, ...]:
+    """Select the one generalized skill that matches a routed workflow family."""
+    try:
+        name = PRINTING_EXPERIMENT_SKILLS[family]
+    except KeyError as exc:
+        known = ", ".join(sorted(PRINTING_EXPERIMENT_SKILLS))
+        raise KeyError(
+            f"unknown printing workflow family {family!r}; available: {known}"
+        ) from exc
+    get_printing_skill(name)
+    return (name,)
+
+
 def load_printing_skill_content(name: str, reference: str | None = None) -> str:
     """Load a selected body or one allowlisted, in-directory reference file."""
     spec = get_printing_skill(name)

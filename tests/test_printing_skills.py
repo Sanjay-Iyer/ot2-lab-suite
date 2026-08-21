@@ -30,7 +30,9 @@ def test_printing_skills_are_discovered_from_real_skill_files_and_bodies_load():
         "standard-paper-printing",
         "design-paper-printing",
         "four-clover-printing",
+        # The two generalized experiment skills, one per workflow family.
         "standard-printing-experiment",
+        "four-clover-experiment",
     }
     standard_path = skills["standard-paper-printing"].directory / "SKILL.md"
     assert standard_path.is_file()

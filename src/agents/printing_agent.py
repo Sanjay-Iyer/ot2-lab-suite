@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.agents.printing_tools import (
     PRINT_EXPERIMENT_TOOLS,
     PRINT_JOB_TOOLS,
+    PRINTING_EXPERIMENT_TOOLS,
     STANDARD_PRINT_EXPERIMENT_TOOLS,
 )
 from src.core.config import Config
@@ -25,6 +26,7 @@ from src.printing.schemas import PrintingFamily
 from src.printing.skills import (
     load_printing_skill_content,
     printing_skill_index,
+    select_printing_experiment_skills,
     select_printing_skills,
     select_standard_experiment_skills,
 )
@@ -313,4 +315,147 @@ def create_standard_experiment_agent(model: Any | None = None):
         model=llm,
         tools=STANDARD_EXPERIMENT_AGENT_TOOLS,
         prompt=standard_experiment_agent_prompt,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# One Printing Agent, two workflow families
+#
+# The request selects the family; the family selects the template, the skill, the
+# tools, and the deterministic executor. There is no second agent, and the model
+# never writes YAML text or OT-2 Python in either branch.
+# --------------------------------------------------------------------------- #
+
+#: Words that only ever mean the four-droplet clover pattern.
+_CLOVER_TERMS = (
+    "clover",
+    "cloverleaf",
+    "four droplets around",
+    "four-droplet pattern",
+    "coffee ring overlap",
+    "coffee-ring overlap",
+    "ring overlap",
+)
+
+
+class PrintingWorkflowFamily(str, Enum):
+    """Which generalized printing workflow a request belongs to."""
+
+    STANDARD = "standard"
+    FOUR_CLOVER = "four_clover"
+
+
+def select_printing_workflow_family(user_intent: str) -> PrintingWorkflowFamily:
+    """Deterministic family routing, done before the model chooses any tool.
+
+    Clover wording is decisive because the clover executor is the only one that
+    prints a pattern around a centre point. Everything else -- wells, columns,
+    dilution series, replicates, controls -- is standard printing, which is also
+    the safe default: the standard schema will reject a request it cannot express
+    rather than silently approximate it.
+    """
+    text = user_intent.lower()
+    if any(term in text for term in _CLOVER_TERMS):
+        return PrintingWorkflowFamily.FOUR_CLOVER
+    return PrintingWorkflowFamily.STANDARD
+
+
+PRINTING_EXPERIMENT_AGENT_PROMPT = """You are the Printing Experiment Agent.
+
+You convert a scientist's natural-language request into a validated experiment
+CONFIGURATION. You never write OT-2 Python, never write raw YAML text, never
+compute coordinates or volumes the tools can compute, and never invent hardware
+values. Deterministic code renders and validates the configuration; a frozen
+executor performs the physical run.
+
+Two workflow families exist. The request selects one:
+
+  standard      Printing onto positions of the 96-position paper grid, with
+                optional transfers, serial or direct dilution, mixing, repeated
+                deposition, delays, replicates, and controls. Multiple liquids.
+                Tools: list_standard_printing_experiment_capabilities,
+                validate_standard_printing_experiment,
+                resolve_standard_printing_experiment,
+                inspect_standard_printing_layout,
+                create_standard_printing_experiment_config.
+
+  four_clover   Printing groups of four droplets around a centre point so their
+                dried rings overlap. Exactly one liquid, no dilution, no mixing.
+                Tools: list_four_clover_experiment_capabilities,
+                validate_four_clover_experiment,
+                preview_four_clover_experiment,
+                create_four_clover_experiment_config,
+                simulate_four_clover_experiment.
+
+Never mix the two tool sets in one experiment. If a request needs dilution AND a
+clover pattern, that is not currently supported: say so with
+report_printing_request_issue rather than approximating it.
+
+Procedure, in order:
+1. Call the capability tool for the selected family before constructing anything.
+2. Build the configuration from the loaded skill and the request alone. Record any
+   value you had to decide rather than read in metadata.notes.
+3. Validate. Then preview or inspect the layout, and present the tool's own
+   review to the scientist. Never substitute a summary you wrote yourself.
+4. Persist with the family's create_*_config tool. Generated configurations are
+   written under configs/generated/ and never over a hand-validated ground truth
+   in configs/experiments/.
+5. Stop for the scientist's decision. Standard simulation requires an externally
+   sealed approval. Clover simulation is local and read-only and reaches no
+   execution-ready state.
+
+Tool validation results are authoritative. If a tool rejects the configuration,
+fix the science; never work around it by changing a machine profile, a resolver,
+or an executor. This surface cannot deploy or execute live OT-2 motion.
+"""
+
+
+PRINTING_EXPERIMENT_AGENT_TOOLS = [*PRINTING_EXPERIMENT_TOOLS]
+
+
+def printing_experiment_agent_prompt(state: dict[str, Any]) -> list[Any]:
+    """Route the family deterministically, then load only that family's skill."""
+    messages = list(state.get("messages", []))
+    user_intent = next(
+        (
+            _message_text(message)
+            for message in reversed(messages)
+            if getattr(message, "type", None) in {"human", "user"}
+            or (
+                isinstance(message, tuple)
+                and message
+                and message[0] in {"human", "user"}
+            )
+        ),
+        "",
+    )
+    family = select_printing_workflow_family(user_intent)
+    skill_names = select_printing_experiment_skills(family.value)
+    skill_context = "\n\n".join(
+        f"## {name}\n{load_printing_skill_content(name)}" for name in skill_names
+    )
+    routing = (
+        "Deterministic workflow routing for this request:\n"
+        f"  family : {family.value}\n"
+        f"  skill  : {', '.join(skill_names)}\n"
+    )
+    return [
+        SystemMessage(
+            content=(
+                f"{PRINTING_EXPERIMENT_AGENT_PROMPT}\n\n{routing}\n\n{skill_context}"
+            )
+        ),
+        *messages,
+    ]
+
+
+def create_printing_experiment_agent(model: Any | None = None):
+    """One Printing Agent covering both generalized workflow families."""
+    from langgraph.prebuilt import create_react_agent
+
+    llm = model or Config.get_llm(temperature=0)
+    return create_react_agent(
+        model=llm,
+        tools=PRINTING_EXPERIMENT_AGENT_TOOLS,
+        prompt=printing_experiment_agent_prompt,
     )

@@ -116,7 +116,8 @@ DROPLET_KEYS = ("d1", "d2", "d3", "d4")
 
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'protocol_label': 'exp02-clover',
+CONFIG = { 'protocol_version': 18,
+  'protocol_label': 'exp02-clover',
   'deck': { 'source': { 'slot': 7,
                         'load_name': 'tuberack_3dprint_20ml_8vials_v2',
                         'namespace': 'custom_beta',
@@ -177,8 +178,7 @@ CONFIG = { 'protocol_label': 'exp02-clover',
                   'allow_duplicate_droplet_positions': False},
   'tips': {'return_tips': True, 'p20': {'print_tip': 'A1'}},
   'flow_rates': {'p20': {'aspirate': 3.0, 'dispense': 3.0}},
-  'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 7},
-  'protocol_version': 18}
+  'safety': {'p20_max_volume_ul': 20.0, 'expected_source_slot': 7}}
 # <<< CONFIG END <<<
 
 

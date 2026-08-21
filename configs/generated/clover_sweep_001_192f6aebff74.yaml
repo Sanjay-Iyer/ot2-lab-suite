@@ -1,0 +1,63 @@
+schema_version: four-clover-experiment-job/v1
+machine_profile: configs/machines/ot2_four_clover_printing_p20_v1.yaml
+experiment:
+  metadata:
+    experiment_id: clover_separation_sweep_001
+    title: Clover Separation Sweep
+    description: Comparison of clover droplet separation (2mm, 3mm, 4mm, 5mm) along
+      row B.
+    notes:
+      order: clover_by_clover
+      wells: B2, B5, B8, B11
+      source_well: A2
+      droplet_volume_ul: 5uL
+      inter_drop_delay_s: 2s
+  source:
+    liquid_id: plasmonic_np_prep_01
+    display_name: Plasmonic nanoparticle preparation
+    well: A2
+    loaded_volume_ul: 5000.0
+    minimum_remaining_ul: 100.0
+  printing:
+    droplet_volume_ul: 5.0
+    layers: 1
+    inter_drop_delay_s: 2.0
+    inter_layer_delay_s: 0.0
+    inter_clover_delay_s: 0.0
+    order: clover_by_clover
+  default_geometry:
+    half_width_mm: 1.0
+    half_height_mm: 1.0
+  clovers:
+  - name: sep_2mm
+    reference_well: B2
+    x_offset_mm: 0.0
+    y_offset_mm: 0.0
+    geometry:
+      half_width_mm: 1.0
+      half_height_mm: 1.0
+    layers: 1
+  - name: sep_3mm
+    reference_well: B5
+    x_offset_mm: 0.0
+    y_offset_mm: 0.0
+    geometry:
+      half_width_mm: 1.5
+      half_height_mm: 1.5
+    layers: 1
+  - name: sep_4mm
+    reference_well: B8
+    x_offset_mm: 0.0
+    y_offset_mm: 0.0
+    geometry:
+      half_width_mm: 2.0
+      half_height_mm: 2.0
+    layers: 1
+  - name: sep_5mm
+    reference_well: B11
+    x_offset_mm: 0.0
+    y_offset_mm: 0.0
+    geometry:
+      half_width_mm: 2.5
+      half_height_mm: 2.5
+    layers: 1

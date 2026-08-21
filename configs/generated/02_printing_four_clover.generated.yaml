@@ -1,0 +1,58 @@
+# AI-GENERATED CONFIGURATION - not a hand-validated ground truth.
+# Produced by scripts/reproduce_ground_truth_from_language.py from a
+# natural-language request alone. Review it before any physical run.
+experiment:
+  default_geometry:
+    half_width_mm: 1
+    half_height_mm: 1
+  printing:
+    inter_clover_delay_s: 0
+    layers: 1
+    order: clover_by_clover
+    droplet_volume_ul: 5
+    inter_drop_delay_s: 2
+    inter_layer_delay_s: 0
+  metadata:
+    description: Comparison of clover droplet separation (2mm, 3mm, 4mm, 5mm) along
+      row B.
+    title: Clover Separation Sweep
+    notes:
+      order: clover_by_clover
+      wells: B2, B5, B8, B11
+      source_well: A2
+      droplet_volume_ul: 5uL
+      inter_drop_delay_s: 2s
+    experiment_id: clover_separation_sweep_001
+  clovers:
+  - layers: 1
+    name: sep_2mm
+    geometry:
+      half_width_mm: 1
+      half_height_mm: 1
+    reference_well: B2
+  - geometry:
+      half_height_mm: 1.5
+      half_width_mm: 1.5
+    name: sep_3mm
+    reference_well: B5
+    layers: 1
+  - geometry:
+      half_height_mm: 2
+      half_width_mm: 2
+    reference_well: B8
+    name: sep_4mm
+    layers: 1
+  - layers: 1
+    reference_well: B11
+    name: sep_5mm
+    geometry:
+      half_width_mm: 2.5
+      half_height_mm: 2.5
+  source:
+    well: A2
+    display_name: Plasmonic nanoparticle preparation
+    liquid_id: plasmonic_np_prep_01
+    loaded_volume_ul: 5000
+    minimum_remaining_ul: 100
+schema_version: four-clover-experiment-job/v1
+machine_profile: configs/machines/ot2_four_clover_printing_p20_v1.yaml

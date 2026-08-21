@@ -32,16 +32,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib.util
-import math
+import re
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-
-import yaml  # noqa: E402
 
 STANDARD_CONFIG = "configs/experiments/01_printing_standard.yaml"
 STANDARD_EXECUTOR = REPO / "src" / "protocols" / "printing" / "01_printing_standard.py"
@@ -55,7 +52,6 @@ CLOVER_UPLOAD = (
     REPO / "src" / "protocols" / "generated" / "02_printing_four_clover_latest.py"
 )
 
-LABWARE_DIR = REPO / "labware"
 RULE = "=" * 78
 
 
@@ -71,26 +67,6 @@ def _banner(title: str) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def _numpy_trapz_shim() -> None:
-    """opentrons_shared_data still imports numpy.trapz, removed in numpy 2."""
-    try:
-        import numpy
-    except ImportError:
-        return
-    if not hasattr(numpy, "trapz") and hasattr(numpy, "trapezoid"):
-        numpy.trapz = numpy.trapezoid
-
-
-def _load_module(path: Path, name: str):
-    _numpy_trapz_shim()
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise WorkflowFailure(f"cannot import {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 # ── workflow 1: standard 96-position SERS printing ────────────────────────────────
@@ -195,288 +171,64 @@ def run_standard(config_reference: str, *, summary_only: bool, simulate: bool) -
 
 
 # ── workflow 2: four-clover printing ──────────────────────────────────────────────
-
-def _clover_config(config_reference: str) -> tuple[dict, dict]:
-    """Load the clover YAML exactly the way the builder does.
-
-    Returns ``(config, run_modes)`` where ``config`` is the mapping embedded into
-    the protocol and ``run_modes`` carries the DEFAULT_* flags.
-    """
-    path = REPO / config_reference if not Path(config_reference).is_absolute() else Path(config_reference)
-    if not path.is_file():
-        raise WorkflowFailure(f"config not found: {path}")
-    loaded = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(loaded, dict):
-        raise WorkflowFailure(f"config must be a mapping: {path}")
-
-    reference = loaded.pop("destination_config", None)
-    if reference:
-        shared_path = Path(reference)
-        if not shared_path.is_absolute():
-            shared_path = REPO / shared_path
-        if not shared_path.is_file():
-            raise WorkflowFailure(f"destination_config not found: {shared_path}")
-        shared = yaml.safe_load(shared_path.read_text(encoding="utf-8")) or {}
-        loaded["destination"] = shared.get("destination", shared)
-    if "destination" not in loaded:
-        raise WorkflowFailure(f"{config_reference} has no 'destination' section")
-
-    run_modes = loaded.pop("run_modes", {}) or {}
-    return loaded, run_modes
-
-
-def _paper_well_centres(load_name: str) -> dict[str, tuple[float, float]]:
-    import json
-
-    path = LABWARE_DIR / f"{load_name}.json"
-    if not path.is_file():
-        raise WorkflowFailure(
-            f"custom labware {load_name}.json not found in {LABWARE_DIR}; the "
-            "coordinate resolver reads well centres straight from the definition"
-        )
-    definition = json.loads(path.read_text(encoding="utf-8"))
-    return {
-        name: (float(well["x"]), float(well["y"]))
-        for name, well in definition["wells"].items()
-    }, definition
-
-
-def _fail_fast_clover(config: dict, centres: dict, config_reference: str) -> None:
-    """Reject a manual edit before anything is generated.
-
-    These duplicate the protocol's own pre-flight so a bad YAML field is named
-    here, at the terminal, instead of surfacing inside a simulation traceback.
-    """
-    problems: list[str] = []
-
-    deck = config.get("deck") or {}
-    for role in ("source", "paper", "tiprack_p20"):
-        if role not in deck:
-            problems.append(f"deck.{role} is missing")
-    slots: dict[int, str] = {}
-    for role, spec in deck.items():
-        slot = (spec or {}).get("slot")
-        if not isinstance(slot, int) or not 1 <= slot <= 11:
-            problems.append(f"deck.{role}.slot must be an integer 1-11, got {slot!r}")
-            continue
-        if slot in slots:
-            problems.append(
-                f"deck slot {slot} is claimed by both '{slots[slot]}' and '{role}'"
-            )
-        slots[slot] = role
-
-    printing = config.get("printing") or {}
-    safety = config.get("safety") or {}
-    p20_max = float(safety.get("p20_max_volume_ul", 20.0))
-    volume = printing.get("droplet_volume_ul")
-    if not isinstance(volume, (int, float)) or isinstance(volume, bool) or not 0 < float(volume) <= p20_max:
-        problems.append(
-            f"printing.droplet_volume_ul must be a number in (0, {p20_max:g}], "
-            f"got {volume!r}"
-        )
-        volume = 0.0
-    volume = float(volume)
-
-    for key in (
-        "dispense_height_mm", "air_gap_ul", "air_gap_height_mm", "push_out_ul",
-        "pre_air_chase_ul", "inter_drop_delay_s", "inter_layer_delay_s",
-        "inter_clover_delay_s",
-    ):
-        value = printing.get(key, 0.0) or 0.0
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            problems.append(f"printing.{key} must be numeric, got {value!r}")
-        elif float(value) < 0:
-            problems.append(f"printing.{key} must be >= 0, got {value!r}")
-    layers = printing.get("layers", 1)
-    if isinstance(layers, bool) or not isinstance(layers, int) or layers < 1:
-        problems.append(f"printing.layers must be an integer >= 1, got {layers!r}")
-
-    source = config.get("source") or {}
-    for name in ("well", "loaded_volume_ul", "aspirate_height_mm"):
-        if name not in source:
-            problems.append(f"source.{name} is missing")
-
-    for spec in (config.get("destination") or {}).get("manual_clover_centers") or []:
-        well = str(spec.get("reference_well", "")).upper()
-        if well not in centres:
-            problems.append(
-                f"clover {spec.get('name', '?')!r}: reference_well {well!r} does not "
-                "exist on the paper labware"
-            )
-
-    tip = ((config.get("tips") or {}).get("p20") or {}).get("print_tip")
-    if not isinstance(tip, str) or not tip.strip():
-        problems.append("tips.p20.print_tip must name a tip well, e.g. A1")
-
-    if problems:
-        raise WorkflowFailure(
-            f"CONFIG VALIDATION FAILED ({config_reference}):\n- " + "\n- ".join(problems)
-        )
-
+#
+# Validation, coordinate resolution, and the review all come from
+# src/printing/clover, which is the same code the AI-facing tools use. This
+# script adds only the terminal presentation and the upload-ready artifact.
 
 def run_four_clover(
     config_reference: str, *, summary_only: bool, simulate: bool
 ) -> bool:
-    builder_module = _load_module(
-        REPO / "scripts" / "build_vial_dilution_print.py", "ot2_print_builder"
+    from src.printing.clover import builder as clover_builder
+    from src.printing.clover.loader import (
+        CloverJobLoadError,
+        load_manual_executor_config,
     )
-    engine = _load_module(CLOVER_EXECUTOR, "clover_executor")
+    from src.printing.clover.resolver import (
+        CloverResolutionError,
+        resolve_manual_config,
+    )
+    from src.printing.clover.review import render_clover_review
 
     _banner("WORKFLOW 2 - FOUR-CLOVER PRINTING")
     print(f"config   : {config_reference}")
     print(f"executor : {CLOVER_EXECUTOR.relative_to(REPO)}")
 
-    config, run_modes = _clover_config(config_reference)
-    config.pop("protocol_version", None)
-    config["protocol_version"] = 18
-
-    paper_load_name = ((config.get("deck") or {}).get("paper") or {}).get("load_name")
-    if not paper_load_name:
-        raise WorkflowFailure("deck.paper.load_name is missing")
-    centres, paper_definition = _paper_well_centres(paper_load_name)
-    _fail_fast_clover(config, centres, config_reference)
-
-    # Resolve coordinates with the executor's own geometry functions, so this
-    # report can never disagree with what the protocol will do.
-    engine.CONFIG = config
     try:
-        clovers = engine._resolve_clovers(lambda name: centres[str(name).upper()])
-        order_mode, plan = engine._print_order(clovers)
-        bounds = engine._paper_bounds(
-            lambda name: centres[str(name).upper()], list(centres)
-        )
-    except (TypeError, ValueError, KeyError) as exc:
-        raise WorkflowFailure(f"COORDINATE RESOLUTION FAILED\n{exc}") from exc
-
-    printing = config["printing"]
-    volume = float(printing["droplet_volume_ul"])
-    air_gap = float(printing.get("air_gap_ul", 0.0) or 0.0)
-    p20_max = float((config.get("safety") or {}).get("p20_max_volume_ul", 20.0))
-    radius = float((config.get("validation") or {}).get("droplet_radius_mm", 0.0) or 0.0)
-
-    fatal = engine._capacity_errors(clovers, volume, air_gap, p20_max)
-    fatal += engine._boundary_violations(clovers, bounds, radius)
-    if fatal:
-        raise WorkflowFailure("PRE-FLIGHT VALIDATION FAILED:\n- " + "\n- ".join(fatal))
-
-    deposits = sum(clover["layers"] for clover in clovers) * len(engine.DROPLET_KEYS)
-    required = deposits * volume
-    source = config["source"]
-    loaded = float(source["loaded_volume_ul"])
-    reserve = float(source.get("minimum_remaining_ul", 0.0) or 0.0)
-    aspirate_height = float(source["aspirate_height_mm"])
-
-    paper_z = float(paper_definition["wells"]["A1"]["z"])
-    dispense_height = float(printing["dispense_height_mm"])
-
-    print()
-    print("--- source ---")
-    print(f"  labware            : {config['deck']['source']['load_name']} "
-          f"(slot {config['deck']['source']['slot']})")
-    print(f"  well               : {str(source['well']).upper()}  "
-          f"[{source.get('material', 'unnamed')}]")
-    print(f"  loaded             : {loaded:g} uL, reserve {reserve:g} uL")
-    print(f"  aspirate height    : {aspirate_height:g} mm above the vial bottom")
-
-    print()
-    print("--- paper ---")
-    print(f"  labware            : {paper_load_name} "
-          f"(slot {config['deck']['paper']['slot']})")
-    print(f"  surface height     : {paper_z:g} mm above the slot floor")
-    print(f"  dispense height    : {dispense_height:g} mm above the surface "
-          f"-> absolute {paper_z + dispense_height:g} mm "
-          f"(standoff {dispense_height:g} mm)")
-    print(f"  usable box         : x [{bounds['min_x']:.2f}, {bounds['max_x']:.2f}] "
-          f"y [{bounds['min_y']:.2f}, {bounds['max_y']:.2f}] mm (paper-local)")
-
-    print()
-    print("--- pattern ---")
-    print(f"  clover patterns    : {len(clovers)}")
-    print(f"  drop volume        : {volume:g} uL liquid per droplet")
-    print(f"  piston load / drop : "
-          f"{engine._piston_load(printing.get('pre_air_chase_ul', 0.0), volume, air_gap)['total']:g}"
-          f" uL of {p20_max:g} uL "
-          f"(chase {float(printing.get('pre_air_chase_ul', 0.0) or 0.0):g} + liquid "
-          f"{volume:g} + air gap {air_gap:g})")
-    print(f"  order              : {order_mode}")
-    print(f"  inter-drop delay   : {float(printing.get('inter_drop_delay_s', 0) or 0):g} s")
-    print(f"  inter-layer delay  : {float(printing.get('inter_layer_delay_s', 0) or 0):g} s")
-    print(f"  inter-clover delay : {float(printing.get('inter_clover_delay_s', 0) or 0):g} s")
-    print(f"  execution steps    : {len(plan)}")
-
-    print()
-    print("--- resolved clover coordinates (paper-local millimetres) ---")
-    for clover in clovers:
-        centre_x, centre_y = clover["center"]
-        offset_x, offset_y = clover["center_offset"]
-        print(f"  {clover['name']}")
-        print(f"      reference well {clover['reference_well']}"
-              f" + offset ({offset_x:+.2f}, {offset_y:+.2f})"
-              f" -> centre x {centre_x:.2f}, y {centre_y:.2f}")
-        print(f"      layers {clover['layers']}, geometry {clover['geometry_source']}, "
-              f"pre-air chase {clover['pre_air_chase_ul']:g} uL")
-        for key in engine.DROPLET_KEYS:
-            droplet = clover["droplets"][key]
-            dx, dy = droplet["offset"]
-            ax, ay = droplet["absolute"]
-            print(f"      {key.upper()}  offset ({dx:+.2f}, {dy:+.2f})"
-                  f"  ->  x {ax:.2f}, y {ay:.2f}, z {paper_z + dispense_height:g}")
-
-    intra, inter = engine._distance_report(clovers)
-    if intra:
-        worst = min(intra, key=lambda entry: entry["min_distance"])
-        print(f"\n  minimum intra-clover distance: {worst['min_distance']:.2f} mm "
-              f"({worst['clover']}, {worst['pair'][0]}-{worst['pair'][1]})")
-    if inter:
-        worst = min(inter, key=lambda entry: entry["min_distance"])
-        print(f"  minimum inter-clover distance: {worst['min_distance']:.2f} mm "
-              f"({worst['clovers'][0]} to {worst['clovers'][1]})")
-
-    print()
-    print("--- consumption ---")
-    print(f"  deposits           : {deposits}")
-    print(f"  liquid required    : {required:g} uL")
-    print(f"  remaining after run: {loaded - required:g} uL "
-          f"(reserve {reserve:g} uL)")
-    if loaded < required + reserve:
+        config, run_modes = load_manual_executor_config(config_reference)
+    except (CloverJobLoadError, ValueError) as exc:
         raise WorkflowFailure(
-            f"INSUFFICIENT SOURCE: the run needs {required:g} uL plus a {reserve:g} uL "
-            f"reserve but source.loaded_volume_ul is {loaded:g}"
-        )
-    vial_diameter = float(
-        __import__("json").loads(
-            (LABWARE_DIR / f"{config['deck']['source']['load_name']}.json").read_text(
-                encoding="utf-8"
-            )
-        )["wells"][str(source["well"]).upper()]["diameter"]
-    )
-    cover_volume = math.pi * (vial_diameter / 2.0) ** 2 * aspirate_height
-    if loaded - required <= cover_volume:
-        raise WorkflowFailure(
-            f"SOURCE WOULD UNCOVER THE TIP: {loaded - required:g} uL would remain, "
-            f"below the ~{cover_volume:g} uL needed to keep the {aspirate_height:g} mm "
-            "aspiration height submerged"
-        )
-    print(f"  submerged margin   : {loaded - required - cover_volume:g} uL above the "
-          f"~{cover_volume:g} uL needed to cover {aspirate_height:g} mm")
-    print(f"  tips required      : 1 "
-          f"({str(config['tips']['p20']['print_tip']).upper()}, held for the whole run, "
-          f"return_tips={bool(config['tips'].get('return_tips', True))})")
-    print("  tip capacity       : PASS")
+            f"CONFIG VALIDATION FAILED ({config_reference}):\n{exc}"
+        ) from exc
+
+    experiment_id = str(config.get("protocol_label") or "manual_clover_config")
+    experiment_id = re.sub(r"[^a-z0-9_]+", "_", experiment_id.lower()).strip("_")
+    try:
+        plan = resolve_manual_config(config, experiment_id=experiment_id or "manual")
+    except CloverResolutionError as exc:
+        raise WorkflowFailure(str(exc)) from exc
+
+    print()
+    print(render_clover_review(plan))
 
     dry_run = bool(run_modes.get("dry_run", True))
     print()
-    print(f"  run_modes.dry_run  : {dry_run} "
-          + ("(PLAN ONLY - the arm will not move on the robot)" if dry_run
-             else "(the robot WILL print when this file is uploaded)"))
+    print(
+        f"  run_modes.dry_run  : {dry_run} "
+        + (
+            "(PLAN ONLY - the arm will not move on the robot)"
+            if dry_run
+            else "(the robot WILL print when this file is uploaded)"
+        )
+    )
 
     if summary_only:
         print("\n--summary: stopping before build and simulation.")
         return True
 
-    # Regenerate the executor's CONFIG block in place, then emit the upload copy.
-    base_text = CLOVER_EXECUTOR.read_text(encoding="utf-8")
-    generated = builder_module.build_source(base_text, config, run_modes)
+    generated = clover_builder.render_protocol_source(
+        plan.executor_config, run_modes=run_modes
+    )
     CLOVER_EXECUTOR.write_text(generated, encoding="utf-8")
     CLOVER_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
     CLOVER_UPLOAD.write_text(generated, encoding="utf-8")
@@ -490,18 +242,17 @@ def run_four_clover(
         return True
 
     print("simulating locally (no robot contact) ...")
-    passed, output = builder_module.simulate(CLOVER_UPLOAD)
+    passed, output = clover_builder.simulate_clover_protocol(CLOVER_UPLOAD)
     print(f"simulation   : {'PASS' if passed else 'FAIL'}")
-    interesting = [
-        line for line in output.splitlines()
+    for line in output.splitlines():
         if any(
             token in line
-            for token in ("Pre-flight", "Clovers:", "Print complete", "WARNING:",
-                          "Minimum intra", "Minimum inter")
-        )
-    ]
-    for line in interesting:
-        print(f"  {line.strip()}")
+            for token in (
+                "Pre-flight", "Clovers:", "Print complete", "WARNING:",
+                "Minimum intra", "Minimum inter",
+            )
+        ):
+            print(f"  {line.strip()}")
     if not passed:
         print("\n--- simulation output ---")
         print(output[-4000:])

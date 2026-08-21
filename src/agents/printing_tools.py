@@ -53,6 +53,13 @@ from src.printing.standard.resolver import resolve_experiment_job
 from src.printing.standard.review import render_plan_review
 from src.printing.config import REPO_ROOT
 from src.printing.schemas.experiments import ExperimentSpecV1
+from src.printing.clover import builder as clover_builder
+from src.printing.clover.loader import (
+    load_experiment_job_mapping as load_clover_job_mapping,
+)
+from src.printing.clover.resolver import resolve_experiment_job as resolve_clover_job
+from src.printing.clover.review import render_clover_coordinates, render_clover_review
+from src.printing.clover.schemas import CloverExperimentSpecV1
 
 
 class ToolInput(BaseModel):
@@ -207,9 +214,11 @@ class StandardExperimentSimulationResultV1(StandardExperimentResolutionResultV1)
     print_count: int = Field(ge=0)
 
 
-STANDARD_EXPERIMENT_PROPOSAL_DIR = (
-    Path(REPO_ROOT) / "configs" / "experiments" / "proposals"
-)
+# AI-generated configurations are written here, never over a hand-validated
+# ground truth in configs/experiments/.
+GENERATED_CONFIG_DIR = Path(REPO_ROOT) / "configs" / "generated"
+STANDARD_EXPERIMENT_PROPOSAL_DIR = GENERATED_CONFIG_DIR
+FOUR_CLOVER_PROPOSAL_DIR = GENERATED_CONFIG_DIR
 
 
 def _standard_approval_key() -> bytes:
@@ -799,3 +808,293 @@ STANDARD_PRINT_EXPERIMENT_TOOLS = [
     simulate_approved_standard_printing_experiment,
     report_printing_request_issue,
 ]
+
+
+# --------------------------------------------------------------------------- #
+# Four-clover experiment surface
+#
+# The same shape as the standard experiment surface above: the agent supplies
+# scientific parameters, deterministic code validates them, resolves the
+# coordinates with the frozen geometry engine, and renders the review. The agent
+# never writes YAML text, never writes Python, and never computes a coordinate.
+# --------------------------------------------------------------------------- #
+
+
+class FourCloverProposalV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["four-clover-experiment-job/v1"] = (
+        "four-clover-experiment-job/v1"
+    )
+    machine_profile: Literal[
+        "configs/machines/ot2_four_clover_printing_p20_v1.yaml"
+    ]
+    experiment: CloverExperimentSpecV1
+
+
+class FourCloverConfigInput(ToolInput):
+    """High-level scientist configuration; never resolved droplet coordinates."""
+
+    experiment_config: FourCloverProposalV1
+
+
+class CreateFourCloverConfigInput(FourCloverConfigInput):
+    output_name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+
+
+class FourCloverValidationResultV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["PASS"] = "PASS"
+    schema_version: Literal["four-clover-experiment-job/v1"]
+    experiment_id: str
+    job_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    machine_profile: str
+    canonical_config_yaml: str
+
+
+class FourCloverConfigArtifactV1(FourCloverValidationResultV1):
+    path: str
+    file_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class FourCloverResolutionResultV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["PASS"] = "PASS"
+    experiment_id: str
+    job_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    plan_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    physical_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    totals: dict[str, int | float]
+
+
+class FourCloverPreviewResultV1(FourCloverResolutionResultV1):
+    absolute_dispense_mm: float
+    review: str
+    resolved_coordinates: str
+
+
+class FourCloverSimulationResultV1(FourCloverResolutionResultV1):
+    simulation: Literal["PASS"] = "PASS"
+    protocol_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    deposit_count: int = Field(ge=0)
+    resolved_coordinates: str
+
+
+def _validated_clover_config(
+    config: FourCloverProposalV1 | dict[str, Any],
+) -> tuple[Any, FourCloverValidationResultV1]:
+    proposal = FourCloverProposalV1.model_validate(config)
+    normalized = proposal.model_dump(mode="json", exclude_none=True)
+    job = load_clover_job_mapping(normalized)
+    result = FourCloverValidationResultV1(
+        schema_version=job.schema_version,
+        experiment_id=job.experiment.metadata.experiment_id,
+        job_sha256=job.job_id,
+        machine_profile=proposal.machine_profile,
+        canonical_config_yaml=yaml.safe_dump(
+            normalized,
+            sort_keys=False,
+            allow_unicode=True,
+            default_flow_style=False,
+        ),
+    )
+    return job, result
+
+
+@tool
+def list_four_clover_experiment_capabilities() -> str:
+    """Describe the four-clover experiment vocabulary and its safety boundary."""
+    return json.dumps(
+        {
+            "job_schema": "four-clover-experiment-job/v1",
+            "plan_schema": "resolved-clover-plan/v1",
+            "template": (
+                "configs/templates/printing/02_printing_four_clover.template.yaml"
+            ),
+            "machine_profiles": [
+                "configs/machines/ot2_four_clover_printing_p20_v1.yaml"
+            ],
+            "executor": "src/protocols/printing/02_printing_four_clover.py",
+            "scientific_fields": [
+                "metadata",
+                "source",
+                "printing.droplet_volume_ul",
+                "printing.layers",
+                "printing.inter_drop_delay_s",
+                "printing.inter_layer_delay_s",
+                "printing.inter_clover_delay_s",
+                "printing.order",
+                "default_geometry.half_width_mm",
+                "default_geometry.half_height_mm",
+                "clovers[].reference_well",
+                "clovers[].x_offset_mm",
+                "clovers[].y_offset_mm",
+                "clovers[].geometry",
+                "clovers[].layers",
+            ],
+            "machine_owned": [
+                "deck slots",
+                "labware load names and namespaces",
+                "pipette identity and limits",
+                "aspiration and park heights",
+                "dispense standoff",
+                "pre air chase, air gap, push out, blow out",
+                "flow rates",
+                "printable area bounds",
+                "tip selection and return policy",
+            ],
+            "internal_only": [
+                "droplet d1..d4 coordinates",
+                "aspirate",
+                "dispense",
+                "move",
+            ],
+            "unsupported": [
+                "dilution",
+                "mixing",
+                "more than one source liquid",
+                "non-clover patterns such as rings or lines",
+            ],
+            "geometry_convention": (
+                "half_width_mm and half_height_mm are offsets FROM THE CENTRE; "
+                "opposing droplets end up twice that far apart, so a 3 mm "
+                "separation is half_width_mm 1.5"
+            ),
+            "live_execution": False,
+        },
+        indent=2,
+    )
+
+
+@tool(args_schema=CreateFourCloverConfigInput)
+def create_four_clover_experiment_config(
+    experiment_config: FourCloverProposalV1, output_name: str
+) -> str:
+    """Validate and persist one immutable proposed four-clover experiment YAML."""
+    _, validated = _validated_clover_config(experiment_config)
+    data = validated.canonical_config_yaml.encode("utf-8")
+    digest = hashlib.sha256(data).hexdigest()
+    directory = FOUR_CLOVER_PROPOSAL_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{output_name}_{digest[:12]}.yaml"
+    if path.exists() and path.read_bytes() != data:
+        raise ValueError(
+            "immutable proposal path already exists with different content"
+        )
+    path.write_bytes(data)
+    try:
+        artifact_path = str(path.relative_to(REPO_ROOT))
+    except ValueError:  # test/injected stores may live outside the repo
+        artifact_path = str(path)
+    return FourCloverConfigArtifactV1(
+        **validated.model_dump(mode="json"),
+        path=artifact_path,
+        file_sha256=digest,
+    ).model_dump_json(indent=2)
+
+
+@tool(args_schema=FourCloverConfigInput)
+def validate_four_clover_experiment(experiment_config: FourCloverProposalV1) -> str:
+    """Validate a proposed four-clover experiment against the registered profile."""
+    _, result = _validated_clover_config(experiment_config)
+    return result.model_dump_json(indent=2)
+
+
+@tool(args_schema=FourCloverConfigInput)
+def preview_four_clover_experiment(experiment_config: FourCloverProposalV1) -> str:
+    """Resolve the patterns and render the four coordinates of every clover."""
+    job, _ = _validated_clover_config(experiment_config)
+    plan = resolve_clover_job(job)
+    return FourCloverPreviewResultV1(
+        experiment_id=plan.experiment_id,
+        job_sha256=job.job_id,
+        plan_sha256=plan.plan_id,
+        physical_sha256=plan.physical_sha256(),
+        totals=plan.totals.model_dump(mode="json"),
+        absolute_dispense_mm=plan.absolute_dispense_mm,
+        review=render_clover_review(plan),
+        resolved_coordinates=render_clover_coordinates(plan),
+    ).model_dump_json(indent=2)
+
+
+@tool(args_schema=FourCloverConfigInput)
+def simulate_four_clover_experiment(experiment_config: FourCloverProposalV1) -> str:
+    """Locally simulate the frozen executor carrying this exact configuration.
+
+    Simulation is local and read-only: it proves the plan is physically
+    executable. It does not produce an upload-ready artifact and does not reach
+    READY_FOR_EXECUTION - a human does that with
+    ``scripts/run_printing_workflow.py``.
+    """
+    job, _ = _validated_clover_config(experiment_config)
+    plan = resolve_clover_job(job)
+    artifact = clover_builder.build_clover_protocol(plan)
+    passed, output = clover_builder.simulate_clover_protocol(
+        artifact.protocol_path, expected_sha256=artifact.protocol_sha256
+    )
+    if not passed:
+        raise RuntimeError(f"local OT-2 simulation failed:\n{output[-2000:]}")
+    return FourCloverSimulationResultV1(
+        experiment_id=plan.experiment_id,
+        job_sha256=job.job_id,
+        plan_sha256=plan.plan_id,
+        physical_sha256=plan.physical_sha256(),
+        totals=plan.totals.model_dump(mode="json"),
+        protocol_sha256=artifact.protocol_sha256,
+        deposit_count=plan.totals.deposit_count,
+        resolved_coordinates=render_clover_coordinates(plan),
+    ).model_dump_json(indent=2)
+
+
+FOUR_CLOVER_EXPERIMENT_TOOLS = [
+    list_four_clover_experiment_capabilities,
+    create_four_clover_experiment_config,
+    validate_four_clover_experiment,
+    preview_four_clover_experiment,
+    simulate_four_clover_experiment,
+    report_printing_request_issue,
+]
+
+
+#: One Printing Agent covers both families; the request selects the workflow.
+def _printing_experiment_tools() -> list:
+    seen: set[str] = set()
+    ordered = []
+    for item in (
+        load_printing_experiment_template,
+        *STANDARD_PRINT_EXPERIMENT_TOOLS,
+        *FOUR_CLOVER_EXPERIMENT_TOOLS,
+    ):
+        if item.name in seen:
+            continue
+        seen.add(item.name)
+        ordered.append(item)
+    return ordered
+
+
+#: The only two files the template reader may return. Not a filesystem tool.
+PRINTING_EXPERIMENT_TEMPLATES = {
+    "standard": "configs/templates/printing/01_printing_standard.template.yaml",
+    "four_clover": "configs/templates/printing/02_printing_four_clover.template.yaml",
+}
+
+
+class LoadPrintingTemplateInput(ToolInput):
+    workflow_family: Literal["standard", "four_clover"]
+
+
+@tool(args_schema=LoadPrintingTemplateInput)
+def load_printing_experiment_template(workflow_family: str) -> str:
+    """Return the generalized configuration template for one workflow family.
+
+    This is an allowlist of exactly two files, not filesystem access. The template
+    teaches the configuration language; it is a placeholder example, never an
+    approved experiment, and its values must not be copied into a real request.
+    """
+    reference = PRINTING_EXPERIMENT_TEMPLATES[workflow_family]
+    return (Path(REPO_ROOT) / reference).read_text(encoding="utf-8")
+
+
+PRINTING_EXPERIMENT_TOOLS = _printing_experiment_tools()
