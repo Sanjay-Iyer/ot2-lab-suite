@@ -82,6 +82,12 @@ def _build_four_clover(config: str | None) -> tuple[Path, bool]:
 
 def _build_print_from_vial(config: str | None) -> tuple[Path, bool]:
     cfg, run_modes = load_print_from_vial_config(config or PRINT_FROM_VIAL_CONFIG)
+    dry_run = bool(run_modes.get("dry_run", True))
+    print(
+        f"run_modes.dry_run = {dry_run} "
+        + ("(PLAN ONLY -- the arm will NOT move or print)"
+           if dry_run else "(LIVE -- this WILL print for real)")
+    )
     built = build_print_from_vial_protocol(cfg, run_modes=run_modes)
     PRINT_FROM_VIAL_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
     PRINT_FROM_VIAL_UPLOAD.write_bytes(built.protocol_path.read_bytes())
