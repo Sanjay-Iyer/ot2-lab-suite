@@ -165,6 +165,7 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         "tips": {
             "print_tip": str(tips.get("print_tip", "A1")).upper(),
             "return_tips": bool(tips.get("return_tips", True)),
+            "pipette_tip_reuse": bool(tips.get("pipette_tip_reuse", True)),
         },
         "flow_rates": {"p20": pipette.get("flow_rates", {})},
         "safety": {"p20_max_volume_ul": float(pipette["maximum_volume_ul"])},

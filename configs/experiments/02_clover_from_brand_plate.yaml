@@ -153,6 +153,8 @@ validation:
 # --- tips --------------------------------------------------------------------
 # One tip is picked up and held for the whole print.
 tips:
+  pipette_tip_reuse: true       # true -> reuse one tip per source well (fewest tips)
+                                # false -> fresh tip for EVERY clover droplet
   return_tips: true             # true returns it to the rack, false drops it in trash
   p20: {print_tip: A1}          # which tip to take
 

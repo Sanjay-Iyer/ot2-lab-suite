@@ -70,5 +70,7 @@ print_groups:
 # never put into another; identical source across groups reuses the same tip for
 # every target and every layer.
 tips:
+  pipette_tip_reuse: true   # true -> reuse one tip per source well (fewest tips)
+                            # false -> fresh tip for EVERY source->paper deposit
   print_tip: A1        # first P20 tiprack position to use
   return_tips: true     # true -> return_tip(), false -> drop_tip()

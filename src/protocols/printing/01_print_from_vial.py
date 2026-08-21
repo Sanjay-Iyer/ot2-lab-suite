@@ -227,15 +227,17 @@ def _preflight(protocol, labware, p20):
     for group in resolved_groups:
         if group["source_well"] and group["source_well"] not in used_sources:
             used_sources.append(group["source_well"])
+    deposits = sum(len(g["targets"]) * g["droplets"] for g in resolved_groups)
+    tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
+    tips_needed = len(used_sources) if tip_reuse else deposits
     if tip_name in tiprack_names:
         start = tiprack_names.index(tip_name)
-        if start + len(used_sources) > len(tiprack_names):
+        if start + tips_needed > len(tiprack_names):
             errors.append(
-                f"need {len(used_sources)} tip(s) starting at {tip_name}, but the "
-                f"tiprack only has {len(tiprack_names) - start} left from there"
+                f"need {tips_needed} tip(s) starting at {tip_name} "
+                f"(pipette_tip_reuse={tip_reuse}), but the tiprack only has "
+                f"{len(tiprack_names) - start} left from there"
             )
-
-    deposits = sum(len(g["targets"]) * g["droplets"] for g in resolved_groups)
 
     # Volume budget per source well.
     loaded = float(src.get("loaded_volume_ul", 0.0) or 0.0)
@@ -310,7 +312,16 @@ def _report_plan(protocol, resolved):
         f"Total: {resolved['deposits']} deposits x {volume:g} uL = "
         f"{resolved['deposits'] * volume:g} uL"
     )
-    protocol.comment(f"Tips: {len(resolved['used_sources'])} (one per source well)")
+    if bool(CONFIG["tips"].get("pipette_tip_reuse", True)):
+        protocol.comment(
+            f"Tips: {len(resolved['used_sources'])} (pipette_tip_reuse=true, "
+            "one per source well)"
+        )
+    else:
+        protocol.comment(
+            f"Tips: {resolved['deposits']} (pipette_tip_reuse=false, fresh tip "
+            "per deposit)"
+        )
     protocol.comment("=== END PLAN ===")
 
 
@@ -337,12 +348,16 @@ def _print_from_vial(protocol, labware, p20, resolved):
     tiprack = labware["tiprack_p20"]
     tip_names = list(tiprack.wells_by_name())
     start_index = tip_names.index(str(CONFIG["tips"]["print_tip"]).upper())
+    # tips.pipette_tip_reuse (default true): keep one tip per source well for the
+    # whole run. False: a fresh tip for every single source -> paper deposit.
+    tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
     # One tip per distinct source well, assigned up front: a tip that has been in
     # one liquid is never put into another.
     tip_for_source = {
         source_well: tip_names[start_index + offset]
         for offset, source_well in enumerate(resolved["used_sources"])
     }
+    next_tip = [start_index + len(resolved["used_sources"])]
     active_source = None
 
     def use_source(source_well):
@@ -356,6 +371,21 @@ def _print_from_vial(protocol, labware, p20, resolved):
         protocol.comment(f"P20 tip {tip_name} picked for source well {source_well}.")
         active_source = source_well
 
+    def fresh_tip(source_well):
+        """Discard whatever is on the pipette and take the next unused tip."""
+        nonlocal active_source
+        _release_tip(p20, return_tips)
+        if next_tip[0] >= len(tip_names):
+            raise RuntimeError(
+                "ran out of P20 tips: pipette_tip_reuse is false, which needs one "
+                "tip per deposit"
+            )
+        tip_name = tip_names[next_tip[0]]
+        next_tip[0] += 1
+        p20.pick_up_tip(tiprack[tip_name])
+        protocol.comment(f"P20 fresh tip {tip_name} for source well {source_well}.")
+        active_source = None
+
     # NOTE on blow_out in a loop: see 02_printing_four_clover.py for the full
     # rationale (blow_out leaves the plunger unprepared; API 2.15 has no
     # prepare_to_aspirate(), so this is deliberately identical to already-
@@ -368,8 +398,11 @@ def _print_from_vial(protocol, labware, p20, resolved):
         protocol.comment(f"--- LAYER {layer} of {resolved['max_layers']} ---")
         for group in active_groups:
             source_well = source_labware[group["source_well"]]
-            use_source(group["source_well"])
+            if tip_reuse:
+                use_source(group["source_well"])
             for target in group["targets"]:
+                if not tip_reuse:
+                    fresh_tip(group["source_well"])
                 destination = paper[target].bottom(z)
                 if chase > 0:
                     p20.aspirate(chase, source_well.bottom(aspirate_height))

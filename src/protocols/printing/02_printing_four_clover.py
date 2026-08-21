@@ -1198,10 +1198,29 @@ def _print_clovers(protocol, labware, p20, resolved):
     }
     active_source = None
     return_tips = bool(CONFIG["tips"].get("return_tips", True))
+    # tips.pipette_tip_reuse (default true): keep one tip per source well for the
+    # whole run. False: a fresh tip for every individual clover droplet.
+    tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
+    next_tip = [start_index + len(ordered_sources)]
 
     def use_source(well_name):
         """Ensure the tip on the pipette is the one dedicated to this source."""
         nonlocal active_source
+        if not tip_reuse:
+            _release_tip(p20, return_tips)
+            if next_tip[0] >= len(tip_names):
+                raise RuntimeError(
+                    "ran out of P20 tips: pipette_tip_reuse is false, which needs "
+                    "one tip per droplet"
+                )
+            chosen_tip = tip_names[next_tip[0]]
+            next_tip[0] += 1
+            p20.pick_up_tip(tiprack[chosen_tip])
+            protocol.comment(
+                f"P20 fresh tip {chosen_tip} for source well {well_name}."
+            )
+            active_source = None
+            return labware["source"][well_name]
         if active_source == well_name:
             return labware["source"][well_name]
         _release_tip(p20, return_tips)

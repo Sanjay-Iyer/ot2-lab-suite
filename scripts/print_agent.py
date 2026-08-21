@@ -57,6 +57,10 @@ Return ONLY a JSON object (no prose, no code fence) with these keys:
   "clover_wells":   ONLY for pattern "clover". List of paper wells to center a
                     clover on, e.g. ["B2","B5","B8"]. If the user asks for "three
                     clovers" without naming wells, use ["B2","B5","B8"].
+  "pipette_tip_reuse": true or false. DEFAULT true. Set it to false ONLY when the
+                    user explicitly asks not to reuse tips -- e.g. "do not reuse
+                    pipette tips", "use a fresh tip for every print", "new tip
+                    each droplet", "clean tip per deposit". Otherwise always true.
 
 Rules:
 - "column 1 rows A-C" means targets ["A1","B1","C1"]. Column N is the number,
@@ -108,7 +112,11 @@ def _standard_yaml(spec: dict) -> dict:
             }
             for g in spec["print_groups"]
         ],
-        "tips": {"print_tip": "A1", "return_tips": True},
+        "tips": {
+            "pipette_tip_reuse": bool(spec.get("pipette_tip_reuse", True)),
+            "print_tip": "A1",
+            "return_tips": True,
+        },
     }
 
 
@@ -129,6 +137,9 @@ def _clover_yaml(spec: dict) -> dict:
         "loaded_volume_ul": 5000.0 if is_vial else 300.0,
         "minimum_remaining_ul": 100.0 if is_vial else 20.0,
     }
+    config.setdefault("tips", {})["pipette_tip_reuse"] = bool(
+        spec.get("pipette_tip_reuse", True)
+    )
     clover_wells = [str(w).upper() for w in (spec.get("clover_wells") or ["B2", "B5", "B8"])]
     geometry = config["destination"].get("default_clover_geometry", {
         "half_width_mm": 2.0, "half_height_mm": 2.0})
@@ -164,14 +175,23 @@ def _describe(spec: dict, config: dict, pattern: str) -> str:
             f"  layers       : {max_layers}, {pr['inter_layer_delay_s']:g} s drying between"
         )
         lines.append("  order        : layer-major (all targets get layer 1, then wait)")
-        tips = len({g["source_well"] for g in config["print_groups"]})
-        lines.append(f"  tips         : {tips} (one per source well)")
+        if config["tips"]["pipette_tip_reuse"]:
+            tips = len({g["source_well"] for g in config["print_groups"]})
+            lines.append(f"  tips         : {tips} (reuse on, one per source well)")
+        else:
+            tips = sum(len(g["targets"]) * g["droplets"] for g in config["print_groups"])
+            lines.append(f"  tips         : {tips} (reuse OFF, fresh tip per deposit)")
     else:
         centers = config["destination"]["manual_clover_centers"]
         lines.append(f"  clovers      : {len(centers)} at "
                      f"{', '.join(c['reference_well'] for c in centers)}")
         lines.append("  geometry     : existing validated four-droplet clover")
-        lines.append("  tips         : 1 (single source well)")
+        if config.get("tips", {}).get("pipette_tip_reuse", True):
+            lines.append("  tips         : 1 (reuse on, single source well)")
+        else:
+            lines.append(
+                f"  tips         : {len(centers) * 4} (reuse OFF, fresh tip per droplet)"
+            )
     return "\n".join(lines)
 
 
