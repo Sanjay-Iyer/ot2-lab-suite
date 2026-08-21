@@ -1,0 +1,81 @@
+# Registered machine profile for print-from-plate (BRAND 96-well -> paper).
+#
+# This file is laboratory-owned. It carries deck slots, labware identities,
+# calibrated heights, and the physically validated droplet release behaviour.
+# It contains no scientific meaning: no liquids, no droplet volume, no layout.
+#
+# Print-from-plate experiment configurations reference this profile by path
+# (`machine_profile: configs/machines/ot2_print_from_plate_p20_v1.yaml`)
+# instead of restating it. An agent proposing an experiment must never invent or
+# alter these values; changing calibrated geometry is a laboratory decision that
+# requires physical revalidation.
+#
+# Provenance:
+#   pipette, paper, tiprack, and print_release values are copied verbatim from
+#   the physically validated configs/machines/ot2_standard_printing_p20_v1.yaml
+#   (same P20, same paper labware, same tip rack, same droplet release profile).
+#   plate_source points at the new BRAND 781662 definition
+#   (labware/brand_96_wellplate_350ul_flat_781662.json, geometry from BRAND's
+#   published datasheet -- see configs/labware/brand_96_wellplate_350ul_flat_781662.yaml).
+#   aspirate_height_mm: 0.2 is carried over from the standard profile's `plate`
+#   role (Corning 6.86 mm diam / 10.67 mm depth flat-bottom well), which is
+#   geometrically almost identical to BRAND 781662 (6.94 mm diam / 10.65 mm
+#   depth). This has NOT been physically re-validated against the BRAND plate --
+#   confirm with Labware Position Check before trusting a near-zero aspirate
+#   height on real hardware.
+
+profile_id: ot2_print_from_plate_p20_v1
+
+machine:
+  robot_type: OT-2
+  api_level: "2.15"
+
+  pipette:
+    name: p20_single_gen2
+    mount: left
+    minimum_volume_ul: 1.0
+    maximum_volume_ul: 20.0
+    flow_rates:
+      aspirate_ul_s: 3.0
+      dispense_ul_s: 3.0
+
+  labware:
+    - role: plate_source
+      kind: source
+      load_name: brand_96_wellplate_350ul_flat_781662
+      namespace: custom_beta
+      version: 1
+      slot: 4
+      well_diameter_mm: 6.94
+      aspirate_reference: bottom
+      aspirate_height_mm: 0.2
+      dispense_reference: top
+      dispense_height_mm: -2.0
+
+    - role: paper
+      kind: substrate
+      load_name: paper_print_96_flat
+      namespace: custom_beta
+      version: 1
+      slot: 5
+      aspirate_reference: bottom
+      aspirate_height_mm: 0.5
+      dispense_reference: bottom
+      dispense_height_mm: 0.5
+
+    - role: tiprack
+      kind: tiprack
+      load_name: opentrons_96_tiprack_20ul
+      namespace: opentrons
+      version: 1
+      slot: 9
+
+  print_release:
+    dispense_reference: bottom
+    dispense_height_mm: 0.5
+    pre_air_chase_ul: 0.0
+    trailing_air_gap_ul: 1.5
+    air_gap_height_mm: 5.0
+    push_out_ul: 3.0
+    blow_out: true
+    post_dispense_delay_s: 2.0

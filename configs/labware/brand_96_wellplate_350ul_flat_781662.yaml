@@ -1,0 +1,42 @@
+# ──────────────────────────────────────────────────────────────────
+# BRANDplates(R) pureGrade(TM) S, 96-well, 350 uL, flat/F-bottom, Ref. 781662
+# ──────────────────────────────────────────────────────────────────
+# Every geometry value below is copied verbatim from BRAND's current
+# manufacturer datasheet for catalog number 781662 (page 3): plate
+# length/width/height, well diameter/depth/volume, 9 mm pitch, and the
+# X1/Xn/Y1/Yn well-center reference coordinates. No dimension here was
+# measured or estimated -- it is manufacturer-published.
+#
+#     python scripts/generate_labware.py configs/labware/brand_96_wellplate_350ul_flat_781662.yaml
+# ──────────────────────────────────────────────────────────────────
+
+load_name: brand_96_wellplate_350ul_flat_781662
+display_name: BRANDplates 96 Well Plate 350 µL Flat 781662
+brand: BRAND
+brand_ids: ["781662"]
+display_category: wellPlate
+plate_format: 96Standard
+
+# 8 rows (A-H) x 12 columns = 96 wells
+rows: 8
+cols: 12
+
+# BRAND datasheet: column 1 center X = 14.36 mm, 9.00 mm pitch.
+# BRAND datasheet: width Y = 85.43 mm, row-A edge offset Y1 = 11.22 mm,
+# so OT-2 row-A center Y (measured from front) = 85.43 - 11.22 = 74.21 mm.
+x_offset: 14.36
+y_offset: 74.21
+x_spacing: 9.0
+y_spacing: 9.0
+
+# Well geometry
+shape: circular
+diameter: 6.94
+depth: 10.65
+total_liquid_volume: 350
+well_bottom_shape: flat
+
+# Footprint (BRAND datasheet). well_z auto-computes to 14.10 - 10.65 = 3.45.
+x_dimension: 127.71
+y_dimension: 85.43
+z_dimension: 14.10

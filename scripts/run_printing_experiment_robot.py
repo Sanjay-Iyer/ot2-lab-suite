@@ -55,8 +55,15 @@ from scripts.run_vial_print_robot import (
     _report_run_error,
     _upload_protocol,
 )
+from src.printing.print_from_vial.builder import (
+    GENERATED_PATH as PRINT_FROM_VIAL_UPLOAD,
+    build_print_from_vial_protocol,
+    simulate_print_from_vial_protocol,
+)
+from src.printing.print_from_vial.loader import load_print_from_vial_config
 
 REPO = Path(__file__).resolve().parent.parent
+PRINT_FROM_VIAL_CONFIG = "configs/experiments/01_print_from_vial.yaml"
 
 
 def _build_standard(config: str | None) -> tuple[Path, bool]:
@@ -73,11 +80,25 @@ def _build_four_clover(config: str | None) -> tuple[Path, bool]:
     return workflow.CLOVER_UPLOAD, ok
 
 
+def _build_print_from_vial(config: str | None) -> tuple[Path, bool]:
+    cfg, run_modes = load_print_from_vial_config(config or PRINT_FROM_VIAL_CONFIG)
+    built = build_print_from_vial_protocol(cfg, run_modes=run_modes)
+    PRINT_FROM_VIAL_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
+    PRINT_FROM_VIAL_UPLOAD.write_bytes(built.protocol_path.read_bytes())
+    passed, output = simulate_print_from_vial_protocol(
+        PRINT_FROM_VIAL_UPLOAD,
+        expected_sha256=None,
+    )
+    if not passed:
+        print(output[-4000:], file=sys.stderr)
+    return PRINT_FROM_VIAL_UPLOAD, passed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("workflow", choices=("standard", "four-clover"))
+    parser.add_argument("workflow", choices=("standard", "four-clover", "print-from-vial"))
     parser.add_argument(
         "--config", default=None,
         help="Override the default YAML for the selected workflow.",
@@ -103,8 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.workflow == "standard":
             protocol_path, ok = _build_standard(args.config)
-        else:
+        elif args.workflow == "four-clover":
             protocol_path, ok = _build_four_clover(args.config)
+        else:
+            protocol_path, ok = _build_print_from_vial(args.config)
         if not ok:
             print("\nBuild/local-simulation failed; refusing to contact the robot.",
                   file=sys.stderr)

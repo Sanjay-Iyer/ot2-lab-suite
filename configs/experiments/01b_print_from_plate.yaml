@@ -1,0 +1,50 @@
+# Print-from-plate - minimal foundational printing primitive.
+#
+# BRAND 781662 96-well plate (one selected well) -> aspirate -> air gap ->
+# paper target -> dispense. No dilution, no intermediate plate, one tip for
+# the whole run, same source well reused for every target.
+#
+#   configs/experiments/01b_print_from_plate.yaml   <- edit this
+#        |  build (validate + flatten with the referenced machine profile)
+#        v
+#   src/protocols/printing/01b_print_from_plate.py  <- regenerated, then simulated
+#
+# Build + validate + simulate (nothing touches the robot):
+#   python scripts/build_print_from_plate.py
+#
+# This path needs no agent, no LLM, no skill and no approval workflow.
+
+# Laboratory-owned hardware: deck slots, labware identities, calibrated heights,
+# and the validated print-release air handling (including the anti-drip air gap
+# on every aspirate/dispense cycle). Referenced, never restated here.
+machine_profile: configs/machines/ot2_print_from_plate_p20_v1.yaml
+
+protocol_label: print_from_plate_test
+
+# dry_run: true  -> plan + validation only, the arm never moves (safe rehearsal)
+# dry_run: false -> real liquid handling when uploaded to the OT-2
+#                   (in local simulation it is still only simulated)
+run_modes: {dry_run: true}
+
+# --- source well (BRAND 781662 plate) -----------------------------------------
+source:
+  well: A1
+  material: print test liquid (diluent)
+  loaded_volume_ul: 300.0
+  minimum_remaining_ul: 20.0
+
+# --- printing behaviour --------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  droplets_per_target: 1        # repeats the SAME location this many times
+  inter_drop_delay_s: 0.0       # rest between repeated droplets (e.g. drying)
+
+# --- where to print --------------------------------------------------------
+# Flat list of paper wells. One droplet (or droplets_per_target droplets) is
+# printed at each, in order, all with the same tip and the same source well.
+targets: [A1, A2, A3]
+
+# --- tip behaviour ---------------------------------------------------------
+tips:
+  print_tip: A1        # which P20 tiprack position to pick up
+  return_tips: false    # true -> return_tip(), false -> drop_tip()
