@@ -91,17 +91,18 @@ CONFIG = { 'protocol_label': 'dye_dilution_print_demo',
                 'push_out_ul': 3.0,
                 'blow_out': True,
                 'inter_drop_delay_s': 0.0},
-  'standard_print': { 'source_well': 'B11',
+  'standard_print': { 'enabled': False,
+                      'source_well': 'B11',
                       'targets': ['A1', 'B1', 'C1', 'D1', 'E1', 'F1', 'G1', 'H1'],
                       'droplets_per_target': 1},
   'clover_print': { 'source_well': 'B11',
-                    'reference': 'B3',
+                    'reference': 'D3',
                     'clovers': 1,
-                    'half_width_mm': 2.0,
-                    'half_height_mm': 2.0,
+                    'half_width_mm': 1.0,
+                    'half_height_mm': 1.0,
                     'x_offset_mm': 0.0,
                     'y_offset_mm': 0.0},
-  'tips': {'start_tip': 'A1', 'return_tips': False, 'pipette_tip_reuse': False},
+  'tips': {'start_tip': 'A1', 'return_tips': False, 'pipette_tip_reuse': True},
   'flow_rates': {'p20': {'aspirate_ul_s': 3.0, 'dispense_ul_s': 3.0}},
   'safety': {'p20_max_volume_ul': 20.0, 'source_minimum_remaining_ul': 10.0}}
 # <<< CONFIG END <<<
@@ -261,10 +262,13 @@ def _preflight(protocol, labware, p20):
         errors.append(f"clover_print.reference {reference} is not on the paper")
 
     droplets_per_target = int(std.get("droplets_per_target", 1))
+    standard_enabled = bool(std.get("enabled", True))
     clover_count = int(clover.get("clovers", 1))
     if clover_count != 1:
         errors.append("clover_print.clovers must be 1 for this demo")
-    standard_deposits = len(targets) * droplets_per_target
+    standard_deposits = (
+        len(targets) * droplets_per_target if standard_enabled else 0
+    )
     clover_deposits = clover_count * len(DROPLET_KEYS)
     printed_ul = (standard_deposits + clover_deposits) * volume
 
@@ -292,7 +296,9 @@ def _preflight(protocol, labware, p20):
         dilution_tips = 0
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", False))
     if tip_reuse:
-        tips_needed = 3  # dye, water, mix+print share where possible
+        # One tip is held for everything drawn from the same source well; the
+        # hand-prepared case needs exactly one.
+        tips_needed = 1 if not dilution_enabled else 3
     else:
         tips_needed = dilution_tips + standard_deposits + clover_deposits
     tip_names = list(labware["tiprack_p20"].wells_by_name())
@@ -319,6 +325,7 @@ def _preflight(protocol, labware, p20):
         "water_transfers": water_transfers,
         "chunk": chunk,
         "targets": targets,
+        "standard_enabled": standard_enabled,
         "droplets_per_target": droplets_per_target,
         "reference": reference,
         "standard_deposits": standard_deposits,
@@ -349,11 +356,14 @@ def _report_plan(protocol, resolved):
             f"{resolved['total']:g} uL of diluted dye. The robot performs no "
             "transfer and no mix."
         )
-    protocol.comment(
-        f"Standard print: {', '.join(resolved['targets'])} x "
-        f"{resolved['droplets_per_target']} droplet(s) = "
-        f"{resolved['standard_deposits']} deposits"
-    )
+    if resolved["standard_enabled"]:
+        protocol.comment(
+            f"Standard print: {', '.join(resolved['targets'])} x "
+            f"{resolved['droplets_per_target']} droplet(s) = "
+            f"{resolved['standard_deposits']} deposits"
+        )
+    else:
+        protocol.comment("Standard print: DISABLED (clover only this run)")
     protocol.comment(
         f"Clover: 1 at {resolved['reference']} = {resolved['clover_deposits']} droplets"
     )
@@ -497,15 +507,18 @@ def _run_demo(protocol, labware, p20, resolved):
     # to keep the tip submerged for the last deposits.
     print_source_height = float(pr.get("source_aspirate_height_mm", 0.5))
 
-    std_source = deck_plate[str(std["source_well"]).upper()]
-    protocol.comment("--- STEP 4: standard print ---")
-    protocol.comment(
-        f"aspirating from {std['source_well']} at {print_source_height:g} mm"
-    )
-    for layer in range(1, resolved["droplets_per_target"] + 1):
-        for target in resolved["targets"]:
-            deposit(std_source, print_source_height, paper[target].bottom(z),
-                    f"standard print {target} (drop {layer})")
+    if resolved["standard_enabled"]:
+        std_source = deck_plate[str(std["source_well"]).upper()]
+        protocol.comment("--- STEP 4: standard print ---")
+        protocol.comment(
+            f"aspirating from {std['source_well']} at {print_source_height:g} mm"
+        )
+        for layer in range(1, resolved["droplets_per_target"] + 1):
+            for target in resolved["targets"]:
+                deposit(std_source, print_source_height, paper[target].bottom(z),
+                        f"standard print {target} (drop {layer})")
+    else:
+        protocol.comment("--- STEP 4 SKIPPED: standard_print.enabled is false ---")
 
     protocol.comment("--- STEP 5: clover print ---")
     clover_source = deck_plate[str(clover_cfg["source_well"]).upper()]

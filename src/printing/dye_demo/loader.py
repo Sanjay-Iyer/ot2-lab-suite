@@ -153,6 +153,8 @@ def load_dye_demo_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
             "inter_drop_delay_s": float(printing.get("inter_drop_delay_s", 0.0) or 0.0),
         },
         "standard_print": {
+            # false -> skip the standard column print entirely (clover-only run)
+            "enabled": bool(standard_print.get("enabled", True)),
             "source_well": str(
                 standard_print.get("source_well", dilution["destination_well"])
             ).upper(),
