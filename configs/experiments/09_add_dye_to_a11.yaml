@@ -1,0 +1,68 @@
+# =============================================================================
+# 09 - ADD DYE: vial rack A2 (slot 7) -> BRAND plate A11 (slot 1)
+# =============================================================================
+# A straight top-up of the concentrated dye stock. No water, no dilution, no
+# printing -- it just moves dye into A11 so the 5x dilutions have stock to draw
+# from.
+#
+#   python scripts/run_printing_experiment_robot.py add-dye
+#
+# ---------------------------------------------------------------------------
+# SET THE VOLUME BELOW. It defaults to 200 uL. This ADDS to whatever A11 already
+# holds and the robot cannot see the current level; the BRAND well caps at
+# 350 uL, so A11 must be at 150 uL or less before you run this.
+# ---------------------------------------------------------------------------
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+protocol_label: add_dye
+
+
+# One tip per distinct source well. Only the dye is moved, so this is 1 tip.
+pipette_tip_reuse: true
+
+# --- the dye being moved (treated as the "stock") -------------------------------
+source:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A2                    # <- the vial holding concentrated dye
+  material: concentrated dye
+  aspirate_height_mm: 4.0
+
+# --- no diluent is used ---------------------------------------------------------
+# A diluent well must still be named (the workflow always resolves one), but
+# diluent_volume_ul is 0 below so nothing is drawn from it and no tip touches it.
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water (unused, 0 uL)
+  aspirate_height_mm: 4.0
+
+# --- destination: the dye stock well on the BRAND plate -------------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [A11]
+  aspirate_height_mm: 0.5
+  dispense_height_mm: 2.0
+
+# --- how much to move -----------------------------------------------------------
+dilution:
+  mode: single
+  stock_volume_ul: 200        # <- CHANGE THIS: how much dye to add to A11
+  diluent_volume_ul: 0        # no water: this is a pure transfer
+  transfer_chunk_ul: 18       # below the 20 uL P20 ceiling so the 1.5 uL air
+                              # gap still fits on every transfer
+  mix_cycles: 0               # nothing to mix -- dye into dye
+  mix_volume_ul: 15
+
+# --- air handling ---------------------------------------------------------------
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+# --- tips -----------------------------------------------------------------------
+tips:
+  start_tip: A1
+  return_tips: true

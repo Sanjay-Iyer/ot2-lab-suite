@@ -144,9 +144,14 @@ def _preflight(protocol, labware, p20):
     # The paper slot is chosen by configuration (slot 5 and slot 11 both hold a
     # paper substrate today), so only its legality is checked here. Slot
     # uniqueness is enforced just below.
-    paper_slot = int(deck["paper"]["slot"])
-    if not (1 <= paper_slot <= 11):
-        errors.append(f"deck.paper slot must be 1-11, got {paper_slot}")
+    paper_roles = CONFIG.get("paper_roles") or ["paper"]
+    for role in paper_roles:
+        if role not in deck or role not in labware:
+            errors.append(f"paper role {role!r} is missing from deck/labware")
+            continue
+        paper_slot = int(deck[role]["slot"])
+        if not (1 <= paper_slot <= 11):
+            errors.append(f"deck.{role} slot must be 1-11, got {paper_slot}")
     for role, expected in (("tiprack_p20", 9),):
         actual = int(deck[role]["slot"])
         if actual != expected:
@@ -183,7 +188,11 @@ def _preflight(protocol, labware, p20):
             f"exceeding the {CONFIG['pipette']['name']} maximum {p20_max:g} uL"
         )
 
-    paper_names = labware["paper"].wells_by_name()
+    paper_names_by_role = {
+        role: labware[role].wells_by_name()
+        for role in paper_roles
+        if role in labware
+    }
     source_names = labware["source"].wells_by_name()
     declared_wells = [str(w).upper() for w in (src.get("wells") or [])]
     for well in declared_wells:
@@ -200,27 +209,41 @@ def _preflight(protocol, labware, p20):
         targets = [str(t).upper() for t in (group.get("targets") or [])]
         if not targets:
             errors.append(f"{label}: targets must list at least one paper well")
-        missing = sorted({t for t in targets if t not in paper_names})
-        if missing:
-            errors.append(f"{label}: targets not on paper labware: {', '.join(missing)}")
+        for role, paper_names in paper_names_by_role.items():
+            missing = sorted({t for t in targets if t not in paper_names})
+            if missing:
+                errors.append(
+                    f"{label}: targets not on {role} labware: {', '.join(missing)}"
+                )
         droplets = group.get("droplets", 1)
         if isinstance(droplets, bool) or not isinstance(droplets, int) or droplets < 1:
             errors.append(f"{label}: droplets must be an integer >= 1, got {droplets!r}")
             droplets = 1
-        source_well = str(
+        default_source_well = str(
             group.get("source_well") or (declared_wells[0] if declared_wells else "")
         ).upper()
-        if not source_well:
-            errors.append(f"{label}: no source_well and no source.wells to fall back on")
-        elif source_well not in source_names:
-            errors.append(f"{label}: source well {source_well} does not exist")
-        elif declared_wells and source_well not in declared_wells:
-            errors.append(
-                f"{label}: source_well {source_well} is not listed in source.wells "
-                f"({', '.join(declared_wells)})"
-            )
+        source_wells = {}
+        for role in paper_roles:
+            source_well = str(
+                (CONFIG.get("paper_sources") or {}).get(role)
+                or default_source_well
+            ).upper()
+            source_wells[role] = source_well
+            if not source_well:
+                errors.append(f"{label}: no source well for {role}")
+            elif source_well not in source_names:
+                errors.append(f"{label}: source well {source_well} does not exist")
+            elif declared_wells and source_well not in declared_wells:
+                errors.append(
+                    f"{label}: source well {source_well} for {role} is not listed "
+                    f"in source.wells ({', '.join(declared_wells)})"
+                )
         resolved_groups.append(
-            {"targets": targets, "droplets": int(droplets), "source_well": source_well}
+            {
+                "targets": targets,
+                "droplets": int(droplets),
+                "source_wells": source_wells,
+            }
         )
 
     tip_name = str(CONFIG["tips"]["print_tip"]).upper()
@@ -231,9 +254,13 @@ def _preflight(protocol, labware, p20):
     # One tip per distinct source well: the tip may never move between liquids.
     used_sources = []
     for group in resolved_groups:
-        if group["source_well"] and group["source_well"] not in used_sources:
-            used_sources.append(group["source_well"])
-    deposits = sum(len(g["targets"]) * g["droplets"] for g in resolved_groups)
+        for source_well in group["source_wells"].values():
+            if source_well and source_well not in used_sources:
+                used_sources.append(source_well)
+    deposits_per_paper = sum(
+        len(g["targets"]) * g["droplets"] for g in resolved_groups
+    )
+    deposits = deposits_per_paper * len(paper_roles)
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
     tips_needed = len(used_sources) if tip_reuse else deposits
     if tip_name in tiprack_names:
@@ -259,8 +286,11 @@ def _preflight(protocol, labware, p20):
             )
         required = sum(
             len(g["targets"]) * g["droplets"] * volume
+            * sum(
+                1 for well in g["source_wells"].values()
+                if well == source_well_name
+            )
             for g in resolved_groups
-            if g["source_well"] == source_well_name
         )
         if not (0 < loaded <= source_well.max_volume):
             errors.append(
@@ -290,6 +320,8 @@ def _preflight(protocol, labware, p20):
     return {
         "groups": resolved_groups,
         "used_sources": used_sources,
+        "paper_roles": paper_roles,
+        "deposits_per_paper": deposits_per_paper,
         "max_layers": max(g["droplets"] for g in resolved_groups),
         "deposits": deposits,
     }
@@ -306,9 +338,20 @@ def _report_plan(protocol, resolved):
         f"{CONFIG['deck']['source']['slot']} ({src['material']!r}); "
         f"wells used: {', '.join(resolved['used_sources'])}"
     )
+    protocol.comment(
+        "Paper: "
+        + ", ".join(
+            f"{role} in slot {CONFIG['deck'][role]['slot']}"
+            for role in resolved["paper_roles"]
+        )
+    )
     for index, group in enumerate(resolved["groups"], start=1):
+        sources = ", ".join(
+            f"slot {CONFIG['deck'][role]['slot']} <- {source_well}"
+            for role, source_well in group["source_wells"].items()
+        )
         protocol.comment(
-            f"  group {index}: source {group['source_well']} -> "
+            f"  group {index}: {sources} -> "
             f"{', '.join(group['targets'])} x {group['droplets']} droplet(s)"
         )
     protocol.comment(
@@ -318,6 +361,11 @@ def _report_plan(protocol, resolved):
         f"Total: {resolved['deposits']} deposits x {volume:g} uL = "
         f"{resolved['deposits'] * volume:g} uL"
     )
+    if len(resolved["paper_roles"]) > 1:
+        protocol.comment(
+            f"Per paper: {resolved['deposits_per_paper']} deposits = "
+            f"{resolved['deposits_per_paper'] * volume:g} uL"
+        )
     if bool(CONFIG["tips"].get("pipette_tip_reuse", True)):
         protocol.comment(
             f"Tips: {len(resolved['used_sources'])} (pipette_tip_reuse=true, "
@@ -336,7 +384,7 @@ def _report_plan(protocol, resolved):
 def _print_from_vial(protocol, labware, p20, resolved):
     src = CONFIG["source"]
     pr = CONFIG["printing"]
-    paper = labware["paper"]
+    papers = [(role, labware[role]) for role in resolved["paper_roles"]]
     source_labware = labware["source"]
 
     volume = float(pr["droplet_volume_ul"])
@@ -403,33 +451,37 @@ def _print_from_vial(protocol, labware, p20, resolved):
             continue
         protocol.comment(f"--- LAYER {layer} of {resolved['max_layers']} ---")
         for group in active_groups:
-            source_well = source_labware[group["source_well"]]
-            if tip_reuse:
-                use_source(group["source_well"])
             for target in group["targets"]:
-                if not tip_reuse:
-                    fresh_tip(group["source_well"])
-                destination = paper[target].bottom(z)
-                if chase > 0:
-                    p20.aspirate(chase, source_well.bottom(aspirate_height))
-                p20.aspirate(volume, source_well.bottom(aspirate_height))
-                if air_gap > 0:
-                    p20.air_gap(air_gap, height=air_gap_height)
+                for paper_role, paper in papers:
+                    source_well_name = group["source_wells"][paper_role]
+                    source_well = source_labware[source_well_name]
+                    if tip_reuse:
+                        use_source(source_well_name)
+                    else:
+                        fresh_tip(source_well_name)
+                    destination = paper[target].bottom(z)
+                    if chase > 0:
+                        p20.aspirate(chase, source_well.bottom(aspirate_height))
+                    p20.aspirate(volume, source_well.bottom(aspirate_height))
+                    if air_gap > 0:
+                        p20.air_gap(air_gap, height=air_gap_height)
 
-                piston = chase + volume + air_gap
-                if push_out > 0:
-                    p20.dispense(piston, destination, push_out=push_out)
-                else:
-                    p20.dispense(piston, destination)
-                if blow_out:
-                    p20.blow_out(destination)
-                printed += 1
-                protocol.comment(
-                    f"layer {layer}: {target} <- {group['source_well']} "
-                    f"(drop {layer}/{group['droplets']})"
-                )
-                if drop_delay > 0:
-                    protocol.delay(seconds=drop_delay)
+                    piston = chase + volume + air_gap
+                    if push_out > 0:
+                        p20.dispense(piston, destination, push_out=push_out)
+                    else:
+                        p20.dispense(piston, destination)
+                    if blow_out:
+                        p20.blow_out(destination)
+                    printed += 1
+                    protocol.comment(
+                        f"layer {layer}: {paper_role} slot "
+                        f"{CONFIG['deck'][paper_role]['slot']} {target} <- "
+                        f"{source_well_name} "
+                        f"(drop {layer}/{group['droplets']})"
+                    )
+                    if drop_delay > 0:
+                        protocol.delay(seconds=drop_delay)
 
         remaining = [g for g in resolved["groups"] if g["droplets"] >= layer + 1]
         if remaining and layer_delay > 0:
@@ -447,9 +499,10 @@ def _print_from_vial(protocol, labware, p20, resolved):
 
 def run(protocol: protocol_api.ProtocolContext):
     deck = CONFIG["deck"]
+    paper_roles = CONFIG.get("paper_roles") or ["paper"]
     labware = {
         role: _load_labware(protocol, deck[role])
-        for role in ("source", "paper", "tiprack_p20")
+        for role in ("source", *paper_roles, "tiprack_p20")
     }
     pip_cfg = CONFIG["pipette"]
     p20 = protocol.load_instrument(

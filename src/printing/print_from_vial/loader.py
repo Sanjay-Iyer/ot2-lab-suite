@@ -77,7 +77,7 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
     print_groups = loaded.pop("print_groups", None)
     # Optional destination override: the machine profile supplies the paper
     # labware, but more than one deck slot can hold a paper substrate, so an
-    # experiment may pick which one without editing the profile.
+    # experiment may pick one slot or mirror the same pattern onto several.
     substrate = loaded.pop("substrate", {}) or {}
     # `targets:` remains accepted as the one-group shorthand.
     legacy_targets = loaded.pop("targets", None)
@@ -128,21 +128,98 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             }
         )
 
+    if "slot" in substrate and "slots" in substrate:
+        raise PrintFromVialLoadError(
+            f"{path}: substrate must declare slot or slots, not both"
+        )
+    raw_paper_slots = substrate.get("slots")
+    if raw_paper_slots is None:
+        raw_paper_slots = [substrate.get("slot", paper["slot"])]
+    if (
+        not isinstance(raw_paper_slots, list)
+        or not raw_paper_slots
+        or any(isinstance(slot, bool) for slot in raw_paper_slots)
+    ):
+        raise PrintFromVialLoadError(
+            f"{path}: substrate.slots must be a non-empty list of deck slots"
+        )
+    try:
+        paper_slots = [int(slot) for slot in raw_paper_slots]
+    except (TypeError, ValueError) as exc:
+        raise PrintFromVialLoadError(
+            f"{path}: substrate slots must be integers"
+        ) from exc
+    if len(set(paper_slots)) != len(paper_slots):
+        raise PrintFromVialLoadError(f"{path}: substrate slots must be unique")
+
+    paper_roles = ["paper"] + [
+        f"paper_{index}" for index in range(2, len(paper_slots) + 1)
+    ]
+    paper_deck = {
+        role: {
+            "slot": slot,
+            "load_name": substrate.get("labware", paper["load_name"]),
+            "namespace": paper.get("namespace"),
+            "version": paper.get("version"),
+        }
+        for role, slot in zip(paper_roles, paper_slots)
+    }
+
+    raw_source_wells = substrate.get("source_wells") or {}
+    if not isinstance(raw_source_wells, dict):
+        raise PrintFromVialLoadError(
+            f"{path}: substrate.source_wells must map paper slots to source wells"
+        )
+    source_wells_by_slot: dict[int, str] = {}
+    for raw_slot, raw_well in raw_source_wells.items():
+        if isinstance(raw_slot, bool):
+            raise PrintFromVialLoadError(
+                f"{path}: substrate.source_wells keys must be deck-slot integers"
+            )
+        try:
+            slot = int(raw_slot)
+        except (TypeError, ValueError) as exc:
+            raise PrintFromVialLoadError(
+                f"{path}: substrate.source_wells keys must be deck-slot integers"
+            ) from exc
+        source_wells_by_slot[slot] = str(raw_well).upper()
+    unknown_source_slots = sorted(set(source_wells_by_slot) - set(paper_slots))
+    if unknown_source_slots:
+        raise PrintFromVialLoadError(
+            f"{path}: substrate.source_wells contains non-paper slot(s) "
+            f"{unknown_source_slots}"
+        )
+    if source_wells_by_slot and set(source_wells_by_slot) != set(paper_slots):
+        missing_source_slots = sorted(set(paper_slots) - set(source_wells_by_slot))
+        raise PrintFromVialLoadError(
+            f"{path}: substrate.source_wells is missing paper slot(s) "
+            f"{missing_source_slots}"
+        )
+    paper_sources = {
+        role: source_wells_by_slot.get(slot, default_source_well)
+        for role, slot in zip(paper_roles, paper_slots)
+    }
+    undeclared_paper_sources = sorted(
+        set(paper_sources.values()) - set(resolved_source["wells"])
+    )
+    if undeclared_paper_sources:
+        raise PrintFromVialLoadError(
+            f"{path}: paper source well(s) must be listed in source.wells: "
+            f"{', '.join(undeclared_paper_sources)}"
+        )
+
     config: dict[str, Any] = {
         "protocol_label": str(protocol_label),
         "deck": {
             "source": resolved_source["deck_spec"],
-            "paper": {
-                "slot": int(substrate.get("slot", paper["slot"])),
-                "load_name": substrate.get("labware", paper["load_name"]),
-                "namespace": paper.get("namespace"),
-                "version": paper.get("version"),
-            },
+            **paper_deck,
             "tiprack_p20": {
                 "slot": int(tiprack["slot"]),
                 "load_name": tiprack["load_name"],
             },
         },
+        "paper_roles": paper_roles,
+        "paper_sources": paper_sources,
         "pipette": {"name": pipette["name"], "mount": pipette["mount"]},
         "source": {
             "type": resolved_source["type"],
@@ -164,6 +241,7 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "inter_layer_delay_s": float(
                 printing.get("inter_layer_delay_s", 0.0) or 0.0
             ),
+
         },
         "print_groups": normalized_groups,
         "tips": {

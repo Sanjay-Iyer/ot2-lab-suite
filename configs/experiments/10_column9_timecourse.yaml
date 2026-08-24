@@ -1,0 +1,73 @@
+# =============================================================================
+# 10 - COLUMN 9 TIME COURSE: 5, 10, and 20 layers one hour apart
+# =============================================================================
+# Execution is LAYER-MAJOR across both paper sheets:
+#
+#   LAYER 1      A9 B9 C9 on slots 5 and 11
+#     wait 1 hour
+#   LAYERS 2-5   A9 B9 C9 on both sheets, with a one-hour wait before each layer
+#   LAYERS 6-10  B9 C9 on both sheets, with a one-hour wait before each layer
+#   LAYERS 11-20 C9 on both sheets, with a one-hour wait before each layer
+#
+# Final drop count per paper:
+#   A9  5 drops
+#   B9 10 drops
+#   C9 20 drops
+#
+# There is NO trailing delay after layer 20. With 19 one-hour inter-layer waits,
+# total run time is a little over 19 hours.
+#
+#   python scripts/run_printing_experiment_robot.py column9-timecourse
+#
+# Runs on the physically validated V1 standard executor
+# (src/protocols/printing/01_print_from_vial.py).
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: column9_timecourse
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- sources: dye in the BRAND 781662 plate, slot 1 ------------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [C11, D11]
+  material: column 9 time-course dyes
+  loaded_volume_ul: 300.0     # volume in each source well at run start
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destinations and their dedicated source wells -------------------------------
+substrate:
+  slots: [5, 11]
+  source_wells:
+    5: C11
+    11: D11
+
+# --- printing behaviour -----------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+  inter_layer_delay_s: 3600.0 # wait one hour before every additional drop layer
+
+# --- column 9 stacks --------------------------------------------------------------
+print_groups:
+  - targets: [A9]
+    droplets: 5
+
+  - targets: [B9]
+    droplets: 10
+
+  - targets: [C9]
+    droplets: 20
+
+# --- tip behaviour ---------------------------------------------------------------
+# Two dedicated tips prevent C11 and D11 from mixing. Each tip is reused only
+# with its assigned source well for all 20 layers.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

@@ -114,6 +114,10 @@ WORKFLOWS = {
         "dilution", "configs/experiments/07_topup_b11_5x_100ul.yaml"),
     "column8-timecourse": (
         "standard", "configs/experiments/08_column8_timecourse.yaml"),
+    "column9-timecourse": (
+        "standard", "configs/experiments/10_column9_timecourse.yaml"),
+    "add-dye": (
+        "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     # --- the three general, agent-facing workflows ---------------------------
     "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
     "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),

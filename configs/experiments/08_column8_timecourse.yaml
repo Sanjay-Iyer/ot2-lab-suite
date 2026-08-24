@@ -40,9 +40,11 @@ source:
   minimum_remaining_ul: 20.0
   aspirate_height_mm: 0.5     # low: the well drains over the run
 
-# --- destination: paper in slot 11 ----------------------------------------------
+# --- destinations: matching paper sheets in slots 5 and 11 ----------------------
+# Each layer mirrors the same column-8 deposits onto both sheets before the
+# shared one-hour drying delay.
 substrate:
-  slot: 11
+  slots: [5, 11]
 
 # --- printing behaviour ---------------------------------------------------------
 printing:
@@ -68,8 +70,8 @@ print_groups:
     droplets: 1
 
 # --- tip behaviour ---------------------------------------------------------
-# One source well, so a single tip is held for the whole run, including through
-# both one-hour waits.
+# One source well, so a single tip is held for both sheets and the whole run,
+# including through both one-hour waits.
 tips:
   pipette_tip_reuse: true
   print_tip: A1
