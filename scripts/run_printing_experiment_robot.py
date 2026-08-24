@@ -106,6 +106,8 @@ WORKFLOWS = {
         "clover", "configs/experiments/02_clover_from_brand_plate.yaml"),
     "dye-demo": ("dye-demo", "configs/experiments/03_dye_dilution_print_demo.yaml"),
     "single-spot": ("standard", "configs/experiments/04_single_spot_stack.yaml"),
+    "quick-print": (
+        "standard", "configs/experiments/05_quick_print_brand_to_paper11.yaml"),
     # --- the three general, agent-facing workflows ---------------------------
     "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
     "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),

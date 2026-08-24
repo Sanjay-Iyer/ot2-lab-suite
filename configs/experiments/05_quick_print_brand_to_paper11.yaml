@@ -1,0 +1,55 @@
+# 05 - QUICK PRINT: dye from the BRAND plate (slot 1) -> paper (slot 11)
+#
+# A short row of single droplets. No dilution, no stacking, no long delays --
+# this is the fast "did it print?" check.
+#
+# Real run (rebuilds fresh from this file, then uploads + plays):
+#   python scripts/run_printing_experiment_robot.py quick-print
+#
+# Runs on the physically validated V1 standard executor
+# (src/protocols/printing/01_print_from_vial.py).
+
+# Laboratory-owned paper/tiprack geometry and the validated print-release air
+# handling (including the anti-drip air gap on every cycle).
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: quick_print_brand_to_paper11
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: dye in the BRAND 781662 plate, slot 1 ------------------------------
+source:
+  type: well_plate            # brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [B11]                # <- CHANGE THIS to whichever well holds your dye
+  material: dye
+  loaded_volume_ul: 300.0     # what is actually in that well
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5     # low: the well drains as it prints
+
+# --- destination: paper in slot 11 ----------------------------------------------
+substrate:
+  slot: 11
+
+# --- printing behaviour ---------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause -- this is the quick check
+  inter_layer_delay_s: 0.0    # unused: only one droplet per target
+
+# --- what to print ---------------------------------------------------------
+# Four spots down column 5, one 5 uL droplet each = 20 uL total, ~1 minute.
+# Column 5 is used because columns 1-3 already carry earlier test prints.
+# Change these wells freely (A1-H12).
+print_groups:
+  - source_well: B11
+    targets: [A5, B5, C5, D5]
+    droplets: 1
+
+# --- tip behaviour ---------------------------------------------------------
+# One source well, so one tip is held for all four droplets.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true
