@@ -39,12 +39,12 @@ printing:
   inter_layer_delay_s: 0.0    # unused: only one droplet per target
 
 # --- what to print ---------------------------------------------------------
-# Four spots down column 5, one 5 uL droplet each = 20 uL total, ~1 minute.
-# Column 5 is used because columns 1-3 already carry earlier test prints.
+# Three spots down column 1 (rows A, B, C), one 5 uL droplet each = 15 uL total.
+# No delays anywhere -- this is the quick "did it print?" check.
 # Change these wells freely (A1-H12).
 print_groups:
   - source_well: B11
-    targets: [A5, B5, C5, D5]
+    targets: [A1, B1, C1]
     droplets: 1
 
 # --- tip behaviour ---------------------------------------------------------
