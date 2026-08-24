@@ -1,0 +1,682 @@
+# =============================================================================
+# VERSION 11 AGENT TEST CASES
+# =============================================================================
+# Each case drives src/printing/v11/agent_core.ExperimentState with a sequence
+# of STRUCTURED INTENTS (what the LLM adapter would return), then asserts the
+# resolved config. No GCloud is involved, so this runs on the home laptop.
+#
+#   conversation: the human phrasing, for readability and rule-based parsing
+#   intents:      the structured intent per turn (ScriptedAdapter input)
+#   expect:       dotted paths checked against the RESOLVED config
+#   expect_resolved_targets / expect_error / expect_tip_count: special checks
+#
+# Run:  python scripts/11_test_agent_configs.py
+# =============================================================================
+
+standard_print:
+
+  - name: std_01_vial_column1_default
+    conversation:
+      - "I want a standard print."
+      - "Use the 20 mL vial rack in slot 7, pull from A1."
+      - "Print one 5 uL drop down all 8 rows of column 1."
+      - "Reuse the pipette tip."
+    intents:
+      - {workflow: standard_print}
+      - {source_type: vial_rack, source_slot: 7, source_well: A1}
+      - {target_selection: {column: 1}, droplet_volume_ul: 5, droplets_per_target: 1}
+      - {pipette_tip_reuse: true}
+    expect:
+      source.type: vial_rack
+      deck.source.slot: 7
+      printing.droplet_volume_ul: 5.0
+      tips.pipette_tip_reuse: true
+    expect_resolved_targets: [A1, B1, C1, D1, E1, F1, G1, H1]
+
+  - name: std_02_brand_column3
+    conversation:
+      - "Standard print from the BRAND plate in slot 1, well C11."
+      - "Print column 3."
+    intents:
+      - {workflow: standard_print, source_type: well_plate, source_slot: 1, source_well: C11}
+      - {target_selection: {column: 3}}
+    expect:
+      source.type: well_plate
+      deck.source.slot: 1
+    expect_resolved_targets: [A3, B3, C3, D3, E3, F3, G3, H3]
+
+  - name: std_03_corning_column5
+    conversation:
+      - "Standard print using the normal 96-well plate."
+      - "Slot 4, well B4. Print column 5."
+    intents:
+      - {workflow: standard_print, source_type: corning_plate}
+      - {source_slot: 4, source_well: B4, target_selection: {column: 5}}
+    expect:
+      source.type: corning_plate
+      deck.source.slot: 4
+    expect_resolved_targets: [A5, B5, C5, D5, E5, F5, G5, H5]
+
+  - name: std_04_three_drops_per_location
+    conversation:
+      - "Standard print from vial A1, column 2, three drops at each spot."
+    intents:
+      - {workflow: standard_print, source_type: vial_rack, source_well: A1,
+         target_selection: {column: 2}, droplets_per_target: 3}
+    expect:
+      print_groups.0.droplets: 3
+
+  - name: std_05_different_drop_volume
+    conversation:
+      - "Standard print, 2.5 microlitre drops."
+    intents:
+      - {workflow: standard_print, droplet_volume_ul: 2.5}
+    expect:
+      printing.droplet_volume_ul: 2.5
+
+  - name: std_06_different_print_height
+    conversation:
+      - "Standard print but print closer to the paper, 0.3 mm."
+    intents:
+      - {workflow: standard_print, print_height_mm: 0.3}
+    expect:
+      paper.print_height_mm: 0.3
+
+  - name: std_07_different_air_gap
+    conversation:
+      - "Standard print with a 2 uL air gap."
+    intents:
+      - {workflow: standard_print, air_gap_ul: 2.0}
+    expect:
+      pipetting.air_gap_ul: 2.0
+
+  - name: std_08_five_second_layer_delay
+    conversation:
+      - "Standard print, three drops each, wait five seconds between layers."
+    intents:
+      - {workflow: standard_print, droplets_per_target: 3, inter_layer_delay_s: 5}
+    expect:
+      timing.inter_layer_delay_s: 5
+
+  - name: std_09_tip_reuse_true
+    conversation:
+      - "Standard print, reuse the same tip."
+    intents:
+      - {workflow: standard_print, pipette_tip_reuse: true}
+    expect:
+      tips.pipette_tip_reuse: true
+
+  - name: std_10_tip_reuse_false
+    conversation:
+      - "Standard print, use a fresh tip for every drop."
+    intents:
+      - {workflow: standard_print, pipette_tip_reuse: false}
+    expect:
+      tips.pipette_tip_reuse: false
+
+  - name: std_11_multiple_source_wells
+    conversation:
+      - "Standard print from vial A1 and A2."
+      - "A1 goes to column 1, A2 goes to column 2."
+    intents:
+      - {workflow: standard_print, source_type: vial_rack, source_wells: [A1, A2]}
+      - {groups: [{source_well: A1, target_selection: {column: 1}, droplets: 1},
+                  {source_well: A2, target_selection: {column: 2}, droplets: 1}]}
+    expect:
+      source.wells: [A1, A2]
+
+  - name: std_12_explicit_target_list
+    conversation:
+      - "Standard print at A1, C3 and E5 only."
+    intents:
+      - {workflow: standard_print, targets: [A1, C3, E5]}
+    expect_resolved_targets: [A1, C3, E5]
+
+  - name: std_13_row_selection
+    conversation:
+      - "Standard print across row B, columns 1 to 3."
+    intents:
+      - {workflow: standard_print, target_selection: {row: B, columns: [1, 2, 3]}}
+    expect_resolved_targets: [B1, B2, B3]
+
+  - name: std_14_column_selection_subset_rows
+    conversation:
+      - "Standard print, column 4, rows A through C."
+    intents:
+      - {workflow: standard_print, target_selection: {column: 4, rows: [A, B, C]}}
+    expect_resolved_targets: [A4, B4, C4]
+
+  - name: std_15_multiple_columns
+    conversation:
+      - "Standard print, columns 1 and 2, rows A to C."
+    intents:
+      - {workflow: standard_print, target_selection: {columns: [1, 2], rows: [A, B, C]}}
+    expect_resolved_targets: [A1, A2, B1, B2, C1, C2]
+
+  - name: std_16_user_changes_mind_midway
+    conversation:
+      - "Standard print from the BRAND plate."
+      - "Actually use the vial rack instead."
+      - "Print column 1."
+    intents:
+      - {workflow: standard_print, source_type: well_plate, source_slot: 1}
+      - {source_type: vial_rack, source_slot: 7, source_well: A1}
+      - {target_selection: {column: 1}}
+    expect:
+      source.type: vial_rack
+      deck.source.slot: 7
+
+  - name: std_17_defaults_only
+    conversation:
+      - "Just do a standard print with the defaults."
+    intents:
+      - {workflow: standard_print}
+    expect:
+      printing.droplet_volume_ul: 5.0
+      paper.print_height_mm: 0.5
+      tips.pipette_tip_reuse: true
+
+  - name: std_18_state_persists_across_turns
+    conversation:
+      - "Standard print."
+      - "BRAND plate slot 1."
+      - "Well C11."
+      - "Column 3."
+      - "Five microlitres."
+      - "Three drops."
+      - "Wait four seconds between layers."
+    intents:
+      - {workflow: standard_print}
+      - {source_type: well_plate, source_slot: 1}
+      - {source_well: C11}
+      - {target_selection: {column: 3}}
+      - {droplet_volume_ul: 5}
+      - {droplets_per_target: 3}
+      - {inter_layer_delay_s: 4}
+    expect:
+      source.type: well_plate
+      deck.source.slot: 1
+      source.wells: [C11]
+      printing.droplet_volume_ul: 5.0
+      print_groups.0.droplets: 3
+      timing.inter_layer_delay_s: 4
+    expect_resolved_targets: [A3, B3, C3, D3, E3, F3, G3, H3]
+
+  - name: std_19_correct_one_field_after_plan
+    conversation:
+      - "Standard print from vial A1, column 1, 5 uL."
+      - "Make that 3 uL instead."
+    intents:
+      - {workflow: standard_print, source_type: vial_rack, source_well: A1,
+         target_selection: {column: 1}, droplet_volume_ul: 5}
+      - {droplet_volume_ul: 3}
+    expect:
+      printing.droplet_volume_ul: 3.0
+    expect_resolved_targets: [A1, B1, C1, D1, E1, F1, G1, H1]
+
+  - name: std_20_change_labware_after_targets
+    conversation:
+      - "Standard print, column 2."
+      - "Take the liquid from the BRAND plate slot 1 well A5."
+    intents:
+      - {workflow: standard_print, target_selection: {column: 2}}
+      - {source_type: well_plate, source_slot: 1, source_well: A5}
+    expect:
+      source.type: well_plate
+      source.wells: [A5]
+    expect_resolved_targets: [A2, B2, C2, D2, E2, F2, G2, H2]
+
+  - name: std_21_target_major_order
+    conversation:
+      - "Standard print, finish each spot before moving on."
+    intents:
+      - {workflow: standard_print, order: target_major, droplets_per_target: 3}
+    expect:
+      printing.order: target_major
+
+  - name: std_22_replicates
+    conversation:
+      - "Standard print at A1 and B1, three replicates."
+    intents:
+      - {workflow: standard_print, targets: [A1, B1], replicates: 3}
+    expect:
+      print_groups.0.replicates: 3
+
+clover_print:
+
+  - name: clv_01_vial_default_clover
+    conversation:
+      - "Print one clover from the vial rack."
+    intents:
+      - {workflow: clover_print, source_type: vial_rack, source_well: A1}
+    expect:
+      source.type: vial_rack
+      printing.droplet_volume_ul: 5.0
+
+  - name: clv_02_brand_c11_at_b3
+    conversation:
+      - "Use the BRAND plate in slot 1, pull from C11."
+      - "Print one clover around B3."
+    intents:
+      - {workflow: clover_print, source_type: well_plate, source_slot: 1, source_well: C11}
+      - {clover_references: [B3]}
+    expect:
+      source.type: well_plate
+      source.wells: [C11]
+
+  - name: clv_03_corning_source
+    conversation:
+      - "Clover print from the normal 96-well plate, slot 4, well B4."
+    intents:
+      - {workflow: clover_print, source_type: corning_plate, source_slot: 4, source_well: B4}
+    expect:
+      source.type: corning_plate
+      deck.source.slot: 4
+
+  - name: clv_04_separation_1mm
+    conversation:
+      - "Clover with the droplets 1 mm apart."
+    intents:
+      - {workflow: clover_print, separation_x_mm: 1.0, separation_y_mm: 1.0}
+    expect_separation: {x: 1.0, y: 1.0}
+
+  - name: clv_05_separation_2mm
+    conversation:
+      - "Clover with 2 mm between droplets."
+    intents:
+      - {workflow: clover_print, separation_x_mm: 2.0, separation_y_mm: 2.0}
+    expect_separation: {x: 2.0, y: 2.0}
+
+  - name: clv_06_separation_3mm
+    conversation:
+      - "Use 3 mm horizontal and vertical separation."
+    intents:
+      - {workflow: clover_print, separation_x_mm: 3.0, separation_y_mm: 3.0}
+    expect_separation: {x: 3.0, y: 3.0}
+
+  - name: clv_07_asymmetric
+    conversation:
+      - "Make it rectangular - 4 mm wide and 2 mm tall."
+    intents:
+      - {workflow: clover_print, separation_x_mm: 4.0, separation_y_mm: 2.0}
+    expect_separation: {x: 4.0, y: 2.0}
+
+  - name: clv_08_multiple_clovers
+    conversation:
+      - "Print three clovers at B3, B6 and B9."
+    intents:
+      - {workflow: clover_print, clover_references: [B3, B6, B9]}
+    expect_clover_count: 3
+
+  - name: clv_09_different_references
+    conversation:
+      - "Put the clovers at D2 and F8."
+    intents:
+      - {workflow: clover_print, clover_references: [D2, F8]}
+    expect_clover_count: 2
+
+  - name: clv_10_droplet_volume
+    conversation:
+      - "Clover with 3 uL droplets."
+    intents:
+      - {workflow: clover_print, droplet_volume_ul: 3}
+    expect:
+      printing.droplet_volume_ul: 3.0
+
+  - name: clv_11_multiple_layers
+    conversation:
+      - "Print the clover three times over."
+    intents:
+      - {workflow: clover_print, layers: 3}
+    expect:
+      layers: 3
+
+  - name: clv_12_inter_layer_delay
+    conversation:
+      - "Two layers, ten seconds of drying between them."
+    intents:
+      - {workflow: clover_print, layers: 2, inter_layer_delay_s: 10}
+    expect:
+      layers: 2
+      timing.inter_layer_delay_s: 10
+
+  - name: clv_13_tip_reuse_true
+    conversation:
+      - "Clover, reuse the tip."
+    intents:
+      - {workflow: clover_print, pipette_tip_reuse: true}
+    expect:
+      tips.pipette_tip_reuse: true
+
+  - name: clv_14_tip_reuse_false
+    conversation:
+      - "Clover, fresh tip for every droplet."
+    intents:
+      - {workflow: clover_print, pipette_tip_reuse: false}
+    expect:
+      tips.pipette_tip_reuse: false
+
+  - name: clv_15_print_height
+    conversation:
+      - "Clover printed 0.8 mm above the paper."
+    intents:
+      - {workflow: clover_print, print_height_mm: 0.8}
+    expect:
+      paper.print_height_mm: 0.8
+
+  - name: clv_16_make_it_tighter
+    conversation:
+      - "Clover with 4 mm separation."
+      - "Actually make it tighter."
+    intents:
+      - {workflow: clover_print, separation_x_mm: 4.0, separation_y_mm: 4.0}
+      - {scale_separation: 0.5}
+    expect_separation: {x: 2.0, y: 2.0}
+
+  - name: clv_17_twice_as_wide
+    conversation:
+      - "Clover with 1.5 mm separation."
+      - "Make it twice as wide."
+    intents:
+      - {workflow: clover_print, separation_x_mm: 1.5, separation_y_mm: 1.5}
+      - {scale_separation: 2.0}
+    expect_separation: {x: 3.0, y: 3.0}
+
+  - name: clv_18_change_location_midway
+    conversation:
+      - "Clover at B3."
+      - "Move it to E6 instead."
+    intents:
+      - {workflow: clover_print, clover_references: [B3]}
+      - {clover_references: [E6]}
+    expect_clover_count: 1
+    expect_clover_references: [E6]
+
+  - name: clv_19_multiple_positions_with_offsets
+    conversation:
+      - "Two clovers at C4 and C8, shifted 1 mm right."
+    intents:
+      - {workflow: clover_print, clover_references: [C4, C8], x_offset_mm: 1.0}
+    expect_clover_count: 2
+    expect:
+      clovers.0.geometry.x_offset_mm: 1.0
+
+  - name: clv_20_defaults_only
+    conversation:
+      - "Just print a clover with the defaults."
+    intents:
+      - {workflow: clover_print}
+    expect:
+      printing.droplet_volume_ul: 5.0
+      tips.pipette_tip_reuse: true
+    expect_separation: {x: 2.0, y: 2.0}
+
+  - name: clv_21_rotation
+    conversation:
+      - "Rotate the clover 45 degrees."
+    intents:
+      - {workflow: clover_print, rotation_deg: 45}
+    expect:
+      clovers.0.geometry.rotation_deg: 45.0
+
+  - name: clv_22_half_value_direct
+    conversation:
+      - "Set the clover half width to 2.5 mm."
+    intents:
+      - {workflow: clover_print, half_width_mm: 2.5, half_height_mm: 2.5}
+    expect_separation: {x: 5.0, y: 5.0}
+
+dilution:
+
+  - name: dil_01_vial_to_brand_single
+    conversation:
+      - "Take stock from vial A1 in slot 7."
+      - "Make a single dilution in the BRAND plate slot 1 at B11."
+    intents:
+      - {workflow: dilution, stock_type: vial_rack, stock_slot: 7, stock_well: A1}
+      - {mode: single, destination_type: well_plate, destination_slot: 1,
+         destination_wells: [B11]}
+    expect:
+      dilution.mode: single
+      deck.stock.load_name: tuberack_3dprint_20ml_8vials_v2
+      deck.destination.load_name: brand_96_wellplate_350ul_flat_781662
+
+  - name: dil_02_plate_to_brand
+    conversation:
+      - "Stock from the Corning plate slot 4 well A1, dilute into the BRAND plate B2."
+    intents:
+      - {workflow: dilution, stock_type: corning_plate, stock_slot: 4, stock_well: A1,
+         destination_type: well_plate, destination_wells: [B2]}
+    expect:
+      deck.stock.load_name: corning_96_wellplate_360ul_custom
+      deck.destination.load_name: brand_96_wellplate_350ul_flat_781662
+
+  - name: dil_03_brand_to_corning
+    conversation:
+      - "Stock from BRAND C11 into the Corning plate at D6."
+    intents:
+      - {workflow: dilution, stock_type: well_plate, stock_well: C11,
+         destination_type: corning_plate, destination_wells: [D6]}
+    expect:
+      deck.stock.load_name: brand_96_wellplate_350ul_flat_781662
+      deck.destination.load_name: corning_96_wellplate_360ul_custom
+
+  - name: dil_04_five_x_from_final_volume
+    conversation:
+      - "Make a 5x dilution with a final volume of 100 microlitres."
+    intents:
+      - {workflow: dilution, dilution_factor: 5, final_volume_ul: 100}
+    expect_resolved_volumes: {stock: 20.0, diluent: 80.0}
+
+  - name: dil_05_explicit_volumes
+    conversation:
+      - "Use 30 uL of stock and 70 uL of water."
+    intents:
+      - {workflow: dilution, stock_volume_ul: 30, diluent_volume_ul: 70}
+    expect_resolved_volumes: {stock: 30.0, diluent: 70.0}
+
+  - name: dil_06_different_final_volume
+    conversation:
+      - "A 4x dilution, final volume 200 uL."
+    intents:
+      - {workflow: dilution, dilution_factor: 4, final_volume_ul: 200}
+    expect_resolved_volumes: {stock: 50.0, diluent: 150.0}
+
+  - name: dil_07_no_mixing
+    conversation:
+      - "Don't mix it afterwards."
+    intents:
+      - {workflow: dilution, mix_enabled: false}
+    expect:
+      mix.enabled: false
+
+  - name: dil_08_mix_cycles
+    conversation:
+      - "Mix ten times."
+    intents:
+      - {workflow: dilution, mix_cycles: 10}
+    expect:
+      mix.cycles: 10
+
+  - name: dil_09_mix_volume
+    conversation:
+      - "Mix with 12 microlitres."
+    intents:
+      - {workflow: dilution, mix_volume_ul: 12}
+    expect:
+      mix.volume_ul: 12
+
+  - name: dil_10_serial_across_row
+    conversation:
+      - "Serial dilution across A1 to A5 of the BRAND plate."
+    intents:
+      - {workflow: dilution, mode: series, destination_type: well_plate,
+         series_start_well: A1, series_direction: row, series_steps: 5}
+    expect:
+      dilution.mode: series
+    expect_resolved_series: [A1, A2, A3, A4, A5]
+
+  - name: dil_11_serial_down_column
+    conversation:
+      - "Serial dilution down column 1, four steps."
+    intents:
+      - {workflow: dilution, mode: series, series_start_well: A1,
+         series_direction: column, series_steps: 4}
+    expect_resolved_series: [A1, B1, C1, D1]
+
+  - name: dil_12_explicit_destination_wells
+    conversation:
+      - "Serial dilution using B2, B4, B6 and B8."
+    intents:
+      - {workflow: dilution, mode: series, series_wells: [B2, B4, B6, B8]}
+    expect_resolved_series: [B2, B4, B6, B8]
+
+  - name: dil_13_tip_reuse_true
+    conversation:
+      - "Reuse the tip for the dilution."
+    intents:
+      - {workflow: dilution, pipette_tip_reuse: true}
+    expect:
+      tips.pipette_tip_reuse: true
+
+  - name: dil_14_tip_reuse_false
+    conversation:
+      - "Use clean tips for every transfer."
+    intents:
+      - {workflow: dilution, pipette_tip_reuse: false}
+    expect:
+      tips.pipette_tip_reuse: false
+
+  - name: dil_15_aspiration_heights
+    conversation:
+      - "Aspirate the stock 2 mm up and the diluent 5 mm up."
+    intents:
+      - {workflow: dilution, stock_aspirate_height_mm: 2.0, diluent_aspirate_height_mm: 5.0}
+    expect:
+      stock.aspirate_height_mm: 2.0
+      diluent.aspirate_height_mm: 5.0
+
+  - name: dil_16_air_gap_chunking
+    conversation:
+      - "Keep a 1.5 uL air gap and cap each transfer at 18 uL."
+    intents:
+      - {workflow: dilution, air_gap_ul: 1.5, max_chunk_ul: 18}
+    expect:
+      transfer.max_chunk_ul: 18
+
+  - name: dil_17_source_changed_midway
+    conversation:
+      - "Dilution with stock from vial A1."
+      - "Actually the stock is in the BRAND plate at C11."
+    intents:
+      - {workflow: dilution, stock_type: vial_rack, stock_well: A1}
+      - {stock_type: well_plate, stock_slot: 1, stock_well: C11}
+    expect:
+      deck.stock.load_name: brand_96_wellplate_350ul_flat_781662
+      stock.well: C11
+
+  - name: dil_18_destination_changed_midway
+    conversation:
+      - "Dilute into B11."
+      - "Change that to C11."
+    intents:
+      - {workflow: dilution, destination_wells: [B11]}
+      - {destination_wells: [C11]}
+    expect:
+      destination.wells: [C11]
+
+  - name: dil_19_defaults_only
+    conversation:
+      - "Just make a dilution with the defaults."
+    intents:
+      - {workflow: dilution}
+    expect:
+      dilution.mode: single
+      mix.enabled: true
+
+  - name: dil_20_single_sentence_complete
+    conversation:
+      - "Make a 5x dilution of vial A1 into BRAND plate B11 at 100 uL final volume, mixing five times."
+    intents:
+      - {workflow: dilution, mode: single, stock_type: vial_rack, stock_well: A1,
+         destination_type: well_plate, destination_slot: 1, destination_wells: [B11],
+         dilution_factor: 5, final_volume_ul: 100, mix_cycles: 5}
+    expect:
+      dilution.mode: single
+      mix.cycles: 5
+    expect_resolved_volumes: {stock: 20.0, diluent: 80.0}
+
+  - name: dil_21_delays
+    conversation:
+      - "Wait two seconds after each transfer."
+    intents:
+      - {workflow: dilution, after_transfer_s: 2}
+    expect:
+      delays.after_transfer_s: 2
+
+# -----------------------------------------------------------------------------
+# INVALID CASES - each must be REJECTED with a clear error
+# -----------------------------------------------------------------------------
+invalid:
+
+  - name: inv_01_unknown_labware
+    intents: [{workflow: standard_print, source_type: unicorn_plate}]
+    expect_error: "not a registered labware"
+
+  - name: inv_02_invalid_well
+    intents: [{workflow: standard_print, source_type: vial_rack, source_well: Z99}]
+    expect_error: "not a well"
+
+  - name: inv_03_invalid_slot
+    intents: [{workflow: standard_print, source_type: vial_rack, source_slot: 44}]
+    expect_error_on_validate: "slot"
+
+  - name: inv_04_negative_droplet_volume
+    intents: [{workflow: standard_print, droplet_volume_ul: -5}]
+    expect_error_on_validate: "droplet"
+
+  - name: inv_05_droplet_over_capacity
+    intents: [{workflow: standard_print, droplet_volume_ul: 25}]
+    expect_error_on_validate: "capacit"
+
+  - name: inv_06_mix_volume_over_capacity
+    intents: [{workflow: dilution, mix_volume_ul: 40}]
+    expect_error_on_validate: "capacit"
+
+  - name: inv_07_zero_volume_dilution
+    intents: [{workflow: dilution, stock_volume_ul: 0, diluent_volume_ul: 0}]
+    expect_error_on_validate: "volume"
+
+  - name: inv_08_clover_out_of_bounds
+    intents: [{workflow: clover_print, clover_references: [A1],
+               separation_x_mm: 40, separation_y_mm: 40}]
+    expect_error_on_validate: "outside the usable paper"
+
+  - name: inv_09_invalid_target_row
+    intents: [{workflow: standard_print, target_selection: {row: Z, columns: [1]}}]
+    expect_error_on_validate: "row"
+
+  - name: inv_10_invalid_target_column
+    intents: [{workflow: standard_print, target_selection: {column: 99}}]
+    expect_error_on_validate: "column"
+
+  - name: inv_11_series_runs_off_plate
+    intents: [{workflow: dilution, mode: series, series_start_well: A10,
+               series_direction: row, series_steps: 6}]
+    expect_error_on_validate: "off the plate"
+
+  - name: inv_12_invalid_clover_reference
+    intents: [{workflow: clover_print, clover_references: [Q7]}]
+    expect_error: "not a well"
+
+  - name: inv_13_bad_mode
+    intents: [{workflow: dilution, mode: sideways}]
+    expect_error: "single or series"
+
+  - name: inv_14_bad_order
+    intents: [{workflow: standard_print, order: sideways}]
+    expect_error: "layer_major"
+
+  - name: inv_15_negative_scale
+    intents: [{workflow: clover_print, scale_separation: -1}]
+    expect_error: "must be > 0"

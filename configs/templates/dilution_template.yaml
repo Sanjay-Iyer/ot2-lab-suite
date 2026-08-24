@@ -1,0 +1,67 @@
+# TEMPLATE - GENERAL DILUTION
+#
+# Copy this, edit it, and run:
+#   python scripts/run_printing_experiment_robot.py dilution --config <your.yaml>
+#
+# Dilution only. This never prints. Run a printing workflow separately afterwards.
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# true  -> one tip per distinct source well (fewest tips)
+# false -> a fresh tip for every transfer and every mix
+pipette_tip_reuse: true
+
+# --- where the concentrated stock is --------------------------------------------
+# labware may be any of:
+#   tuberack_3dprint_20ml_8vials_v2        (20 mL vial rack, default slot 7)
+#   corning_96_wellplate_360ul_custom      (Corning 96-well, default slot 4)
+#   brand_96_wellplate_350ul_flat_781662   (BRAND 781662, default slot 1)
+source:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: stock
+  aspirate_height_mm: 4.0
+
+# --- where the diluent (usually water) is ---------------------------------------
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A2
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- where the dilution is made -------------------------------------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [B11]              # one well for mode single, the ladder for mode series
+  aspirate_height_mm: 1.0   # used when carrying a series well to well
+  dispense_height_mm: 2.0
+
+# --- what to make ---------------------------------------------------------------
+# mode: single
+#   each destination well gets stock_volume_ul + diluent_volume_ul, then a mix.
+#   20 + 80 = 100 uL is a 5x dilution.
+#
+# mode: series
+#   every destination well gets diluent_volume_ul, the FIRST also gets
+#   stock_volume_ul, then transfer_volume_ul is carried down the list, mixing
+#   at each step. 20 into 80 is a 5x step at every point.
+dilution:
+  mode: single
+
+  stock_volume_ul: 20
+  diluent_volume_ul: 80
+
+  transfer_volume_ul: 20    # mode series only
+  transfer_chunk_ul: 20     # P20 maximum per aspirate; larger volumes are split
+
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+# --- tips -----------------------------------------------------------------------
+tips:
+  start_tip: A1
+  return_tips: true

@@ -1,0 +1,521 @@
+# =============================================================================
+# VERSION 11 PARAMETER REFERENCE
+# =============================================================================
+# The contract every 11_ template, loader and executor follows. This file is
+# documentation, not a runnable config: it lists every parameter a scientist may
+# reasonably want to change through natural language, with its default, meaning,
+# validated range, and whether the AI agent is allowed to set it.
+#
+#   agent: yes   the conversational agent may set this from natural language
+#   agent: no    laboratory-owned / physically validated; humans change it
+#
+# Physical defaults are inherited unchanged from the proven Version 1 behaviour.
+# Making a value configurable must never change what the robot does by default.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# SHARED - present in all three Version 11 workflows
+# -----------------------------------------------------------------------------
+shared:
+
+  run_modes:
+    dry_run:
+      default: false
+      meaning: true = plan/validate only, the arm never moves. false = real motion.
+      range: boolean
+      agent: no          # humans decide when a run is live
+
+  machine_profile:
+    default: configs/machines/ot2_standard_printing_p20_v1.yaml
+    meaning: laboratory-owned pipette, tiprack and validated release behaviour
+    range: a file under configs/machines/
+    agent: no
+
+  pipette:
+    name:
+      default: p20_single_gen2
+      meaning: the only pipette these workflows use
+      range: p20_single_gen2
+      agent: no
+    mount:
+      default: left
+      range: left | right
+      agent: no
+    max_volume_ul:
+      default: 20.0
+      meaning: hard ceiling; no command may exceed it including air gap
+      range: from the machine profile
+      agent: no
+
+  tips:
+    pipette_tip_reuse:
+      default: true
+      meaning: >-
+        true = one tip per distinct source well, held for the whole run.
+        false = a fresh tip for every individual deposit / transfer / mix.
+      range: boolean
+      agent: yes         # "reuse the tip", "fresh tip every drop", "clean tips"
+    return_tips:
+      default: true
+      meaning: true = return_tip() to the rack, false = drop_tip() to trash
+      range: boolean
+      agent: yes         # "return the tips", "drop used tips"
+    start_tip:
+      default: A1
+      meaning: first tiprack position consumed
+      range: any well on opentrons_96_tiprack_20ul
+      agent: yes
+
+  # Any of the three registered labware may play any role. Identity is fixed by
+  # the registry (src/printing/source_config.py); slot and heights are per run.
+  labware_registry:
+    vial_rack:
+      load_name: tuberack_3dprint_20ml_8vials_v2
+      usual_slot: 7
+      wells: A1-A4 / B1-B4
+      well_depth_mm: 55.0
+      default_aspirate_height_mm: 4.0
+    corning_plate:
+      load_name: corning_96_wellplate_360ul_custom
+      usual_slot: 4
+      wells: A1-H12
+      well_depth_mm: 10.67
+      default_aspirate_height_mm: 1.0
+    well_plate:
+      load_name: brand_96_wellplate_350ul_flat_781662
+      usual_slot: 1
+      wells: A1-H12
+      well_depth_mm: 10.65
+      default_aspirate_height_mm: 1.0
+    paper:
+      load_name: paper_print_96_flat
+      usual_slots: [5, 11]
+      wells: A1-H12 (a 9.00 mm coordinate grid on a flat sheet)
+
+  source:
+    type:
+      default: vial_rack
+      meaning: which registered labware the liquid comes from
+      range: vial_rack | corning_plate | well_plate
+      agent: yes         # "use the BRAND plate", "the normal 96-well plate"
+    slot:
+      default: the registry's usual_slot for that type
+      range: 1-11, unique across the deck
+      agent: yes
+    well:
+      default: A1
+      range: must exist on the chosen labware
+      agent: yes
+    loaded_volume_ul:
+      default: 5000 (vial) / 300 (plate)
+      meaning: what the operator physically loaded; drives the sufficiency check
+      range: > 0 and <= the well's max_volume
+      agent: yes
+    minimum_remaining_ul:
+      default: 100 (vial) / 20 (plate)
+      meaning: refuse to plan a run that would drain below this
+      range: >= 0
+      agent: yes
+    aspirate_height_mm:
+      default: the registry default for that labware
+      meaning: height above the well bottom to aspirate at
+      range: > 0 and < the well depth
+      agent: yes         # "aspirate lower", "the well is nearly empty"
+
+  pipetting:
+    aspirate_flow_rate_ul_s:
+      default: 3.0
+      range: > 0
+      agent: yes
+    dispense_flow_rate_ul_s:
+      default: 3.0
+      range: > 0
+      agent: yes
+    air_gap_ul:
+      default: 1.5
+      meaning: >-
+        air taken AFTER the liquid; sits between liquid and tip opening and
+        leaves first. Anti-drip in transit only; it cannot help droplet release.
+      range: >= 0, and liquid + air_gap must fit max_volume_ul
+      agent: yes
+    air_gap_height_mm:
+      default: 5.0
+      meaning: height above the well the tip lifts to before taking the gap
+      range: >= 0
+      agent: no
+    post_aspirate_delay_s:
+      default: 0.0
+      meaning: settle time after aspirating, before moving
+      range: >= 0
+      agent: yes
+    post_dispense_delay_s:
+      default: 0.0
+      meaning: settle time after dispensing, before the next move
+      range: >= 0
+      agent: yes
+
+# -----------------------------------------------------------------------------
+# DILUTION - 11_general_dilution
+# -----------------------------------------------------------------------------
+dilution:
+
+  stock_source:
+    meaning: the concentrated liquid; full shared.source shape
+    agent: yes
+
+  diluent_source:
+    meaning: usually water; full shared.source shape, independent of the stock
+    agent: yes
+
+  destination:
+    labware/slot:
+      default: well_plate / 1
+      meaning: the plate the dilution is made in
+      range: any registered plate labware
+      agent: yes
+    wells:
+      default: [B11]
+      meaning: explicit destination wells, resolved before execution
+      range: must exist on the destination labware
+      agent: yes
+    aspirate_height_mm:
+      default: 1.0
+      meaning: height used when carrying a series from well to well
+      range: > 0 and < well depth
+      agent: yes
+    dispense_height_mm:
+      default: 2.0
+      meaning: height liquid is delivered at inside the destination well
+      range: > 0 and < well depth
+      agent: yes
+
+  mode:
+    default: single
+    meaning: >-
+      single = each destination well gets stock + diluent, then a mix.
+      series = every well gets diluent, the first also gets stock, then
+      transfer_volume is carried down the list, mixing at each step.
+    range: single | series
+    agent: yes
+
+  single:
+    stock_volume_ul:
+      default: 20
+      range: > 0
+      agent: yes
+    diluent_volume_ul:
+      default: 80
+      range: >= 0
+      agent: yes
+    final_volume_ul:
+      default: 100
+      meaning: must equal stock + diluent; the loader cross-checks it
+      range: > 0 and <= destination well capacity
+      agent: yes
+    dilution_factor:
+      default: null
+      meaning: >-
+        convenience input. With final_volume_ul, the loader RESOLVES this into
+        explicit stock/diluent volumes (5x of 100 uL -> 20 + 80) and writes them
+        into the config. The executor only ever sees resolved volumes.
+      range: > 1
+      agent: yes         # "make a 5x dilution", "1 to 5"
+
+  series:
+    wells:
+      default: [A1, A2, A3, A4, A5]
+      meaning: explicit ladder, in order
+      range: >= 2 wells, all on the destination labware
+      agent: yes
+    start_well / direction / steps:
+      default: null
+      meaning: >-
+        convenience selector resolved into explicit `wells` before execution.
+        direction: row (across columns) | column (down rows).
+      range: steps >= 2, must stay on the plate
+      agent: yes
+    transfer_volume_ul:
+      default: 20
+      meaning: volume carried from each well into the next
+      range: > 0
+      agent: yes
+    diluent_volume_ul:
+      default: 80
+      range: >= 0
+      agent: yes
+
+  transfer:
+    max_chunk_ul:
+      default: 18
+      meaning: >-
+        largest single aspirate. Chosen below the 20 uL P20 ceiling so a 1.5 uL
+        air gap still fits. Volumes larger than this are split into chunks.
+      range: > 0 and <= max_volume_ul
+      agent: yes
+    air_gap_ul:
+      default: 1.5
+      meaning: see shared.pipetting.air_gap_ul
+      range: >= 0
+      agent: yes
+    on_capacity_conflict:
+      default: reduce_chunk
+      meaning: >-
+        if chunk + air_gap > pipette capacity: reduce_chunk shrinks the chunk to
+        preserve the air gap; fail refuses to build. Never emits an over-capacity
+        command either way.
+      range: reduce_chunk | fail
+      agent: no
+
+  mix:
+    enabled:
+      default: true
+      range: boolean
+      agent: yes         # "don't mix", "skip mixing"
+    cycles:
+      default: 5
+      range: >= 1 when enabled
+      agent: yes
+    volume_ul:
+      default: 15
+      range: > 0 and <= max_volume_ul
+      agent: yes
+    aspirate_height_mm:
+      default: destination.aspirate_height_mm
+      range: > 0 and < well depth
+      agent: yes
+    dispense_height_mm:
+      default: destination.dispense_height_mm
+      range: > 0 and < well depth
+      agent: yes
+
+  delays:
+    after_transfer_s:
+      default: 0
+      range: >= 0
+      agent: yes
+    after_mix_s:
+      default: 0
+      range: >= 0
+      agent: yes
+
+# -----------------------------------------------------------------------------
+# STANDARD PRINT - 11_standard_print
+# -----------------------------------------------------------------------------
+standard_print:
+
+  source:
+    meaning: full shared.source shape; may list several wells for groups
+    agent: yes
+
+  paper:
+    labware:
+      default: paper_print_96_flat
+      range: paper_print_96_flat
+      agent: no
+    slot:
+      default: 11
+      range: 1-11 (5 and 11 both hold paper today)
+      agent: yes
+    print_height_mm:
+      default: 0.5
+      meaning: >-
+        height above the paper surface the droplet is released from. 0.5 mm is
+        the physically confirmed release height; larger values left drops on the
+        tip in earlier testing. KEY EXPERIMENTAL PARAMETER.
+      range: >= 0 and < 10
+      agent: yes         # "print closer to the paper", "0.3 mm above"
+
+  printing:
+    droplet_volume_ul:
+      default: 5.0
+      meaning: liquid deposited per droplet
+      range: > 0, and droplet + air_gap <= max_volume_ul
+      agent: yes
+    order:
+      default: layer_major
+      meaning: >-
+        layer_major = every target gets layer 1, wait, then layer 2 ...
+        target_major = one target receives all its droplets before the next.
+      range: layer_major | target_major
+      agent: yes
+
+  targets:
+    explicit:
+      default: [A1..H1]
+      meaning: explicit paper wells
+      range: must exist on the paper labware
+      agent: yes
+    target_selection:
+      default: null
+      meaning: >-
+        convenience selector { column: N, rows: [A..H] } or { row: X,
+        columns: [1..12] }, resolved into explicit targets before execution.
+      range: columns 1-12, rows A-H
+      agent: yes         # "print column 3", "rows A to C"
+    groups:
+      default: one group
+      meaning: >-
+        list of { source_well, targets, droplets }. Different groups may draw
+        from different source wells and receive different droplet counts.
+      range: every source_well must appear in source.wells
+      agent: yes
+    droplets_per_target:
+      default: 1
+      meaning: how many layers that group participates in
+      range: >= 1
+      agent: yes
+    replicates:
+      default: 1
+      meaning: >-
+        repeat the resolved target list this many times, resolved into explicit
+        positions before execution. Never lets the agent invent coordinates.
+      range: >= 1, resolved targets must stay on the paper
+      agent: yes
+
+  timing:
+    inter_drop_delay_s:
+      default: 0.0
+      meaning: pause after each individual droplet
+      range: >= 0
+      agent: yes
+    inter_layer_delay_s:
+      default: 5.0
+      meaning: drying pause between layers (layer_major order)
+      range: >= 0
+      agent: yes
+    inter_target_delay_s:
+      default: 0.0
+      meaning: pause when moving to a new target position
+      range: >= 0
+      agent: yes
+
+# -----------------------------------------------------------------------------
+# CLOVER PRINT - 11_clover_print
+# -----------------------------------------------------------------------------
+clover_print:
+
+  source:
+    meaning: full shared.source shape, identical to standard print
+    agent: yes
+
+  paper:
+    slot:
+      default: 11
+      range: 1-11
+      agent: yes
+    print_height_mm:
+      default: 0.5
+      meaning: see standard_print.paper.print_height_mm
+      range: >= 0 and < 10
+      agent: yes
+
+  printing:
+    droplet_volume_ul:
+      default: 5.0
+      range: > 0, droplet + air_gap <= max_volume_ul
+      agent: yes
+
+  clovers:
+    default: [{ reference: B3 }]
+    meaning: >-
+      one entry per clover: { reference, source_well?, geometry?, layers? }.
+      Any number, limited only by paper bounds.
+    range: reference must exist on the paper labware
+    agent: yes
+
+  geometry:
+    half_width_mm:
+      default: 1.0
+      meaning: >-
+        HALF the horizontal separation. Droplets sit at +/- this from the centre,
+        so the actual left-to-right separation is 2x this value.
+        1.0 -> 2.0 mm apart. 2.5 -> 5.0 mm apart.
+      range: > 0; droplets must stay within paper bounds
+      agent: yes         # agent converts requested SEPARATION to half-width
+    half_height_mm:
+      default: 1.0
+      meaning: HALF the vertical separation; actual top-to-bottom = 2x this
+      range: > 0; must stay within paper bounds
+      agent: yes
+    separation_x_mm / separation_y_mm:
+      default: null
+      meaning: >-
+        convenience inputs in ACTUAL droplet-to-droplet millimetres. The loader
+        resolves them to half_width/half_height (halving them) and writes both
+        forms into the resolved config so the plan can report real distances.
+      range: > 0
+      agent: yes         # "make the droplets 3 mm apart"
+    x_offset_mm:
+      default: 0.0
+      meaning: shifts the clover centre off the reference well centre
+      range: any; droplets must stay within paper bounds
+      agent: yes
+    y_offset_mm:
+      default: 0.0
+      range: any; must stay within paper bounds
+      agent: yes
+    rotation_deg:
+      default: 0.0
+      meaning: >-
+        rotates the four droplet offsets about the clover centre. A pure 2-D
+        rotation of the existing offsets; the d1..d4 corner model is unchanged.
+      range: 0-360
+      agent: yes
+
+  layers:
+    default: 1
+    meaning: how many times the whole clover is deposited
+    range: >= 1
+    agent: yes
+
+  timing:
+    inter_drop_delay_s:
+      default: 0.0
+      range: >= 0
+      agent: yes
+    inter_layer_delay_s:
+      default: 5.0
+      meaning: drying pause between repeated depositions of the pattern
+      range: >= 0
+      agent: yes
+    inter_clover_delay_s:
+      default: 0.0
+      meaning: pause when moving to the next clover
+      range: >= 0
+      agent: yes
+
+  validation:
+    droplet_radius_mm:
+      default: 1.5
+      meaning: assumed dried ring radius, used for the paper-bounds check
+      range: >= 0
+      agent: no
+    boundary_check:
+      default: true
+      meaning: >-
+        a droplet outside the usable paper box is always a hard failure,
+        regardless of any other validation setting
+      range: boolean
+      agent: no
+
+# -----------------------------------------------------------------------------
+# AGENT DEFAULTS
+# -----------------------------------------------------------------------------
+agent:
+  templates:
+    dilution: configs/templates/11_dilution_template.yaml
+    standard_print: configs/templates/11_standard_print_template.yaml
+    clover_print: configs/templates/11_clover_print_template.yaml
+  outputs:
+    dilution: configs/generated/11_current_dilution.yaml
+    standard_print: configs/generated/11_current_standard_print.yaml
+    clover_print: configs/generated/11_current_clover_print.yaml
+  rules:
+    - The agent edits YAML only. It never writes or edits deterministic Python.
+    - Defaults live in the templates, never hidden inside prompts or Python.
+    - Convenience inputs (dilution_factor, target_selection, separation_x_mm,
+      start_well/direction/steps, replicates) are RESOLVED into explicit values
+      by the loader before anything reaches the robot.
+    - The agent must ask for genuinely missing required parameters rather than
+      inventing them.
+    - The agent may not invent labware outside the registry above.

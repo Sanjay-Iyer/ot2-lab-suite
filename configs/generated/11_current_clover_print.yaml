@@ -1,0 +1,138 @@
+# =============================================================================
+# VERSION 11 CURRENT CONFIG (seeded from the template) - VERSION 11 CLOVER PAPER PRINT
+# =============================================================================
+# Four droplets around a centre point ("a clover") so their dried coffee rings
+# can overlap. Printing only: no dilution, no mixing.
+#
+# Copy this file, edit the copy, then build and simulate it:
+#
+#   from src.printing.v11.clover_loader import load_clover_config
+#   from src.printing.v11.clover_builder import build_and_simulate
+#   config, run_modes = load_clover_config("configs/generated/11_current_clover_print.yaml")
+#   built, passed, output = build_and_simulate(config, run_modes=run_modes)
+#
+# Every parameter below is defined in configs/templates/11_parameter_reference.yaml,
+# which is the contract. Defaults live here, never inside Python or a prompt.
+#
+# THE KNOBS YOU NORMALLY TOUCH
+#   source.type / slot / well          where the liquid comes from
+#   paper.slot                         which paper (5 or 11)
+#   printing.droplet_volume_ul         uL of liquid per droplet
+#   clovers                            one entry per clover, any number
+#   geometry.separation_x_mm           ACTUAL mm between left and right droplets
+#   layers                             how many times each clover is repeated
+#   tips.pipette_tip_reuse             true = one tip per source well
+# =============================================================================
+
+schema: v11
+workflow: clover_print
+protocol_label: 11_clover_print
+
+# Laboratory-owned pipette, tiprack and physically validated droplet release
+# (0.5 mm release height, 1.5 uL trailing air gap, 3.0 uL push-out, blow-out on).
+# An agent may not invent or edit this file.
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+# dry_run: true  -> plan and validate only, the arm never moves
+# dry_run: false -> real liquid handling once uploaded to the OT-2
+run_modes:
+  dry_run: false
+  do_print: true
+
+# --- source liquid -----------------------------------------------------------
+# type: vial_rack (slot 7) | corning_plate (slot 4) | well_plate (slot 1, BRAND)
+source:
+  type: vial_rack
+  slot: 7
+  well: A1                      # or `wells: [A1, A2]` when clovers use different wells
+  material: print liquid
+  loaded_volume_ul: 5000.0      # what the operator physically loaded
+  minimum_remaining_ul: 100.0   # refuse to plan a run that would drain below this
+  aspirate_height_mm: 4.0       # above the well bottom
+  park_height_mm: 5.0           # rest height above the source during delays
+
+# --- paper -------------------------------------------------------------------
+paper:
+  slot: 11                      # 5 and 11 both hold paper today
+  print_height_mm: 0.5          # VALIDATED release height above the paper surface.
+                                # Larger values left droplets on the tip in testing.
+
+# --- printing ----------------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0        # LIQUID per droplet. droplet + air gap must fit
+                                # the 20 uL P20.
+
+# --- clover geometry ---------------------------------------------------------
+# Absolute droplet position =
+#     paper well centre (reference)
+#   + clover centre offset (x_offset_mm, y_offset_mm)
+#   + the droplet's own offset, rotated by rotation_deg
+#
+#     d1 ....... d2      +y is toward paper row A
+#        .  C  .         +x is toward paper column 12
+#     d3 ....... d4
+#
+# half_width_mm / half_height_mm are offsets FROM THE CENTRE, so opposing
+# droplets end up TWICE that far apart:
+#     half_width_mm 1.0  ->  2.0 mm between d1 and d2
+#     half_width_mm 2.5  ->  5.0 mm between d1 and d2
+#
+# If you would rather state the real distance, use separation_x_mm /
+# separation_y_mm instead and the loader halves them for you:
+#     separation_x_mm: 3.0   ->  half_width_mm 1.5, droplets 3.0 mm apart
+# Give one form or the other per axis, not both.
+geometry:
+  half_width_mm: 1.0            # -> 2.0 mm between the left and right droplets
+  half_height_mm: 1.0           # -> 2.0 mm between the top and bottom droplets
+  # separation_x_mm: 2.0        # the same thing said in actual millimetres
+  # separation_y_mm: 2.0
+  x_offset_mm: 0.0              # shifts the clover centre off the reference well
+  y_offset_mm: 0.0
+  rotation_deg: 0.0             # rotates the four offsets about the clover centre
+
+# --- where the clovers go ----------------------------------------------------
+# One entry per clover; add entries for more. Each may carry its own
+# `geometry` (overriding the block above, one field at a time), its own
+# `layers`, and its own `source_well` (which must appear in source.wells).
+clovers:
+  - name: clover_01
+    reference: B3
+  # - name: clover_02
+  #   reference: B6
+  #   geometry: {separation_x_mm: 4.0, separation_y_mm: 4.0}
+  # - name: clover_03
+  #   reference: B9
+  #   layers: 2
+
+# How many times the whole clover pattern is deposited. Per-clover `layers` wins.
+layers: 1
+
+# --- timing ------------------------------------------------------------------
+timing:
+  inter_drop_delay_s: 0.0       # pause after each individual droplet
+  inter_layer_delay_s: 5.0      # drying pause between repeated depositions
+  inter_clover_delay_s: 0.0     # pause when moving to the next clover
+
+# --- pipetting ---------------------------------------------------------------
+pipetting:
+  aspirate_flow_rate_ul_s: 3.0
+  dispense_flow_rate_ul_s: 3.0
+  air_gap_ul: 1.5               # air taken AFTER the liquid; anti-drip in transit
+                                # only, it cannot help droplet release
+  air_gap_height_mm: 5.0        # height above the well the tip lifts to first
+  post_aspirate_delay_s: 0.0
+  post_dispense_delay_s: 0.0
+
+# --- tips --------------------------------------------------------------------
+tips:
+  pipette_tip_reuse: true       # true  -> one tip per distinct source well,
+                                #          held for the whole run
+                                # false -> a fresh tip for EVERY droplet
+  return_tips: true             # true returns to the rack, false drops in trash
+  start_tip: A1
+
+# --- validation --------------------------------------------------------------
+validation:
+  droplet_radius_mm: 1.5        # assumed dried ring radius, used for paper bounds
+  boundary_check: true          # a droplet outside the usable paper box is always
+                                # a hard failure, whatever this says

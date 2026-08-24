@@ -1,0 +1,126 @@
+# =============================================================================
+# VERSION 11 CURRENT CONFIG (seeded from the template) - VERSION 11 GENERAL DILUTION
+# =============================================================================
+# Every value below is a default from configs/templates/11_parameter_reference.yaml
+# (section `dilution:` plus the shared blocks). Copy this file, edit the YAML,
+# and never edit the deterministic Python.
+#
+#   configs/templates/11_dilution_template.yaml
+#        |  src/printing/v11/dilution_loader.py   (resolve + validate)
+#        v
+#   src/protocols/printing/11_general_dilution.py (CONFIG block substituted)
+#        |  src/printing/v11/dilution_builder.py
+#        v
+#   src/protocols/generated/11_general_dilution_latest.py   <- uploaded
+#
+# Dilution ONLY: this workflow never prints and never touches the paper.
+#
+# Convenience inputs (dilution_factor, start_well/direction/steps) are RESOLVED
+# into explicit volumes and explicit wells by the loader, before anything can
+# reach the robot. Version 11 is standalone: it needs no machine_profile.
+# =============================================================================
+
+# DEFAULT IS LIVE. Real physical instrument motion.
+run_modes:
+  dry_run: false
+
+protocol_label: v11_dilution
+
+# --- pipette (laboratory-owned; humans change this) ------------------------------
+pipette:
+  name: p20_single_gen2
+  mount: left
+  max_volume_ul: 20.0     # hard ceiling; no command may exceed it INCLUDING air gap
+
+# --- tips ------------------------------------------------------------------------
+tips:
+  # true  -> one tip per distinct source well, held for the whole run
+  # false -> a fresh tip for every individual chunk transfer and every mix
+  pipette_tip_reuse: true
+  return_tips: true       # true = return_tip() to the rack, false = drop to trash
+  start_tip: A1
+  # tiprack_slot: 9       # opentrons_96_tiprack_20ul; slot 9 unless the deck moves
+
+# --- shared pipetting behaviour --------------------------------------------------
+pipetting:
+  aspirate_flow_rate_ul_s: 3.0
+  dispense_flow_rate_ul_s: 3.0
+  air_gap_ul: 1.5         # taken AFTER the liquid; anti-drip in transit only
+  air_gap_height_mm: 5.0  # height above the well the tip lifts to before the gap
+  post_aspirate_delay_s: 0.0
+  post_dispense_delay_s: 0.0
+
+# --- where the concentrated stock is ---------------------------------------------
+# type may be any registered labware:
+#   vial_rack      tuberack_3dprint_20ml_8vials_v2       (20 mL vials, slot 7)
+#   corning_plate  corning_96_wellplate_360ul_custom     (360 uL wells, slot 4)
+#   well_plate     brand_96_wellplate_350ul_flat_781662  (350 uL wells, slot 1)
+# Roles may share one physical labware and slot; the deck loads it only once.
+stock_source:
+  type: vial_rack
+  slot: 7
+  well: A1
+  material: stock
+  loaded_volume_ul: 5000      # what the operator physically loaded
+  minimum_remaining_ul: 100   # refuse to plan a run that would drain below this
+  aspirate_height_mm: 4.0     # height above the well bottom
+
+# --- where the diluent (usually water) is ----------------------------------------
+diluent_source:
+  type: vial_rack
+  slot: 7
+  well: A2
+  material: water
+  loaded_volume_ul: 5000
+  minimum_remaining_ul: 100
+  aspirate_height_mm: 4.0
+
+# --- where the dilution is made --------------------------------------------------
+destination:
+  type: well_plate
+  slot: 1
+  wells: [B11]              # mode single: every well listed gets stock + diluent
+  aspirate_height_mm: 1.0   # used when carrying a series from well to well
+  dispense_height_mm: 2.0   # height liquid is delivered at inside the well
+
+# --- what to make ----------------------------------------------------------------
+# single = each destination well gets diluent + stock, then a mix.
+# series = every well gets diluent, the first also gets stock, then
+#          transfer_volume_ul is carried down the ladder, mixing at each step.
+mode: single
+
+single:
+  stock_volume_ul: 20
+  diluent_volume_ul: 80
+  final_volume_ul: 100      # cross-checked: must equal stock + diluent
+  dilution_factor: null     # e.g. 5 -> the loader resolves 100 uL into 20 + 80.
+                            # Set this INSTEAD of the two volumes above, not
+                            # alongside conflicting ones.
+
+series:
+  wells: [A1, A2, A3, A4, A5]   # the explicit ladder, in order
+  # start_well: A1              # convenience selector, resolved into `wells`
+  # direction: row              # row = across columns, column = down rows
+  # steps: 5                    # >= 2, must stay on the plate
+  transfer_volume_ul: 20        # carried from each well into the next
+  diluent_volume_ul: 80         # placed in every well first
+  # stock_volume_ul: 20         # into the FIRST well; defaults to transfer_volume_ul
+
+# --- how liquid is moved ---------------------------------------------------------
+transfer:
+  max_chunk_ul: 18              # largest single aspirate; 18 + 1.5 gap fits the P20
+  air_gap_ul: 1.5               # overrides pipetting.air_gap_ul for transfers
+  on_capacity_conflict: reduce_chunk   # reduce_chunk | fail
+
+# --- mixing ----------------------------------------------------------------------
+mix:
+  enabled: true
+  cycles: 5
+  volume_ul: 15
+  # aspirate_height_mm: 1.0     # defaults to destination.aspirate_height_mm
+  # dispense_height_mm: 2.0     # defaults to destination.dispense_height_mm
+
+# --- pauses ----------------------------------------------------------------------
+delays:
+  after_transfer_s: 0
+  after_mix_s: 0

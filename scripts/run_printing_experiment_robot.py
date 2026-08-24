@@ -67,6 +67,28 @@ from src.printing.dye_demo.builder import (
     build_dye_demo_protocol,
 )
 from src.printing.dye_demo.loader import load_dye_demo_config
+from src.printing.dilution.builder import (
+    GENERATED_PATH as DILUTION_UPLOAD,
+    build_dilution_protocol,
+)
+from src.printing.dilution.loader import load_dilution_config
+
+# --- Version 11 family (isolated from the Version 1 modules above) --------
+from src.printing.v11.standard_loader import load_standard_print_config as v11_load_standard
+from src.printing.v11.standard_builder import (
+    GENERATED_PATH as V11_STANDARD_UPLOAD,
+    build_standard_print_protocol as v11_build_standard,
+)
+from src.printing.v11.clover_loader import load_clover_config as v11_load_clover
+from src.printing.v11.clover_builder import (
+    GENERATED_PATH as V11_CLOVER_UPLOAD,
+    build_clover_protocol as v11_build_clover,
+)
+from src.printing.v11.dilution_loader import load_dilution_config as v11_load_dilution
+from src.printing.v11.dilution_builder import (
+    GENERATED_PATH as V11_DILUTION_UPLOAD,
+    build_dilution_protocol as v11_build_dilution,
+)
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -84,6 +106,16 @@ WORKFLOWS = {
         "clover", "configs/experiments/02_clover_from_brand_plate.yaml"),
     "dye-demo": ("dye-demo", "configs/experiments/03_dye_dilution_print_demo.yaml"),
     "single-spot": ("standard", "configs/experiments/04_single_spot_stack.yaml"),
+    # --- the three general, agent-facing workflows ---------------------------
+    "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
+    "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),
+    "clover-print": ("clover", "configs/generated/current_clover_print.yaml"),
+    # --- Version 11 -------------------------------------------------------
+    "v11-dilution": ("v11-dilution", "configs/generated/11_current_dilution.yaml"),
+    "v11-standard-print": (
+        "v11-standard", "configs/generated/11_current_standard_print.yaml"),
+    "v11-clover-print": (
+        "v11-clover", "configs/generated/11_current_clover_print.yaml"),
     "standard": ("legacy-standard", None),
     "four-clover": ("clover", None),
 }
@@ -138,6 +170,55 @@ def _build_dye_demo(config: str | None) -> tuple[Path, bool]:
     return DYE_DEMO_UPLOAD, True
 
 
+def _build_dilution(config: str | None) -> tuple[Path, bool]:
+    cfg, run_modes = load_dilution_config(config or WORKFLOWS["dilution"][1])
+    dry_run = bool(run_modes.get("dry_run", False))
+    print(
+        f"run_modes.dry_run = {dry_run} "
+        + ("(PLAN ONLY -- the arm will NOT move)"
+           if dry_run else "(LIVE -- this WILL move liquid)")
+    )
+    print(f"pipette_tip_reuse = {cfg['tips']['pipette_tip_reuse']}")
+    built = build_dilution_protocol(cfg, run_modes=run_modes)
+    DILUTION_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
+    DILUTION_UPLOAD.write_bytes(built.protocol_path.read_bytes())
+    return DILUTION_UPLOAD, True
+
+
+def _v11_report(cfg: dict, run_modes: dict) -> None:
+    dry_run = bool(run_modes.get("dry_run", False))
+    print(
+        f"run_modes.dry_run = {dry_run} "
+        + ("(PLAN ONLY -- the arm will NOT move)" if dry_run
+           else "(LIVE -- this WILL move liquid)")
+    )
+    print(f"pipette_tip_reuse = {cfg.get('tips', {}).get('pipette_tip_reuse')}")
+
+
+def _build_v11_standard(config: str | None) -> tuple[Path, bool]:
+    cfg, run_modes = v11_load_standard(
+        config or WORKFLOWS["v11-standard-print"][1])
+    _v11_report(cfg, run_modes)
+    v11_build_standard(cfg, run_modes=run_modes, write_latest=True)
+    return V11_STANDARD_UPLOAD, True
+
+
+def _build_v11_clover(config: str | None) -> tuple[Path, bool]:
+    cfg, run_modes = v11_load_clover(config or WORKFLOWS["v11-clover-print"][1])
+    _v11_report(cfg, run_modes)
+    v11_build_clover(cfg, run_modes=run_modes, write_latest=True)
+    return V11_CLOVER_UPLOAD, True
+
+
+def _build_v11_dilution(config: str | None) -> tuple[Path, bool]:
+    cfg, run_modes = v11_load_dilution(config or WORKFLOWS["v11-dilution"][1])
+    _v11_report(cfg, run_modes)
+    built = v11_build_dilution(cfg, run_modes=run_modes)
+    V11_DILUTION_UPLOAD.parent.mkdir(parents=True, exist_ok=True)
+    V11_DILUTION_UPLOAD.write_bytes(Path(built.protocol_path).read_bytes())
+    return V11_DILUTION_UPLOAD, True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -174,6 +255,14 @@ def main(argv: list[str] | None = None) -> int:
             protocol_path, ok = _build_four_clover(config)
         elif family == "dye-demo":
             protocol_path, ok = _build_dye_demo(config)
+        elif family == "dilution":
+            protocol_path, ok = _build_dilution(config)
+        elif family == "v11-standard":
+            protocol_path, ok = _build_v11_standard(config)
+        elif family == "v11-clover":
+            protocol_path, ok = _build_v11_clover(config)
+        elif family == "v11-dilution":
+            protocol_path, ok = _build_v11_dilution(config)
         else:
             protocol_path, ok = _build_print_from_vial(config)
         if not ok:

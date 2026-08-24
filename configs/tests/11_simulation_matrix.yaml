@@ -1,0 +1,443 @@
+# =============================================================================
+# VERSION 11 SIMULATION MATRIX
+# =============================================================================
+# A deliberately SELECTED matrix - not a full Cartesian product. Each case
+# changes one or two things from a known-good baseline so a failure points at a
+# specific interaction, plus explicit boundary rows.
+#
+# Every case is: overrides -> V11 loader -> V11 builder -> generated protocol
+#                -> opentrons.simulate -> inspect the command stream.
+#
+# `expect` counts are checked against the simulated run log where given.
+#   deposits          PRINT/dispense-onto-paper count
+#   tip_pickups       pick_up_tip count
+#   aspirates         aspirate count (includes air_gap on some API versions)
+#
+# Run:  python scripts/11_run_simulation_matrix.py
+# =============================================================================
+
+standard_print:
+
+  # ---- baseline -----------------------------------------------------------
+  - name: std_baseline_vial_column1
+    overrides: {}
+    expect: {deposits: 8, tip_pickups: 1}
+
+  # ---- source labware sweep ----------------------------------------------
+  - name: std_source_corning
+    overrides:
+      source: {type: corning_plate, slot: 4, wells: [A1], loaded_volume_ul: 300,
+               minimum_remaining_ul: 20, aspirate_height_mm: 1.0}
+    expect: {deposits: 8, tip_pickups: 1}
+
+  - name: std_source_brand_slot1
+    overrides:
+      source: {type: well_plate, slot: 1, wells: [C11], loaded_volume_ul: 300,
+               minimum_remaining_ul: 20, aspirate_height_mm: 1.0}
+      groups:
+        - {source_well: C11, target_selection: {column: 1}, droplets: 1}
+    expect: {deposits: 8, tip_pickups: 1}
+
+  - name: std_source_vial_alt_well
+    overrides:
+      source: {type: vial_rack, slot: 7, wells: [B2]}
+      groups:
+        - {source_well: B2, target_selection: {column: 1}, droplets: 1}
+    expect: {deposits: 8, tip_pickups: 1}
+
+  # ---- paper slot ---------------------------------------------------------
+  - name: std_paper_slot5
+    overrides:
+      paper: {slot: 5}
+    expect: {deposits: 8, tip_pickups: 1}
+
+  # ---- print height boundaries -------------------------------------------
+  - name: std_print_height_low
+    overrides:
+      paper: {print_height_mm: 0.1}
+    expect: {deposits: 8}
+
+  - name: std_print_height_high
+    overrides:
+      paper: {print_height_mm: 4.0}
+    expect: {deposits: 8}
+
+  # ---- droplet volume sweep ----------------------------------------------
+  - name: std_droplet_1ul
+    overrides:
+      printing: {droplet_volume_ul: 1.0}
+    expect: {deposits: 8}
+
+  - name: std_droplet_10ul
+    overrides:
+      printing: {droplet_volume_ul: 10.0}
+    expect: {deposits: 8}
+
+  - name: std_droplet_18ul_with_gap
+    overrides:
+      printing: {droplet_volume_ul: 18.0}
+      pipetting: {air_gap_ul: 1.5}
+      source: {type: vial_rack, slot: 7, wells: [A1], loaded_volume_ul: 5000}
+    expect: {deposits: 8}
+
+  # ---- air gap ------------------------------------------------------------
+  - name: std_air_gap_zero
+    overrides:
+      pipetting: {air_gap_ul: 0.0}
+    expect: {deposits: 8}
+
+  - name: std_air_gap_large
+    overrides:
+      pipetting: {air_gap_ul: 5.0}
+    expect: {deposits: 8}
+
+  # ---- droplet counts / layering -----------------------------------------
+  - name: std_three_drops_layer_major
+    overrides:
+      groups:
+        - {target_selection: {column: 1}, droplets: 3}
+      timing: {inter_layer_delay_s: 2}
+    expect: {deposits: 24, tip_pickups: 1}
+
+  - name: std_mixed_groups_1_and_3
+    overrides:
+      groups:
+        - {target_selection: {column: 1, rows: [A, B, C]}, droplets: 1}
+        - {target_selection: {column: 2, rows: [A, B, C]}, droplets: 3}
+      timing: {inter_layer_delay_s: 2}
+    expect: {deposits: 12, tip_pickups: 1}
+
+  - name: std_target_major_order
+    overrides:
+      printing: {order: target_major}
+      groups:
+        - {target_selection: {column: 1, rows: [A, B]}, droplets: 3}
+    expect: {deposits: 6, tip_pickups: 1}
+
+  # ---- tip policy ---------------------------------------------------------
+  - name: std_fresh_tip_per_deposit
+    overrides:
+      tips: {pipette_tip_reuse: false}
+    expect: {deposits: 8, tip_pickups: 8}
+
+  - name: std_fresh_tip_three_layers
+    overrides:
+      tips: {pipette_tip_reuse: false}
+      groups:
+        - {target_selection: {column: 1, rows: [A, B, C]}, droplets: 3}
+    expect: {deposits: 9, tip_pickups: 9}
+
+  # ---- multi-source groups ------------------------------------------------
+  - name: std_two_source_wells
+    overrides:
+      source: {type: vial_rack, slot: 7, wells: [A1, A2]}
+      groups:
+        - {source_well: A1, target_selection: {column: 1, rows: [A, B]}, droplets: 1}
+        - {source_well: A2, target_selection: {column: 2, rows: [A, B]}, droplets: 1}
+    expect: {deposits: 4, tip_pickups: 2}
+
+  # ---- target selection forms --------------------------------------------
+  - name: std_explicit_targets
+    overrides:
+      groups:
+        - {targets: [A1, C3, E5, G7], droplets: 1}
+    expect: {deposits: 4}
+
+  - name: std_row_selection
+    overrides:
+      groups:
+        - {target_selection: {row: B, columns: [1, 2, 3, 4]}, droplets: 1}
+    expect: {deposits: 4}
+
+  - name: std_full_plate_column
+    overrides:
+      groups:
+        - {target_selection: {columns: [1, 2], rows: [A, B, C, D]}, droplets: 1}
+    expect: {deposits: 8}
+
+  # ---- timing -------------------------------------------------------------
+  - name: std_zero_delays
+    overrides:
+      timing: {inter_drop_delay_s: 0, inter_layer_delay_s: 0, inter_target_delay_s: 0}
+    expect: {deposits: 8}
+
+  - name: std_nonzero_delays
+    overrides:
+      timing: {inter_drop_delay_s: 1, inter_layer_delay_s: 3, inter_target_delay_s: 1}
+    expect: {deposits: 8}
+
+  # ---- flow rates ---------------------------------------------------------
+  - name: std_slow_flow
+    overrides:
+      pipetting: {aspirate_flow_rate_ul_s: 1.0, dispense_flow_rate_ul_s: 1.0}
+    expect: {deposits: 8}
+
+clover_print:
+
+  - name: clv_baseline_one_clover
+    overrides: {}
+    expect: {deposits: 4, tip_pickups: 1}
+
+  # ---- geometry sweep (actual separation in mm) --------------------------
+  - name: clv_sep_1mm
+    overrides:
+      geometry: {separation_x_mm: 1.0, separation_y_mm: 1.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+    expect_separation: {x: 1.0, y: 1.0}
+
+  - name: clv_sep_2mm
+    overrides:
+      geometry: {separation_x_mm: 2.0, separation_y_mm: 2.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+    expect_separation: {x: 2.0, y: 2.0}
+
+  - name: clv_sep_3mm
+    overrides:
+      geometry: {separation_x_mm: 3.0, separation_y_mm: 3.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+    expect_separation: {x: 3.0, y: 3.0}
+
+  - name: clv_sep_4mm
+    overrides:
+      geometry: {separation_x_mm: 4.0, separation_y_mm: 4.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+    expect_separation: {x: 4.0, y: 4.0}
+
+  - name: clv_sep_5mm
+    overrides:
+      geometry: {separation_x_mm: 5.0, separation_y_mm: 5.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+    expect_separation: {x: 5.0, y: 5.0}
+
+  - name: clv_half_values_direct
+    overrides:
+      geometry: {half_width_mm: 0.5, half_height_mm: 0.5}
+    expect: {deposits: 4}
+    expect_separation: {x: 1.0, y: 1.0}
+
+  - name: clv_asymmetric
+    overrides:
+      geometry: {separation_x_mm: 5.0, separation_y_mm: 2.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+    expect_separation: {x: 5.0, y: 2.0}
+
+  # ---- offsets and rotation ----------------------------------------------
+  - name: clv_offset
+    overrides:
+      geometry: {separation_x_mm: 2.0, separation_y_mm: 2.0,
+                 x_offset_mm: 2.0, y_offset_mm: -2.0,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+
+  - name: clv_rotation_45
+    overrides:
+      geometry: {separation_x_mm: 3.0, separation_y_mm: 3.0, rotation_deg: 45,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+
+  - name: clv_rotation_90
+    overrides:
+      geometry: {separation_x_mm: 4.0, separation_y_mm: 2.0, rotation_deg: 90,
+                 half_width_mm: null, half_height_mm: null}
+    expect: {deposits: 4}
+
+  # ---- multiple clovers ---------------------------------------------------
+  - name: clv_three_clovers
+    overrides:
+      clovers: [{reference: B3}, {reference: B6}, {reference: B9}]
+    expect: {deposits: 12, tip_pickups: 1}
+
+  - name: clv_six_clovers
+    overrides:
+      clovers: [{reference: B2}, {reference: B5}, {reference: B8}, {reference: B11},
+                {reference: E2}, {reference: E5}]
+    expect: {deposits: 24}
+
+  # ---- layers -------------------------------------------------------------
+  - name: clv_two_layers
+    overrides:
+      layers: 2
+      timing: {inter_layer_delay_s: 2}
+    expect: {deposits: 8}
+
+  - name: clv_three_layers_two_clovers
+    overrides:
+      layers: 3
+      clovers: [{reference: B3}, {reference: B7}]
+      timing: {inter_layer_delay_s: 1}
+    expect: {deposits: 24}
+
+  # ---- source labware -----------------------------------------------------
+  - name: clv_source_brand
+    overrides:
+      source: {type: well_plate, slot: 1, wells: [C11], loaded_volume_ul: 300,
+               minimum_remaining_ul: 20, aspirate_height_mm: 1.0}
+    expect: {deposits: 4}
+
+  - name: clv_source_corning
+    overrides:
+      source: {type: corning_plate, slot: 4, wells: [B4], loaded_volume_ul: 300,
+               minimum_remaining_ul: 20, aspirate_height_mm: 1.0}
+    expect: {deposits: 4}
+
+  # ---- tip policy ---------------------------------------------------------
+  - name: clv_fresh_tip_per_droplet
+    overrides:
+      tips: {pipette_tip_reuse: false}
+    expect: {deposits: 4, tip_pickups: 4}
+
+  - name: clv_fresh_tip_three_clovers
+    overrides:
+      tips: {pipette_tip_reuse: false}
+      clovers: [{reference: B3}, {reference: B6}, {reference: B9}]
+    expect: {deposits: 12, tip_pickups: 12}
+
+  # ---- other parameters ---------------------------------------------------
+  - name: clv_droplet_2ul
+    overrides:
+      printing: {droplet_volume_ul: 2.0}
+    expect: {deposits: 4}
+
+  - name: clv_print_height
+    overrides:
+      paper: {print_height_mm: 1.0}
+    expect: {deposits: 4}
+
+  - name: clv_paper_slot5
+    overrides:
+      paper: {slot: 5}
+    expect: {deposits: 4}
+
+  - name: clv_air_gap_zero
+    overrides:
+      pipetting: {air_gap_ul: 0.0}
+    expect: {deposits: 4}
+
+dilution:
+
+  - name: dil_baseline_single
+    overrides: {}
+
+  # ---- volumes ------------------------------------------------------------
+  - name: dil_5x_100ul
+    overrides:
+      single: {dilution_factor: 5, final_volume_ul: 100,
+               stock_volume_ul: null, diluent_volume_ul: null}
+    expect_volumes: {stock: 20.0, diluent: 80.0}
+
+  - name: dil_2x_200ul
+    overrides:
+      single: {dilution_factor: 2, final_volume_ul: 200,
+               stock_volume_ul: null, diluent_volume_ul: null}
+    expect_volumes: {stock: 100.0, diluent: 100.0}
+
+  - name: dil_10x_300ul
+    overrides:
+      single: {dilution_factor: 10, final_volume_ul: 300,
+               stock_volume_ul: null, diluent_volume_ul: null}
+    expect_volumes: {stock: 30.0, diluent: 270.0}
+
+  - name: dil_explicit_volumes
+    overrides:
+      single: {stock_volume_ul: 15, diluent_volume_ul: 45, final_volume_ul: 60}
+    expect_volumes: {stock: 15.0, diluent: 45.0}
+
+  # ---- chunking / air gap interaction ------------------------------------
+  - name: dil_chunk_18_gap_1p5
+    overrides:
+      transfer: {max_chunk_ul: 18, air_gap_ul: 1.5}
+
+  - name: dil_chunk_20_gap_1p5_autoreduce
+    overrides:
+      transfer: {max_chunk_ul: 20, air_gap_ul: 1.5}
+
+  - name: dil_chunk_10
+    overrides:
+      transfer: {max_chunk_ul: 10, air_gap_ul: 1.0}
+
+  - name: dil_gap_zero
+    overrides:
+      transfer: {max_chunk_ul: 20, air_gap_ul: 0.0}
+
+  # ---- mixing -------------------------------------------------------------
+  - name: dil_no_mixing
+    overrides:
+      mix: {enabled: false}
+
+  - name: dil_mix_10_cycles
+    overrides:
+      mix: {enabled: true, cycles: 10, volume_ul: 15}
+
+  - name: dil_mix_small_volume
+    overrides:
+      mix: {enabled: true, cycles: 3, volume_ul: 5}
+
+  - name: dil_mix_at_capacity
+    overrides:
+      mix: {enabled: true, cycles: 2, volume_ul: 20}
+
+  # ---- series -------------------------------------------------------------
+  - name: dil_series_row_5
+    overrides:
+      mode: series
+      series: {start_well: A1, direction: row, steps: 5,
+               transfer_volume_ul: 20, diluent_volume_ul: 80}
+
+  - name: dil_series_column_4
+    overrides:
+      mode: series
+      series: {start_well: A1, direction: column, steps: 4,
+               transfer_volume_ul: 20, diluent_volume_ul: 80}
+
+  - name: dil_series_explicit_wells
+    overrides:
+      mode: series
+      series: {wells: [B2, B4, B6], transfer_volume_ul: 15, diluent_volume_ul: 60}
+
+  - name: dil_series_8_steps
+    overrides:
+      mode: series
+      series: {start_well: A1, direction: column, steps: 8,
+               transfer_volume_ul: 20, diluent_volume_ul: 80}
+
+  # ---- labware combinations ----------------------------------------------
+  - name: dil_vial_to_corning
+    overrides:
+      stock_source: {type: vial_rack, slot: 7, well: A1}
+      destination: {type: corning_plate, slot: 4, wells: [A1]}
+
+  - name: dil_brand_to_corning
+    overrides:
+      stock_source: {type: well_plate, slot: 1, well: C11, loaded_volume_ul: 300,
+                     aspirate_height_mm: 1.0}
+      destination: {type: corning_plate, slot: 4, wells: [D6]}
+
+  - name: dil_corning_to_brand
+    overrides:
+      stock_source: {type: corning_plate, slot: 4, well: A1, loaded_volume_ul: 300,
+                     aspirate_height_mm: 1.0}
+      destination: {type: well_plate, slot: 1, wells: [B11]}
+
+  - name: dil_multi_destination_wells
+    overrides:
+      destination: {type: well_plate, slot: 1, wells: [A1, A2, A3]}
+
+  # ---- tips ---------------------------------------------------------------
+  - name: dil_fresh_tips
+    overrides:
+      tips: {pipette_tip_reuse: false}
+
+  - name: dil_reuse_tips
+    overrides:
+      tips: {pipette_tip_reuse: true}
+
+  # ---- delays -------------------------------------------------------------
+  - name: dil_with_delays
+    overrides:
+      delays: {after_transfer_s: 1, after_mix_s: 2}
