@@ -1,0 +1,79 @@
+# =============================================================================
+# 11 - COMBINED COLUMN 8 + COLUMN 9 TIME COURSES
+# =============================================================================
+# Both time courses share one layer-major hourly clock across paper slots 5/11.
+# Every active target on both sheets receives its next drop before the one-hour
+# delay. Column 8 finishes after layer 3; column 9 continues through layer 20.
+#
+# Final drop count per paper:
+#   Column 8: A8/B8=3, C8/D8=2, E8/F8/G8/H8=1  (14 deposits, B11)
+#   Column 9: A9=5, B9=10, C9=20               (35 deposits)
+#
+# Column 9 source routing:
+#   paper slot 5  <- BRAND slot 1 C11
+#   paper slot 11 <- BRAND slot 1 D11
+#
+# Total: 49 deposits / 245 uL per paper; 98 deposits / 490 uL overall.
+# There is no trailing delay after layer 20: 19 one-hour waits total.
+#
+#   python scripts/run_printing_experiment_robot.py combined-timecourses
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: combined_column8_column9_timecourses
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- sources: dye in the BRAND 781662 plate, slot 1 ----------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [B11, C11, D11]
+  material: combined time-course dyes
+  loaded_volume_ul: 300.0     # volume in each source well at run start
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# Both paper sheets default to B11. Column-9 groups override this per paper.
+substrate:
+  slots: [5, 11]
+
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+  inter_layer_delay_s: 3600.0
+
+print_groups:
+  # Column 8 time course: B11 feeds the same pattern on both paper sheets.
+  - source_well: B11
+    targets: [A8, B8]
+    droplets: 3
+
+  - source_well: B11
+    targets: [C8, D8]
+    droplets: 2
+
+  - source_well: B11
+    targets: [E8, F8, G8, H8]
+    droplets: 1
+
+  # Column 9 time course: each paper sheet has its own dedicated source well.
+  - source_wells: {5: C11, 11: D11}
+    targets: [A9]
+    droplets: 5
+
+  - source_wells: {5: C11, 11: D11}
+    targets: [B9]
+    droplets: 10
+
+  - source_wells: {5: C11, 11: D11}
+    targets: [C9]
+    droplets: 20
+
+# Three dedicated tips prevent B11, C11, and D11 from mixing.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

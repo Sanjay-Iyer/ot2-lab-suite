@@ -1,0 +1,64 @@
+# =============================================================================
+# 12 - PREPARE C11 AND D11: 300 uL each at 1:4 dye:water
+# =============================================================================
+# Concentrated dye comes from BRAND plate A11 in slot 1. Water comes from vial
+# rack A1 in slot 7. Each destination receives:
+#
+#    60 uL concentrated dye
+#   240 uL water
+#   ------
+#   300 uL total (5x dilution; dye:water = 1:4)
+#
+# This prepares the two source wells used by 10_column9_timecourse.yaml.
+#
+#   python scripts/run_printing_experiment_robot.py prepare-c11-d11 --live
+#
+# Before a live run, C11 and D11 must be empty: the robot cannot detect their
+# starting volumes, and each BRAND well has a 350 uL capacity.
+
+protocol_label: prepare_c11_d11_5x
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+pipette_tip_reuse: true
+
+# --- concentrated dye -----------------------------------------------------------
+source:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: A11
+  material: concentrated dye
+  aspirate_height_mm: 0.5
+
+# --- water ----------------------------------------------------------------------
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- two 300 uL 5x dilution wells -----------------------------------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [C11, D11]
+  aspirate_height_mm: 0.5
+  dispense_height_mm: 2.0
+
+dilution:
+  mode: single
+  stock_volume_ul: 60
+  diluent_volume_ul: 240
+  transfer_chunk_ul: 18
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+tips:
+  start_tip: A1
+  return_tips: true

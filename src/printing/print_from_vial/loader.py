@@ -123,6 +123,7 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
                 "source_well": str(
                     group.get("source_well") or default_source_well
                 ).upper(),
+                "source_wells_by_slot": group.get("source_wells") or {},
                 "targets": [str(t).upper() for t in targets],
                 "droplets": int(group.get("droplets", 1)),
             }
@@ -208,6 +209,48 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             f"{', '.join(undeclared_paper_sources)}"
         )
 
+    for index, group in enumerate(normalized_groups, start=1):
+        raw_group_sources = group.pop("source_wells_by_slot")
+        if not raw_group_sources:
+            continue
+        if not isinstance(raw_group_sources, dict):
+            raise PrintFromVialLoadError(
+                f"{path}: print_groups[{index}].source_wells must map paper "
+                "slots to source wells"
+            )
+        group_sources_by_slot: dict[int, str] = {}
+        for raw_slot, raw_well in raw_group_sources.items():
+            if isinstance(raw_slot, bool):
+                raise PrintFromVialLoadError(
+                    f"{path}: print_groups[{index}].source_wells keys must be "
+                    "deck-slot integers"
+                )
+            try:
+                slot = int(raw_slot)
+            except (TypeError, ValueError) as exc:
+                raise PrintFromVialLoadError(
+                    f"{path}: print_groups[{index}].source_wells keys must be "
+                    "deck-slot integers"
+                ) from exc
+            group_sources_by_slot[slot] = str(raw_well).upper()
+        if set(group_sources_by_slot) != set(paper_slots):
+            raise PrintFromVialLoadError(
+                f"{path}: print_groups[{index}].source_wells must map exactly "
+                f"the paper slots {paper_slots}"
+            )
+        group["source_wells"] = {
+            role: group_sources_by_slot[slot]
+            for role, slot in zip(paper_roles, paper_slots)
+        }
+        undeclared_group_sources = sorted(
+            set(group["source_wells"].values()) - set(resolved_source["wells"])
+        )
+        if undeclared_group_sources:
+            raise PrintFromVialLoadError(
+                f"{path}: print_groups[{index}] source well(s) must be listed "
+                f"in source.wells: {', '.join(undeclared_group_sources)}"
+            )
+
     config: dict[str, Any] = {
         "protocol_label": str(protocol_label),
         "deck": {
@@ -241,7 +284,6 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "inter_layer_delay_s": float(
                 printing.get("inter_layer_delay_s", 0.0) or 0.0
             ),
-
         },
         "print_groups": normalized_groups,
         "tips": {

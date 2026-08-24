@@ -69,7 +69,7 @@ DEFAULT_DO_PRINT = True
 
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'protocol_label': 'column9_timecourse',
+CONFIG = { 'protocol_label': 'combined_column8_column9_timecourses',
   'deck': { 'source': { 'slot': 1,
                         'load_name': 'brand_96_wellplate_350ul_flat_781662',
                         'namespace': 'custom_beta',
@@ -84,11 +84,11 @@ CONFIG = { 'protocol_label': 'column9_timecourse',
                          'version': 1},
             'tiprack_p20': {'slot': 9, 'load_name': 'opentrons_96_tiprack_20ul'}},
   'paper_roles': ['paper', 'paper_2'],
-  'paper_sources': {'paper': 'C11', 'paper_2': 'D11'},
+  'paper_sources': {'paper': 'B11', 'paper_2': 'B11'},
   'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
   'source': { 'type': 'well_plate',
-              'wells': ['C11', 'D11'],
-              'material': 'column 9 time-course dyes',
+              'wells': ['B11', 'C11', 'D11'],
+              'material': 'combined time-course dyes',
               'loaded_volume_ul': 300.0,
               'minimum_remaining_ul': 20.0,
               'aspirate_height_mm': 0.5},
@@ -101,9 +101,21 @@ CONFIG = { 'protocol_label': 'column9_timecourse',
                 'blow_out': True,
                 'inter_drop_delay_s': 0.0,
                 'inter_layer_delay_s': 3600.0},
-  'print_groups': [ {'source_well': 'C11', 'targets': ['A9'], 'droplets': 5},
-                    {'source_well': 'C11', 'targets': ['B9'], 'droplets': 10},
-                    {'source_well': 'C11', 'targets': ['C9'], 'droplets': 20}],
+  'print_groups': [ {'source_well': 'B11', 'targets': ['A8', 'B8'], 'droplets': 3},
+                    {'source_well': 'B11', 'targets': ['C8', 'D8'], 'droplets': 2},
+                    {'source_well': 'B11', 'targets': ['E8', 'F8', 'G8', 'H8'], 'droplets': 1},
+                    { 'source_well': 'B11',
+                      'targets': ['A9'],
+                      'droplets': 5,
+                      'source_wells': {'paper': 'C11', 'paper_2': 'D11'}},
+                    { 'source_well': 'B11',
+                      'targets': ['B9'],
+                      'droplets': 10,
+                      'source_wells': {'paper': 'C11', 'paper_2': 'D11'}},
+                    { 'source_well': 'B11',
+                      'targets': ['C9'],
+                      'droplets': 20,
+                      'source_wells': {'paper': 'C11', 'paper_2': 'D11'}}],
   'tips': {'print_tip': 'A1', 'return_tips': True, 'pipette_tip_reuse': True},
   'flow_rates': {'p20': {'aspirate_ul_s': 3.0, 'dispense_ul_s': 3.0}},
   'safety': {'p20_max_volume_ul': 20.0}}
@@ -230,10 +242,12 @@ def _preflight(protocol, labware, p20):
             group.get("source_well") or (declared_wells[0] if declared_wells else "")
         ).upper()
         source_wells = {}
+        configured_source_wells = (
+            group.get("source_wells") or CONFIG.get("paper_sources") or {}
+        )
         for role in paper_roles:
             source_well = str(
-                (CONFIG.get("paper_sources") or {}).get(role)
-                or default_source_well
+                configured_source_wells.get(role) or default_source_well
             ).upper()
             source_wells[role] = source_well
             if not source_well:

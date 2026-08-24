@@ -223,10 +223,12 @@ def _preflight(protocol, labware, p20):
             group.get("source_well") or (declared_wells[0] if declared_wells else "")
         ).upper()
         source_wells = {}
+        configured_source_wells = (
+            group.get("source_wells") or CONFIG.get("paper_sources") or {}
+        )
         for role in paper_roles:
             source_well = str(
-                (CONFIG.get("paper_sources") or {}).get(role)
-                or default_source_well
+                configured_source_wells.get(role) or default_source_well
             ).upper()
             source_wells[role] = source_well
             if not source_well:
