@@ -1,0 +1,71 @@
+# =============================================================================
+# 07 - TOP UP B11: make another 100 uL of the same 5x dye dilution
+# =============================================================================
+# Same recipe as the original B11 batch, one third of the volume:
+#
+#     20 uL concentrated dye  (BRAND plate A11, slot 1)
+#   + 80 uL water             (vial rack A1, slot 7)
+#   ------
+#   100 uL of 5x dilution ADDED INTO B11
+#
+# Dilution only -- this never prints. Run a printing workflow afterwards.
+#
+#   python scripts/run_printing_experiment_robot.py topup-b11
+#
+# ---------------------------------------------------------------------------
+# CHECK THE LEVEL FIRST. This ADDS 100 uL to whatever B11 already holds; the
+# BRAND well capacity is 350 uL and the robot cannot see the current level.
+# B11 must be at 250 uL or less before you run this, or it will overflow.
+# Run this AFTER your printing runs, not before.
+# ---------------------------------------------------------------------------
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# One tip per distinct source well: a dye tip, a water tip and a mixing tip.
+# A tip that has been in one liquid is never put into another.
+pipette_tip_reuse: true
+
+# --- concentrated dye -----------------------------------------------------------
+source:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: A11                   # the concentrated dye stock
+  material: concentrated dye
+  aspirate_height_mm: 1.0
+
+# --- water ----------------------------------------------------------------------
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- destination: the same well being topped up ---------------------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [B11]
+  aspirate_height_mm: 0.5     # low: the well may be nearly empty when mixing
+  dispense_height_mm: 2.0
+
+# --- the 5x recipe --------------------------------------------------------------
+dilution:
+  mode: single
+  stock_volume_ul: 20         # dye
+  diluent_volume_ul: 80       # water   -> 100 uL total, 1 part in 5
+  transfer_chunk_ul: 18       # below the 20 uL P20 ceiling so the 1.5 uL air
+                              # gap still fits on every transfer
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+# --- air handling ---------------------------------------------------------------
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+# --- tips -----------------------------------------------------------------------
+tips:
+  start_tip: A1
+  return_tips: true

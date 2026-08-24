@@ -39,12 +39,12 @@ printing:
   inter_layer_delay_s: 0.0    # unused: only one droplet per target
 
 # --- what to print ---------------------------------------------------------
-# Three spots down column 1 (rows A, B, C), one 5 uL droplet each = 15 uL total.
-# No delays anywhere -- this is the quick "did it print?" check.
-# Change these wells freely (A1-H12).
+# The REST of column 1: rows D through H (A/B/C were printed in the first pass).
+# One 5 uL droplet each = 25 uL total. No delays anywhere.
+# To reprint the whole column instead, use [A1, B1, C1, D1, E1, F1, G1, H1].
 print_groups:
   - source_well: B11
-    targets: [A1, B1, C1]
+    targets: [D1, E1, F1, G1, H1]
     droplets: 1
 
 # --- tip behaviour ---------------------------------------------------------
