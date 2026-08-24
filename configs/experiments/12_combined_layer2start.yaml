@@ -1,0 +1,76 @@
+# =============================================================================
+# 12 - COMBINED TIME COURSES, RESUME AT ORIGINAL LAYER 2
+# =============================================================================
+# Original layer 1 has already been printed. This workflow begins with a
+# one-hour no-motion hold, with no tip attached, then executes original layers
+# 2 through 20. All first-layer-only positions are intentionally omitted.
+#
+# Remaining drops per paper:
+#   Column 8: A8/B8 +2, C8/D8 +1                         (6 deposits, B11)
+#   Column 9: A9 +4, B9 +9, C9 +19                      (32 deposits)
+#
+# Total remaining: 38 deposits / 190 uL per paper;
+#                  76 deposits / 380 uL overall.
+#
+# Waiting: one initial one-hour hold, then 18 one-hour inter-layer waits.
+#
+#   python scripts/run_printing_experiment_robot.py combined_layer2start
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: combined_timecourses_layer2start
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+source:
+  type: well_plate
+  slot: 1
+  wells: [B11, C11, D11]
+  material: combined time-course dyes, layer 2 resume
+  # Conservative common budget. If all wells began at 300 uL, after layer 1
+  # B11 is about 220 uL and C11/D11 are about 285 uL.
+  loaded_volume_ul: 220.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# Both papers default to B11. Column-9 groups override the source per slot.
+substrate:
+  slots: [5, 11]
+
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+  inter_layer_delay_s: 3600.0
+  initial_delay_s: 3600.0
+  layer_number_offset: 1
+
+print_groups:
+  # Remaining column 8 deposits after original layer 1.
+  - source_well: B11
+    targets: [A8, B8]
+    droplets: 2
+
+  - source_well: B11
+    targets: [C8, D8]
+    droplets: 1
+
+  # Remaining column 9 deposits after original layer 1.
+  - source_wells: {5: C11, 11: D11}
+    targets: [A9]
+    droplets: 4
+
+  - source_wells: {5: C11, 11: D11}
+    targets: [B9]
+    droplets: 9
+
+  - source_wells: {5: C11, 11: D11}
+    targets: [C9]
+    droplets: 19
+
+# Three source-dedicated tips beginning at A1.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

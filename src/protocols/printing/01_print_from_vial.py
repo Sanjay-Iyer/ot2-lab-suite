@@ -177,10 +177,19 @@ def _preflight(protocol, labware, p20):
         errors.append(f"printing.push_out_ul must be in [0, {p20_max:g}]")
     for key in (
         "dispense_height_mm", "air_gap_height_mm", "inter_drop_delay_s",
-        "inter_layer_delay_s",
+        "inter_layer_delay_s", "initial_delay_s",
     ):
         if float(pr.get(key, 0.0) or 0.0) < 0:
             errors.append(f"printing.{key} must be >= 0")
+    if float(src.get("park_height_mm", 5.0)) < 0:
+        errors.append("source.park_height_mm must be >= 0")
+    layer_number_offset = pr.get("layer_number_offset", 0)
+    if (
+        isinstance(layer_number_offset, bool)
+        or not isinstance(layer_number_offset, int)
+        or layer_number_offset < 0
+    ):
+        errors.append("printing.layer_number_offset must be an integer >= 0")
     piston = chase + volume + air_gap
     if piston > p20_max + 1e-9:
         errors.append(
@@ -334,6 +343,8 @@ def _report_plan(protocol, resolved):
     src = CONFIG["source"]
     volume = float(pr["droplet_volume_ul"])
     layer_delay = float(pr.get("inter_layer_delay_s", 0.0) or 0.0)
+    initial_delay = float(pr.get("initial_delay_s", 0.0) or 0.0)
+    layer_offset = int(pr.get("layer_number_offset", 0) or 0)
     protocol.comment("=== STANDARD PRINT PLAN ===")
     protocol.comment(
         f"Source: {src.get('type', 'vial_rack')} in slot "
@@ -356,9 +367,21 @@ def _report_plan(protocol, resolved):
             f"  group {index}: {sources} -> "
             f"{', '.join(group['targets'])} x {group['droplets']} droplet(s)"
         )
-    protocol.comment(
-        f"Layers: {resolved['max_layers']} (delay between layers: {layer_delay:g} s)"
-    )
+    if initial_delay > 0:
+        protocol.comment(
+            f"Initial no-motion hold: {initial_delay:g} s before resumed printing."
+        )
+    if layer_offset > 0:
+        protocol.comment(
+            f"Resume layers: {layer_offset + 1}-"
+            f"{layer_offset + resolved['max_layers']} "
+            f"(delay between layers: {layer_delay:g} s)"
+        )
+    else:
+        protocol.comment(
+            f"Layers: {resolved['max_layers']} "
+            f"(delay between layers: {layer_delay:g} s)"
+        )
     protocol.comment(
         f"Total: {resolved['deposits']} deposits x {volume:g} uL = "
         f"{resolved['deposits'] * volume:g} uL"
@@ -391,6 +414,7 @@ def _print_from_vial(protocol, labware, p20, resolved):
 
     volume = float(pr["droplet_volume_ul"])
     aspirate_height = float(src["aspirate_height_mm"])
+    park_height = float(src.get("park_height_mm", 5.0))
     z = float(pr["dispense_height_mm"])
     chase = float(pr.get("pre_air_chase_ul", 0.0) or 0.0)
     air_gap = float(pr.get("air_gap_ul", 0.0) or 0.0)
@@ -399,7 +423,15 @@ def _print_from_vial(protocol, labware, p20, resolved):
     blow_out = bool(pr.get("blow_out", True))
     drop_delay = float(pr.get("inter_drop_delay_s", 0.0) or 0.0)
     layer_delay = float(pr.get("inter_layer_delay_s", 0.0) or 0.0)
+    initial_delay = float(pr.get("initial_delay_s", 0.0) or 0.0)
+    layer_offset = int(pr.get("layer_number_offset", 0) or 0)
     return_tips = bool(CONFIG["tips"].get("return_tips", True))
+
+    if initial_delay > 0:
+        protocol.comment(
+            f"Initial no-motion hold for {initial_delay:g} s; no tip is attached."
+        )
+        protocol.delay(seconds=initial_delay)
 
     tiprack = labware["tiprack_p20"]
     tip_names = list(tiprack.wells_by_name())
@@ -447,15 +479,21 @@ def _print_from_vial(protocol, labware, p20, resolved):
     # prepare_to_aspirate(), so this is deliberately identical to already-
     # physically-used behaviour).
     printed = 0
+    last_source_well_name = None
     for layer in range(1, resolved["max_layers"] + 1):
         active_groups = [g for g in resolved["groups"] if g["droplets"] >= layer]
         if not active_groups:
             continue
-        protocol.comment(f"--- LAYER {layer} of {resolved['max_layers']} ---")
+        display_layer = layer + layer_offset
+        protocol.comment(
+            f"--- LAYER {display_layer} "
+            f"(resume {layer} of {resolved['max_layers']}) ---"
+        )
         for group in active_groups:
             for target in group["targets"]:
                 for paper_role, paper in papers:
                     source_well_name = group["source_wells"][paper_role]
+                    last_source_well_name = source_well_name
                     source_well = source_labware[source_well_name]
                     if tip_reuse:
                         use_source(source_well_name)
@@ -477,18 +515,24 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         p20.blow_out(destination)
                     printed += 1
                     protocol.comment(
-                        f"layer {layer}: {paper_role} slot "
+                        f"layer {display_layer}: {paper_role} slot "
                         f"{CONFIG['deck'][paper_role]['slot']} {target} <- "
                         f"{source_well_name} "
-                        f"(drop {layer}/{group['droplets']})"
+                        f"(drop {display_layer}/"
+                        f"{group['droplets'] + layer_offset})"
                     )
                     if drop_delay > 0:
                         protocol.delay(seconds=drop_delay)
 
         remaining = [g for g in resolved["groups"] if g["droplets"] >= layer + 1]
         if remaining and layer_delay > 0:
+            p20.move_to(
+                source_labware[last_source_well_name].top(park_height)
+            )
             protocol.comment(
-                f"Drying {layer_delay:g} s before layer {layer + 1}."
+                f"Drying {layer_delay:g} s before layer "
+                f"{display_layer + 1}; tip parked "
+                f"{park_height:g} mm above source {last_source_well_name}."
             )
             protocol.delay(seconds=layer_delay)
 

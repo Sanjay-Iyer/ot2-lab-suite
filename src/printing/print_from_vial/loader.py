@@ -271,6 +271,7 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "loaded_volume_ul": resolved_source["loaded_volume_ul"],
             "minimum_remaining_ul": resolved_source["minimum_remaining_ul"],
             "aspirate_height_mm": resolved_source["aspirate_height_mm"],
+            "park_height_mm": float(source.get("park_height_mm", 5.0)),
         },
         "printing": {
             "droplet_volume_ul": float(printing.get("droplet_volume_ul", 5.0)),
@@ -283,6 +284,12 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "inter_drop_delay_s": float(printing.get("inter_drop_delay_s", 0.0) or 0.0),
             "inter_layer_delay_s": float(
                 printing.get("inter_layer_delay_s", 0.0) or 0.0
+            ),
+            "initial_delay_s": float(
+                printing.get("initial_delay_s", 0.0) or 0.0
+            ),
+            "layer_number_offset": int(
+                printing.get("layer_number_offset", 0) or 0
             ),
         },
         "print_groups": normalized_groups,

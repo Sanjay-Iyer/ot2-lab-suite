@@ -118,6 +118,8 @@ WORKFLOWS = {
         "standard", "configs/experiments/10_column9_timecourse.yaml"),
     "combined-timecourses": (
         "standard", "configs/experiments/11_combined_timecourses.yaml"),
+    "combined_layer2start": (
+        "standard", "configs/experiments/12_combined_layer2start.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
