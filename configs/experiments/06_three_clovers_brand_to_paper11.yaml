@@ -1,16 +1,28 @@
 # =============================================================================
 # 06 - THREE CLOVER SPACING TEST: dye (BRAND slot 1) -> paper (slot 11)
 # =============================================================================
-# Three four-droplet clovers at 1 mm, 2 mm and 3 mm ACTUAL droplet separation,
-# placed along row D at columns 4, 7 and 10.
+# ROUND 2 on the SAME sheet of paper.
+# Round 1 (already printed) sits on row D at columns 4, 7, 10 with half widths
+# 0.5 / 1.0 / 1.5 mm. This round uses half widths 2 / 3 / 4 mm and is printed
+# TWO ROWS BELOW the round-1 clovers, on row F at the same columns 4, 7, 10,
+# so the new patterns sit directly underneath the old ones without touching.
 #
-# Clearances (droplet radius 1.5 mm, computed against the real paper grid):
-#   1 mm clover  <-> column-1 standard print : 23.50 mm
-#   2 mm clover  <-> column-1 standard print : 50.00 mm
-#   3 mm clover  <-> column-1 standard print : 76.50 mm
-#   1 mm <-> 2 mm clover                     : 22.50 mm
-#   2 mm <-> 3 mm clover                     : 21.50 mm
-# Nothing can touch the column-1 print or another clover.
+# half_width_mm is an offset FROM THE CENTRE, so actual droplet-to-droplet
+# separation is TWICE it:
+#   half 2.0 mm -> 4.0 mm apart   (F4)
+#   half 3.0 mm -> 6.0 mm apart   (F7)
+#   half 4.0 mm -> 8.0 mm apart   (F10)
+#
+# Clearances (9 mm well pitch, droplet radius 1.5 mm, edge-to-edge):
+#   F4  clover <-> round-1 D4  clover        : 12.50 mm
+#   F7  clover <-> round-1 D7  clover        : 11.00 mm
+#   F10 clover <-> round-1 D10 clover        :  9.50 mm
+#   F4  clover <-> column-1 standard print   : 22.00 mm
+#   F7  clover <-> column-1 standard print   : 48.00 mm
+#   F10 clover <-> column-1 standard print   : 74.00 mm
+#   F4 <-> F7 clover                         : 19.00 mm
+#   F7 <-> F10 clover                        : 17.00 mm
+# Nothing can touch the column-1 print, the round-1 clovers, or each other.
 #
 # Real run:
 #   python scripts/run_printing_experiment_robot.py three-clovers
@@ -96,17 +108,18 @@ destination:
   manual_clover_centers:
     # half_width_mm / half_height_mm are offsets FROM THE CENTRE, so the actual
     # droplet-to-droplet separation is TWICE each value.
-    - name: sep_1mm
-      reference_well: D4
-      geometry: {half_width_mm: 0.5, half_height_mm: 0.5}   # -> 1.0 mm apart
+    # Row F = two rows BELOW the round-1 clovers already printed on row D.
+    - name: hw2mm
+      reference_well: F4
+      geometry: {half_width_mm: 2.0, half_height_mm: 2.0}   # -> 4.0 mm apart
 
-    - name: sep_2mm
-      reference_well: D7
-      geometry: {half_width_mm: 1.0, half_height_mm: 1.0}   # -> 2.0 mm apart
+    - name: hw3mm
+      reference_well: F7
+      geometry: {half_width_mm: 3.0, half_height_mm: 3.0}   # -> 6.0 mm apart
 
-    - name: sep_3mm
-      reference_well: D10
-      geometry: {half_width_mm: 1.5, half_height_mm: 1.5}   # -> 3.0 mm apart
+    - name: hw4mm
+      reference_well: F10
+      geometry: {half_width_mm: 4.0, half_height_mm: 4.0}   # -> 8.0 mm apart
 
   # Printable area, derived from the well grid plus a margin.
   paper_bounds:

@@ -1,0 +1,76 @@
+# =============================================================================
+# 08 - COLUMN 8 TIME COURSE: three layers, one hour apart
+# =============================================================================
+# Execution is LAYER-MAJOR, so the schedule falls out of the droplet counts:
+#
+#   LAYER 1   A8 B8 C8 D8 E8 F8 G8 H8      (all 8 rows, 1 drop each)
+#     wait 1 hour
+#   LAYER 2   A8 B8 C8 D8                  (first 4 rows)
+#     wait 1 hour
+#   LAYER 3   A8 B8                        (first 2 rows)
+#
+# Final drop count per position:
+#   A8, B8              3 drops
+#   C8, D8              2 drops
+#   E8, F8, G8, H8      1 drop
+#
+# There is NO trailing delay after the last layer.
+# Total run time is a little over 2 hours.
+#
+#   python scripts/run_printing_experiment_robot.py column8-timecourse
+#
+# Runs on the physically validated V1 standard executor
+# (src/protocols/printing/01_print_from_vial.py).
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: column8_timecourse
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: dye in the BRAND 781662 plate, slot 1 ------------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [B11]                # the 5x diluted dye
+  material: dye (5x)
+  loaded_volume_ul: 300.0     # what is actually in B11 when you start
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5     # low: the well drains over the run
+
+# --- destination: paper in slot 11 ----------------------------------------------
+substrate:
+  slot: 11
+
+# --- printing behaviour ---------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause between individual droplets
+  inter_layer_delay_s: 3600.0 # ONE HOUR of drying between layers
+
+# --- what to print ---------------------------------------------------------
+# A group takes part in layer N only while its `droplets` count is >= N, which
+# is what produces the shrinking passes. Groups run in the order listed, so
+# layer 1 goes down the column A8 -> H8.
+print_groups:
+  - source_well: B11
+    targets: [A8, B8]                 # layers 1, 2 and 3
+    droplets: 3
+
+  - source_well: B11
+    targets: [C8, D8]                 # layers 1 and 2
+    droplets: 2
+
+  - source_well: B11
+    targets: [E8, F8, G8, H8]         # layer 1 only
+    droplets: 1
+
+# --- tip behaviour ---------------------------------------------------------
+# One source well, so a single tip is held for the whole run, including through
+# both one-hour waits.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

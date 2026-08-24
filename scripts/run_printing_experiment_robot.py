@@ -112,6 +112,8 @@ WORKFLOWS = {
         "clover", "configs/experiments/06_three_clovers_brand_to_paper11.yaml"),
     "topup-b11": (
         "dilution", "configs/experiments/07_topup_b11_5x_100ul.yaml"),
+    "column8-timecourse": (
+        "standard", "configs/experiments/08_column8_timecourse.yaml"),
     # --- the three general, agent-facing workflows ---------------------------
     "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
     "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),
