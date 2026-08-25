@@ -8,9 +8,12 @@
 #   python scripts/run_printing_experiment_robot.py add-dye
 #
 # ---------------------------------------------------------------------------
-# Moves 20 uL. This ADDS to whatever A11 already holds and the robot cannot see
-# the current level; the BRAND well caps at 350 uL, so A11 must be at 330 uL or
-# less before you run this. Change dilution.stock_volume_ul to move more.
+# Moves 100 uL as 7 pulls: six of 15 uL then a final 10 uL. This ADDS to whatever
+# A11 already holds and the robot cannot see the current level; the BRAND well
+# caps at 350 uL, so A11 must be at 250 uL or less before you run this.
+#
+# A2 must hold at least ~410 uL: ~310 uL to keep the tip submerged at the 0.5 mm
+# aspirate height, plus the 100 uL being removed.
 # ---------------------------------------------------------------------------
 
 # DEFAULT IS LIVE. Real physical instrument test.
@@ -54,10 +57,13 @@ destination:
 # --- how much to move -----------------------------------------------------------
 dilution:
   mode: single
-  stock_volume_ul: 20         # <- how much dye to add to A11
+  stock_volume_ul: 100        # 6 pulls x 15 uL + a final 10 uL = 7 pulls
   diluent_volume_ul: 0        # no water: this is a pure transfer
-  transfer_chunk_ul: 18       # below the 20 uL P20 ceiling so the 1.5 uL air
-                              # gap still fits on every transfer
+  transfer_chunk_ul: 15       # 15 uL per pull. Each pull takes min(chunk,
+                              # remaining), so 100 uL becomes 15x6 then 10 --
+                              # 7 pulls, the last one short.
+                              # (15 + 1.5 uL air gap = 16.5 uL, well under the
+                              #  20 uL P20 ceiling)
   mix_cycles: 0               # nothing to mix -- dye into dye
   mix_volume_ul: 15
 
