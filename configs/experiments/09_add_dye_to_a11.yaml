@@ -8,9 +8,9 @@
 #   python scripts/run_printing_experiment_robot.py add-dye
 #
 # ---------------------------------------------------------------------------
-# SET THE VOLUME BELOW. It defaults to 200 uL. This ADDS to whatever A11 already
-# holds and the robot cannot see the current level; the BRAND well caps at
-# 350 uL, so A11 must be at 150 uL or less before you run this.
+# Moves 20 uL. This ADDS to whatever A11 already holds and the robot cannot see
+# the current level; the BRAND well caps at 350 uL, so A11 must be at 330 uL or
+# less before you run this. Change dilution.stock_volume_ul to move more.
 # ---------------------------------------------------------------------------
 
 # DEFAULT IS LIVE. Real physical instrument test.
@@ -27,7 +27,11 @@ source:
   slot: 7
   well: A2                    # <- the vial holding concentrated dye
   material: concentrated dye
-  aspirate_height_mm: 4.0
+  # 0.5 mm, not the usual 4.0 mm: this vial holds only a small amount of dye.
+  # The vial is 28 mm across, so 4.0 mm would need ~2.5 mL just to submerge the
+  # tip; at 0.5 mm it needs ~310 uL. Do not go lower -- below 0.5 mm a tip-length
+  # or calibration error could drive the tip into the vial floor.
+  aspirate_height_mm: 0.5
 
 # --- no diluent is used ---------------------------------------------------------
 # A diluent well must still be named (the workflow always resolves one), but
@@ -50,7 +54,7 @@ destination:
 # --- how much to move -----------------------------------------------------------
 dilution:
   mode: single
-  stock_volume_ul: 200        # <- CHANGE THIS: how much dye to add to A11
+  stock_volume_ul: 20         # <- how much dye to add to A11
   diluent_volume_ul: 0        # no water: this is a pure transfer
   transfer_chunk_ul: 18       # below the 20 uL P20 ceiling so the 1.5 uL air
                               # gap still fits on every transfer

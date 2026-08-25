@@ -1,0 +1,69 @@
+# =============================================================================
+# 13 - NANOPARTICLE COLUMN 1: BRAND A10 -> paper slots 5 and 11
+# =============================================================================
+# A single-layer print. Every row of column 1 gets one 5 uL nanoparticle drop
+# on BOTH paper sheets:
+#
+#   A1 B1 C1 D1 E1 F1 G1 H1     one drop each, on slot 5 AND slot 11
+#
+# Execution order is target-then-paper, so each row is deposited on slot 5 and
+# then slot 11 before moving to the next row:
+#
+#   A1(5) A1(11) B1(5) B1(11) ... H1(5) H1(11)
+#
+# 8 targets x 2 sheets x 1 drop x 5 uL = 16 deposits, 80 uL total
+#                                        (40 uL per paper sheet)
+#
+# One layer only, so no inter-layer drying delay ever fires and the whole run
+# is continuous.
+#
+#   python scripts/run_printing_experiment_robot.py nanoparticle-column1
+#
+# Runs on the physically validated V1 standard executor
+# (src/protocols/printing/01_print_from_vial.py).
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: nanoparticle_column1_a10
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: nanoparticle suspension in the BRAND 781662 plate, slot 1 ---------
+source:
+  type: well_plate
+  slot: 1
+  wells: [A10]                # <- the nanoparticle stock well
+  material: nanoparticles
+  # The run draws 80 uL and holds 20 uL back, so A10 must contain at least
+  # 100 uL at start. Raise this to match what is actually loaded.
+  loaded_volume_ul: 150.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5     # low: keeps reach as the well drains, and stays
+                              # near settled nanoparticles rather than above them
+
+# --- destinations: matching paper sheets in slots 5 and 11 ---------------------
+substrate:
+  slots: [5, 11]
+
+# --- printing behaviour --------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause between individual droplets
+  inter_layer_delay_s: 0.0    # unused: there is only one layer
+
+# --- what to print -------------------------------------------------------------
+# One group, one layer: all eight rows of column 1 receive a single drop.
+print_groups:
+  - source_well: A10
+    targets: [A1, B1, C1, D1, E1, F1, G1, H1]
+    droplets: 1
+
+# --- tip behaviour -------------------------------------------------------------
+# One source well, so a single tip is picked up once and held for both sheets
+# and the entire run.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

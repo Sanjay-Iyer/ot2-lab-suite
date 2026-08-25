@@ -120,6 +120,8 @@ WORKFLOWS = {
         "standard", "configs/experiments/11_combined_timecourses.yaml"),
     "combined_layer2start": (
         "standard", "configs/experiments/12_combined_layer2start.yaml"),
+    "nanoparticle-column1": (
+        "standard", "configs/experiments/13_nanoparticle_column1_a10.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
