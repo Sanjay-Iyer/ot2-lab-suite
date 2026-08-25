@@ -1,0 +1,95 @@
+# =============================================================================
+# 14 - TOP UP B11 AND C11: 100 uL of 5x dye dilution added to each
+# =============================================================================
+# Same 5x recipe as 07 (B11) and 12 (C11/D11), run into both wells in one go.
+# Each destination receives:
+#
+#     20 uL concentrated dye  (BRAND plate A11, slot 1)
+#   + 80 uL water             (vial rack A1, slot 7)
+#   ------
+#   100 uL of 5x dilution (dye:water = 1:4) ADDED INTO the well
+#
+# 200 uL of dilution total: 40 uL dye + 160 uL water drawn.
+#
+# Dilution only -- this never prints. Run a printing workflow afterwards.
+#
+#   python scripts/run_printing_experiment_robot.py topup-b11 \
+#       --config configs/experiments/14_topup_b11_c11_5x_100ul.yaml
+#
+# ---------------------------------------------------------------------------
+# CHECK BOTH LEVELS FIRST. This ADDS 100 uL to whatever B11 and C11 already
+# hold; the BRAND well capacity is 350 uL and the robot cannot see the current
+# level. Both wells must be at 250 uL or less before you run this.
+# A11 must hold at least 40 uL of dye plus what the tip cannot reach.
+# Run this AFTER your printing runs, not before.
+# ---------------------------------------------------------------------------
+
+protocol_label: topup_b11_c11_5x
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# Tips are keyed per (liquid, destination): water->B11, dye->B11, mix B11,
+# water->C11, dye->C11, mix C11 = 6 tips, A1 through F1, all returned.
+# A tip that has been in one liquid is never put into another.
+pipette_tip_reuse: true
+
+# --- concentrated dye -----------------------------------------------------------
+source:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: A11                   # the concentrated dye stock
+  material: concentrated dye
+  aspirate_height_mm: 0.5     # low: A11 may be running down
+
+# --- water ----------------------------------------------------------------------
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- destinations: both wells being topped up -----------------------------------
+# mode single gives EACH well the full stock + diluent volume below.
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [B11, C11]
+  aspirate_height_mm: 0.5     # low: the well may be nearly empty when mixing
+  dispense_height_mm: 2.0
+
+# --- the 5x recipe --------------------------------------------------------------
+# TOTAL VOLUME AND RATIO ARE SET BY THESE TWO NUMBERS, PER WELL:
+#   total volume = stock_volume_ul + diluent_volume_ul
+#   ratio        = stock_volume_ul : diluent_volume_ul  (dye : water)
+# The current pair is 100 uL total at 1:4 (5x). Other totals at the same 1:4:
+#   total  50 uL ->  stock 10, diluent  40
+#   total 100 uL ->  stock 20, diluent  80   <-- in use
+#   total 150 uL ->  stock 30, diluent 120
+#   total 200 uL ->  stock 40, diluent 160
+#   total 300 uL ->  stock 60, diluent 240   (the 12_prepare_c11_d11 recipe)
+# Other ratios at 100 uL total:
+#   1:1  (2x)  -> stock 50, diluent 50
+#   1:3  (4x)  -> stock 25, diluent 75
+#   1:4  (5x)  -> stock 20, diluent 80
+#   1:9  (10x) -> stock 10, diluent 90
+# Keep stock + diluent under the well's free headroom; 350 uL is the hard cap.
+dilution:
+  mode: single
+  stock_volume_ul: 20         # dye   per well
+  diluent_volume_ul: 80       # water per well -> 100 uL total, 1 part in 5
+  transfer_chunk_ul: 18       # below the 20 uL P20 ceiling so the 1.5 uL air
+                              # gap still fits on every transfer
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+# --- air handling ---------------------------------------------------------------
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+# --- tips -----------------------------------------------------------------------
+tips:
+  start_tip: A1
+  return_tips: true
