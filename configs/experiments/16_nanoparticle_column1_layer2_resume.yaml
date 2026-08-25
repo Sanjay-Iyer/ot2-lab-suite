@@ -1,0 +1,106 @@
+# =============================================================================
+# 16 - NANOPARTICLE COLUMN 1, RESUME AT LAYER 2: BRAND A10 -> slots 5 and 11
+# =============================================================================
+# Original layer 1 (run 13: one 5 uL drop on all eight rows of column 1) has
+# ALREADY been printed. This workflow picks up at layer 2 and finishes the
+# build-up. Layer numbers in the run log are offset so they read 2, 3, 4 ...
+# matching the real experiment rather than restarting at 1.
+#
+# Remaining drops, per paper sheet:
+#
+#   A1 B1 C1     none        already complete at 1 drop (these receive dye in
+#                            run 14, so no further nanoparticles go on them)
+#   D1 E1 F1     +2 drops    layers 2 and 3
+#   G1 H1        +9 drops    layers 2 through 10
+#
+# FINAL drop count per position once this run finishes:
+#
+#   A1 B1 C1      1 drop
+#   D1 E1 F1      3 drops
+#   G1 H1        10 drops
+#
+# (3 x 2) + (2 x 9) = 24 deposits per sheet, x 2 sheets = 48 deposits
+# 48 x 5 uL = 240 uL total, 120 uL per paper sheet.
+#
+# Execution is layer-major: every position still owing a drop receives one,
+# then the whole pass rests for inter_layer_delay_s so the deposit can dry.
+# D1/E1/F1 drop out after layer 3; G1/H1 continue alone to layer 10.
+#
+#   python scripts/run_printing_experiment_robot.py nanoparticle-column1-layer2
+#
+# ---------------------------------------------------------------------------
+# RUN TIME: 9 layers means 8 inter-layer waits of 1.5 hours each -- about 12.5
+# hours end to end. There is NO trailing delay after layer 10, and no initial
+# hold: this assumes original layer 1 is already dry. To change either:
+#   * continuous, no drying (~20 min): set inter_layer_delay_s to 0
+#   * hold before layer 2 as well:     set initial_delay_s to 5400
+#
+# During every wait the tip is parked 50 mm above the top of source well A10 --
+# high and clear of both papers and the plate, with no motion until the next
+# layer begins. Adjust with source.park_height_mm.
+#
+# SOURCE VOLUME: this draws 240 uL from A10 and holds 20 uL back, so A10 needs
+# at least 260 uL at the start -- close to the 350 uL BRAND well ceiling. Run 13
+# already took 80 uL out of A10, so TOP IT UP before starting.
+#
+# TIP: D1 -- the next clean tip. A1 is the tip run 13 used for these same
+# nanoparticles and returned to the rack; a fresh tip avoids dried residue
+# narrowing the orifice over a run this long. Switch to A1 only if you would
+# rather conserve tips and A1 is visibly clear.
+# ---------------------------------------------------------------------------
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: nanoparticle_column1_layer2_resume
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: nanoparticle suspension in the BRAND 781662 plate, slot 1 ---------
+source:
+  type: well_plate
+  slot: 1
+  wells: [A10]                # <- the nanoparticle stock well, same as run 13
+  material: nanoparticles
+  # Needs 240 uL drawn + 20 uL reserve = 260 uL minimum. Set this to what A10
+  # actually holds after you top it up.
+  loaded_volume_ul: 300.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5     # low: the well drains a long way over 48 pulls,
+                              # and this stays near settled nanoparticles
+  # Where the tip waits out each 1.5 hour dry: 50 mm above the TOP of A10, well
+  # clear of the plate and both paper sheets. The arm holds there without motion
+  # for the whole delay. Default is 5.0 mm; this is deliberately high.
+  park_height_mm: 50.0
+
+# --- destinations: matching paper sheets in slots 5 and 11 ---------------------
+substrate:
+  slots: [5, 11]
+
+# --- printing behaviour --------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause between individual droplets
+  inter_layer_delay_s: 5400.0 # 1.5 HOURS of drying between drops on a position
+  initial_delay_s: 0.0        # no hold up front: original layer 1 is already dry
+  layer_number_offset: 1      # report layers as 2..10, not 1..9
+
+# --- what to print -------------------------------------------------------------
+# A group takes part in layer N only while its `droplets` count is >= N, which
+# is what makes D1/E1/F1 stop after two passes while G1/H1 continue.
+print_groups:
+  - source_well: A10
+    targets: [D1, E1, F1]     # the next three rows: 2 more drops each
+    droplets: 2
+
+  - source_well: A10
+    targets: [G1, H1]         # the last two rows: 9 more drops each
+    droplets: 9
+
+# --- tip behaviour -------------------------------------------------------------
+# One source well, so a single tip is held for both sheets and the entire run,
+# including through all eight 1.5 hour waits.
+tips:
+  pipette_tip_reuse: true
+  print_tip: D1
+  return_tips: true
