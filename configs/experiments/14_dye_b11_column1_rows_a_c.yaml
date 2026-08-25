@@ -1,0 +1,75 @@
+# =============================================================================
+# 14 - DYE OVER NANOPARTICLES: BRAND B11 -> column 1 rows A-C, slots 5 and 11
+# =============================================================================
+# The second half of the pair. Run 13 lays 5 uL of nanoparticles on all eight
+# rows of column 1; this run puts one 5 uL dye drop on only the TOP THREE of
+# those positions, on both sheets:
+#
+#   A1 B1 C1     one drop each, on slot 5 AND slot 11
+#
+# Rows D1-H1 are left as nanoparticles only, so column 1 reads as three
+# dye-over-nanoparticle positions above five bare nanoparticle positions.
+#
+# Execution order is target-then-paper:
+#
+#   A1(5) A1(11) B1(5) B1(11) C1(5) C1(11)
+#
+# 3 targets x 2 sheets x 1 drop x 5 uL = 6 deposits, 30 uL total
+#                                       (15 uL per paper sheet)
+#
+# Single layer, so no inter-layer drying delay ever fires.
+#
+#   python scripts/run_printing_experiment_robot.py dye-column1-top3
+#
+# ---------------------------------------------------------------------------
+# RUN THIS AFTER 13, NOT BEFORE. It deposits onto positions run 13 has already
+# printed; let the nanoparticle drops dry first or the two will pool together.
+#
+# TIP: this run starts at B1, not A1. Run 13 uses A1 and RETURNS it to the rack
+# with nanoparticle residue -- starting here at A1 would carry that residue into
+# the dye. Leave print_tip at B1.
+# ---------------------------------------------------------------------------
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: dye_b11_column1_rows_a_c
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: the 5x diluted dye in the BRAND 781662 plate, slot 1 --------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [B11]                # <- the 5x diluted dye
+  material: dye (5x)
+  # The run draws 30 uL and holds 20 uL back, so B11 must contain at least
+  # 50 uL at start. Raise this to match what is actually left in B11.
+  loaded_volume_ul: 100.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5     # low: the well has already been drawn down
+
+# --- destinations: matching paper sheets in slots 5 and 11 ---------------------
+substrate:
+  slots: [5, 11]
+
+# --- printing behaviour --------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause between individual droplets
+  inter_layer_delay_s: 0.0    # unused: there is only one layer
+
+# --- what to print -------------------------------------------------------------
+# One group, one layer: only the first three rows of column 1.
+print_groups:
+  - source_well: B11
+    targets: [A1, B1, C1]
+    droplets: 1
+
+# --- tip behaviour -------------------------------------------------------------
+# One source well, so a single tip is held for both sheets and the whole run.
+# B1 -- see the tip note in the header before changing this.
+tips:
+  pipette_tip_reuse: true
+  print_tip: B1
+  return_tips: true
