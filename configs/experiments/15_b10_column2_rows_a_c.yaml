@@ -1,0 +1,71 @@
+# =============================================================================
+# 15 - COLUMN 2, TOP THREE ROWS: BRAND B10 -> paper slots 5 and 11
+# =============================================================================
+# A single-layer print onto a fresh column. One 5 uL drop on the top three rows
+# of column 2, on BOTH paper sheets:
+#
+#   A2 B2 C2     one drop each, on slot 5 AND slot 11
+#
+# Column 2 is otherwise untouched: rows D2-H2 stay blank. This is independent
+# of the column-1 work in runs 13 and 14 -- nothing here overprints those.
+#
+# Execution order is target-then-paper:
+#
+#   A2(5) A2(11) B2(5) B2(11) C2(5) C2(11)
+#
+# 3 targets x 2 sheets x 1 drop x 5 uL = 6 deposits, 30 uL total
+#                                       (15 uL per paper sheet)
+#
+# Single layer, so no inter-layer drying delay ever fires.
+#
+#   python scripts/run_printing_experiment_robot.py b10-column2-top3
+#
+# ---------------------------------------------------------------------------
+# TIP: this run starts at C1. Run 13 uses tip A1 and run 14 uses tip B1, and
+# both RETURN their tip to the rack carrying residue. C1 is the next clean tip.
+# ---------------------------------------------------------------------------
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: b10_column2_rows_a_c
+
+# DEFAULT IS LIVE. Real physical instrument test.
+run_modes: {dry_run: false}
+
+# --- source: BRAND 781662 plate, slot 1, well B10 ------------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [B10]                # <- the stock for this run
+  material: B10 stock
+  # The run draws 30 uL and holds 20 uL back, so B10 must contain at least
+  # 50 uL at start. Raise this to match what is actually loaded.
+  loaded_volume_ul: 100.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5     # low: keeps reach as the well drains, and stays
+                              # near anything settled rather than above it
+
+# --- destinations: matching paper sheets in slots 5 and 11 ---------------------
+substrate:
+  slots: [5, 11]
+
+# --- printing behaviour --------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause between individual droplets
+  inter_layer_delay_s: 0.0    # unused: there is only one layer
+
+# --- what to print -------------------------------------------------------------
+# One group, one layer: only the first three rows of column 2.
+print_groups:
+  - source_well: B10
+    targets: [A2, B2, C2]
+    droplets: 1
+
+# --- tip behaviour -------------------------------------------------------------
+# One source well, so a single tip is held for both sheets and the whole run.
+# C1 -- see the tip note in the header before changing this.
+tips:
+  pipette_tip_reuse: true
+  print_tip: C1
+  return_tips: true

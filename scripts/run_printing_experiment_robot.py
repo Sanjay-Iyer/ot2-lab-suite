@@ -124,6 +124,8 @@ WORKFLOWS = {
         "standard", "configs/experiments/13_nanoparticle_column1_a10.yaml"),
     "dye-column1-top3": (
         "standard", "configs/experiments/14_dye_b11_column1_rows_a_c.yaml"),
+    "b10-column2-top3": (
+        "standard", "configs/experiments/15_b10_column2_rows_a_c.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
