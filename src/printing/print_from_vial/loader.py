@@ -79,6 +79,9 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
     # labware, but more than one deck slot can hold a paper substrate, so an
     # experiment may pick one slot or mirror the same pattern onto several.
     substrate = loaded.pop("substrate", {}) or {}
+    # Optional finishing pass: a second liquid applied after every layer is
+    # done. Passed straight through; the executor validates it.
+    overprint = loaded.pop("overprint", None)
     # `targets:` remains accepted as the one-group shorthand.
     legacy_targets = loaded.pop("targets", None)
 
@@ -301,4 +304,19 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         "flow_rates": {"p20": pipette.get("flow_rates", {})},
         "safety": {"p20_max_volume_ul": float(pipette["maximum_volume_ul"])},
     }
+    if overprint:
+        if not isinstance(overprint, dict):
+            raise PrintFromVialLoadError(f"{path}: overprint must be a mapping")
+        source_well = str(overprint.get("source_well") or "").upper()
+        if source_well and source_well not in resolved_source["wells"]:
+            raise PrintFromVialLoadError(
+                f"{path}: overprint source well {source_well} must be listed in "
+                f"source.wells ({', '.join(resolved_source['wells'])})"
+            )
+        config["overprint"] = {
+            "source_well": source_well,
+            "targets": [str(t).upper() for t in (overprint.get("targets") or [])],
+            "droplets": int(overprint.get("droplets", 1)),
+            "delay_s": float(overprint.get("delay_s", 0.0) or 0.0),
+        }
     return config, run_modes

@@ -5,19 +5,19 @@
 # TWO HOURS with no tip attached and no motion, then puts one 5 uL drop of CV
 # dye on every position that received extra nanoparticle layers:
 #
-#   D1 E1 F1     the rows built up to 3 nanoparticle drops
-#   G1 H1        the rows built up to 10 nanoparticle drops
+#   E2 (row 5)   built up to 4 nanoparticle drops
+#   F2 (row 6)   built up to 10 nanoparticle drops
 #
-# A1/B1/C1 are NOT touched here -- they never received extra layers, and they
-# already carry the B11 dye from run 14.
+# Nothing else is touched. A1/B1/C1 already carry the B11 dye from run 14, and
+# D1/G1/H1 never received extra layers.
 #
 # Execution order is target-then-paper, so each position is deposited on slot 5
 # and then slot 11 before advancing:
 #
-#   D1(5) D1(11) E1(5) E1(11) F1(5) F1(11) G1(5) G1(11) H1(5) H1(11)
+#   E2(5) E2(11) F2(5) F2(11)
 #
-# 5 targets x 2 sheets x 1 drop x 5 uL = 10 deposits, 50 uL total
-#                                        (25 uL per paper sheet)
+# 2 targets x 2 sheets x 1 drop x 5 uL = 4 deposits, 20 uL total
+#                                        (10 uL per paper sheet)
 #
 # Single layer, so no inter-layer delay ever fires -- the only wait is the
 # two-hour hold at the start.
@@ -50,8 +50,8 @@ source:
   slot: 1
   wells: [C11]                # <- the CV dye
   material: CV dye
-  # The run draws 50 uL and holds 20 uL back, so C11 must contain at least
-  # 70 uL at start. Raise this to match what is actually in C11.
+  # The run draws 20 uL and holds 20 uL back, so C11 must contain at least
+  # 40 uL at start. Raise this to match what is actually in C11.
   loaded_volume_ul: 100.0
   minimum_remaining_ul: 20.0
   aspirate_height_mm: 0.5
@@ -69,10 +69,10 @@ printing:
                               # tip is picked up and before the first drop
 
 # --- what to print -------------------------------------------------------------
-# One group, one layer: exactly the five positions run 16 built up.
+# One group, one layer: exactly the two positions run 16 built up.
 print_groups:
   - source_well: C11
-    targets: [D1, E1, F1, G1, H1]
+    targets: [E2, F2]
     droplets: 1
 
 # --- tip behaviour -------------------------------------------------------------
