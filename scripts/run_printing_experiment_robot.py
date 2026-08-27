@@ -144,6 +144,8 @@ WORKFLOWS = {
         "dilution", "configs/experiments/18_dye_column11_5x_to_100x.yaml"),
     "a11-column11-dilutions": (
         "dilution", "configs/experiments/19_a11_dilutions_into_column11.yaml"),
+    "consolidate-b11-c11": (
+        "dilution", "configs/experiments/20_consolidate_b11_c11_into_a11.yaml"),
     # --- the three general, agent-facing workflows ---------------------------
     "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
     "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),
@@ -316,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
                 "a11-column11-dilutions",
                 "a10-paper-column3",
                 "column11-paper-columns3-4",
+                "consolidate-b11-c11",
             )
         ) and not args.no_start and not args.live:
             print(

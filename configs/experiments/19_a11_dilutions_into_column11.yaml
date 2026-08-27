@@ -1,49 +1,65 @@
 # =============================================================================
-# 19 - DILUTE BRAND A11 (slot 1) DOWN THE REST OF COLUMN 11
+# 19 - DILUTE BRAND A11 (slot 1) DOWN THE REST OF COLUMN 11, 300 uL PER WELL
 # =============================================================================
-# The stock is already on the plate: BRAND well A11 in slot 1. Water comes from
-# vial-rack A1 (slot 7). The robot prepares 100 uL in each of the seven wells
-# below A11, every point drawn DIRECTLY from A11 -- this is not a serial
-# dilution, so an error in one well does not propagate to the next.
+# The stock is already on the plate and is NOT adjusted by this run: BRAND A11
+# in slot 1, holding ~240 uL made as 120 uL dye + 120 uL water. A11 is therefore
+# ALREADY A 2x DILUTION of the concentrated dye. Water comes from vial-rack A1
+# (slot 7).
 #
-#   B11    2x   50.0000 uL A11 +  50.0000 uL water
-#   C11    5x   20.0000 uL A11 +  80.0000 uL water
-#   D11   10x   10.0000 uL A11 +  90.0000 uL water
-#   E11   20x    5.0000 uL A11 +  95.0000 uL water
-#   F11   30x    3.3333 uL A11 +  96.6667 uL water
-#   G11   50x    2.0000 uL A11 +  98.0000 uL water
-#   H11  100x    1.0000 uL A11 +  99.0000 uL water
+# Each of the seven wells below A11 is filled to 300 uL, drawn DIRECTLY from
+# A11 -- not serially, so an error in one well does not propagate to the next.
 #
-# Factors are relative to whatever A11 itself holds. If A11 is already the 5x
-# dye, then B11 is 10x overall, C11 is 25x, and so on.
+#   well  factor vs A11   from A11    water        absolute vs neat dye
+#   B11        5x          60.0 uL    240.0 uL            10x
+#   C11       10x          30.0 uL    270.0 uL            20x
+#   D11       20x          15.0 uL    285.0 uL            40x
+#   E11       30x          10.0 uL    290.0 uL            60x
+#   F11       50x           6.0 uL    294.0 uL           100x
+#   G11      100x           3.0 uL    297.0 uL           200x
+#   H11      200x           1.5 uL    298.5 uL           400x
 #
-# 100 uL per well keeps the smallest pull at 1.0 uL, exactly the P20 floor.
-# Do not lower total_volume_ul or the 100x point drops below the P20 minimum
-# and pre-flight will reject the run.
+# The "absolute" column is the dilution relative to the neat dye, and is simply
+# 2x the factor because A11 is itself 2x. Every stock volume is a round number,
+# so nothing depends on the pipette hitting an awkward fractional target.
 #
-# TOTAL CONSUMPTION: 91.33 uL out of A11 and 608.67 uL of water.
+# ---------------------------------------------------------------------------
+# WHY THE SERIES STARTS AT 5x AND NOT 2x
+#
+# A11 holds 240 uL. The tip aspirates at a fixed 0.5 mm over a 6.94 mm flat
+# well floor, which sits at the 18.9 uL mark, so only ~221 uL of the 240 uL is
+# physically reachable. At 300 uL per well a 2x point alone would need 150 uL,
+# and the old 2x-to-100x series would need 274 uL -- over budget, and the run
+# would run A11 dry partway through.
+#
+# Shifting every point one step deeper costs 125.5 uL of the 221 uL budget, a
+# ~95 uL margin, so the "about 120 + 120" estimate for A11 does not have to be
+# exact. It also reaches 200x, which the old 100 uL wells could not: at 300 uL
+# a 200x point is a 1.5 uL pull, comfortably above the 1.0 uL P20 floor.
+# ---------------------------------------------------------------------------
+#
+# TOTAL CONSUMPTION: 125.5 uL out of A11 and 1974.5 uL (~2.0 mL) of water.
 # This protocol only makes dilutions. It does not print.
+#
+# RUNTIME: the P20 moves everything in <=18 uL bites, and this run places
+# 2100 uL, so expect ~124 aspirate/dispense cycles and roughly 20 minutes.
+# That is inherent to a 20 uL pipette placing 2 mL; it is not a fault.
 #
 # REAL ROBOT LAPTOP (after review and pull):
 #   conda activate llm
 #   python scripts/run_printing_experiment_robot.py a11-column11-dilutions --robot-ip 169.254.46.57 --live
 #
-# ---------------------------------------------------------------------------
 # BEFORE RUNNING:
-#   * B11:H11 must all be EMPTY. The robot cannot detect their starting volume,
-#     and each BRAND well caps at 350 uL.
-#   * A11 must hold at least 150 uL. It gives up 91.33 uL, and the tip
-#     aspirates at 0.5 mm above the flat bottom, which needs roughly 20 uL left
-#     in the well to stay submerged. 200 uL is the comfortable number. Top it
-#     up first with:
-#       python scripts/run_printing_experiment_robot.py add-dye --robot-ip 169.254.46.57 --live
-#   * Vial-rack A1 needs at least 3.5 mL of water: 608.67 uL consumed plus
-#     enough depth to submerge the tip at the 4.0 mm aspirate height in a 28 mm
-#     bore vial.
+#   * Do NOT run add-dye. A11 is the intended starting point exactly as it is;
+#     topping it up would change the concentration every factor below refers to.
+#   * B11:H11 must all be EMPTY. Each finished well holds 300 uL and the BRAND
+#     well caps at 350 uL, so there is only 50 uL of slack -- residue in a
+#     destination well throws off both its volume and its concentration.
+#   * Vial-rack A1 needs at least 4.5 mL of water: 1974.5 uL consumed plus the
+#     ~2.5 mL that just submerges the tip at the 4.0 mm aspirate height in a
+#     28 mm bore vial.
 #   * Use a fresh P20 rack, or confirm A1:C8 are clean. The run consumes
 #     21 tips (water, stock and mix each get their own tip per well) and drops
 #     them in the trash so plate-contaminated tips are never returned.
-# ---------------------------------------------------------------------------
 
 protocol_label: a11_dilutions_column11
 
@@ -52,14 +68,14 @@ run_modes: {dry_run: false}
 
 pipette_tip_reuse: true
 
-# --- stock: the dye already sitting in BRAND A11, slot 1 ----------------------
+# --- stock: the 2x dye already sitting in BRAND A11, slot 1 -------------------
 # Same labware as the destination. The executor loads each deck slot once, so
 # stock and destination legitimately share the slot 1 plate.
 source:
   labware: brand_96_wellplate_350ul_flat_781662
   slot: 1
   well: A11
-  material: dye stock in A11
+  material: dye stock in A11 (2x -- 120 uL dye + 120 uL water)
   # 0.5 mm, not the registered 1.0 mm default: A11 gets drawn down over the run
   # and the flat well is only 10.65 mm deep. Do not go lower.
   aspirate_height_mm: 0.5
@@ -78,12 +94,15 @@ destination:
   slot: 1
   wells: [B11, C11, D11, E11, F11, G11, H11]
   aspirate_height_mm: 0.5
+  # 2.0 mm. The finished 300 uL stands 7.93 mm deep, so the tip ends up well
+  # submerged -- which is what the mix step needs, since it mixes at this same
+  # height. Do not raise this above ~7 mm or the mix would aspirate air.
   dispense_height_mm: 2.0
 
 dilution:
   mode: factors
-  factors: [2, 5, 10, 20, 30, 50, 100]
-  total_volume_ul: 100
+  factors: [5, 10, 20, 30, 50, 100, 200]
+  total_volume_ul: 300
   # 18 uL leaves room for the 1.5 uL trailing air gap in the 20 uL P20.
   transfer_chunk_ul: 18
   mix_cycles: 5

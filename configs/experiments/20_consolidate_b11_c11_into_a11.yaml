@@ -1,0 +1,106 @@
+# =============================================================================
+# 20 - CONSOLIDATE: BRAND B11 + C11 -> A11 (all in slot 1)
+# =============================================================================
+# Pulls 100 uL out of B11 and 100 uL out of C11 and puts both into A11. Source
+# and destination are the same plate in slot 1; the executor loads each deck
+# slot once, so all three roles share that one labware. No water is used, no
+# dilution is performed and nothing is printed -- this only consolidates.
+#
+# ORDER: C11 empties first, then B11, then A11 is mixed. Each source well gets
+# its own tip, so B11 and C11 never cross-contaminate.
+#
+#   C11 -> A11   100 uL requested   (6 pulls: 5 x 18 uL + 10 uL)
+#   B11 -> A11   100 uL requested   (6 pulls: 5 x 18 uL + 10 uL)
+#
+# ---------------------------------------------------------------------------
+# READ THIS: YOU WILL NOT GET THE FULL 100 uL OUT OF EITHER WELL.
+#
+# The BRAND well is a 6.94 mm flat-bottom cylinder -- 37.8 uL per mm of depth.
+# 100 uL is only 2.64 mm deep. The tip aspirates at a FIXED 0.5 mm above the
+# floor, which sits at the 18.9 uL mark, so roughly 81 uL of the 100 uL in each
+# well is physically reachable. The last pull from each well runs dry and takes
+# in mostly air. That is harmless -- the air is dispensed and blown out at A11
+# -- but it means A11 receives about 162 uL of liquid, not 200 uL, and roughly
+# 19 uL is left behind in each of B11 and C11.
+#
+# Asking for 100 uL (rather than a clean 81 uL) is deliberate: it makes the tip
+# skim the well down to the 0.5 mm line and recovers as much as the geometry
+# allows. Do NOT lower aspirate_height_mm to chase the last 19 uL -- 0.3 mm
+# would recover ~89 uL, but a tip-length or plate-calibration error at that
+# height can drive the tip into the well floor.
+# ---------------------------------------------------------------------------
+#
+# REAL ROBOT LAPTOP (after review and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py consolidate-b11-c11 --robot-ip 169.254.46.57 --live
+#
+# BEFORE RUNNING:
+#   * A11 must be at 150 uL or LESS. It receives up to 200 uL, the BRAND well
+#     caps at 350 uL, and the robot cannot see the current level.
+#   * B11 and C11 should each hold about 100 uL. If they hold more, only 100 uL
+#     is taken from each; if they hold less, the pulls simply run dry sooner.
+#   * B11 and C11 must be compatible liquids. This mixes them irreversibly.
+#   * Use a fresh P20 rack or confirm A1:C1 are clean. The run consumes 3 tips
+#     (one per source well plus one for mixing) and drops them in the trash --
+#     they have all touched plate liquid and are never returned to the rack.
+
+protocol_label: consolidate_b11_c11_into_a11
+
+# The generated protocol moves liquid. The named runner also requires --live.
+run_modes: {dry_run: false}
+
+# One tip per distinct source well.
+pipette_tip_reuse: true
+
+# --- first liquid: B11 ---------------------------------------------------------
+# Carried in the "stock" role. Moved SECOND (mode single always runs the
+# diluent role before the stock role).
+source:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: B11
+  material: B11 contents
+  # 0.5 mm: the lowest height this repo treats as safe over a flat well floor.
+  # See the recovery note in the header before changing it.
+  aspirate_height_mm: 0.5
+
+# --- second liquid: C11 --------------------------------------------------------
+# The executor always resolves a "diluent" role, so C11 is carried there. It is
+# NOT a diluent and nothing is being diluted -- it is simply the other 100 uL,
+# and it gets its own tip because it is a distinct source well. Moved FIRST.
+diluent:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: C11
+  material: C11 contents
+  aspirate_height_mm: 0.5
+
+# --- everything lands in A11 ---------------------------------------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [A11]
+  aspirate_height_mm: 0.5
+  # 2.0 mm: above the 5.29 mm the combined 200 uL would stand at only if A11
+  # started empty, so the tip dispenses into the well, not below the surface.
+  dispense_height_mm: 2.0
+
+# --- how much to move ----------------------------------------------------------
+dilution:
+  mode: single
+  stock_volume_ul: 100        # out of B11
+  diluent_volume_ul: 100      # out of C11
+  # 18 uL per pull leaves room for the 1.5 uL trailing air gap in the 20 uL P20.
+  # 100 uL becomes 5 x 18 uL then a final 10 uL -- 6 pulls per source well.
+  transfer_chunk_ul: 18
+  # A11 may now hold three different liquids at three levels. Mix it.
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+tips:
+  start_tip: A1
+  return_tips: false
