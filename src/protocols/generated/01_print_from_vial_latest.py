@@ -69,12 +69,12 @@ DEFAULT_DO_PRINT = True
 
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'protocol_label': 'column11_dilutions_to_paper_columns3_4',
+CONFIG = { 'protocol_label': 'column11_dilutions_to_paper5_columns3_4',
   'deck': { 'source': { 'slot': 1,
                         'load_name': 'brand_96_wellplate_350ul_flat_781662',
                         'namespace': 'custom_beta',
                         'version': 1},
-            'paper': { 'slot': 11,
+            'paper': { 'slot': 5,
                        'load_name': 'paper_print_96_flat',
                        'namespace': 'custom_beta',
                        'version': 1},
@@ -132,7 +132,7 @@ CONFIG = { 'protocol_label': 'column11_dilutions_to_paper_columns3_4',
                       'targets': ['H3', 'H4'],
                       'droplets': 1,
                       'source_wells': {'paper': 'H11'}}],
-  'tips': {'print_tip': 'B4', 'return_tips': True, 'pipette_tip_reuse': True},
+  'tips': {'print_tip': 'C5', 'return_tips': True, 'pipette_tip_reuse': True},
   'flow_rates': {'p20': {'aspirate_ul_s': 3.0, 'dispense_ul_s': 3.0}},
   'safety': {'p20_max_volume_ul': 20.0}}
 # <<< CONFIG END <<<

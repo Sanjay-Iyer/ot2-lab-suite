@@ -32,7 +32,13 @@
 #
 # REAL ROBOT LAPTOP (after review and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py consolidate-b11-c11 --robot-ip 169.254.46.57 --live
+#   python scripts/run_printing_experiment_robot.py consolidate-b11-c11 --live
+#
+# No --robot-host: resolve_host() walks OT2_ROBOT_HOST -> mDNS
+# (OT2CEP20220929R02.local) -> cached -> discovery, which tracks the robot's
+# actual address. Do NOT paste a 169.254.x.x literal in here -- it is
+# link-local and renegotiated per boot, and the repo already carries two
+# conflicting ones (see docs/architecture/STAGE0_BASELINE.md).
 #
 # BEFORE RUNNING:
 #   * A11 must be at 150 uL or LESS. It receives up to 200 uL, the BRAND well

@@ -136,6 +136,11 @@ WORKFLOWS = {
     "column11-paper-columns3-4": (
         "standard",
         "configs/experiments/21_column11_dilutions_to_paper_columns3_4.yaml"),
+    "a10-paper5-column3": (
+        "standard", "configs/experiments/22_a10_to_paper5_column3.yaml"),
+    "column11-paper5-columns3-4": (
+        "standard",
+        "configs/experiments/23_column11_dilutions_to_paper5_columns3_4.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
@@ -318,6 +323,8 @@ def main(argv: list[str] | None = None) -> int:
                 "a11-column11-dilutions",
                 "a10-paper-column3",
                 "column11-paper-columns3-4",
+                "a10-paper5-column3",
+                "column11-paper5-columns3-4",
                 "consolidate-b11-c11",
             )
         ) and not args.no_start and not args.live:
