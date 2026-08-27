@@ -1,0 +1,119 @@
+# Experiment 1 - nanoparticle dilutions printed, dried, then overprinted with CV.
+#
+# This is the human-authored path: edit this file and run it with
+#   python scripts/run_sers_experiment.py --config configs/experiments/sers_exp1_np_cv.yaml
+# No LLM is involved. The conversational agent writes files in exactly this
+# format, so anything it produces can be inspected, edited, and re-run by hand.
+#
+# What is NOT in this file, deliberately: pipette mount, aspiration heights,
+# dispense references, flow rates, air-gap mechanics, and labware load names.
+# Those are laboratory-calibrated and come from the machine profile below.
+# Changing them is a hardware decision, not an experiment decision.
+
+schema_version: sers-experiment-intent/v1
+experiment_id: sers_exp1_np_cv
+experiment_name: sers_exp1_np_cv
+description: >-
+  Prepare 30x and 50x nanoparticle dilutions, print them onto paper columns 1
+  and 2, dry, then overprint Crystal Violet onto the same six locations.
+
+machine_profile: configs/machines/ot2_sers_p20_v1.yaml
+
+# Deck roles are yours to name. `kind` decides which approved labware the
+# machine profile loads into that slot.
+deck:
+  - {role: working_plate, kind: plate,     slot: 1}
+  - {role: paper,         kind: paper,     slot: 5}
+  - {role: vial_rack,     kind: vial_rack, slot: 7}
+  - {role: tips,          kind: tiprack,   slot: 9}
+
+# What you physically load before the run.
+#
+# NOTE on minimum_remaining_volume_ul: the profile aspirates from the 20 mL
+# vials at 4.0 mm above the floor, and the vial bore is 28 mm, so 4.0 mm of
+# liquid is about 2.46 mL. Keeping 2.5 mL in reserve is what keeps the tip
+# submerged; the depth gate rejects the run otherwise.
+liquids:
+  - name: nanoparticles
+    labware: vial_rack
+    well: A1
+    loaded_volume_ul: 5000
+    minimum_remaining_volume_ul: 2500
+    description: SERS nanoparticle stock
+
+  - name: water
+    labware: vial_rack
+    well: A2
+    loaded_volume_ul: 15000
+    minimum_remaining_volume_ul: 2500
+    description: diluent
+
+  - name: crystal_violet
+    labware: vial_rack
+    well: B1
+    loaded_volume_ul: 5000
+    minimum_remaining_volume_ul: 2500
+    description: Crystal Violet reporter dye stock
+
+# Three primitives only: dilution, print, wait. They run in this order.
+steps:
+  # Give the target, not the volumes. The resolver computes 150/30 = 5 uL of
+  # stock plus 145 uL of water, and chunks the water for the P20.
+  - step_type: dilution
+    step_id: np_30x
+    label: NP 30x
+    source: nanoparticles
+    diluent: water
+    destination: working_plate:A1
+    dilution_factor: 30
+    final_volume_ul: 150
+    pre_mix_cycles: 3          # nanoparticles settle; resuspend before drawing
+    pre_mix_volume_ul: 15
+    mix_cycles: 5
+    mix_volume_ul: 15
+
+  - step_type: dilution
+    step_id: np_50x
+    label: NP 50x
+    source: nanoparticles
+    diluent: water
+    destination: working_plate:A2
+    dilution_factor: 50
+    final_volume_ul: 150
+    pre_mix_cycles: 3
+    pre_mix_volume_ul: 15
+    mix_cycles: 5
+    mix_volume_ul: 15
+
+  - step_type: print
+    step_id: print_np_30x
+    label: Print NP 30x
+    source: np_30x             # an earlier dilution, by step id
+    targets: [A1:C1]           # paper column 1, rows A-C
+    drop_volume_ul: 5
+    drops_per_target: 1
+
+  - step_type: print
+    step_id: print_np_50x
+    label: Print NP 50x
+    source: np_50x
+    targets: [A2:C2]
+    drop_volume_ul: 5
+    drops_per_target: 3        # a different drop count per condition
+
+  - step_type: wait
+    step_id: dry_nanoparticles
+    duration_s: 1800
+    reason: dry the nanoparticle spots before the reporter dye
+
+  - step_type: print
+    step_id: print_cv
+    label: Overprint Crystal Violet
+    source: crystal_violet     # straight from the vial, no dilution
+    targets: [A1:C1, A2:C2]    # the same six locations
+    drop_volume_ul: 5
+    drops_per_target: 1
+
+tips:
+  start_tip: A1
+  return_tips: false

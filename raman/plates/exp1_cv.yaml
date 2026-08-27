@@ -1,0 +1,28 @@
+# =============================================================================
+# PLATE CONFIG - experiment 1, crystal violet on paper (scans 00722-00739)
+# -----------------------------------------------------------------------------
+# This is not a physical A1-H12 grid; it is the scan->sample map for exp1 cast
+# into the plate abstraction. 18 consecutive scans = 6 sample groups x 3 spots.
+#
+#   column      scans        sample
+#   ---------------------------------------------------------------
+#   ow-dye      722 723 724  offwhite paper, CV dye reference
+#   ow-dilute   725 726 727  offwhite paper, dilute      (spots 1a 1b 1c)
+#   ow-conc     728 729 730  offwhite paper, concentrated(spots 2a 2b 2c)
+#   dw-dilute   731 732 733  desktop white, dilute       (spots 1a 1b 1c)
+#   dw-conc     734 735 736  desktop white, concentrated (spots 2a 2b 2c)
+#   dw-dye      737 738 739  desktop white, CV dye reference
+# =============================================================================
+name: cv
+description: "Exp 1: crystal violet on offwhite vs desktop-white paper, dye/dilute/concentrated, 3 spots each."
+
+columns: [ow-dye, ow-dilute, ow-conc, dw-dilute, dw-conc, dw-dye]
+rows: [a, b, c]
+start_scan: 722
+order: column_major
+
+scan_regex: '(?i)scan[ _-]?0*(\d+)'
+
+date_format: "%m%d%y"
+name_pattern: "{sample}_{column}_{row}_{date}"   # cv_ow-conc_a_082526
+fallback_pattern: "{stem}_{date}"

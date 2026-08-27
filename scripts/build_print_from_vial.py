@@ -61,11 +61,23 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     dry_run = bool(run_modes.get("dry_run", True))
-    print(f"source     : well {config['source']['well']!r}, {config['source']['material']!r}")
-    print(f"targets    : {', '.join(config['targets'])}")
+    source_wells = config["source"]["wells"]
+    groups = config["print_groups"]
+    paper_count = len(config.get("paper_roles") or ["paper"])
+    targets = list(
+        dict.fromkeys(target for group in groups for target in group["targets"])
+    )
+    deposits_per_paper = sum(
+        len(group["targets"]) * group["droplets"] for group in groups
+    )
+    print(
+        f"source     : well(s) {', '.join(source_wells)}, "
+        f"{config['source']['material']!r}"
+    )
+    print(f"targets    : {', '.join(targets)}")
     print(f"droplet_ul : {config['printing']['droplet_volume_ul']:g}")
-    print(f"per target : {config['printing']['droplets_per_target']} droplet(s)")
-    print(f"deposits   : {len(config['targets']) * config['printing']['droplets_per_target']}")
+    print(f"groups     : {len(groups)}")
+    print(f"deposits   : {deposits_per_paper * paper_count}")
     print(
         f"dry_run    : {dry_run} "
         + ("(PLAN ONLY - the arm will not move)" if dry_run else "(the robot WILL print when uploaded)")

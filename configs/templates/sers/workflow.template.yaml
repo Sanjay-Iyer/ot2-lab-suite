@@ -1,0 +1,134 @@
+# CANONICAL TEMPLATE - arbitrary combined workflow
+#
+# A starting pattern, not a separate schema. This is an ordinary
+# SERSExperimentV1 document and flows through the same resolver, validator,
+# simulation, and execution path as any other experiment.
+#
+# WHAT THIS SHOWS
+#   `steps` is a plain ordered list. The engine executes it top to bottom and
+#   applies no grouping of its own. This template is deliberately INTERLEAVED
+#
+#       dilution -> print -> dilution -> print -> wait -> print
+#
+#   to make the point that a workflow is NOT restricted to "all dilutions first,
+#   then all printing". Group them if the science wants that:
+#
+#       dilution, dilution, print, print, wait, print
+#
+#   Both are one-line reorderings of the same list. So are 10 dilutions, 16
+#   prints and 3 waits in whatever order you need.
+#
+# THE THREE PRIMITIVES ARE THE WHOLE VOCABULARY
+#   dilution   prepare one condition in one working-plate well
+#   print      deposit one liquid onto explicit paper locations
+#   wait       hold for a fixed time, pipette parked clear
+#   "Overprinting", "a concentration series", "a timecourse" are compositions of
+#   these three, never new step types.
+#
+# HOW SOURCES CHAIN
+#   A print step's `source` is either a declared liquid name or the step_id of an
+#   EARLIER dilution. That is how a prepared condition gets printed, and it is
+#   why order matters: a step cannot draw from a dilution that has not run yet.
+
+schema_version: sers-experiment-intent/v1
+experiment_id: sers_workflow_template
+experiment_name: sers_workflow_template
+description: >-
+  Starting pattern for an arbitrary ordered combination of dilution, print and
+  wait steps.
+
+machine_profile: configs/machines/ot2_sers_p20_v1.yaml
+
+deck:
+  - {role: working_plate, kind: plate,     slot: 1}
+  - {role: paper,         kind: paper,     slot: 5}
+  - {role: vial_rack,     kind: vial_rack, slot: 7}
+  - {role: tips,          kind: tiprack,   slot: 9}
+
+liquids:
+  - name: nanoparticles
+    labware: vial_rack
+    well: A1
+    loaded_volume_ul: 5000
+    minimum_remaining_volume_ul: 2500
+    description: SERS nanoparticle stock
+
+  - name: water
+    labware: vial_rack
+    well: A2
+    loaded_volume_ul: 15000
+    minimum_remaining_volume_ul: 2500
+    description: diluent
+
+  - name: crystal_violet
+    labware: vial_rack
+    well: B1
+    loaded_volume_ul: 5000
+    minimum_remaining_volume_ul: 2500
+    description: reporter dye stock
+
+steps:
+  # 1. Prepare the first condition.
+  - step_type: dilution
+    step_id: dilution_1
+    label: NP 30x
+    source: nanoparticles
+    diluent: water
+    destination: working_plate:A1
+    dilution_factor: 30
+    final_volume_ul: 150
+    pre_mix_cycles: 3
+    pre_mix_volume_ul: 15
+    mix_cycles: 5
+    mix_volume_ul: 15
+
+  # 2. Print it immediately, before the second condition exists.
+  - step_type: print
+    step_id: print_1
+    label: Print NP 30x
+    source: dilution_1
+    targets: [A1:C1]
+    drop_volume_ul: 5
+    drops_per_target: 1
+
+  # 3. Now prepare the second condition. Interleaving is the point.
+  - step_type: dilution
+    step_id: dilution_2
+    label: NP 50x
+    source: nanoparticles
+    diluent: water
+    destination: working_plate:A2
+    dilution_factor: 50
+    final_volume_ul: 150
+    pre_mix_cycles: 3
+    pre_mix_volume_ul: 15
+    mix_cycles: 5
+    mix_volume_ul: 15
+
+  # 4. Print it, with a different drop count.
+  - step_type: print
+    step_id: print_2
+    label: Print NP 50x
+    source: dilution_2
+    targets: [A2:C2]
+    drop_volume_ul: 5
+    drops_per_target: 3
+
+  # 5. Dry before the reporter layer.
+  - step_type: wait
+    step_id: dry_1
+    duration_s: 1800
+    reason: dry the nanoparticle spots before the reporter dye
+
+  # 6. Overprint straight from the vial, onto the same six locations.
+  - step_type: print
+    step_id: print_3
+    label: Overprint Crystal Violet
+    source: crystal_violet
+    targets: [A1:C1, A2:C2]
+    drop_volume_ul: 5
+    drops_per_target: 1
+
+tips:
+  start_tip: A1
+  return_tips: false

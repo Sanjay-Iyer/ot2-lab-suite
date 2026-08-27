@@ -1,0 +1,112 @@
+# =============================================================================
+# CONFIG: crystal violet (CV) SERS band set - experiment 1 (paper substrates)
+# -----------------------------------------------------------------------------
+# Eight literature CV bands, each given an explicit search_min/search_max taken
+# from the published range for that assignment rather than a symmetric +/- window.
+# Detection is `targeted`, so every band is characterized in every spectrum and
+# the `found` flag records whether it cleared min_snr.
+#
+# Normalization is deliberately OFF: this experiment compares SERS intensity
+# ACROSS substrates, so the corrected heights must stay on the raw count scale.
+# (Integration time varied - AutoInt was On - so the reporting step converts
+# heights to counts/second before comparing samples.)
+# =============================================================================
+name: "cv_sers"
+description: "Crystal violet SERS bands: 430, 526, 806, 914, 1175, 1378, 1587, 1620 cm^-1."
+
+io:
+  input_dir: raw/exp1/exp1
+  output_dir: results/exp1_cv
+  file_glob: "*.csv"
+  csv:
+    has_header: false       # two-column headerless export: shift, intensity
+    wavelength_col: 0
+    intensity_col: 1
+    delimiter: ","
+
+analysis_range:
+  enabled: true
+  # Detector range is 400-2300, but everything above ~1800 is signal-free tail:
+  # its point-to-point noise is ~2x the band region and it carries cosmic-ray
+  # spikes (e.g. ~2071 in scans 728 and 731). Including it inflates the
+  # MAD-derivative noise estimate and therefore deflates every SNR. The highest
+  # CV band of interest is 1621, so 1800 leaves ample baseline headroom.
+  min: 400
+  max: 1800
+
+preprocessing:
+  baseline:
+    method: arpls           # paper fluoresces heavily - arPLS handles it
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol
+    savgol: {window: 11, polyorder: 3}   # 11 cm^-1 at 1 cm^-1 spacing
+  normalize:
+    method: none            # keep absolute counts for cross-substrate comparison
+
+noise:
+  method: mad_derivative
+
+detection:
+  mode: targeted
+  min_height: null
+  min_prominence: null
+  min_snr: 3.0              # a band counts as "detected" at >= 3 sigma
+  min_width: 3              # cm^-1 - reject single-point spikes
+  max_width: 60             # cm^-1 - reject broad baseline humps
+  area_fwhm_multiplier: 2.0
+
+fitting:
+  enabled: true
+  model: lorentzian         # Raman bands are closer to Lorentzian than Gaussian
+
+peaks:
+  - name: "cv_430"
+    center: 430
+    search_min: 415
+    search_max: 448
+    primary: false          # phenyl-C-phenyl deformation; weak but recognizable
+  - name: "cv_526"
+    center: 526
+    search_min: 514
+    search_max: 540
+    primary: false          # aromatic ring skeletal; secondary marker
+  - name: "cv_806"
+    center: 806
+    search_min: 793
+    search_max: 815
+    primary: true           # aromatic C-H deformation, lit 795-810
+  - name: "cv_914"
+    center: 914
+    search_min: 902
+    search_max: 922
+    primary: true           # ring skeletal / C-H deformation, lit 905-916
+  - name: "cv_1175"
+    center: 1175
+    search_min: 1163
+    search_max: 1188
+    primary: true           # aromatic C-H in-plane bending, lit 1171-1180
+  - name: "cv_1375"
+    center: 1375
+    search_min: 1358
+    search_max: 1392
+    primary: true           # N-phenyl / C-N, lit 1363-1385
+  - name: "cv_1587"
+    center: 1587
+    search_min: 1576
+    search_max: 1602
+    primary: true           # aromatic C=C/C-C stretching, lit 1585-1597
+  - name: "cv_1620"
+    center: 1620
+    search_min: 1606
+    search_max: 1632
+    primary: true           # aromatic ring C-C stretching, lit 1614-1621
+
+plotting:
+  overview: true
+  zoom: true
+  dpi: 150
+  figsize: [13, 6]
+  show_raw: true
+  show_baseline: true
+  annotate: true

@@ -1,0 +1,103 @@
+# Registered machine profile for generalized SERS work on the OT-2:
+# 20 mL vials + BRAND 96-well working plate + A1:H12 paper, single P20.
+#
+# This file is laboratory-owned. It carries pipette identity, labware identities,
+# calibrated aspiration/dispense geometry, and the physically validated droplet
+# release behaviour. It contains no scientific meaning: no liquids, no dilution
+# factors, no layout, no deck slots.
+#
+# The conversational agent may NEVER invent or alter these values. It selects
+# liquids, wells, volumes, targets, and ordering; this file decides how the tip
+# approaches glass and paper. Changing calibrated geometry is a laboratory
+# decision requiring physical revalidation.
+#
+# PROVENANCE - every value below is copied verbatim from an existing registered
+# profile. Nothing here is new geometry.
+#   pipette, vial_rack, paper, tiprack, print_release
+#       <- configs/machines/ot2_standard_printing_p20_v1.yaml
+#   working_plate (BRAND 781662, aspirate_height_mm 0.2)
+#       <- configs/machines/ot2_print_from_plate_p20_v1.yaml
+#
+# CARRIED-OVER CAVEAT, restated from ot2_print_from_plate_p20_v1.yaml:
+#   the BRAND 781662 aspirate height of 0.2 mm was inherited from the Corning
+#   6.86 mm flat-bottom well and has NOT been physically re-validated against
+#   the BRAND plate. Confirm with Labware Position Check before trusting a
+#   near-zero aspirate height on real hardware.
+
+profile_id: ot2_sers_p20_v1
+
+machine:
+  robot_type: OT-2
+  api_level: "2.15"
+
+  pipette:
+    name: p20_single_gen2
+    mount: left
+    minimum_volume_ul: 1.0
+    maximum_volume_ul: 20.0
+    max_transfer_volume_ul: 18.0
+    flow_rates:
+      aspirate_ul_s: 3.0
+      dispense_ul_s: 3.0
+
+  labware:
+    - role_kind: vial_rack
+      load_name: tuberack_3dprint_20ml_8vials_v2
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/tuberack_3dprint_20ml_8vials_v2.json
+      well_diameter_mm: 28.0
+      aspirate_reference: bottom
+      aspirate_height_mm: 4.0
+      dispense_reference: top
+      dispense_height_mm: -2.0
+
+    - role_kind: plate
+      load_name: brand_96_wellplate_350ul_flat_781662
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/brand_96_wellplate_350ul_flat_781662.json
+      well_diameter_mm: 6.94
+      safe_max_volume_ul: 250.0
+      aspirate_reference: bottom
+      aspirate_height_mm: 0.2
+      dispense_reference: top
+      dispense_height_mm: -2.0
+
+    - role_kind: paper
+      load_name: paper_print_96_flat
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/paper_print_96_flat.json
+      aspirate_reference: bottom
+      aspirate_height_mm: 0.5
+      dispense_reference: bottom
+      dispense_height_mm: 0.5
+
+    - role_kind: tiprack
+      load_name: opentrons_96_tiprack_20ul
+      namespace: opentrons
+      version: 1
+
+  print_release:
+    dispense_reference: bottom
+    dispense_height_mm: 0.5
+    trailing_air_gap_ul: 1.5
+    air_gap_height_mm: 5.0
+    push_out_ul: 3.0
+    blow_out: true
+    post_dispense_delay_s: 2.0
+
+  # Paper release height is a meaningful printing parameter, so an experiment may
+  # tune it -- but only inside this validated envelope. Anything outside is a
+  # laboratory decision, not an agent decision.
+  experiment_tunable:
+    paper_dispense_height_mm:
+      minimum: 0.0
+      maximum: 2.0
+      default: 0.5
+
+  # Mixing reaches into liquid, so it is bottom-referenced regardless of where
+  # the profile dispenses.
+  mixing:
+    plate_mix_bottom_offset_mm: 2.0

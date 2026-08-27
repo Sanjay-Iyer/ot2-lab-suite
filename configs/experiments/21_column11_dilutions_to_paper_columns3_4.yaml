@@ -1,0 +1,77 @@
+# =============================================================================
+# 21 - PRINT THE EIGHT COLUMN-11 DILUTIONS ON PAPER COLUMNS 3 AND 4
+# =============================================================================
+# Each dilution in BRAND plate column 11 (slot 1) is printed onto the matching
+# row in BOTH paper columns 3 and 4 (slot 11):
+#
+#   A11 -> A3, A4       E11 -> E3, E4
+#   B11 -> B3, B4       F11 -> F3, F4
+#   C11 -> C3, C4       G11 -> G3, G4
+#   D11 -> D3, D4       H11 -> H3, H4
+#
+# Column 3 is an overprint on the eight A10 spots made by script 20. Column 4
+# receives the same dilution series on otherwise separate paper spots.
+#
+# 16 deposits x 5 uL = 80 uL total, 10 uL drawn from each source well. There
+# is no further dilution, stacking, or drying delay in this script.
+#
+# SIMULATION LAPTOP (build + local simulation only):
+#   conda activate ai
+#   python scripts/build_print_from_vial.py --config configs/experiments/21_column11_dilutions_to_paper_columns3_4.yaml
+#
+# REAL ROBOT LAPTOP (after review, commit/push, and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py column11-paper-columns3-4 --robot-ip 169.254.46.57 --live
+#
+# Script 20 uses and returns tip A4. This script therefore starts at B4 and
+# assigns one dedicated tip to each of the eight source wells. In rack order
+# those tips are B4, C4, D4, E4, F4, G4, H4, and A5. A tip that enters one
+# dilution is never used in another dilution.
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: column11_dilutions_to_paper_columns3_4
+
+# The generated protocol moves liquid. The named runner requires --live.
+run_modes: {dry_run: false}
+
+# --- sources: eight prepared dilutions in the BRAND plate, slot 1 ------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [A11, B11, C11, D11, E11, F11, G11, H11]
+  material: column-11 dilution series
+  # Each dilution recipe prepares 100 uL; this print removes 10 uL and reserves
+  # 20 uL. A11 must also contain at least 100 uL when this print begins.
+  loaded_volume_ul: 100.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destination: paper in slot 11 -------------------------------------------
+substrate:
+  slot: 11
+
+# --- printing behavior -------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+  inter_layer_delay_s: 0.0
+
+# --- exact row-matched source -> paper mappings ------------------------------
+print_groups:
+  # source_wells explicitly binds the paper deck slot to the intended plate
+  # well. This prevents the executor's default per-paper source from replacing
+  # the row-specific source_well when the plan is flattened.
+  - {source_well: A11, source_wells: {11: A11}, targets: [A3, A4], droplets: 1}
+  - {source_well: B11, source_wells: {11: B11}, targets: [B3, B4], droplets: 1}
+  - {source_well: C11, source_wells: {11: C11}, targets: [C3, C4], droplets: 1}
+  - {source_well: D11, source_wells: {11: D11}, targets: [D3, D4], droplets: 1}
+  - {source_well: E11, source_wells: {11: E11}, targets: [E3, E4], droplets: 1}
+  - {source_well: F11, source_wells: {11: F11}, targets: [F3, F4], droplets: 1}
+  - {source_well: G11, source_wells: {11: G11}, targets: [G3, G4], droplets: 1}
+  - {source_well: H11, source_wells: {11: H11}, targets: [H3, H4], droplets: 1}
+
+tips:
+  pipette_tip_reuse: true
+  print_tip: B4
+  return_tips: true

@@ -1,0 +1,83 @@
+# =============================================================================
+# 18 - EIGHT INDEPENDENT CV DYE DILUTIONS IN BRAND PLATE COLUMN 11
+# =============================================================================
+# Concentrated CV dye comes from vial-rack A2 and water comes from vial-rack A1.
+# The robot prepares 100 uL in each BRAND plate well:
+#
+#   A11   5x    20.0000 uL dye + 80.0000 uL water
+#   B11  10x    10.0000 uL dye + 90.0000 uL water
+#   C11  15x     6.6667 uL dye + 93.3333 uL water
+#   D11  20x     5.0000 uL dye + 95.0000 uL water
+#   E11  30x     3.3333 uL dye + 96.6667 uL water
+#   F11  40x     2.5000 uL dye + 97.5000 uL water
+#   G11  50x     2.0000 uL dye + 98.0000 uL water
+#   H11 100x     1.0000 uL dye + 99.0000 uL water
+#
+# The P20's configured range is 1-20 uL, so the 1 uL dye transfer for H11 is
+# valid and 100 uL per well is sufficient. Every point is prepared directly
+# from the concentrated stock; this is not a serial dilution.
+#
+# TOTAL CONSUMPTION: 50.5 uL concentrated dye and 749.5 uL water.
+# This protocol only makes dilutions. It does not print.
+#
+# REAL ROBOT LAPTOP (after review and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py dye-column11-dilutions --robot-ip 169.254.46.57 --live
+#
+# Before running, A11:H11 must all be empty. The robot cannot detect their
+# starting volumes. The BRAND wells have a 350 uL physical capacity.
+#
+# LOAD AT LEAST:
+#   A2 concentrated dye: 400 uL (50.5 uL consumed plus low-vial dead volume)
+#   A1 water:            3.5 mL (749.5 uL consumed plus 4 mm aspiration depth)
+# Use a fresh P20 tip rack, or confirm A1:H3 are all clean and unused. The run
+# consumes 24 tips and drops them in trash so contaminated tips are not returned.
+
+protocol_label: cv_dye_column11_5x_to_100x
+
+# The generated protocol moves liquid. The named runner also requires --live.
+run_modes: {dry_run: false}
+
+pipette_tip_reuse: true
+
+# --- concentrated dye ---------------------------------------------------------
+source:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A2
+  material: concentrated CV dye
+  # Same validated low-volume vial height used by yesterday's add-dye workflow.
+  aspirate_height_mm: 0.5
+
+# --- water --------------------------------------------------------------------
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- eight finished dilutions, top to bottom in column 11 ---------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [A11, B11, C11, D11, E11, F11, G11, H11]
+  aspirate_height_mm: 0.5
+  dispense_height_mm: 2.0
+
+dilution:
+  mode: factors
+  factors: [5, 10, 15, 20, 30, 40, 50, 100]
+  total_volume_ul: 100
+  # 18 uL leaves room for the 1.5 uL trailing air gap in the P20.
+  transfer_chunk_ul: 18
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+tips:
+  start_tip: A1
+  return_tips: false

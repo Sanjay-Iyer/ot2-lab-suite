@@ -1,0 +1,169 @@
+# Canonical SERS CV demo: NP layer -> dry -> 5x CV dilution -> CV overprint.
+#
+# This configuration is intentionally simulation-only.  The requested
+# right-mounted P20 and 0.5 mm vial aspiration height do not match the current
+# physical robot profile (right-mounted P300; repository-validated vial height
+# 4.0 mm).  Set neither live safety flag until that hardware/geometry has been
+# physically installed, calibrated, and reviewed on the real robot laptop.
+
+schema_version: sers-experiment/v1
+experiment_name: sers_cv_titration_demo
+description: >-
+  Print nanoparticles onto two paper fixtures, dry for 30 minutes, prepare a
+  5x Crystal Violet dilution in B11, and overprint the dye on the same spots.
+robot_type: OT-2
+api_level: "2.15"
+
+deck_layout:
+  labware:
+    working_plate:
+      slot: 1
+      kind: plate
+      load_name: brand_96_wellplate_350ul_flat_781662
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/brand_96_wellplate_350ul_flat_781662.json
+      safe_max_volume_ul: 250
+    vial_rack:
+      slot: 7
+      kind: vial_rack
+      load_name: tuberack_3dprint_20ml_8vials_v2
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/tuberack_3dprint_20ml_8vials_v2.json
+    paper_sheet_1:
+      slot: 5
+      kind: paper
+      load_name: paper_print_96_flat
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/paper_print_96_flat.json
+    paper_sheet_2:
+      slot: 11
+      kind: paper
+      load_name: paper_print_96_flat
+      namespace: custom_beta
+      version: 1
+      definition_path: labware/paper_print_96_flat.json
+  tip_racks:
+    p20_tips:
+      slot: 9
+      kind: tiprack
+      load_name: opentrons_96_tiprack_20ul
+      namespace: opentrons
+      version: 1
+
+pipette:
+  name: p20_single_gen2
+  mount: right
+  tip_rack_roles: [p20_tips]
+  minimum_volume_ul: 1
+  maximum_volume_ul: 20
+  max_transfer_volume_ul: 18
+  transfer_air_gap_ul: 1.5
+  air_gap_height_mm: 5
+  aspirate_flow_rate_ul_s: 3
+  dispense_flow_rate_ul_s: 3
+
+tips:
+  start_tip: A1
+  return_tips: false
+
+dilutions:
+  - operation_id: cv_5x_in_b11
+    source:
+      labware: vial_rack
+      well: A1
+      material: Crystal Violet stock
+      bottom_offset_mm: 0.5
+      loaded_volume_ul: 500
+      minimum_remaining_volume_ul: 50
+    diluent:
+      labware: vial_rack
+      well: A2
+      material: water
+      bottom_offset_mm: 0.5
+      loaded_volume_ul: 5000
+      minimum_remaining_volume_ul: 100
+    destination:
+      labware: working_plate
+      well: B11
+      # Machine profile ot2_standard_printing_p20_v1 delivers into plate wells at
+      # top(-2.0). Dispensing against the rim keeps the tip clear of the rising
+      # column: at a 2.0 mm bottom offset the water tip would be submerged in
+      # Crystal Violet once B11 passed ~76 uL, and would carry dye back into the
+      # shared diluent vial on the next chunk.
+      dispense_reference: top
+      dispense_offset_mm: -2.0
+      mix_bottom_offset_mm: 2.0
+      initial_volume_ul: 0
+    stock_volume_ul: 20
+    diluent_volume_ul: 80
+    pre_mix_cycles: 3
+    pre_mix_volume_ul: 15
+    mix_cycles: 5
+    mix_volume_ul: 15
+    blow_out: true
+
+print_layers:
+  - layer_name: nanoparticle_print
+    source_location:
+      labware: working_plate
+      well: A10
+      material: nanoparticle stock
+      bottom_offset_mm: 0.5
+      loaded_volume_ul: 150
+      minimum_remaining_volume_ul: 20
+    drop_volume_ul: 5
+    paper_targets:
+      - labware: paper_sheet_1
+        wells: [A1, A2, A3, A4, A5, A6]
+      - labware: paper_sheet_2
+        wells: [A1, A2, A3, A4, A5, A6]
+    dispense_height_mm: 0.5
+    air_gap_ul: 1.5
+    air_gap_height_mm: 5
+    push_out_ul: 3
+    blow_out: true
+    touch_tip: false
+    post_dispense_delay_s: 2
+    drying_time_s: 1800
+    park_height_mm: 50
+
+  - layer_name: cv_overprint
+    source_location:
+      labware: working_plate
+      well: B11
+      material: 5x diluted Crystal Violet
+      bottom_offset_mm: 0.5
+      minimum_remaining_volume_ul: 20
+    drop_volume_ul: 5
+    paper_targets:
+      - labware: paper_sheet_1
+        wells: [A1, A2, A3, A4, A5, A6]
+      - labware: paper_sheet_2
+        wells: [A1, A2, A3, A4, A5, A6]
+    dispense_height_mm: 0.5
+    air_gap_ul: 1.5
+    air_gap_height_mm: 5
+    push_out_ul: 3
+    blow_out: true
+    touch_tip: false
+    post_dispense_delay_s: 2
+    drying_time_s: 0
+    park_height_mm: 50
+
+# Explicit interleaving resolves the otherwise ambiguous separation between
+# dilutions and print_layers in the declarative schema.
+workflow:
+  - kind: print_layer
+    ref: nanoparticle_print
+  - kind: dilution
+    ref: cv_5x_in_b11
+  - kind: print_layer
+    ref: cv_overprint
+
+safety:
+  live_execution_allowed: false
+  hardware_profile_verified: false
+  required_laptop_role: real-robot

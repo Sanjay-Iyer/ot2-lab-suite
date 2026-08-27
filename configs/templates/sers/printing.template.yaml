@@ -1,0 +1,77 @@
+# CANONICAL TEMPLATE - printing only
+#
+# A starting pattern, not a separate schema. This is an ordinary
+# SERSExperimentV1 document and flows through the same resolver, validator,
+# simulation, and execution path as any other experiment.
+#
+# WHAT THIS SHOWS
+#   one source liquid -> selected A1:H12 paper locations, with no dilution.
+#   The deck carries no working plate, because nothing is prepared on one.
+#   Add `{role: working_plate, kind: plate, slot: 1}` to the deck if you later
+#   add a dilution step.
+#
+# THE PRINT STEP IS CHEMICAL-AGNOSTIC
+#   Nanoparticles, Crystal Violet, water, or a prepared dilution all use this
+#   same step. `source` is just a name; there are no per-chemical primitives.
+#
+# TARGET GRAMMAR - any of these work in `targets`
+#   A1                      one location
+#   A1:C1                   a block, column-major
+#   A1:C3                   a 3x3 block
+#   column 1                whole column, A1 through H1
+#   columns 1 and 2         two whole columns
+#   rows A-C                three whole rows
+#   [A1, B4, F7]            an explicit list
+#   Repeating a location is refused - use drops_per_target instead.
+
+schema_version: sers-experiment-intent/v1
+experiment_id: sers_printing_template
+experiment_name: sers_printing_template
+description: >-
+  Starting pattern for printing a stock or prepared liquid onto A1:H12 paper.
+
+machine_profile: configs/machines/ot2_sers_p20_v1.yaml
+
+deck:
+  - {role: paper,     kind: paper,     slot: 5}
+  - {role: vial_rack, kind: vial_rack, slot: 7}
+  - {role: tips,      kind: tiprack,   slot: 9}
+
+liquids:
+  - name: nanoparticles
+    labware: vial_rack
+    well: A1
+    loaded_volume_ul: 5000
+    minimum_remaining_volume_ul: 2500
+    description: stock printed directly, undiluted
+
+steps:
+  - step_type: print
+    step_id: print_1
+    label: Print NP stock
+    source: nanoparticles      # a declared liquid, or an earlier dilution's step_id
+    paper: paper               # omit when the deck has exactly one paper fixture
+    targets: [column 1]
+    drop_volume_ul: 5
+    drops_per_target: 1
+
+    # per_layer  one tip for the whole layer (fastest)
+    # per_paper  a fresh tip per paper fixture
+    # per_target a fresh tip per location (clean data runs; costs one tip each)
+    tip_strategy: per_layer
+
+    # Release height above the paper floor. This is the one piece of geometry an
+    # experiment may tune, and only inside the envelope the machine profile
+    # declares (0.0-2.0 mm; default 0.5). Anything outside is clamped and warned.
+    dispense_height_mm: 0.5
+
+    # Hold at the spot after each droplet, for wicking. Defaults to the
+    # profile's validated 2.0 s when omitted.
+    post_dispense_delay_s: 2.0
+
+  # Drying between layers is a separate `wait` step, not a property of a print:
+  #   - {step_type: wait, step_id: dry, duration_s: 1800, reason: dry the spots}
+
+tips:
+  start_tip: A1
+  return_tips: false

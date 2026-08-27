@@ -131,10 +131,19 @@ WORKFLOWS = {
         "configs/experiments/16_nanoparticle_column1_layer2_resume.yaml"),
     "cv-dye-layered-spots": (
         "standard", "configs/experiments/17_cv_dye_c11_layered_spots.yaml"),
+    "a10-paper-column3": (
+        "standard", "configs/experiments/20_a10_to_paper_column3.yaml"),
+    "column11-paper-columns3-4": (
+        "standard",
+        "configs/experiments/21_column11_dilutions_to_paper_columns3_4.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
         "dilution", "configs/experiments/12_prepare_c11_d11_5x.yaml"),
+    "dye-column11-dilutions": (
+        "dilution", "configs/experiments/18_dye_column11_5x_to_100x.yaml"),
+    "a11-column11-dilutions": (
+        "dilution", "configs/experiments/19_a11_dilutions_into_column11.yaml"),
     # --- the three general, agent-facing workflows ---------------------------
     "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
     "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),
@@ -260,10 +269,10 @@ def main(argv: list[str] | None = None) -> int:
     add_robot_host_arguments(parser)
     parser.add_argument(
         "--live", action="store_true",
-        help="Required to actually play a STANDARD run (it has no dry_run gate: "
-             "uploading and playing it always prints for real). For four-clover, "
-             "whether liquid moves is controlled by the config's run_modes.dry_run "
-             "-- this flag is not required and does not override that setting.",
+        help="Required to actually play a STANDARD run or the named column-11 "
+             "dye-dilution run. For four-clover, whether liquid moves is "
+             "controlled by the config's run_modes.dry_run; this flag does not "
+             "override that setting.",
     )
     parser.add_argument(
         "--no-start", action="store_true",
@@ -300,11 +309,19 @@ def main(argv: list[str] | None = None) -> int:
             run_log.finish("build_failed", exit_code=1)
             return 1
 
-        if family == "legacy-standard" and not args.no_start and not args.live:
+        if (
+            family == "legacy-standard"
+            or args.workflow in (
+                "dye-column11-dilutions",
+                "a11-column11-dilutions",
+                "a10-paper-column3",
+                "column11-paper-columns3-4",
+            )
+        ) and not args.no_start and not args.live:
             print(
-                "\nREFUSED: the standard executor has no dry_run gate -- playing "
-                "this run moves real liquid. Pass --live to confirm, or --no-start "
-                "to upload/create the run without pressing play.",
+                "\nREFUSED: this workflow moves real liquid. Pass --live to "
+                "confirm, or --no-start to upload/create the run without pressing "
+                "play.",
                 file=sys.stderr,
             )
             run_log.finish("refused_no_live_confirmation", exit_code=1)

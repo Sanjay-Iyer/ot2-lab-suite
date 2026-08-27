@@ -1,0 +1,98 @@
+# =============================================================================
+# 19 - DILUTE BRAND A11 (slot 1) DOWN THE REST OF COLUMN 11
+# =============================================================================
+# The stock is already on the plate: BRAND well A11 in slot 1. Water comes from
+# vial-rack A1 (slot 7). The robot prepares 100 uL in each of the seven wells
+# below A11, every point drawn DIRECTLY from A11 -- this is not a serial
+# dilution, so an error in one well does not propagate to the next.
+#
+#   B11    2x   50.0000 uL A11 +  50.0000 uL water
+#   C11    5x   20.0000 uL A11 +  80.0000 uL water
+#   D11   10x   10.0000 uL A11 +  90.0000 uL water
+#   E11   20x    5.0000 uL A11 +  95.0000 uL water
+#   F11   30x    3.3333 uL A11 +  96.6667 uL water
+#   G11   50x    2.0000 uL A11 +  98.0000 uL water
+#   H11  100x    1.0000 uL A11 +  99.0000 uL water
+#
+# Factors are relative to whatever A11 itself holds. If A11 is already the 5x
+# dye, then B11 is 10x overall, C11 is 25x, and so on.
+#
+# 100 uL per well keeps the smallest pull at 1.0 uL, exactly the P20 floor.
+# Do not lower total_volume_ul or the 100x point drops below the P20 minimum
+# and pre-flight will reject the run.
+#
+# TOTAL CONSUMPTION: 91.33 uL out of A11 and 608.67 uL of water.
+# This protocol only makes dilutions. It does not print.
+#
+# REAL ROBOT LAPTOP (after review and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py a11-column11-dilutions --robot-ip 169.254.46.57 --live
+#
+# ---------------------------------------------------------------------------
+# BEFORE RUNNING:
+#   * B11:H11 must all be EMPTY. The robot cannot detect their starting volume,
+#     and each BRAND well caps at 350 uL.
+#   * A11 must hold at least 150 uL. It gives up 91.33 uL, and the tip
+#     aspirates at 0.5 mm above the flat bottom, which needs roughly 20 uL left
+#     in the well to stay submerged. 200 uL is the comfortable number. Top it
+#     up first with:
+#       python scripts/run_printing_experiment_robot.py add-dye --robot-ip 169.254.46.57 --live
+#   * Vial-rack A1 needs at least 3.5 mL of water: 608.67 uL consumed plus
+#     enough depth to submerge the tip at the 4.0 mm aspirate height in a 28 mm
+#     bore vial.
+#   * Use a fresh P20 rack, or confirm A1:C8 are clean. The run consumes
+#     21 tips (water, stock and mix each get their own tip per well) and drops
+#     them in the trash so plate-contaminated tips are never returned.
+# ---------------------------------------------------------------------------
+
+protocol_label: a11_dilutions_column11
+
+# The generated protocol moves liquid. The named runner also requires --live.
+run_modes: {dry_run: false}
+
+pipette_tip_reuse: true
+
+# --- stock: the dye already sitting in BRAND A11, slot 1 ----------------------
+# Same labware as the destination. The executor loads each deck slot once, so
+# stock and destination legitimately share the slot 1 plate.
+source:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  well: A11
+  material: dye stock in A11
+  # 0.5 mm, not the registered 1.0 mm default: A11 gets drawn down over the run
+  # and the flat well is only 10.65 mm deep. Do not go lower.
+  aspirate_height_mm: 0.5
+
+# --- water --------------------------------------------------------------------
+diluent:
+  labware: tuberack_3dprint_20ml_8vials_v2
+  slot: 7
+  well: A1
+  material: water
+  aspirate_height_mm: 4.0
+
+# --- seven finished dilutions, top to bottom below A11 -------------------------
+destination:
+  labware: brand_96_wellplate_350ul_flat_781662
+  slot: 1
+  wells: [B11, C11, D11, E11, F11, G11, H11]
+  aspirate_height_mm: 0.5
+  dispense_height_mm: 2.0
+
+dilution:
+  mode: factors
+  factors: [2, 5, 10, 20, 30, 50, 100]
+  total_volume_ul: 100
+  # 18 uL leaves room for the 1.5 uL trailing air gap in the 20 uL P20.
+  transfer_chunk_ul: 18
+  mix_cycles: 5
+  mix_volume_ul: 15
+
+liquid_handling:
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+
+tips:
+  start_tip: A1
+  return_tips: false

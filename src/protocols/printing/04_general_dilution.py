@@ -13,7 +13,7 @@ workflow separately afterwards if you want to print what you just made.
 
     python scripts/run_printing_experiment_robot.py dilution
 
-Two modes, both driven entirely by YAML:
+Three modes, all driven entirely by YAML:
 
   mode: single
       stock_volume_ul from the stock well + diluent_volume_ul from the diluent
@@ -23,6 +23,12 @@ Two modes, both driven entirely by YAML:
       every destination well gets diluent_volume_ul; the first also gets
       stock_volume_ul from the stock well; then transfer_volume_ul is carried
       from each well into the next, mixing at every step.
+
+  mode: factors
+      prepares independent direct dilutions from the undiluted stock. One
+      factor is paired with each destination well; stock is total_volume_ul /
+      factor and diluent fills the remainder. Errors cannot propagate from one
+      dilution point into the next.
 
 Every transfer larger than the P20 is split into chunks of transfer_chunk_ul.
 The trailing air gap is trimmed to whatever still fits alongside the liquid, so
@@ -40,8 +46,8 @@ metadata = {
     "protocolName": "General Dilution (P20, API 2.15)",
     "author": "OT-2 Lab Suite",
     "description": (
-        "Config-driven single or serial dilution between any registered source "
-        "and destination labware. No printing."
+        "Config-driven single, serial, or independent-factor dilution between "
+        "any registered source and destination labware. No printing."
     ),
 }
 requirements = {"robotType": "OT-2", "apiLevel": "2.15"}
@@ -101,6 +107,30 @@ def _set_flow_rates(p20):
         p20.flow_rate.dispense = float(rates["dispense"])
 
 
+def _split_volume(total, maximum, minimum):
+    """Split a transfer while keeping every chunk inside the pipette range."""
+    if total < minimum - 1e-9:
+        raise RuntimeError(
+            f"transfer of {total:g} uL is below the pipette minimum {minimum:g} uL"
+        )
+    chunks = []
+    remaining = total
+    while remaining > 1e-9:
+        this = min(maximum, remaining)
+        chunks.append(this)
+        remaining -= this
+    if len(chunks) > 1 and chunks[-1] < minimum - 1e-9:
+        merged = chunks[-2] + chunks[-1]
+        half = merged / 2.0
+        if half < minimum - 1e-9 or half > maximum + 1e-9:
+            raise RuntimeError(
+                f"cannot split {total:g} uL into chunks within "
+                f"[{minimum:g}, {maximum:g}] uL"
+            )
+        chunks[-2:] = [half, half]
+    return chunks
+
+
 def _load_deck(protocol):
     """Load each distinct deck slot once; roles may share one labware."""
     by_slot = {}
@@ -124,6 +154,7 @@ def _preflight(protocol, labware, p20):
     errors = []
     dil = CONFIG["dilution"]
     dest = CONFIG["destination"]
+    p20_min = float(CONFIG["safety"].get("p20_min_volume_ul", 1.0))
     p20_max = float(CONFIG["safety"]["p20_max_volume_ul"])
 
     if int(CONFIG["deck"]["tiprack_p20"]["slot"]) != 9:
@@ -136,8 +167,11 @@ def _preflight(protocol, labware, p20):
         errors.append(f"pipette must be {CONFIG['pipette']['name']}, got {p20.name}")
 
     mode = str(dil.get("mode", "single")).lower()
-    if mode not in ("single", "series"):
-        errors.append(f"dilution.mode must be 'single' or 'series', got {mode!r}")
+    if mode not in ("single", "series", "factors"):
+        errors.append(
+            "dilution.mode must be 'single', 'series', or 'factors', "
+            f"got {mode!r}"
+        )
 
     stock_well = str(CONFIG["stock"]["well"]).upper()
     diluent_well = str(CONFIG["diluent"]["well"]).upper()
@@ -155,6 +189,46 @@ def _preflight(protocol, labware, p20):
         errors.append(f"destination wells not on the labware: {', '.join(missing)}")
     if mode == "series" and len(wells) < 2:
         errors.append("dilution.mode series needs at least two destination wells")
+
+    factors = []
+    factor_points = []
+    total_volume = float(dil.get("total_volume_ul", 0.0) or 0.0)
+    if mode == "factors":
+        raw_factors = dil.get("factors") or []
+        if len(raw_factors) != len(wells):
+            errors.append(
+                "dilution.mode factors needs exactly one factor per destination "
+                f"well ({len(raw_factors)} factors, {len(wells)} wells)"
+            )
+        if total_volume <= 0:
+            errors.append("dilution.total_volume_ul must be > 0 for mode factors")
+        for index, raw_factor in enumerate(raw_factors):
+            try:
+                factor = float(raw_factor)
+            except (TypeError, ValueError):
+                errors.append(f"dilution.factors[{index}] is not numeric: {raw_factor!r}")
+                continue
+            if factor < 1:
+                errors.append(
+                    f"dilution.factors[{index}] must be >= 1, got {factor:g}"
+                )
+                continue
+            factors.append(factor)
+            stock = total_volume / factor
+            diluent = total_volume - stock
+            if 0 < stock < p20_min - 1e-9:
+                errors.append(
+                    f"factor {factor:g} needs {stock:g} uL stock, below the "
+                    f"P20 minimum {p20_min:g} uL; increase total_volume_ul"
+                )
+            if 0 < diluent < p20_min - 1e-9:
+                errors.append(
+                    f"factor {factor:g} needs {diluent:g} uL diluent, below the "
+                    f"P20 minimum {p20_min:g} uL; increase total_volume_ul"
+                )
+            factor_points.append(
+                {"factor": factor, "stock_volume": stock, "diluent_volume": diluent}
+            )
 
     chunk = float(dil.get("transfer_chunk_ul", p20_max))
     if not (0 < chunk <= p20_max):
@@ -180,8 +254,10 @@ def _preflight(protocol, labware, p20):
     if wells and not missing:
         if mode == "single":
             per_well = stock_volume + diluent_volume
-        else:
+        elif mode == "series":
             per_well = diluent_volume + max(stock_volume, transfer_volume)
+        else:
+            per_well = total_volume
         capacity = dest_names[wells[0]].max_volume
         if per_well > capacity + 1e-9:
             errors.append(
@@ -209,6 +285,10 @@ def _preflight(protocol, labware, p20):
         "transfer_volume": transfer_volume,
         "mix_cycles": int(mix_cycles),
         "mix_volume": mix_volume,
+        "factors": factors,
+        "factor_points": factor_points,
+        "total_volume": total_volume,
+        "p20_min": p20_min,
     }
 
 
@@ -236,12 +316,22 @@ def _report_plan(protocol, resolved):
             f"{resolved['diluent_volume']:g} uL diluent = "
             f"{resolved['stock_volume'] + resolved['diluent_volume']:g} uL"
         )
-    else:
+    elif resolved["mode"] == "series":
         protocol.comment(
             f"Series: {resolved['diluent_volume']:g} uL diluent in every well, "
             f"{resolved['stock_volume']:g} uL stock into {resolved['wells'][0]}, "
             f"then {resolved['transfer_volume']:g} uL carried down the series"
         )
+    else:
+        protocol.comment(
+            f"Independent factors: {resolved['total_volume']:g} uL in each well"
+        )
+        for name, point in zip(resolved["wells"], resolved["factor_points"]):
+            protocol.comment(
+                f"  {name}: {point['factor']:g}x = "
+                f"{point['stock_volume']:g} uL stock + "
+                f"{point['diluent_volume']:g} uL diluent"
+            )
     protocol.comment(
         f"Mix: {resolved['mix_cycles']} cycles x {resolved['mix_volume']:g} uL"
     )
@@ -284,20 +374,15 @@ def _run_dilution(protocol, labware, p20, resolved):
 
     def transfer(source_well, source_height, destination_well, volume, source_key, label):
         """Chunked aspirate/dispense; the air gap shrinks to whatever fits."""
-        remaining = volume
-        index = 0
-        chunks = max(1, int(-(-volume // resolved["chunk"])))
-        while remaining > 1e-9:
-            index += 1
-            this = min(resolved["chunk"], remaining)
-            use_tip(source_key, f"{label} ({index}/{chunks})")
+        chunks = _split_volume(volume, resolved["chunk"], resolved["p20_min"])
+        for index, this in enumerate(chunks, start=1):
+            use_tip(source_key, f"{label} ({index}/{len(chunks)})")
             gap = min(air_gap, max(0.0, p20_max - this))
             p20.aspirate(this, source_well.bottom(source_height))
             if gap > 0:
                 p20.air_gap(gap, height=air_gap_height)
             p20.dispense(this + gap, destination_well.bottom(dispense_height))
             p20.blow_out(destination_well.bottom(dispense_height))
-            remaining -= this
         protocol.comment(f"{label}: {volume:g} uL")
 
     def mix(well, name):
@@ -328,7 +413,7 @@ def _run_dilution(protocol, labware, p20, resolved):
             transfer(stock_well, stock_height, well, resolved["stock_volume"],
                      f"stock:{resolved['stock_well']}", f"stock -> {name}")
             mix(well, name)
-    else:
+    elif resolved["mode"] == "series":
         # Every well gets diluent first.
         protocol.comment("--- diluent into every well ---")
         for name in resolved["wells"]:
@@ -349,6 +434,28 @@ def _run_dilution(protocol, labware, p20, resolved):
                      dest_labware[current], resolved["transfer_volume"],
                      f"series:{previous}", f"{previous} -> {current}")
             mix(dest_labware[current], current)
+    else:
+        for name, point in zip(resolved["wells"], resolved["factor_points"]):
+            well = dest_labware[name]
+            protocol.comment(f"--- {name}: {point['factor']:g}x ---")
+            if point["diluent_volume"] > 0:
+                transfer(
+                    diluent_well,
+                    diluent_height,
+                    well,
+                    point["diluent_volume"],
+                    f"diluent:{resolved['diluent_well']}",
+                    f"diluent -> {name}",
+                )
+            transfer(
+                stock_well,
+                stock_height,
+                well,
+                point["stock_volume"],
+                f"stock:{resolved['stock_well']}",
+                f"stock -> {name}",
+            )
+            mix(well, name)
 
     _release_tip(p20, return_tips)
     protocol.comment(

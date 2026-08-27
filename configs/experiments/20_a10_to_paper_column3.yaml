@@ -1,0 +1,62 @@
+# =============================================================================
+# 20 - PRINT BRAND A10 ONTO ALL EIGHT SPOTS IN PAPER COLUMN 3
+# =============================================================================
+# One 5 uL deposit is drawn from BRAND plate well A10 in slot 1 and printed
+# onto every row of column 3 on the paper in slot 11:
+#
+#   A10 -> A3, B3, C3, D3, E3, F3, G3, H3
+#
+# 8 deposits x 5 uL = 40 uL total. There is no dilution, stacking, or drying
+# delay in this script.
+#
+# SIMULATION LAPTOP (build + local simulation only):
+#   conda activate ai
+#   python scripts/build_print_from_vial.py --config configs/experiments/20_a10_to_paper_column3.yaml
+#
+# REAL ROBOT LAPTOP (after review, commit/push, and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py a10-paper-column3 --robot-ip 169.254.46.57 --live
+#
+# The preceding column-11 dilution workflow consumes tips A1:H3. This print
+# therefore starts at A4, the next clean P20 tip, and returns it to A4. If a
+# different tip history applies, change tips.print_tip before building.
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: a10_to_paper_column3
+
+# The generated protocol moves liquid. The named runner requires --live.
+run_modes: {dry_run: false}
+
+# --- source: selected well in the BRAND plate, slot 1 -------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [A10]
+  material: sample in A10
+  # This plan draws 40 uL and reserves 20 uL. Set this to the actual starting
+  # volume if A10 contains less than the 150 uL used by the earlier A10 plan.
+  loaded_volume_ul: 150.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destination: paper in slot 11 -------------------------------------------
+substrate:
+  slot: 11
+
+# --- printing behavior -------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+  inter_layer_delay_s: 0.0
+
+# --- exact source -> paper mapping -------------------------------------------
+print_groups:
+  - source_well: A10
+    targets: [A3, B3, C3, D3, E3, F3, G3, H3]
+    droplets: 1
+
+tips:
+  pipette_tip_reuse: true
+  print_tip: A4
+  return_tips: true

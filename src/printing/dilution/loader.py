@@ -95,6 +95,10 @@ def load_dilution_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
     if tip_reuse is None:
         tip_reuse = tips.get("pipette_tip_reuse", True)
 
+    raw_factors = dilution.get("factors", []) or []
+    if not isinstance(raw_factors, list):
+        raise DilutionLoadError("dilution.factors must be a list")
+
     config: dict[str, Any] = {
         "protocol_label": str(protocol_label),
         "deck": {
@@ -127,6 +131,8 @@ def load_dilution_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
             "stock_volume_ul": float(dilution.get("stock_volume_ul", 20.0)),
             "diluent_volume_ul": float(dilution.get("diluent_volume_ul", 80.0)),
             "transfer_volume_ul": float(dilution.get("transfer_volume_ul", 20.0)),
+            "factors": [float(value) for value in raw_factors],
+            "total_volume_ul": float(dilution.get("total_volume_ul", 100.0)),
             "transfer_chunk_ul": float(
                 dilution.get("transfer_chunk_ul", pipette["maximum_volume_ul"])
             ),
@@ -149,6 +155,9 @@ def load_dilution_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
             "pipette_tip_reuse": bool(tip_reuse),
         },
         "flow_rates": {"p20": pipette.get("flow_rates", {})},
-        "safety": {"p20_max_volume_ul": float(pipette["maximum_volume_ul"])},
+        "safety": {
+            "p20_min_volume_ul": float(pipette["minimum_volume_ul"]),
+            "p20_max_volume_ul": float(pipette["maximum_volume_ul"]),
+        },
     }
     return config, run_modes

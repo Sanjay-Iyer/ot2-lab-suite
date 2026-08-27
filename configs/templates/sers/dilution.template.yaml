@@ -1,0 +1,74 @@
+# CANONICAL TEMPLATE - dilution only
+#
+# A starting pattern, not a separate schema. This is an ordinary
+# SERSExperimentV1 document: load it, patch it, add steps, and it flows through
+# the same resolver, validator, simulation, and execution path as any other
+# experiment.
+#
+# WHAT THIS SHOWS
+#   stock + diluent -> working plate destination, with no printing at all.
+#   The deck carries no paper fixture, because nothing prints.
+#
+# TO EXPAND IT
+#   Add more `dilution` steps with new step_id values and new destination wells.
+#   Eight conditions in A1:A8 is just eight entries under `steps`.
+#
+# WHAT YOU MUST NOT PUT HERE
+#   Aspiration heights, dispense references, flow rates, air-gap behaviour, or
+#   labware load names. Those are laboratory-calibrated and come from
+#   machine_profile. An experiment cannot override them.
+
+schema_version: sers-experiment-intent/v1
+experiment_id: sers_dilution_template
+experiment_name: sers_dilution_template
+description: >-
+  Starting pattern for preparing one or more dilutions without printing.
+
+machine_profile: configs/machines/ot2_sers_p20_v1.yaml
+
+deck:
+  - {role: working_plate, kind: plate,     slot: 1}
+  - {role: vial_rack,     kind: vial_rack, slot: 7}
+  - {role: tips,          kind: tiprack,   slot: 9}
+
+# What you physically load before the run.
+#
+# minimum_remaining_volume_ul is a real physical constraint, not padding: the
+# profile aspirates from the 20 mL vials at 4.0 mm above the floor, and a 28 mm
+# bore needs about 2.46 mL to reach that height. The depth gate rejects the run
+# if a vial would drop below it.
+liquids:
+  - name: nanoparticles
+    labware: vial_rack
+    well: A1
+    loaded_volume_ul: 5000
+    minimum_remaining_volume_ul: 2500
+    description: stock to be diluted
+
+  - name: water
+    labware: vial_rack
+    well: A2
+    loaded_volume_ul: 15000
+    minimum_remaining_volume_ul: 2500
+    description: diluent
+
+steps:
+  # Give the scientific target. The resolver computes the transfer volumes
+  # (100 / 10 = 10 uL of stock plus 90 uL of water) and chunks them for the P20.
+  # Never write the arithmetic into this file.
+  - step_type: dilution
+    step_id: dilution_1
+    label: NP 10x
+    source: nanoparticles
+    diluent: water
+    destination: working_plate:A1
+    dilution_factor: 10
+    final_volume_ul: 100
+    pre_mix_cycles: 3          # resuspend a settling stock before drawing
+    pre_mix_volume_ul: 15
+    mix_cycles: 5              # mix the finished dilution
+    mix_volume_ul: 15
+
+tips:
+  start_tip: A1
+  return_tips: false

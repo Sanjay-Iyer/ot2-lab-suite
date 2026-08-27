@@ -69,26 +69,22 @@ DEFAULT_DO_PRINT = True
 
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'protocol_label': 'cv_dye_c11_layered_spots',
+CONFIG = { 'protocol_label': 'column11_dilutions_to_paper_columns3_4',
   'deck': { 'source': { 'slot': 1,
                         'load_name': 'brand_96_wellplate_350ul_flat_781662',
                         'namespace': 'custom_beta',
                         'version': 1},
-            'paper': { 'slot': 5,
+            'paper': { 'slot': 11,
                        'load_name': 'paper_print_96_flat',
                        'namespace': 'custom_beta',
                        'version': 1},
-            'paper_2': { 'slot': 11,
-                         'load_name': 'paper_print_96_flat',
-                         'namespace': 'custom_beta',
-                         'version': 1},
             'tiprack_p20': {'slot': 9, 'load_name': 'opentrons_96_tiprack_20ul'}},
-  'paper_roles': ['paper', 'paper_2'],
-  'paper_sources': {'paper': 'C11', 'paper_2': 'C11'},
+  'paper_roles': ['paper'],
+  'paper_sources': {'paper': 'A11'},
   'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
   'source': { 'type': 'well_plate',
-              'wells': ['C11'],
-              'material': 'CV dye',
+              'wells': ['A11', 'B11', 'C11', 'D11', 'E11', 'F11', 'G11', 'H11'],
+              'material': 'column-11 dilution series',
               'loaded_volume_ul': 100.0,
               'minimum_remaining_ul': 20.0,
               'aspirate_height_mm': 0.5,
@@ -102,10 +98,41 @@ CONFIG = { 'protocol_label': 'cv_dye_c11_layered_spots',
                 'blow_out': True,
                 'inter_drop_delay_s': 0.0,
                 'inter_layer_delay_s': 0.0,
-                'initial_delay_s': 7200.0,
+                'initial_delay_s': 0.0,
                 'layer_number_offset': 0},
-  'print_groups': [{'source_well': 'C11', 'targets': ['E1', 'F1'], 'droplets': 1}],
-  'tips': {'print_tip': 'E1', 'return_tips': True, 'pipette_tip_reuse': True},
+  'print_groups': [ { 'source_well': 'A11',
+                      'targets': ['A3', 'A4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'A11'}},
+                    { 'source_well': 'B11',
+                      'targets': ['B3', 'B4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'B11'}},
+                    { 'source_well': 'C11',
+                      'targets': ['C3', 'C4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'C11'}},
+                    { 'source_well': 'D11',
+                      'targets': ['D3', 'D4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'D11'}},
+                    { 'source_well': 'E11',
+                      'targets': ['E3', 'E4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'E11'}},
+                    { 'source_well': 'F11',
+                      'targets': ['F3', 'F4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'F11'}},
+                    { 'source_well': 'G11',
+                      'targets': ['G3', 'G4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'G11'}},
+                    { 'source_well': 'H11',
+                      'targets': ['H3', 'H4'],
+                      'droplets': 1,
+                      'source_wells': {'paper': 'H11'}}],
+  'tips': {'print_tip': 'B4', 'return_tips': True, 'pipette_tip_reuse': True},
   'flow_rates': {'p20': {'aspirate_ul_s': 3.0, 'dispense_ul_s': 3.0}},
   'safety': {'p20_max_volume_ul': 20.0}}
 # <<< CONFIG END <<<
@@ -265,6 +292,55 @@ def _preflight(protocol, labware, p20):
             }
         )
 
+    # Optional finishing pass: after EVERY layer is done, hold for `delay_s`,
+    # then deposit from a different source well onto a chosen set of targets.
+    # This is how a second liquid is applied on top of a finished stack -- the
+    # layer loop cannot express it, because every print group starts at layer 1.
+    # Absent from CONFIG, nothing below changes behaviour in any way.
+    overprint_raw = CONFIG.get("overprint") or None
+    resolved_overprint = None
+    if overprint_raw:
+        label = "overprint"
+        op_targets = [str(t).upper() for t in (overprint_raw.get("targets") or [])]
+        if not op_targets:
+            errors.append(f"{label}: targets must list at least one paper well")
+        for role, paper_names in paper_names_by_role.items():
+            missing = sorted({t for t in op_targets if t not in paper_names})
+            if missing:
+                errors.append(
+                    f"{label}: targets not on {role} labware: {', '.join(missing)}"
+                )
+        op_droplets = overprint_raw.get("droplets", 1)
+        if (
+            isinstance(op_droplets, bool)
+            or not isinstance(op_droplets, int)
+            or op_droplets < 1
+        ):
+            errors.append(
+                f"{label}: droplets must be an integer >= 1, got {op_droplets!r}"
+            )
+            op_droplets = 1
+        op_delay = float(overprint_raw.get("delay_s", 0.0) or 0.0)
+        if op_delay < 0:
+            errors.append(f"{label}: delay_s must be >= 0")
+            op_delay = 0.0
+        op_source = str(overprint_raw.get("source_well") or "").upper()
+        if not op_source:
+            errors.append(f"{label}: source_well is required")
+        elif op_source not in source_names:
+            errors.append(f"{label}: source well {op_source} does not exist")
+        elif declared_wells and op_source not in declared_wells:
+            errors.append(
+                f"{label}: source well {op_source} is not listed in source.wells "
+                f"({', '.join(declared_wells)})"
+            )
+        resolved_overprint = {
+            "targets": op_targets,
+            "droplets": int(op_droplets),
+            "delay_s": op_delay,
+            "source_well": op_source,
+        }
+
     tip_name = str(CONFIG["tips"]["print_tip"]).upper()
     tiprack_names = list(labware["tiprack_p20"].wells_by_name())
     if tip_name not in tiprack_names:
@@ -276,9 +352,19 @@ def _preflight(protocol, labware, p20):
         for source_well in group["source_wells"].values():
             if source_well and source_well not in used_sources:
                 used_sources.append(source_well)
+    # The overprint liquid is a distinct source well, so it earns its own tip
+    # through the same one-tip-per-source rule -- it is never the tip that has
+    # been sitting in the layer liquid.
+    if resolved_overprint and resolved_overprint["source_well"]:
+        if resolved_overprint["source_well"] not in used_sources:
+            used_sources.append(resolved_overprint["source_well"])
+    overprint_per_paper = (
+        len(resolved_overprint["targets"]) * resolved_overprint["droplets"]
+        if resolved_overprint else 0
+    )
     deposits_per_paper = sum(
         len(g["targets"]) * g["droplets"] for g in resolved_groups
-    )
+    ) + overprint_per_paper
     deposits = deposits_per_paper * len(paper_roles)
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
     tips_needed = len(used_sources) if tip_reuse else deposits
@@ -311,6 +397,14 @@ def _preflight(protocol, labware, p20):
             )
             for g in resolved_groups
         )
+        if resolved_overprint and resolved_overprint["source_well"] == source_well_name:
+            # The overprint pass goes onto every paper, same as a layer group.
+            required += (
+                len(resolved_overprint["targets"])
+                * resolved_overprint["droplets"]
+                * volume
+                * len(paper_roles)
+            )
         if not (0 < loaded <= source_well.max_volume):
             errors.append(
                 f"source.loaded_volume_ul must be in (0, {source_well.max_volume:g}] "
@@ -343,6 +437,7 @@ def _preflight(protocol, labware, p20):
         "deposits_per_paper": deposits_per_paper,
         "max_layers": max(g["droplets"] for g in resolved_groups),
         "deposits": deposits,
+        "overprint": resolved_overprint,
     }
 
 
@@ -389,6 +484,14 @@ def _report_plan(protocol, resolved):
         protocol.comment(
             f"Layers: {resolved['max_layers']} "
             f"(delay between layers: {layer_delay:g} s)"
+        )
+    overprint = resolved.get("overprint")
+    if overprint:
+        protocol.comment(
+            f"Overprint: after the last layer, hold {overprint['delay_s']:g} s, "
+            f"then {overprint['source_well']} -> "
+            f"{', '.join(overprint['targets'])} x {overprint['droplets']} "
+            "droplet(s) on every paper"
         )
     protocol.comment(
         f"Total: {resolved['deposits']} deposits x {volume:g} uL = "
@@ -543,6 +646,52 @@ def _print_from_vial(protocol, labware, p20, resolved):
                 f"{park_height:g} mm above source {last_source_well_name}."
             )
             protocol.delay(seconds=layer_delay)
+
+    # ── Optional overprint: a second liquid, after everything has dried ──────
+    overprint = resolved.get("overprint")
+    if overprint:
+        op_delay = float(overprint["delay_s"])
+        if op_delay > 0:
+            # Drop the layer tip first: nothing should sit loaded for hours.
+            _release_tip(p20, return_tips)
+            active_source = None
+            protocol.comment(
+                f"Overprint hold: {op_delay:g} s after the last layer drop; "
+                "no tip is attached."
+            )
+            protocol.delay(seconds=op_delay)
+        op_source_name = overprint["source_well"]
+        op_source_well = source_labware[op_source_name]
+        for op_layer in range(1, overprint["droplets"] + 1):
+            for target in overprint["targets"]:
+                for paper_role, paper in papers:
+                    if tip_reuse:
+                        use_source(op_source_name)
+                    else:
+                        fresh_tip(op_source_name)
+                    destination = paper[target].bottom(z)
+                    if chase > 0:
+                        p20.aspirate(chase, op_source_well.bottom(aspirate_height))
+                    p20.aspirate(volume, op_source_well.bottom(aspirate_height))
+                    if air_gap > 0:
+                        p20.air_gap(air_gap, height=air_gap_height)
+
+                    piston = chase + volume + air_gap
+                    if push_out > 0:
+                        p20.dispense(piston, destination, push_out=push_out)
+                    else:
+                        p20.dispense(piston, destination)
+                    if blow_out:
+                        p20.blow_out(destination)
+                    printed += 1
+                    protocol.comment(
+                        f"overprint: {paper_role} slot "
+                        f"{CONFIG['deck'][paper_role]['slot']} {target} <- "
+                        f"{op_source_name} "
+                        f"(drop {op_layer}/{overprint['droplets']})"
+                    )
+                    if drop_delay > 0:
+                        protocol.delay(seconds=drop_delay)
 
     _release_tip(p20, return_tips)
     protocol.comment(
