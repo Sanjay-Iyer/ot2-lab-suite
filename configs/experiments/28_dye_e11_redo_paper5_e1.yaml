@@ -1,0 +1,80 @@
+# =============================================================================
+# 28 - SINGLE-SPOT REDO: E11 DYE ONTO WHITE PAPER SLOT 5, WELL E1
+# =============================================================================
+# Repair pass for one missed deposit in script 27
+# (27_dye_column11_over_np_paper5_11_columns1_2.yaml). In that run the white
+# paper in slot 5 did not receive its dye droplet at column 1, row 5 - row 5 is
+# row E, so the empty position is E1.
+#
+# E1 already carries the A9 nanoparticle spot laid down by script 26; only the
+# dye layer is missing. This script prints exactly that one dye droplet and
+# nothing else:
+#
+#   E11 (BRAND plate, slot 1)  ->  E1 (paper, slot 5)   1 droplet x 5 uL
+#
+# One deposit, 5 uL total, drawn from the single well E11. No other row, no
+# other column, no second paper. The paper in slot 11 is not touched, and E2
+# and E3 on this paper are not reprinted.
+#
+# TIP: B1, reused, as requested - the same tip script 27 used for its whole dye
+# pass and returned to the rack. Accepted knowingly: B1 now carries B9
+# nanoparticle residue plus every dilution from A11 through H11, so this
+# aspiration carries F11/G11/H11 carryover into the E11 stock well, further
+# than the original pass did. Do not read E11 as a clean 5-step dilution after
+# this run. A fresh tip would avoid that but would give E1 a different tip
+# history from its neighbours E2 and E3.
+#
+# VOLUME: E11 needs at least 25 uL in it (5 uL drawn + 20 uL reserve). It has
+# already been drawn from by scripts 23-25 and 27; confirm the well is above
+# that before running, or correct loaded_volume_ul below to the real volume.
+#
+# DECK: unchanged from script 27 - BRAND plate in slot 1, papers in slots 5 and
+# 11, tiprack in slot 9. Leave the slot-11 paper in place so the deck matches
+# the profile even though nothing is printed on it.
+#
+# SIMULATION LAPTOP (local build + simulation only; no robot contact):
+#   conda activate ai
+#   python scripts/build_print_from_vial.py --config configs/experiments/28_dye_e11_redo_paper5_e1.yaml
+#
+# REAL ROBOT LAPTOP (after review, commit/push, and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py dye-e11-redo-paper5-e1 --live
+#
+# Physical execution requires the real robot laptop and explicit readiness
+# confirmation. Creating or locally simulating this config does not run it live.
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: dye_e11_redo_paper5_e1
+
+# The generated protocol moves liquid. The named runner requires --live.
+run_modes: {dry_run: false}
+
+# --- source: the single row-E dye dilution in the BRAND plate, slot 1 -------
+source:
+  type: well_plate
+  slot: 1
+  wells: [E11]
+  material: column-11 dye dilution series, row E
+  loaded_volume_ul: 100.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destination: white paper in slot 5 only --------------------------------
+substrate:
+  slot: 5
+
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0
+  inter_layer_delay_s: 0.0
+
+print_groups:
+  # The one missed spot. Same binding style as script 27, one group, one target.
+  - {source_well: E11, source_wells: {5: E11}, targets: [E1], droplets: 1}
+
+tips:
+  pipette_tip_reuse: true
+  # Reuse the script-27 dye tip, as requested. See the TIP note above.
+  print_tip: B1
+  return_tips: true

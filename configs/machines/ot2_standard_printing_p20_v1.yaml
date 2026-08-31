@@ -14,9 +14,10 @@
 #   configs/printing/four_clover_spacing_v13.yaml records
 #   `dispense_height_mm: 0.5` as physically confirmed (previously 4.0), with a
 #   1.5 uL trailing air gap, 3.0 uL push-out, and blow-out enabled.
-# On 2026-08-31, the user requested a paper dispense height of 0.8 mm.
-# This replaces the previously confirmed 0.5 mm height; physical revalidation
-# of 0.8 mm is pending. Print-release air handling is unchanged.
+# On 2026-08-31, the user requested 0.8 mm, then revised the paper dispense
+# height to 1.1 mm for NP and dye printing. The previously physically confirmed
+# height was 0.5 mm; physical revalidation of 1.1 mm is pending.
+# Print-release air handling is unchanged.
 # Provenance of the plate aspiration height:
 #   0.2 mm is the laboratory-validated low-volume operating point for the
 #   6.86 mm flat-bottom well geometry. Changes require physical revalidation.
@@ -70,7 +71,7 @@ machine:
       aspirate_reference: bottom
       aspirate_height_mm: 0.5
       dispense_reference: bottom
-      dispense_height_mm: 0.8
+      dispense_height_mm: 1.1
 
     - role: tiprack
       kind: tiprack
@@ -81,7 +82,7 @@ machine:
 
   print_release:
     dispense_reference: bottom
-    dispense_height_mm: 0.8
+    dispense_height_mm: 1.1
     pre_air_chase_ul: 0.0
     trailing_air_gap_ul: 1.5
     air_gap_height_mm: 5.0

@@ -153,6 +153,9 @@ WORKFLOWS = {
     "dye-column11-over-np-paper5-11": (
         "standard",
         "configs/experiments/27_dye_column11_over_np_paper5_11_columns1_2.yaml"),
+    "dye-e11-redo-paper5-e1": (
+        "standard",
+        "configs/experiments/28_dye_e11_redo_paper5_e1.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
@@ -341,6 +344,7 @@ def main(argv: list[str] | None = None) -> int:
                 "column11-paper5-column3",
                 "np-a9-b9-paper5-11",
                 "dye-column11-over-np-paper5-11",
+                "dye-e11-redo-paper5-e1",
                 "consolidate-b11-c11",
             )
         ) and not args.no_start and not args.live:
