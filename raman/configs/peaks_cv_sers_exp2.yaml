@@ -1,0 +1,71 @@
+# =============================================================================
+# CONFIG: crystal violet dye-dilution series - experiment 2 (082726, offwhite)
+# -----------------------------------------------------------------------------
+# Identical band definitions and processing to peaks_cv_sers (exp 1) so the two
+# experiments stay directly comparable; only io: differs.
+#
+# NOTE ON file_glob: the raw folder holds BOTH exports side by side - the
+# two-column "shift,intensity" files (timestamped 11_30_33_* / 11_30_34_*) and
+# the full metadata files (11_30_44_*). The glob below selects only the
+# two-column ones. The metadata files are read separately by the report script.
+# =============================================================================
+name: "cv_sers_exp2"
+description: "Crystal violet dye dilution 2x-200x, NP+dye vs dye-only, offwhite paper."
+
+io:
+  input_dir: raw/082726_dyedilutioncomparison/082726_dyedilutioncomparison/offwhite
+  output_dir: results/exp2_dilution
+  file_glob: "*_11_30_3*.csv"
+  csv:
+    has_header: false
+    wavelength_col: 0
+    intensity_col: 1
+    delimiter: ","
+
+analysis_range:
+  enabled: true
+  min: 400
+  max: 1800
+
+preprocessing:
+  baseline:
+    method: arpls
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol
+    savgol: {window: 11, polyorder: 3}
+  normalize:
+    method: none
+
+noise:
+  method: mad_derivative
+
+detection:
+  mode: targeted
+  min_snr: 3.0
+  min_width: 3
+  max_width: 60
+  area_fwhm_multiplier: 2.0
+
+fitting:
+  enabled: true
+  model: lorentzian
+
+peaks:
+  - {name: "cv_430",  center: 430,  search_min: 415,  search_max: 448,  primary: false}
+  - {name: "cv_526",  center: 526,  search_min: 514,  search_max: 540,  primary: false}
+  - {name: "cv_806",  center: 806,  search_min: 793,  search_max: 815,  primary: true}
+  - {name: "cv_914",  center: 914,  search_min: 902,  search_max: 922,  primary: true}
+  - {name: "cv_1175", center: 1175, search_min: 1163, search_max: 1188, primary: true}
+  - {name: "cv_1375", center: 1375, search_min: 1358, search_max: 1392, primary: true}
+  - {name: "cv_1587", center: 1587, search_min: 1576, search_max: 1602, primary: true}
+  - {name: "cv_1620", center: 1620, search_min: 1606, search_max: 1632, primary: true}
+
+plotting:
+  overview: true
+  zoom: true
+  dpi: 150
+  figsize: [13, 6]
+  show_raw: true
+  show_baseline: true
+  annotate: true

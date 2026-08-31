@@ -1,0 +1,30 @@
+# =============================================================================
+# PLATE CONFIG - experiment 2, CV dye dilution comparison (scans 00747-00778)
+# -----------------------------------------------------------------------------
+# 32 consecutive scans = 2 papers x 2 series x 8 dilutions.
+#
+#   column        scans      sample
+#   -----------------------------------------------------------------
+#   ow-np         747-754    offwhite, column 3: 5 uL nanoparticles + dye
+#   ow-dyeonly    755-762    offwhite, column 4: dye only
+#   w-dyeonly     763-770    white,    column 4: dye only
+#   w-np          771-778    white,    column 3: 5 uL nanoparticles + dye
+#
+# Each series runs 2x -> 200x. NOTE the white sheet was acquired column 4 FIRST,
+# the reverse of offwhite - confirmed against the sample key. Getting this
+# backwards inverts the nanoparticle conclusion for white, so do not assume the
+# offwhite ordering carries over.
+# =============================================================================
+name: cvdil
+description: "Exp 2: CV dye dilution 2x-200x, NP+dye vs dye-only, offwhite and white paper, 082726."
+
+columns: [ow-np, ow-dyeonly, w-dyeonly, w-np]
+rows: ["2x", "5x", "10x", "20x", "30x", "50x", "100x", "200x"]
+start_scan: 747
+order: column_major
+
+scan_regex: '(?i)scan[ _-]?0*(\d+)'
+
+date_format: "%m%d%y"
+name_pattern: "{sample}_{column}_{row}_{date}"    # cvdil_w-np_10x_082726
+fallback_pattern: "{stem}_{date}"

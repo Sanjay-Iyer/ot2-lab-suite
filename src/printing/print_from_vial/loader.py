@@ -300,6 +300,12 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "print_tip": str(tips.get("print_tip", "A1")).upper(),
             "return_tips": bool(tips.get("return_tips", True)),
             "pipette_tip_reuse": bool(tips.get("pipette_tip_reuse", True)),
+            # Opt-in: one tip carried across every layer source well instead of
+            # one tip per well. The executor's pre-flight rejects it unless
+            # pipette_tip_reuse is true.
+            "single_tip_all_sources": bool(
+                tips.get("single_tip_all_sources", False)
+            ),
         },
         "flow_rates": {"p20": pipette.get("flow_rates", {})},
         "safety": {"p20_max_volume_ul": float(pipette["maximum_volume_ul"])},

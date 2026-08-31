@@ -332,7 +332,25 @@ def _preflight(protocol, labware, p20):
     ) + overprint_per_paper
     deposits = deposits_per_paper * len(paper_roles)
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
-    tips_needed = len(used_sources) if tip_reuse else deposits
+    # tips.single_tip_all_sources: deliberately carry ONE tip across every layer
+    # source well instead of one tip per well. This trades the no-cross-liquid
+    # guarantee for a consistent deposition tip, so it must be asked for
+    # explicitly. The overprint liquid still keeps its own dedicated tip.
+    shared_tip = bool(CONFIG["tips"].get("single_tip_all_sources", False))
+    if shared_tip and not tip_reuse:
+        errors.append(
+            "tips.single_tip_all_sources requires pipette_tip_reuse: true "
+            "(a fresh tip per deposit cannot also be one shared tip)"
+        )
+    op_source_name = (
+        resolved_overprint["source_well"] if resolved_overprint else ""
+    )
+    if not tip_reuse:
+        tips_needed = deposits
+    elif shared_tip:
+        tips_needed = 1 + (1 if op_source_name else 0)
+    else:
+        tips_needed = len(used_sources)
     if tip_name in tiprack_names:
         start = tiprack_names.index(tip_name)
         if start + tips_needed > len(tiprack_names):
@@ -515,22 +533,44 @@ def _print_from_vial(protocol, labware, p20, resolved):
     # tips.pipette_tip_reuse (default true): keep one tip per source well for the
     # whole run. False: a fresh tip for every single source -> paper deposit.
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
-    # One tip per distinct source well, assigned up front: a tip that has been in
-    # one liquid is never put into another.
-    tip_for_source = {
-        source_well: tip_names[start_index + offset]
-        for offset, source_well in enumerate(resolved["used_sources"])
-    }
-    next_tip = [start_index + len(resolved["used_sources"])]
+    # tips.single_tip_all_sources (default false): see the pre-flight note. When
+    # true, every layer source shares ONE tip; the overprint liquid still gets a
+    # dedicated tip so the finishing pass never runs on the layer tip.
+    shared_tip = bool(CONFIG["tips"].get("single_tip_all_sources", False))
+    _overprint = resolved.get("overprint")
+    _op_source = _overprint["source_well"] if _overprint else ""
+    if shared_tip:
+        # One shared tip for every layer source, assigned up front.
+        tip_for_source = {
+            source_well: tip_names[start_index]
+            for source_well in resolved["used_sources"]
+            if source_well != _op_source
+        }
+        used_count = 1
+        if _op_source:
+            tip_for_source[_op_source] = tip_names[start_index + 1]
+            used_count = 2
+    else:
+        # One tip per distinct source well, assigned up front: a tip that has
+        # been in one liquid is never put into another.
+        tip_for_source = {
+            source_well: tip_names[start_index + offset]
+            for offset, source_well in enumerate(resolved["used_sources"])
+        }
+        used_count = len(resolved["used_sources"])
+    next_tip = [start_index + used_count]
     active_source = None
 
     def use_source(source_well):
         """Ensure the tip on the pipette is the one dedicated to this source."""
         nonlocal active_source
-        if active_source == source_well:
+        tip_name = tip_for_source[source_well]
+        # Compare by tip, not by source: under single_tip_all_sources several
+        # sources map to the same tip and must not trigger a drop/re-pick.
+        if active_source is not None and tip_for_source[active_source] == tip_name:
+            active_source = source_well
             return
         _release_tip(p20, return_tips)
-        tip_name = tip_for_source[source_well]
         p20.pick_up_tip(tiprack[tip_name])
         protocol.comment(f"P20 tip {tip_name} picked for source well {source_well}.")
         active_source = source_well
