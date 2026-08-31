@@ -39,10 +39,13 @@
 # B1 and keeps that single tip on the pipette for all 32 deposits across all
 # eight dilutions.
 #
-# CHECK BEFORE RUNNING: B1 is near the start of the rack. Scripts up through 26
-# consume tips as far as D7, so B1 is only clean on a FRESH or replaced
-# tiprack in slot 9. If the rack from scripts 23-26 is still loaded, B1 is
-# already used -- put in a new rack or move print_tip to the first clean tip.
+# B1 IS DELIBERATELY NOT A CLEAN TIP. Script 26 assigns A1 to the A9
+# nanoparticles and B1 to the B9 nanoparticles, and returns both to the rack
+# (return_tips: true). This script picks B1 back up on purpose, as requested.
+# The consequence, accepted knowingly: residual B9 nanoparticle material on
+# that tip enters every one of the eight column-11 dye dilution wells on the
+# first aspiration and stays in the series. Do not read the column-11 stock as
+# clean dye after this run. If script 26 is re-tipped, move print_tip to match.
 #
 # Consequence to be aware of: the tip carries dye between dilution wells. Going
 # A11 -> H11 in the order below, each aspiration returns a tip wetted with the
@@ -53,8 +56,8 @@
 # order so the most dilute well is drawn first; the row/column layout is bound
 # per group and does not change.
 #
-# The tip is returned to the rack with dye residue; do not treat B1 as clean
-# for any later run.
+# The tip is returned to the rack again with dye plus nanoparticle residue; do
+# not treat B1 as clean for any later run.
 # Physical execution requires the real robot laptop and explicit readiness
 # confirmation. Creating or locally simulating this config does not run it live.
 
