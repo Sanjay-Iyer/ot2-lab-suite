@@ -63,9 +63,35 @@
 #   * Vial-rack A1 needs at least 4.5 mL of water: 1974.5 uL consumed plus the
 #     ~2.5 mL that just submerges the tip at the 4.0 mm aspirate height in a
 #     28 mm bore vial.
-#   * Use a fresh P20 rack, or confirm A1:C8 are clean. The run consumes
-#     21 tips (water, stock and mix each get their own tip per well) and drops
-#     them in the trash so plate-contaminated tips are never returned.
+#   * Use a fresh P20 rack, or confirm A1 is clean. The run now consumes ONE
+#     tip (see below) and drops it in the trash at the end.
+#
+# ---------------------------------------------------------------------------
+# SINGLE-TIP MODE IS ON (tips.single_tip_all_sources: true), BY REQUEST.
+#
+# This run used to take 21 tips: water, stock and mix each got their own tip
+# per well, so the tip never carried liquid from one well into another. It now
+# takes a single tip for the whole run.
+#
+# WHAT THAT TIP DOES, IN ORDER, FOR EACH OF B11..H11:
+#   1. aspirates water from vial-rack A1
+#   2. aspirates 2x stock from A11
+#   3. mixes the finished dilution, submerged in it at 2.0 mm
+#   ...then goes straight back to step 1 for the next well.
+#
+# CONSEQUENCE, ACCEPTED KNOWINGLY: from the second well onward the tip carries
+# dye residue back into BOTH shared reservoirs -- the ~4 mL water vial A1 and
+# the A11 stock that every factor below is defined against. The water stops
+# being water and A11 stops being a clean 2x, so the later wells in the series
+# are more concentrated than their stated factor, by an amount nothing here
+# measures. The dispense height (2.0 mm) sits below the 7.93 mm liquid surface,
+# so the tip is submerged on every dispense; this is not avoidable by skipping
+# the mix step.
+#
+# Do not treat vial A1 as clean water or A11 as a clean 2x stock after this
+# run. If the series concentrations need to be trustworthy, set
+# single_tip_all_sources back to false and accept the 21 tips.
+# ---------------------------------------------------------------------------
 
 protocol_label: a11_dilutions_column11
 
@@ -120,4 +146,8 @@ liquid_handling:
 
 tips:
   start_tip: A1
+  # Requested: one tip for the entire dilution run rather than one per source.
+  # Requires pipette_tip_reuse: true. See the SINGLE-TIP MODE note above for
+  # the reservoir cross-contamination this accepts.
+  single_tip_all_sources: true
   return_tips: false

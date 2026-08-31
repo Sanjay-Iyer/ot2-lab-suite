@@ -269,6 +269,16 @@ def _preflight(protocol, labware, p20):
     start_tip = str(CONFIG["tips"].get("start_tip", "A1")).upper()
     if start_tip not in tip_names:
         errors.append(f"tips.start_tip {start_tip} does not exist")
+    # single_tip_all_sources keeps ONE tip on the pipette for the whole run. It
+    # is incompatible with pipette_tip_reuse: false, which demands a fresh tip
+    # per chunk. Carrying one tip means it re-enters the diluent and stock
+    # wells after touching finished dilutions -- see the config header.
+    if bool(CONFIG["tips"].get("single_tip_all_sources", False)) and not bool(
+        CONFIG["tips"].get("pipette_tip_reuse", True)
+    ):
+        errors.append(
+            "tips.single_tip_all_sources requires pipette_tip_reuse: true"
+        )
 
     if errors:
         protocol.comment("PRE-FLIGHT VALIDATION FAILED")
@@ -347,6 +357,7 @@ def _run_dilution(protocol, labware, p20, resolved):
     p20_max = float(CONFIG["safety"]["p20_max_volume_ul"])
     return_tips = bool(CONFIG["tips"].get("return_tips", True))
     tip_reuse = bool(CONFIG["tips"].get("pipette_tip_reuse", True))
+    shared_tip = bool(CONFIG["tips"].get("single_tip_all_sources", False))
     air_gap = float(lh.get("air_gap_ul", 0.0) or 0.0)
     air_gap_height = float(lh.get("air_gap_height_mm", 5.0))
 
@@ -357,6 +368,11 @@ def _run_dilution(protocol, labware, p20, resolved):
 
     def use_tip(source_key, reason):
         """One tip per distinct source when reusing; otherwise always fresh."""
+        # tips.single_tip_all_sources: one tip for the ENTIRE run -- diluent,
+        # stock and every mix. Deliberately defeats the per-source separation,
+        # so it must be asked for explicitly. See the pre-flight note.
+        if shared_tip and p20.has_tip:
+            return
         if tip_reuse and p20.has_tip and active_source[0] == source_key:
             return
         _release_tip(p20, return_tips)

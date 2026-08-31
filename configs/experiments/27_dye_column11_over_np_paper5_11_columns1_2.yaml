@@ -1,20 +1,23 @@
 # =============================================================================
-# 27 - OVERPRINT THE COLUMN-11 DYE DILUTIONS ONTO THE SCRIPT-26 NP SPOTS
+# 27 - CV DYE ON NP COLUMNS 1/2 AND UNPREPRINTED COLUMN 3 ON BOTH PAPERS
 # =============================================================================
 # Companion to script 26. Script 26 lays down the nanoparticles:
 #   BRAND A9 (user notation 9A) -> paper column 1, rows A-H
 #   BRAND B9 (user notation 9B) -> paper column 2, rows A-H
 # on BOTH papers (slot 5 and slot 11). This script prints the eight-step dye
 # dilution series held in BRAND plate column 11 (slot 1) on top of those spots,
-# one dilution per row, so every dilution meets both nanoparticle types:
+# one dilution per row, so every dilution meets both nanoparticle types.
+# The same dilution is also printed on column 3, which script 26 leaves blank.
+# Column 3 has no intentional NP preprint, but the shared used tip can carry
+# NP residue into it; it is not a clean dye-only control (see TIPS below).
 #
-#   A11 -> A1, A2      E11 -> E1, E2
-#   B11 -> B1, B2      F11 -> F1, F2
-#   C11 -> C1, C2      G11 -> G1, G2
-#   D11 -> D1, D2      H11 -> H1, H2
+#   A11 -> A1, A2, A3      E11 -> E1, E2, E3
+#   B11 -> B1, B2, B3      F11 -> F1, F2, F3
+#   C11 -> C1, C2, C3      G11 -> G1, G2, G3
+#   D11 -> D1, D2, D3      H11 -> H1, H2, H3
 #
-# ...and the same 16-spot pattern is repeated on the second paper. 32 deposits
-# x 5 uL = 160 uL total, 20 uL drawn from each of the eight dilution wells.
+# ...and the same 24-spot pattern is repeated on the second paper. 48 deposits
+# x 5 uL = 240 uL total, 30 uL drawn from each of the eight dilution wells.
 # No further dilution, no extra layers, no drying delay in this script.
 #
 # ORDER MATTERS: run script 26 first and let the NP spots dry before running
@@ -32,11 +35,11 @@
 #
 # loaded_volume_ul is a planning assumption PER dilution well, not a
 # measurement. Column 11 was already drawn from by scripts 23-25, so top the
-# series back up to at least 40 uL per well (20 uL consumed + 20 uL reserve)
+# series back up to at least 50 uL per well (30 uL consumed + 20 uL reserve)
 # or correct the configured 100 uL to the actual starting volume before running.
 #
 # TIPS: one shared tip for the whole dye pass, by request. The run starts at
-# B1 and keeps that single tip on the pipette for all 32 deposits across all
+# B1 and keeps that single tip on the pipette for all 48 deposits across all
 # eight dilutions.
 #
 # B1 IS DELIBERATELY NOT A CLEAN TIP. Script 26 assigns A1 to the A9
@@ -90,14 +93,14 @@ printing:
 print_groups:
   # Explicit per-paper bindings keep each row tied to its own dilution well on
   # both papers, exactly as script 26 binds each column to its own NP well.
-  - {source_well: A11, source_wells: {5: A11, 11: A11}, targets: [A1, A2], droplets: 1}
-  - {source_well: B11, source_wells: {5: B11, 11: B11}, targets: [B1, B2], droplets: 1}
-  - {source_well: C11, source_wells: {5: C11, 11: C11}, targets: [C1, C2], droplets: 1}
-  - {source_well: D11, source_wells: {5: D11, 11: D11}, targets: [D1, D2], droplets: 1}
-  - {source_well: E11, source_wells: {5: E11, 11: E11}, targets: [E1, E2], droplets: 1}
-  - {source_well: F11, source_wells: {5: F11, 11: F11}, targets: [F1, F2], droplets: 1}
-  - {source_well: G11, source_wells: {5: G11, 11: G11}, targets: [G1, G2], droplets: 1}
-  - {source_well: H11, source_wells: {5: H11, 11: H11}, targets: [H1, H2], droplets: 1}
+  - {source_well: A11, source_wells: {5: A11, 11: A11}, targets: [A1, A2, A3], droplets: 1}
+  - {source_well: B11, source_wells: {5: B11, 11: B11}, targets: [B1, B2, B3], droplets: 1}
+  - {source_well: C11, source_wells: {5: C11, 11: C11}, targets: [C1, C2, C3], droplets: 1}
+  - {source_well: D11, source_wells: {5: D11, 11: D11}, targets: [D1, D2, D3], droplets: 1}
+  - {source_well: E11, source_wells: {5: E11, 11: E11}, targets: [E1, E2, E3], droplets: 1}
+  - {source_well: F11, source_wells: {5: F11, 11: F11}, targets: [F1, F2, F3], droplets: 1}
+  - {source_well: G11, source_wells: {5: G11, 11: G11}, targets: [G1, G2, G3], droplets: 1}
+  - {source_well: H11, source_wells: {5: H11, 11: H11}, targets: [H1, H2, H3], droplets: 1}
 
 tips:
   pipette_tip_reuse: true

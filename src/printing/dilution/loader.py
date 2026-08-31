@@ -153,6 +153,10 @@ def load_dilution_config(reference: str | Path) -> tuple[dict[str, Any], dict[st
             "start_tip": str(tips.get("start_tip", "A1")).upper(),
             "return_tips": bool(tips.get("return_tips", True)),
             "pipette_tip_reuse": bool(tip_reuse),
+            # Opt-in: one tip for the whole run (diluent, stock and mixes).
+            "single_tip_all_sources": bool(
+                tips.get("single_tip_all_sources", False)
+            ),
         },
         "flow_rates": {"p20": pipette.get("flow_rates", {})},
         "safety": {
