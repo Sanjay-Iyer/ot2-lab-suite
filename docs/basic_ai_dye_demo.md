@@ -5,7 +5,7 @@ make a dilution series, then print those dilutions onto paper.
 
 ```powershell
 python scripts\ai_dye_demo.py --simulate   # local only; never contacts a robot
-python scripts\ai_dye_demo.py              # real OT-2, after you type RUN LIVE
+python scripts\ai_dye_demo.py              # real OT-2, after you type run
 ```
 
 The agent introduces itself, asks what you want, and edits a timestamped YAML copy
@@ -58,7 +58,45 @@ works:
 If you have no idea what to ask for, say **"I don't know"** — the agent prints the
 standard example above and invites you to adjust it.
 
-Typed commands: `plan`, `show` (raw YAML), `run`, `help`, `quit`.
+Typed commands: `plan`, `show` (raw YAML), `help`, `quit`.
+
+## Starting the run
+
+Every plan ends by naming the exact word that starts it, so it is never something
+you have to already know:
+
+```text
+  >>>  TO RUN THE SIMULATION NOW, TYPE:   run
+       Or keep talking to change the plan first.
+```
+
+That word runs it — there is no second confirmation prompt. A plain go-ahead works
+too (`go`, `go ahead`, `this is good run it`); anything carrying a number or a piece
+of labware is treated as an edit instead, so "run 8 dilutions in column 3" changes
+the plan rather than starting it.
+
+**It is the same word on the real instrument** — nothing new to remember at the
+moment it matters. Live mode says which one you are in three times over:
+
+```text
+Mode        : LIVE - the real OT-2 will move
+...
+  >>>  TO START THE REAL ROBOT NOW, TYPE: run
+       The OT-2 starts moving as soon as you do.
+       Or keep talking to change the plan first.
+```
+
+and typing it prints the deck it is about to work on before handing off to the
+runner:
+
+```text
+==============================================================================
+STARTING THE REAL OT-2 - the robot is about to move.
+  vial rack slot 7, plate slot 4, paper slot 5, tips slot 9
+  8 dilutions, then 8 drops on paper
+  Ctrl-C now if the deck does not match.
+==============================================================================
+```
 
 ## What the agent will not do
 
@@ -79,9 +117,9 @@ Rejected edits leave the config exactly as it was, and the agent says why:
 python scripts\ai_dye_demo.py --simulate
 ```
 
-Nothing runs until you type exactly `RUN SIMULATION`. That builds the protocol from
-your YAML and simulates every movement locally. It never discovers or contacts a
-robot. On this simulation laptop use `conda activate ai` and only `--simulate`.
+Nothing runs until you type `run`. That builds the protocol from your YAML and
+simulates every movement locally. It never discovers or contacts a robot. On this
+simulation laptop use `conda activate ai` and only `--simulate`.
 
 ## Real robot run
 
@@ -94,9 +132,10 @@ python scripts\find_robot.py --check
 python scripts\ai_dye_demo.py
 ```
 
-Review the printed plan, then type exactly `RUN LIVE`. The runner rebuilds,
-simulates, uploads over the HTTP API, starts the run and monitors it. The robot
-host comes from `configs\robot.yaml`; pass `--robot-host` only to override it.
+Review the printed plan, then type `run` — the plan's own footer says so, and the
+header above it reads `LIVE - the real OT-2 will move`. The runner rebuilds,
+simulates, uploads over the HTTP API, starts the run and monitors it. The robot host
+comes from `configs\robot.yaml`; pass `--robot-host` only to override it.
 
 ## Work-laptop setup after a pull
 

@@ -2,7 +2,10 @@
 """Conversational OT-2 demo: dilute a dye series, then print it onto paper.
 
     python scripts/ai_dye_demo.py --simulate  # local only, no robot contact
-    python scripts/ai_dye_demo.py             # real robot after RUN LIVE
+    python scripts/ai_dye_demo.py             # the real robot
+
+Either way the plan ends by naming the word that starts it, and that word is the
+same one ("run") in both modes.
 
 The agent introduces itself, asks what you want, and edits a timestamped YAML copy
 from plain language. Robot Python stays deterministic: the LLM never writes code,
@@ -46,6 +49,12 @@ RULE = "=" * 78
 THIN = "-" * 78
 ROWS = tuple("ABCDEFGH")
 
+# What the scientist types to start the run — the same word in both modes, so there
+# is nothing to remember differently when it is the real instrument's turn. Every
+# plan ends by naming it, and in live mode the plan header, the plan footer and the
+# banner printed the instant it is typed all say the robot is about to move.
+TRIGGER = "run"
+
 # Sections the agent may rewrite. Everything else — the pipette, the calibrated
 # release geometry, flow rates, safety limits, run modes — is laboratory-owned.
 ALLOWED_ROOTS = {"deck", "materials", "dilution", "mixing", "print", "tips"}
@@ -61,6 +70,25 @@ LOCKED_KEYS = (
     ("dilution", "max_transfer_ul"),
 )
 IMMUTABLE_ROOTS = ("pipette", "safety", "flow_rates", "run_modes", "protocol_version")
+
+# "That's it, go" — a short sentence whose only content is a start verb. Anything
+# carrying a number or a piece of labware is an edit ("run 8 dilutions in column 3",
+# "make 4 dilutions and run it at 10 uL"), never a trigger, so a request is never
+# swallowed as a go-ahead.
+RUN_VERB = re.compile(r"\b(run|go|start|execute|proceed)\b", re.I)
+EDIT_SIGNAL = re.compile(
+    r"\d|\b(ul|microlit\w*|slot|column|row|well|vial|tip|drop\w*|dilut\w*|paper|"
+    r"plate|mix\w*|volume|replicate\w*|rack)\b",
+    re.I,
+)
+
+
+def _wants_to_run(text: str) -> bool:
+    """A short go-ahead with nothing to change in it."""
+    return (len(text.split()) <= 6
+            and bool(RUN_VERB.search(text))
+            and not EDIT_SIGNAL.search(text))
+
 
 # "I have no idea what to ask for" — show the standard example and explain it.
 UNSURE = re.compile(
@@ -122,7 +150,8 @@ GREETING = """agent> Hello. I am the AI agent in control of the OT-2.
        If you are not sure what to ask for, just say "I don't know" and I will
        start from a standard example that you can then adjust.
 
-       Commands: plan (show the plan), show (raw YAML), run, help, quit."""
+       Commands: plan (show the plan), show (raw YAML), help, quit.
+       When the plan looks right, type {trigger} to start it."""
 
 HELP = """agent> Say what you want changed, in plain language. Things I can change:
          how many dilutions, and how strong each one is
@@ -137,7 +166,8 @@ HELP = """agent> Say what you want changed, in plain language. Things I can chan
        I will not change the pipette, the calibrated print heights and air
        handling, or the safety limits - those are set on the instrument.
 
-       Commands: plan, show, run, help, quit."""
+       Commands: plan, show, help, quit.
+       When the plan looks right, type {trigger} to start it."""
 
 
 # ── plan arithmetic ───────────────────────────────────────────────────────────────
@@ -419,8 +449,20 @@ def render_plan(config: dict[str, Any], *, simulate: bool, config_path: Path) ->
         "  and report the result. No robot is contacted."
         if simulate else
         "  watching the run until it finishes.",
-        THIN,
+        "",
     ]
+    if simulate:
+        lines += [
+            f"  >>>  TO RUN THE SIMULATION NOW, TYPE:   {TRIGGER}",
+            "       Or keep talking to change the plan first.",
+        ]
+    else:
+        lines += [
+            f"  >>>  TO START THE REAL ROBOT NOW, TYPE: {TRIGGER}",
+            "       The OT-2 starts moving as soon as you do.",
+            "       Or keep talking to change the plan first.",
+        ]
+    lines.append(THIN)
     return "\n".join(lines)
 
 
@@ -559,7 +601,7 @@ def main(argv: list[str] | None = None) -> int:
     print(Config.describe_llm_auth())
     print(f"Working config : {working.relative_to(REPO)}")
     print(f"Session log    : {log.path.relative_to(REPO)}\n")
-    print(GREETING)
+    print(GREETING.format(trigger=TRIGGER))
 
     # The model is built on first use, so plan/show/help/run and the worked example
     # still work on a laptop without Vertex credentials.
@@ -581,7 +623,7 @@ def main(argv: list[str] | None = None) -> int:
             log.write("session_stopped")
             return 0
         if low in {"help", "?"}:
-            print(HELP)
+            print(HELP.format(trigger=TRIGGER))
             continue
         if low in {"show", "yaml"}:
             print(yaml.safe_dump(config, sort_keys=False))
@@ -589,7 +631,7 @@ def main(argv: list[str] | None = None) -> int:
         if low in {"plan", "p"}:
             print(render_plan(config, simulate=args.simulate, config_path=working))
             continue
-        if low in {"run", "go"}:
+        if _wants_to_run(request):
             break
         if UNSURE.search(low):
             log.write("user_request", text=request, handled_as="default_example")
@@ -621,18 +663,20 @@ def main(argv: list[str] | None = None) -> int:
         print(render_plan(config, simulate=args.simulate, config_path=working))
         log.write("config_updated", explanation=explanation, updates=response["updates"])
 
-    print("\nFINAL REVIEW\n")
-    print(render_plan(config, simulate=args.simulate, config_path=working))
-    expected = "RUN SIMULATION" if args.simulate else "RUN LIVE"
-    print(f"\nType exactly {expected} to execute, or anything else to cancel.")
-    try:
-        confirmation = input("confirm> ").strip()
-    except (EOFError, KeyboardInterrupt):
-        confirmation = ""
-    log.write("confirmation", expected=expected, received=confirmation)
-    if confirmation != expected:
-        print("Cancelled. No run was started.")
-        return 0
+    log.write("run_confirmed", trigger=request, mode=mode)
+    if args.simulate:
+        print(f"\n{RULE}\nSTARTING SIMULATION - building, then simulating every "
+              f"movement locally.\nNo robot is contacted.\n{RULE}")
+    else:
+        deck = config["deck"]
+        print(f"\n{RULE}\nSTARTING THE REAL OT-2 - the robot is about to move.")
+        print(f"  vial rack slot {deck['tuberack']['slot']}, plate slot "
+              f"{deck['plate']['slot']}, paper slot {deck['paper']['slot']}, "
+              f"tips slot {deck['tiprack']['slot']}")
+        print(f"  {len(_factors(config))} dilutions, then "
+              f"{len(_dilution_rows(config)) * sum(s['droplets'] for s in _paper_columns(config))} "
+              f"drops on paper")
+        print(f"  Ctrl-C now if the deck does not match.\n{RULE}")
     (run_dir / "executed_config.yaml").write_text(
         yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
     )

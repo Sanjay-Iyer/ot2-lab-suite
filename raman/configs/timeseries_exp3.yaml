@@ -122,6 +122,27 @@ excess_noise:
   white_band_cm1: [2, 4]
   measure_window_cm1: [400, 800]   # where the detector fills first
 
+# ---------------------------------------------------------------------------
+# Baseline sensitivity QC.
+#
+# Quantitative band heights come from a LOCAL LINEAR baseline built from each
+# band's own shoulders - see local_baseline_height(). arPLS is unchanged and
+# still produces the corrected full spectra that every plot uses; it simply no
+# longer sets a reported number. These lambdas re-measure each height under
+# three global stiffnesses so the report can state how far a height could move
+# if the global baseline were chosen differently. The point is not to pick the
+# right lambda; it is to show whether a conclusion survives all of them.
+# ---------------------------------------------------------------------------
+baseline_sensitivity:
+  arpls_lambdas: [10000.0, 100000.0, 1000000.0]
+
+# An exposure counts as being on the SNR plateau if its band SNR is at least
+# this fraction of the best admissible exposure's. 0.75 is deliberately loose:
+# with one spot per exposure the SNR carries roughly +/-25% of scan-to-scan
+# scatter, so anything much tighter would read that scatter as a real optimum -
+# and anything looser lets a clearly inferior longer exposure onto the plateau.
+plateau_tolerance: 0.80
+
 # Bands scored and plotted. Names must exist in exp1_cv_report.BANDS, except
 # `paper_1095`, which the report adds itself - on paper the ~1095 feature is
 # carbonate filler in the sheet, NOT an analyte band.

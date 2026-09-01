@@ -307,6 +307,11 @@ def gain_table(scans, screen, cfg) -> pd.DataFrame:
         test, control = by_scan[scan], by_scan[cscan]
         grid = test["x_fit"]
         base = np.interp(grid, control["x_fit"], control["smooth_cps"])
+        # Quantitative heights come off the local-baseline trace (see
+        # ts.local_baseline_height); `base`/`diff` above stay on the arPLS trace
+        # because they feed the plotted difference spectra.
+        test_raw = test["smooth_cps_raw"]
+        ctrl_raw = np.interp(grid, control["x_fit"], control["smooth_cps_raw"])
         diff = test["smooth_cps"] - base
         sigma = ts._sigma_from(test["corr_cps"] - np.interp(
             grid, control["x_fit"], control["corr_cps"]))
@@ -314,16 +319,17 @@ def gain_table(scans, screen, cfg) -> pd.DataFrame:
             lo, hi = ALL_BANDS[band]["search"]
             # Two separate quantities, deliberately not mixed:
             #   gain  = peak height of the test over peak height of the control,
-            #           each picked with ts.window_peak so both agree with the
-            #           per-scan band table they will be checked against
+            #           each measured against its OWN local baseline so both
+            #           agree with the per-scan band table they get checked
+            #           against, and neither depends on a global arPLS lambda
             #   delta = the largest excursion of the DIFFERENCE spectrum, which
             #           is what the SNR test is run on
             # Adding delta to the control height and calling that the test
             # height would be wrong whenever the two peaks sit at slightly
             # different wavenumbers, which on a shifting SERS band they do.
-            _, test_cps, _ = ts.window_peak(grid, test["smooth_cps"], lo, hi)
-            _, ref, _ = ts.window_peak(grid, base, lo, hi)
-            _, delta, _ = ts.window_peak(grid, diff, lo, hi)
+            _, test_cps, _ = ts.local_baseline_height(grid, test_raw, lo, hi)
+            _, ref, _ = ts.local_baseline_height(grid, ctrl_raw, lo, hi)
+            _, delta, _ = ts.local_baseline_height(grid, test_raw - ctrl_raw, lo, hi)
             rows.append({
                 "key": key, "condition": cond, "dilution": dil,
                 "factor": float(str(dil)[:-1]), "peak_name": band,

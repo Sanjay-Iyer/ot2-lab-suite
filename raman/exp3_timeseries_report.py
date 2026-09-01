@@ -201,14 +201,28 @@ def process(rec: dict, cfg: dict) -> dict:
 
     cps = y / rec["int_time_s"]                    # exposure divided out
     arp = pre["baseline"]["arpls"]
+    sg = pre["smoothing"]["savgol"]
     base = baseline_arpls(cps, lam=arp["lam"], ratio=arp["ratio"], niter=arp["niter"])
     corr = cps - base
-    sg = pre["smoothing"]["savgol"]
     smooth = savgol_filter(corr, sg["window"], sg["polyorder"])
+    # Smoothed but NOT baseline-subtracted. Quantitative band heights are taken
+    # from this trace against a local baseline built from the band's own
+    # shoulders, so no global baseline parameter enters a reported number.
+    smooth_cps_raw = savgol_filter(cps, sg["window"], sg["polyorder"])
+
+    # arPLS at the sensitivity lambdas, kept for the QC columns only. These are
+    # never the primary height; they exist to say how far a reported height
+    # could move if the global baseline were chosen differently.
+    alt = {}
+    for lam in cfg.get("baseline_sensitivity", {}).get("arpls_lambdas", []):
+        b = baseline_arpls(cps, lam=float(lam), ratio=arp["ratio"],
+                           niter=arp["niter"])
+        alt[float(lam)] = savgol_filter(cps - b, sg["window"], sg["polyorder"])
 
     rec = dict(rec)
     rec.update({"x_fit": x, "y_counts": y, "y_cps": cps,
-                "baseline_cps": base, "corr_cps": corr, "smooth_cps": smooth})
+                "baseline_cps": base, "corr_cps": corr, "smooth_cps": smooth,
+                "smooth_cps_raw": smooth_cps_raw, "arpls_alt": alt})
     return rec
 
 
@@ -370,6 +384,53 @@ def window_peak(x: np.ndarray, y: np.ndarray, lo: float,
     return float(x[sel][j]), float(local[j]), at_edge
 
 
+def _lam_tag(lam: float) -> str:
+    """1e4 -> '1e4', for the sensitivity column names.
+
+    Formatted from the exponent rather than via "%g", which renders 1e4 as
+    "10000" and only switches to exponent form at 1e6 - giving column names
+    that disagree with each other for no reason.
+    """
+    e = np.log10(float(lam))
+    return "1e%d" % round(e) if abs(e - round(e)) < 1e-9 else ("%g" % lam)
+
+
+def _shoulders(x: np.ndarray, lo: float, hi: float, pad: float = 60.0):
+    """The two signal-free flanks either side of a band window.
+
+    Same regions the SNR denominator has always used, so the local baseline and
+    the noise estimate are anchored on identical stretches of spectrum.
+    """
+    return ((x >= lo - pad) & (x < lo)) | ((x > hi) & (x <= hi + pad))
+
+
+def local_baseline_height(x: np.ndarray, y: np.ndarray, lo: float, hi: float,
+                          pad: float = 60.0) -> tuple[float, float, bool]:
+    """(centre, height, at_edge) against a straight line drawn under the band.
+
+    A narrow band here sits a few percent above a very large fluorescence
+    background, so its height is a small difference of two big numbers and the
+    background model does most of the work. A global arPLS fit answers that with
+    one stiffness parameter applied to the whole spectrum; this answers it with
+    the band's own two shoulders and nothing else, which is the standard
+    treatment for a narrow feature on a large background and removes any global
+    parameter from the reported number.
+
+    The line is fitted through the MEDIAN of each shoulder at the shoulder's
+    mean position - medians rather than means so a cosmic ray in a flank cannot
+    tilt the baseline under the peak. Falls back to the global-corrected trace
+    only if a shoulder is too short to be trustworthy.
+    """
+    left = (x >= lo - pad) & (x < lo)
+    right = (x > hi) & (x <= hi + pad)
+    if left.sum() < 5 or right.sum() < 5:
+        return window_peak(x, y, lo, hi)
+    xl, yl = float(x[left].mean()), float(np.median(y[left]))
+    xr, yr = float(x[right].mean()), float(np.median(y[right]))
+    slope = (yr - yl) / (xr - xl) if xr != xl else 0.0
+    return window_peak(x, y - (yl + slope * (x - xl)), lo, hi)
+
+
 def band_metrics(rec: dict, cfg: dict) -> list[dict]:
     """Height and SNR of each configured band on the corrected counts/s trace."""
     x, corr, smooth = rec["x_fit"], rec["corr_cps"], rec["smooth_cps"]
@@ -377,22 +438,58 @@ def band_metrics(rec: dict, cfg: dict) -> list[dict]:
     for band in cfg["bands"]:
         meta = ALL_BANDS[band]
         lo, hi = meta["search"]
-        centre, height, at_edge = window_peak(x, smooth, lo, hi)
-        # The SNR denominator comes from a signal-free shoulder just outside the
-        # band, on the UNSMOOTHED trace - smoothing suppresses noise without
-        # suppressing signal, so an SNR taken after it is inflated.
+        # PRIMARY quantitative height: local linear baseline from this band's own
+        # shoulders. The arPLS-corrected trace is still produced and plotted, but
+        # no single global stiffness parameter sets a reported number any more.
         pad = 60.0
-        shoulder = ((x >= lo - pad) & (x < lo)) | ((x > hi) & (x <= hi + pad))
+        centre, height, at_edge = local_baseline_height(x, rec["smooth_cps_raw"],
+                                                        lo, hi, pad)
+        # Noise definition UNCHANGED: second-difference MAD over the same
+        # shoulders, on the unsmoothed arPLS-corrected trace. The second
+        # difference is blind to a smooth background, so this number is
+        # effectively baseline-independent and is left exactly as it was.
+        shoulder = _shoulders(x, lo, hi, pad)
         sigma = _sigma_from(corr[shoulder]) if shoulder.sum() > 20 else _sigma_from(corr)
-        lit_lo, lit_hi = meta["lit"]
-        out.append({
+
+        # QC only: the same height under three arPLS stiffnesses, to say how far
+        # it could move if the global baseline were chosen differently.
+        arpls_heights = {lam: window_peak(x, trace, lo, hi)[1]
+                         for lam, trace in rec.get("arpls_alt", {}).items()}
+        row = {
             "scan_number": rec["scan_number"], "key": rec["key"],
             "int_time_s": rec["int_time_s"], "peak_name": band,
             "nominal": meta["nominal"], "center_cm1": centre,
-            "in_lit_window": lit_lo <= centre <= lit_hi, "at_window_edge": at_edge,
-            "height_cps": height, "sigma_cps": sigma,
+            "in_lit_window": meta["lit"][0] <= centre <= meta["lit"][1],
+            "at_window_edge": at_edge,
+            # height_cps keeps its name and its meaning for every consumer, but
+            # is now the local-baseline value.
+            "height_cps": height, "height_local_cps": height,
+            "sigma_cps": sigma,
             "snr": height / sigma if sigma and np.isfinite(sigma) else np.nan,
-        })
+        }
+        for lam, h in sorted(arpls_heights.items()):
+            row["height_arpls_%s_cps" % _lam_tag(lam)] = h
+        pool = [height] + list(arpls_heights.values())
+        pool = [v for v in pool if np.isfinite(v)]
+        if arpls_heights:
+            row["height_arpls_min_cps"] = min(arpls_heights.values())
+            row["height_arpls_max_cps"] = max(arpls_heights.values())
+        # Sensitivity = full spread across {local, the arPLS heights}, over the
+        # local height. DEFENSIVE DENOMINATOR: a band that has died into the
+        # baseline has a local height near zero, and dividing by it would
+        # manufacture a huge percentage out of pure noise. The denominator is
+        # floored at this band's own sigma, below which the height is not a
+        # measurement at all; `sensitivity_floored` records where that applied.
+        denom, floored = abs(height), False
+        if not np.isfinite(sigma) or sigma <= 0:
+            pass
+        elif denom < sigma:
+            denom, floored = sigma, True
+        row["baseline_sensitivity_pct"] = (
+            100.0 * (max(pool) - min(pool)) / denom
+            if len(pool) > 1 and denom > 0 else np.nan)
+        row["sensitivity_floored"] = floored
+        out.append(row)
     return out
 
 
@@ -532,6 +629,12 @@ def verdict_table(df: pd.DataFrame, bands: pd.DataFrame, cfg: dict) -> pd.DataFr
     q = cfg["quality"]
     med_snr = (bands[bands["peak_name"].isin(q["snr_bands"])]
                .groupby(["key", "scan_number"])["snr"].median().to_dict())
+    # The veto keeps using the cross-band median (unchanged). Selection ranks on
+    # the REFERENCE band instead - that is the quantitative local-baseline
+    # measurement the exposure has to serve, and the median across five bands
+    # blends four weaker ones into it.
+    ref_snr = (bands[bands["peak_name"] == cfg["reference_band"]]
+               .set_index(["key", "scan_number"])["snr"].to_dict())
 
     def light(value, warn, fail, higher_is_worse=True):
         if not np.isfinite(value):
@@ -557,26 +660,56 @@ def verdict_table(df: pd.DataFrame, bands: pd.DataFrame, cfg: dict) -> pd.DataFr
             "int_time_s": r["int_time_s"], "total_time_s": r["total_time_s"],
             **{"c_" + k: v for k, v in crit.items()},
             "median_cv_snr": s,
+            "ref_band_snr": ref_snr.get((r["key"], r["scan_number"]), np.nan),
             "overall": max(crit.values(), key=lambda v: VERDICT_RANK[v]),
             "caveats": ", ".join(k.replace("_", " ") for k, v in crit.items()
                                  if v == "warn"),
         })
     out = pd.DataFrame(rows)
 
-    # Longest exposure that is CLEAN, not merely longest that does not fail.
+    # Selection, in the order the vetoes are meant to bind:
+    #   1-3. any raw-data failure (headroom, linearity, noise excess) removes an
+    #        exposure outright. A high SNR never buys one back.
+    #   4.   among what survives, rank on the local-baseline band SNR.
+    #   5.   take the PLATEAU - every admissible exposure within
+    #        plateau_tolerance of the best - and operate at the longest one.
     #
-    # The earlier rule ignored warns, and on white bipyramids that picked 10 s
-    # (amber on linearity, dye SNR 63) over 8 s (all-pass, dye SNR 79) - worse
-    # on both counts. A warn is evidence, so it is used: prefer an all-pass
-    # exposure, take the longest of those, and only fall back to the longest
-    # warn-level exposure when nothing is fully clean.
-    rec = {}
+    # Step 5 is the change. The previous rule returned the single highest-scoring
+    # exposure, which reads scan-to-scan scatter as a real optimum: on white
+    # stars the nominal best moves between 4 s and 10 s depending only on which
+    # baseline is used to measure the height, so there is no unique maximum there
+    # to find. Where the plateau holds one member the answer really is a clear
+    # optimum, and `selection` records which case each sweep is.
+    tol = cfg.get("plateau_tolerance", 0.75)
+    rec, plateau_lo, plateau_hi, kind = {}, {}, {}, {}
     for key, g in out.groupby("key", sort=False):
-        clean = g[g["overall"] == "pass"].sort_values("int_time_s")
-        usable = g[g["overall"] != "fail"].sort_values("int_time_s")
-        pick = clean if len(clean) else usable
-        rec[key] = float(pick["int_time_s"].iloc[-1]) if len(pick) else np.nan
-    out["recommended"] = [t == rec[k] for k, t in zip(out["key"], out["int_time_s"])]
+        ok = g[g["overall"] != "fail"].sort_values("int_time_s")
+        if not len(ok) or not np.isfinite(ok["ref_band_snr"]).any():
+            rec[key] = np.nan
+            continue
+        best = float(np.nanmax(ok["ref_band_snr"]))
+        band = ok[ok["ref_band_snr"] >= tol * best]
+        # Operate at the LONGEST exposure on the plateau, with one guard: a
+        # warn-level exposure is only taken if it is not meaningfully worse than
+        # the best clean exposure on the plateau, judged on the same tolerance.
+        # Without the guard the rule would prefer a longer exposure that is both
+        # dirtier and lower-SNR purely because it is longer.
+        clean = band[band["overall"] == "pass"]
+        best_clean = (float(np.nanmax(clean["ref_band_snr"])) if len(clean)
+                      else -np.inf)
+        keep = band[(band["overall"] == "pass")
+                    | (band["ref_band_snr"] >= tol * best_clean)]
+        if not len(keep):
+            keep = band
+        rec[key] = float(keep["int_time_s"].iloc[-1])
+        plateau_lo[key] = float(band["int_time_s"].min())
+        plateau_hi[key] = float(band["int_time_s"].max())
+        kind[key] = "clear optimum" if len(band) == 1 else "plateau"
+    out["recommended"] = [t == rec.get(k) for k, t in
+                          zip(out["key"], out["int_time_s"])]
+    out["plateau_lo_s"] = out["key"].map(plateau_lo)
+    out["plateau_hi_s"] = out["key"].map(plateau_hi)
+    out["selection"] = out["key"].map(kind)
     return out
 
 
@@ -1138,7 +1271,14 @@ def _snr_series(bands, verdict, cfg, key):
     b = (bands[(bands["key"] == key) & (bands["peak_name"] == band)]
          .sort_values("int_time_s").set_index("int_time_s"))
     t = np.array(list(v.index), dtype=float)
-    return t, b.loc[t, "snr"].to_numpy(float), (v.loc[t, "overall"] != "fail").to_numpy()
+    sig = b.loc[t, "sigma_cps"].to_numpy(float)
+    # Sensitivity band: the same SNR recomputed from the arPLS lambda sweep.
+    # Same denominator, so the band shows only how far the BASELINE could move
+    # the answer.
+    lo_hi = (b.loc[t, "height_arpls_min_cps"].to_numpy(float) / sig,
+             b.loc[t, "height_arpls_max_cps"].to_numpy(float) / sig)
+    return (t, b.loc[t, "snr"].to_numpy(float),
+            (v.loc[t, "overall"] != "fail").to_numpy(), lo_hi)
 
 
 def _plain_axes(ax, cfg):
@@ -1149,9 +1289,11 @@ def _plain_axes(ax, cfg):
 
 
 def fig_plain_one_sweep(bands, verdict, cfg, spec, path):
-    t, snr, ok = _snr_series(bands, verdict, cfg, spec["key"])
+    t, snr, ok, (blo, bhi) = _snr_series(bands, verdict, cfg, spec["key"])
     col = PARTICLE_COLOR[spec["particle"]]
     fig, ax = plt.subplots(figsize=(6.4, 4.6))
+    ax.fill_between(t, np.minimum(blo, snr), np.maximum(bhi, snr), color=col,
+                    alpha=0.15, lw=0, zorder=0, label="arPLS baseline range")
     ax.plot(t, snr, color=col, lw=1.6, zorder=1)
     ax.scatter(t[ok], snr[ok], color=col, s=70, zorder=2, label="usable")
     if (~ok).any():
@@ -1160,7 +1302,7 @@ def fig_plain_one_sweep(bands, verdict, cfg, spec, path):
         # new series.
         ax.scatter(t[~ok], snr[~ok], facecolor="white", edgecolor=col, s=70,
                    linewidth=1.6, zorder=2, label="saturated")
-        ax.legend(frameon=False)
+    ax.legend(frameon=False, fontsize=9)
     ax.set_xticks(t)
     ax.set_xticklabels(["%g" % v for v in t])
     _plain_axes(ax, cfg)
@@ -1213,9 +1355,11 @@ def fig_plain_paper(bands, verdict, cfg, paper, path):
     fig, ax = plt.subplots(figsize=(6.4, 4.6))
     ticks = set()
     for spec in specs:
-        t, snr, ok = _snr_series(bands, verdict, cfg, spec["key"])
+        t, snr, ok, (blo, bhi) = _snr_series(bands, verdict, cfg, spec["key"])
         ticks.update(t.tolist())
         col = PARTICLE_COLOR[spec["particle"]]
+        ax.fill_between(t, np.minimum(blo, snr), np.maximum(bhi, snr), color=col,
+                        alpha=0.13, lw=0, zorder=0)
         ax.plot(t, snr, color=col, lw=1.6, zorder=1)
         ax.scatter(t[ok], snr[ok], color=col, s=70, zorder=2, label=spec["particle"])
         if (~ok).any():
@@ -1291,7 +1435,7 @@ def _bad(df, q):
     return df[df["noise_excess_p90"] >= q["noise_excess_fail"]]
 
 
-def write_findings(df, verdict, allscreen, model, cfg, path):
+def write_findings(df, verdict, allscreen, model, bands, cfg, path):
     q = cfg["quality"]
     lines = [
         "# Experiment 3 - integration-time sweep (083126)", "",
@@ -1299,8 +1443,8 @@ def write_findings(df, verdict, allscreen, model, cfg, path):
         "AutoInt was Off on every scan and Averages was %d throughout, so exposure "
         "really is the only variable." % int(df["averages"].mode().iloc[0]), "",
         "## Answer", "",
-        "| sweep | use | wall clock per spot | why not longer | caveats |",
-        "|---|---|---|---|---|",
+        "| sweep | use | wall clock per spot | basis | why not longer | caveats |",
+        "|---|---|---|---|---|---|",
     ]
     for spec in cfg["sweeps"]:
         g = verdict[verdict["key"] == spec["key"]].sort_values("int_time_s",
@@ -1318,12 +1462,37 @@ def write_findings(df, verdict, allscreen, model, cfg, path):
                      if k.startswith("c_") and nxt[k] == "fail"]
             soft = [k[2:].replace("_", " ") for k in g.columns
                     if k.startswith("c_") and nxt[k] == "warn"]
-            why = ("%g s fails %s" % (nxt["int_time_s"], ", ".join(broke)) if broke
-                   else "%g s is only borderline (%s)"
-                   % (nxt["int_time_s"], ", ".join(soft)))
-        lines.append("| %s | **%g s** | %g s | %s | %s |"
-                     % (spec["label"], r["int_time_s"], r["total_time_s"], why,
-                        r["caveats"] or "none"))
+            if broke:
+                why = "%g s fails %s" % (nxt["int_time_s"], ", ".join(broke))
+            elif soft:
+                why = "%g s is only borderline (%s)" % (nxt["int_time_s"],
+                                                        ", ".join(soft))
+            else:
+                # Passes every veto, but its SNR is off the plateau - so it is
+                # longer for no gain, which is a reason in itself.
+                why = ("%g s is clean but its SNR is %.0f%% lower"
+                       % (nxt["int_time_s"],
+                          100 * (1 - nxt["ref_band_snr"] / r["ref_band_snr"]))
+                       if np.isfinite(nxt["ref_band_snr"]) else
+                       "%g s gains nothing" % nxt["int_time_s"])
+        basis = ("clear optimum" if r["selection"] == "clear optimum"
+                 else "plateau %g-%g s" % (r["plateau_lo_s"], r["plateau_hi_s"]))
+        lines.append("| %s | **%g s** | %g s | %s | %s | %s |"
+                     % (spec["label"], r["int_time_s"], r["total_time_s"], basis,
+                        why, r["caveats"] or "none"))
+
+    plateaus = verdict[verdict["recommended"] & (verdict["selection"] == "plateau")]
+    if len(plateaus):
+        lines += ["", "Not every one of these is a resolved maximum. Where the "
+                  "`basis` column says plateau, SNR is effectively flat across the "
+                  "quoted range and the recommended time is a robust operating point "
+                  "inside it, not a statistically unique optimum:", ""]
+        for _, r in plateaus.iterrows():
+            lines.append("* **%s** - SNR is effectively plateaued across "
+                         "approximately %g-%g s. A %g s integration was selected as a "
+                         "robust operating point within this plateau."
+                         % (r["label"], r["plateau_lo_s"], r["plateau_hi_s"],
+                            r["int_time_s"]))
 
     lines += [
         "", "## How the call was made", "",
@@ -1344,6 +1513,31 @@ def write_findings(df, verdict, allscreen, model, cfg, path):
         "reference: it cannot move with the dye, so where the two agree the dye curve "
         "is reading exposure, and where they diverge something sample-side is moving."
         % ALL_BANDS[cfg["reference_band"]]["nominal"],
+        "",
+        "## How band heights are measured, and how much that matters", "",
+        "Quantitative band heights and band SNR come from a **local linear "
+        "baseline**: a straight line fitted through the medians of the band's own "
+        "two shoulders and subtracted underneath the peak. arPLS is unchanged and "
+        "still produces every corrected full spectrum that gets plotted - it is "
+        "simply no longer what sets a reported number.", "",
+        "The reason is specific to this sample. A narrow band here sits only a few "
+        "percent above a very large fluorescence background, so its height is a "
+        "small difference of two big numbers and the background model does most of "
+        "the work. `band_metrics.csv` therefore also carries the same height "
+        "measured under arPLS at lambda 1e4, 1e5 and 1e6, and "
+        "`baseline_sensitivity_pct` = 100 x (max - min) / |local height| across "
+        "those four. The denominator is floored at that band's own sigma so a band "
+        "that has died into the baseline cannot manufacture a huge percentage out "
+        "of noise; `sensitivity_floored` flags where that applied.", "",
+        "This is QC, not lambda selection. The question it answers is whether a "
+        "conclusion survives every reasonable baseline choice.", "",
+        "| band | median baseline sensitivity |", "|---|---|",
+    ]
+    sens = (bands.groupby("peak_name")["baseline_sensitivity_pct"].median()
+            .sort_values(ascending=False))
+    for name, val in sens.items():
+        lines.append("| %d cm-1 | %.0f%% |" % (ALL_BANDS[name]["nominal"], val))
+    lines += [
         "",
         "## Setting the exposure in future runs", "",
         "Exposure is the wrong thing to standardise on, because the right exposure "
@@ -1474,7 +1668,7 @@ def main() -> int:
     cal.to_csv(out / "calibration_curve.csv", index=False)
     fig11_calibration(cal, cfg, model, fig_dir / "11_calibration_curve.png")
 
-    write_findings(df, verdict, allscreen, model, cfg, out / "FINDINGS.md")
+    write_findings(df, verdict, allscreen, model, bands, cfg, out / "FINDINGS.md")
     (out / "run_context.json").write_text(json.dumps({
         "config": CONFIG_PATH.name,
         "raw_root": cfg["io"]["raw_root"],

@@ -7,6 +7,9 @@ import yaml
 
 from scripts.ai_dye_demo import (
     DEFAULT_CONFIG,
+    GREETING,
+    HELP,
+    TRIGGER,
     UNSURE,
     _config_problems,
     _dilution_rows,
@@ -15,6 +18,7 @@ from scripts.ai_dye_demo import (
     _paper_columns,
     _tip_names,
     _validate_ai_update,
+    _wants_to_run,
     render_plan,
 )
 
@@ -108,6 +112,31 @@ def test_plan_names_both_steps_and_promises_no_robot_contact(config):
     assert "5 uL" in text
 
 
+def test_the_plan_ends_by_naming_exactly_what_to_type(config):
+    """The scientist must never have to already know the magic word."""
+    simulated = render_plan(config, simulate=True, config_path=Path("x.yaml"))
+    assert f"TO RUN THE SIMULATION NOW, TYPE:   {TRIGGER}" in simulated
+    assert "No robot is contacted." in simulated
+
+    live = render_plan(config, simulate=False, config_path=Path("x.yaml"))
+    assert f"TO START THE REAL ROBOT NOW, TYPE: {TRIGGER}" in live
+    assert "the real OT-2 will move" in live
+    assert "The OT-2 starts moving as soon as you do." in live
+
+
+def test_one_trigger_word_serves_both_modes(config):
+    """Same word live as in simulation - nothing new to learn at the instrument."""
+    assert _wants_to_run(TRIGGER)
+    for simulate in (True, False):
+        plan = render_plan(config, simulate=simulate, config_path=Path("x.yaml"))
+        assert f"TYPE: {TRIGGER}" in plan or f"TYPE:   {TRIGGER}" in plan
+
+
+def test_the_greeting_and_help_name_the_trigger():
+    assert f"type {TRIGGER} to start it" in GREETING.format(trigger=TRIGGER)
+    assert f"type {TRIGGER} to start it" in HELP.format(trigger=TRIGGER)
+
+
 def test_plan_marks_a_skipped_step(config):
     updated = _validate_ai_update(config, {"print": {"enabled": False}})
     text = render_plan(updated, simulate=True, config_path=Path("x.yaml"))
@@ -127,6 +156,26 @@ def test_an_unsure_scientist_gets_the_worked_example(text):
 ])
 def test_a_specific_request_is_not_mistaken_for_uncertainty(text):
     assert not UNSURE.search(text)
+
+
+@pytest.mark.parametrize("text", [
+    "run", "go", "go ahead", "this is good run it", "yes run it", "ok start",
+    "looks good, run it", "proceed", "lets go",
+])
+def test_a_plain_go_ahead_starts_the_run_instead_of_editing(text):
+    assert _wants_to_run(text)
+
+
+@pytest.mark.parametrize("text", [
+    "make 4 dilutions and run it at 10 uL",
+    "run 8 dilutions in column 3",
+    "go to slot 6",
+    "run the dilutions in column 11 please",
+    "start the series at row D",
+    "i dont know",
+])
+def test_a_request_carrying_a_change_is_never_swallowed_as_a_go_ahead(text):
+    assert not _wants_to_run(text)
 
 
 def test_extract_json_tolerates_fenced_replies():
