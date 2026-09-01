@@ -155,6 +155,17 @@ _SPECS = (
         Lifecycle.SUPPORTED, True, True,
         "Current four-clover spacing sweep at the configured paper location.",
     ),
+    PrintingWorkflowSpec(
+        "ai_agent_dilution_print_demo", 19,
+        _PRINT / "13_ai_agent_dilution_print_demo.py",
+        "ai_agent_dilution_print_demo",
+        _WORKFLOW_DEFAULTS / "ai_agent_dilution_print_demo.yaml",
+        lifecycle=Lifecycle.SUPPORTED, discoverable=False,
+        description=(
+            "Conversational P20 demo: dilution series in one plate column, then "
+            "printed onto paper. Self-validating; driven by scripts/ai_dye_demo.py."
+        ),
+    ),
 )
 
 _BY_NAME = {spec.name: spec for spec in _SPECS}
@@ -197,22 +208,28 @@ def builder_protocol_versions() -> dict[int, tuple[Path, str]]:
     }
 
 
+# Versions outside the modern family registry whose protocol validates its own
+# YAML: the builder embeds the mapping as CONFIG and the protocol's pre-flight is
+# the authority on its shape. v19 is the conversational demo.
+_SELF_VALIDATING = {4, 6, 7, 8, 19}
+
+
 def embed_raw_versions() -> set[int]:
     """Versions whose protocol consumes the resolved YAML mapping directly."""
     modern = {spec.builder_version for spec in _SPECS if spec.family is not None}
-    return modern | {4, 6, 7, 8}
+    return modern | _SELF_VALIDATING
 
 
 def api_215_versions() -> set[int]:
     """Versions whose runtime flags must be embedded for the OT-2 API 2.15 path."""
     modern = {spec.builder_version for spec in _SPECS if spec.family is not None}
-    return modern | {3, 4, 6, 7, 8}
+    return modern | _SELF_VALIDATING | {3}
 
 
 def imageless_versions() -> set[int]:
     """Versions that do not use the historical before/after camera workflow."""
     modern = {spec.builder_version for spec in _SPECS if spec.family is not None}
-    return modern | {4, 6, 7, 8}
+    return modern | _SELF_VALIDATING
 
 
 def no_matrix_versions() -> set[int]:

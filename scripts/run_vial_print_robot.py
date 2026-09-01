@@ -733,7 +733,7 @@ def main() -> int:
                     "validation immediately before upload; do not use "
                     "--skip-build or --skip-validate."
                 )
-        if version in (4, 6, 7, 8) and args.pipette_check:
+        if version in (4, 6, 7, 8, 19) and args.pipette_check:
             raise ValueError(
                 f"--pipette-check is not available for v{version} (API-2.15, no "
                 f"runtime parameters). Just add --live."

@@ -1,0 +1,112 @@
+# AI agent demo: 8-point dye dilution series, then print every dilution on paper.
+#
+# This is the "I don't know what I want" starting point for scripts/ai_dye_demo.py.
+# It is a complete, physically sane plan on its own: an 8-point dilution series
+# down one plate column, then one 5 uL drop of each onto paper column 1.
+#
+#   configs/workflows/defaults/ai_agent_dilution_print_demo.yaml   <- this file
+#        |  the agent copies it, edits the copy from conversation, validates
+#        v
+#   configs/workflows/user/ai_dye_demo_<timestamp>.yaml
+#        |  scripts/build_vial_dilution_print.py (embeds YAML, simulates)
+#        v
+#   src/protocols/generated/ai_agent_dilution_print_demo_latest.py  <- uploaded
+#
+# Everything under deck, materials, dilution, mixing, print and tips is meant to be
+# changed by talking to the agent. The pipette, the release geometry inside `print`
+# and everything under `safety` are laboratory-owned and stay fixed.
+
+protocol_version: 19
+
+# DEFAULT IS LIVE. --simulate on the command line is what makes a run harmless.
+run_modes: {dry_run: false, do_dilution: true, do_print: true}
+
+# --- where things sit on the deck ----------------------------------------------
+deck:
+  tuberack:
+    slot: 7
+    load_name: tuberack_3dprint_20ml_8vials_v2
+    namespace: custom_beta
+    version: 1
+  plate:
+    slot: 4
+    load_name: corning_96_wellplate_360ul_custom
+    namespace: custom_beta
+    version: 1
+  paper:
+    slot: 5
+    load_name: paper_print_96_flat
+    namespace: custom_beta
+    version: 1
+  tiprack:
+    slot: 9
+    load_name: opentrons_96_tiprack_20ul
+
+# Laboratory-owned. The whole workflow is single-channel P20.
+pipette: {name: p20_single_gen2, mount: left}
+
+# --- what is in the vial rack ---------------------------------------------------
+# role "solvent" = the diluent, role "sample" = the thing being diluted.
+materials:
+  water: {role: solvent, vial: A1, aspirate_height_mm: 4.0}
+  dye:   {role: sample,  vial: A2, aspirate_height_mm: 4.0}
+
+# --- the dilution series --------------------------------------------------------
+# One dilution per plate row, all in `plate_column`, starting at `start_row`.
+# factor N means "1 part dye in N parts total": 150 uL at 4x is 37.5 uL dye
+# + 112.5 uL water. 1 to 8 factors; the P20 needs at least 1 uL of dye per well,
+# so 150 uL total allows fold factors up to 150x — but this default stops at 16x,
+# where every dye transfer is still 9 uL or more and therefore accurate. Ask the
+# agent for a steeper series (2-fold to 128x, say) if a wider range matters more
+# than precision at the dilute end.
+dilution:
+  enabled: true
+  plate_column: '11'
+  start_row: A
+  factors: [1, 2, 3, 4, 6, 8, 12, 16]
+  total_volume_ul: 150.0
+  max_transfer_ul: 20.0        # P20 ceiling per transfer chunk
+  solvent_dispense_from_top_mm: -2.0
+  sample_dispense_from_top_mm: -1.0
+
+# Mix the source well immediately before each print aspiration.
+mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
+
+# --- printing the dilutions onto paper ------------------------------------------
+# Each dilution prints on its own paper ROW; each droplet volume x replicate gets
+# its own paper COLUMN, starting at paper_start_column.
+#   droplet_volume_ul: 5.0        -> one 5 uL drop per dilution, paper column 1
+#   droplet_volume_ul: [5.0, 10] -> 5 uL in column 1, 10 uL in column 2
+print:
+  enabled: true
+  droplet_volume_ul: 5.0
+  droplets_per_spot: 1          # stacked drops on the same spot
+  replicates: 1                 # side-by-side paper columns per volume
+  paper_start_column: 1
+  paper_columns: 12
+
+  # --- laboratory-owned release geometry; do not tune these for a demo ---------
+  # From configs/machines/ot2_standard_printing_p20_v1.yaml: paper dispense 1.1 mm
+  # off the bottom, 1.5 uL trailing air gap released 5 mm up, 3.0 uL push-out,
+  # blow-out on, and a 2 s dwell so the drop separates from the tip.
+  z_mm: 1.1
+  aspirate_height_mm: 1.0       # inside the dilution well
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  post_dispense_delay_s: 2.0
+
+# Tips are taken in rack order from start_tip: one solvent tip, one sample tip,
+# then a fresh tip for every dilution row that gets printed.
+tips: {start_tip: A1, return_tips: false}
+
+flow_rates: {aspirate: 3.0, dispense: 3.0}
+
+# --- laboratory-owned limits ----------------------------------------------------
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_well_count: 8
+  p20_max_volume_ul: 20.0
+  p20_min_volume_ul: 1.0
+  max_well_fill_ul: 340.0

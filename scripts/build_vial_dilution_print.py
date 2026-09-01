@@ -820,9 +820,13 @@ def main() -> int:
     if args.no_sim:
         return 0
 
+    # An explicitly requested interpreter (flag or env var) is honoured for every
+    # version: API 2.15 protocols need an environment that actually has opentrons
+    # 7.0.2, which the caller's own interpreter may not. Without one, only the
+    # pinned versions leave the current interpreter.
+    requested_python = args.simulator_python or os.environ.get("OT2_API_2_15_PYTHON")
     simulator_python = (
-        args.simulator_python
-        or os.environ.get("OT2_API_2_15_PYTHON")
+        requested_python
         or (str(V3_SIMULATOR_PYTHON) if V3_SIMULATOR_PYTHON.exists() else None)
         or sys.executable
     )
@@ -832,14 +836,14 @@ def main() -> int:
             print(f"SIMULATION ENVIRONMENT INVALID: {simulator_problem}")
             return 1
 
-    ok, output = simulate(
-        run_path,
-        simulator_python if version in SIMULATOR_PINNED_VERSIONS else sys.executable,
-    )
+    use_pinned = version in SIMULATOR_PINNED_VERSIONS or bool(requested_python)
+    ok, output = simulate(run_path, simulator_python if use_pinned else sys.executable)
     tail = "\n".join(line for line in output.splitlines()
                      if any(k in line for k in ("Pre-flight", "Series:", "Printing 8",
                                                 "Returned", "Completed ===", "WARNING",
-                                                "Clovers:", "Minimum int", "Usable paper")))
+                                                "Clovers:", "Minimum int", "Usable paper",
+                                                "Print plan:",
+                                                "Paper print complete")))
     print("\n--- simulation key lines ---")
     print(tail)
     print("--- end ---")

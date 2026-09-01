@@ -23,8 +23,11 @@ from src.printing.workflows import (
 
 def test_builder_mapping_comes_from_registry_without_compatibility_drift():
     assert PROTOCOL_VERSIONS == builder_protocol_versions()
-    assert set(PROTOCOL_VERSIONS) == {1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18}
+    assert set(PROTOCOL_VERSIONS) == {
+        1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+    }
     assert PROTOCOL_VERSIONS[18][1] == "four_clover_spacing_v13"
+    assert PROTOCOL_VERSIONS[19][1] == "ai_agent_dilution_print_demo"
     assert robot_runner._PROTOCOL_BY_VERSION == {
         version: robot_runner.GENERATED_PROTOCOL_DIR / f"{stem}_latest.py"
         for version, (_, stem) in PROTOCOL_VERSIONS.items()

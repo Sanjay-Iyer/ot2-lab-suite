@@ -1,75 +1,92 @@
-# Basic AI Dye Dilution + Paper Print Demo
+# AI Agent Demo: Dilutions and Paper Printing
 
-One command runs the conversational demo:
-
-```powershell
-python scripts\ai_dye_demo.py --simulate  # local only; no robot connection
-python scripts\ai_dye_demo.py             # real OT-2 after confirmation
-```
-
-The AI edits a timestamped YAML under `configs/workflows/user/`; it never edits
-robot Python. The builder validates and embeds the YAML into a deterministic
-protocol, then simulates that exact artifact before physical execution.
-
-## Default plan
-
-| Slot | Item | Contents |
-|---:|---|---|
-| 7 | 20 mL vial rack | A1 water, A2 dye |
-| 4 | 96-well plate | A9-D9: 1x, 2x, 5x, 10x; 200 uL each |
-| 5 | paper proxy | four 30 uL drops at paper column 1 |
-| 9 | 300 uL tip rack | setup and print tips |
-
-The terminal resolves and displays the dye/water volume in every well, all deck
-locations, paper columns, number of drops, and total liquid before confirmation.
-
-## Work-laptop setup after `git pull`
-
-From the repository root:
+One conversational command shows the OT-2 doing the two things this lab does most:
+make a dilution series, then print those dilutions onto paper.
 
 ```powershell
-conda activate llm
-gcloud auth login
-gcloud auth application-default login
-gcloud config set project YOUR_GCP_PROJECT_ID
+python scripts\ai_dye_demo.py --simulate   # local only; never contacts a robot
+python scripts\ai_dye_demo.py              # real OT-2, after you type RUN LIVE
 ```
 
-Set these values in `.env` (do not commit credentials):
+The agent introduces itself, asks what you want, and edits a timestamped YAML copy
+of the standard plan. It never writes robot Python. Every edit is validated against
+the P20's real limits before it is accepted, and the deterministic builder embeds
+the YAML into protocol v19
+(`src/protocols/printing/13_ai_agent_dilution_print_demo.py`) and simulates that
+exact artifact before anything physical happens.
 
-```text
-LLM_PROVIDER=vertexai
-GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT_ID
-GOOGLE_CLOUD_LOCATION=us-central1
-GEMINI_MODEL=gemini-1.5-flash
-```
+## What it runs
 
-Verify LLM authentication without robot motion:
+Everything is on the single-channel **P20** — the same instrument, tip logic and
+liquid handling as the v6 dilution/print workflow, with the print-release cycle
+from the recent printing scripts.
 
-```powershell
-python -m src.agents.check_llm_auth
-```
+1. **Dilutions** — water into every well of one plate column, then dye on top of
+   it, one fold factor per plate row, mixed before use.
+2. **Printing** — each dilution prints on its own paper row; each droplet volume
+   and replicate takes its own paper column. A fresh tip per dilution, so no two
+   concentrations ever share a tip.
 
-## Simulation-only rehearsal
+### The default plan (the "I don't know" answer)
+
+| | |
+|---|---|
+| Dilutions | 8 — 1x, 2x, 3x, 4x, 6x, 8x, 12x, 16x, 150 µL each, plate column 11 |
+| Print | one **5 µL** drop of each, paper column 1 |
+| Deck | vial rack 7, plate 4, paper 5, 20 µL tip rack 9 |
+| Liquids | water in vial A1, dye in vial A2 |
+| Tips | 10, from A1 — one water, one dye, one per printed dilution |
+
+The series stops at 16x so every dye transfer is 9 µL or more, where the P20 is
+accurate. Ask for a steeper series (2-fold out to 128x) if range matters more than
+precision — 150 µL total supports up to 150x before the 1 µL floor bites.
+
+## What you can say
+
+The agent opens with a greeting and a list of examples. Anything in this space
+works:
+
+- `make 8 dilutions in column 11 and print them at 5 uL`
+- `4 dilutions, 10 uL drops, start printing at paper column 3`
+- `move the plate to slot 6 and use dye vial A3`
+- `print at 5 and 10 uL side by side, two columns each`
+- `three drops stacked on each spot`
+- `start the series at row D`
+- `only do the dilutions, skip the printing`
+- `use 200 uL per dilution and start from tip C2`
+
+If you have no idea what to ask for, say **"I don't know"** — the agent prints the
+standard example above and invites you to adjust it.
+
+Typed commands: `plan`, `show` (raw YAML), `run`, `help`, `quit`.
+
+## What the agent will not do
+
+Rejected edits leave the config exactly as it was, and the agent says why:
+
+- the pipette, the safety limits, the flow rates and the run modes are fixed;
+- the calibrated print geometry — dispense height, air gap, push-out, blow-out,
+  dwell — is laboratory-owned and comes from
+  `configs/machines/ot2_standard_printing_p20_v1.yaml`;
+- physically impossible plans are refused with the reason: a 25 µL drop on a P20,
+  two things in one deck slot, 9 dilutions, a series that runs past row H, a
+  1000x dilution that would need 0.15 µL of dye, a print that runs off the paper,
+  a starting tip that leaves too few tips.
+
+## Simulation rehearsal
 
 ```powershell
 python scripts\ai_dye_demo.py --simulate
 ```
 
-Example request:
-
-```text
-Use dye vial A3, make 6 dilutions in plate column 8, use 25 uL drops,
-and print twice starting at paper column 3.
-```
-
-Type `show` for the full YAML or `run` for final review. Nothing executes until
-you type exactly `RUN SIMULATION`. This performs a local build, Opentrons
-simulation, validation matrix, and mock droplet-count CV. It never discovers or
-contacts a robot.
+Nothing runs until you type exactly `RUN SIMULATION`. That builds the protocol from
+your YAML and simulates every movement locally. It never discovers or contacts a
+robot. On this simulation laptop use `conda activate ai` and only `--simulate`.
 
 ## Real robot run
 
-On the physically supervised robot laptop only:
+On the physically supervised robot laptop, after checking the deck, tips, liquids,
+labware, pipette and paper:
 
 ```powershell
 conda activate llm
@@ -77,26 +94,36 @@ python scripts\find_robot.py --check
 python scripts\ai_dye_demo.py
 ```
 
-The default robot IP is `169.254.46.57`. After reviewing the printed plan and
-checking the physical deck, type exactly `RUN LIVE`. The live runner rebuilds,
-simulates, validates, uploads, starts, monitors, and pulls enabled camera images.
+Review the printed plan, then type exactly `RUN LIVE`. The runner rebuilds,
+simulates, uploads over the HTTP API, starts the run and monitors it. The robot
+host comes from `configs\robot.yaml`; pass `--robot-host` only to override it.
 
-Useful requests include:
+## Work-laptop setup after a pull
 
-- `Move the plate to slot 6 and the paper to slot 4.`
-- `Use dye vial B2 and make the dilutions in plate column 11.`
-- `Make 5 dilutions with factors 1, 2, 4, 8, and 16.`
-- `Print 3 passes starting at paper column 2 with 30 uL drops.`
-- `Use another installed 96-well plate definition.`
+```powershell
+conda activate llm
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project YOUR_GCP_PROJECT_ID
+python -m src.agents.check_llm_auth
+```
 
-Invalid AI edits are rejected and the previous config remains unchanged.
+`.env` (do not commit credentials):
 
-## Logs
+```text
+LLM_PROVIDER=vertexai
+GOOGLE_CLOUD_PROJECT=YOUR_GCP_PROJECT_ID
+GOOGLE_CLOUD_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.5-flash
+```
 
-- `configs/workflows/user/ai_dye_demo_YYYYMMDD_HHMMSS.yaml`: edited config
-- `runs/ai_dye_demo/YYYYMMDD_HHMMSS/session.log`: timestamped JSON-lines audit
-- `runs/ai_dye_demo/YYYYMMDD_HHMMSS/executed_config.yaml`: executed snapshot
-- `src/protocols/generated/vial_dilution_print_latest.py`: generated protocol
-- existing robot runner logs and pulled images for live runs
+## Files
 
-On this simulation laptop use `conda activate ai` and only `--simulate`.
+- `configs/workflows/defaults/ai_agent_dilution_print_demo.yaml` — the standard
+  plan the agent starts from; every knob is commented
+- `configs/workflows/user/ai_dye_demo_YYYYMMDD_HHMMSS.yaml` — the edited copy
+- `runs/ai_dye_demo/YYYYMMDD_HHMMSS/session.log` — JSON-lines audit of the
+  conversation, every accepted and rejected edit, and the confirmation
+- `runs/ai_dye_demo/YYYYMMDD_HHMMSS/executed_config.yaml` — what actually ran
+- `src/protocols/generated/ai_agent_dilution_print_demo_latest.py` — the uploaded
+  protocol
