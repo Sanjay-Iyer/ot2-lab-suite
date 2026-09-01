@@ -203,6 +203,25 @@ def validate(cfg: dict) -> list:
             slots.append(deck[pos]["slot"])
     if len(slots) != len(set(slots)):
         errors.append(f"deck slots must be distinct, got {slots}")
+    for role, spec in deck.items():
+        slot = spec.get("slot")
+        if isinstance(slot, bool) or not isinstance(slot, int) or not (1 <= slot <= 11):
+            errors.append(
+                f"deck.{role}.slot must be an integer from 1 to 11, got {slot!r}"
+            )
+
+    # Seven idle nozzles extend beyond the active nozzle in SINGLE mode. Labware
+    # used by that phase must stay in the two middle rows or travel can leave the
+    # OT-2 envelope. Paper is used only with a complete 8-tip column.
+    if cfg.get("pipette", {}).get("name") == "p300_multi_gen2":
+        middle_slots = {4, 5, 6, 7, 8, 9}
+        for role in ("tuberack", "plate", "tiprack"):
+            slot = deck.get(role, {}).get("slot")
+            if slot not in middle_slots:
+                errors.append(
+                    f"deck.{role}.slot {slot!r} is unsafe for P300 SINGLE-nozzle "
+                    f"motion; use one of {sorted(middle_slots)}"
+                )
 
     # ── Dynamic limits from labware JSON + safety config ──────────────────────────
     plate_lw_data  = _load_labware_json(deck.get("plate", {}).get("load_name", ""))

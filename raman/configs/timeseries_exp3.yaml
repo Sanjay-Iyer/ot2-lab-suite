@@ -1,0 +1,152 @@
+# =============================================================================
+# CONFIG: integration-time sweep - experiment 3 (083126)
+# -----------------------------------------------------------------------------
+# A DIFFERENT KIND OF EXPERIMENT from exp 1 and 2. There the sample varied and
+# the acquisition was held fixed; here the sample is ONE SPOT and the exposure
+# is swept 20 s -> 2 s. The question is not "how much dye is there" but "which
+# integration time should every future scan use".
+#
+# Consumed by exp3_timeseries_report.py. Band windows are NOT defined here -
+# they are imported from exp1_cv_report.BANDS so all three experiments score
+# against identical windows. `bands:` below only selects which of those to use.
+#
+# NOTE ON file discovery: each raw folder holds two exports per scan - a bare
+# two-column "shift,intensity" CSV and a metadata CSV whose header carries
+# IntTime and whose "Intensities" row carries the same spectrum. The report
+# reads ONLY the metadata export, because exposure is the independent variable
+# here and must come from the file itself, never from the folder name.
+# =============================================================================
+name: "timeseries_exp3"
+description: "Integration-time sweep 20 s -> 2 s, bipyramid and star nanoparticles, offwhite and white paper, 083126."
+
+io:
+  raw_root: raw/083126_Raman_TimeSeries/083126_Raman_TimeSeries
+  output_dir: results/exp3_timeseries
+
+# Each sweep is one spot measured repeatedly at falling exposure. `folder` is
+# relative to io.raw_root; exposures are read from each file, not from here.
+sweeps:
+  - {key: ow-bp,    folder: offwhite_NP_bypyramids_20S-2S, paper: offwhite, particle: bipyramids, label: "Offwhite / bipyramids"}
+  - {key: ow-star,  folder: offwhite_NP_STARS_20S-2S,      paper: offwhite, particle: stars,      label: "Offwhite / stars"}
+  - {key: w-bp,     folder: white_NP_bypyramids_20S-2S,    paper: white,    particle: bipyramids, label: "White / bipyramids"}
+  - {key: w-star,   folder: white_timeseries_stars_10s-2s, paper: white,    particle: stars,      label: "White / stars"}
+
+# Every other scan in the 083126 dump (stars panels, bipyramid rerun) is pooled
+# into the noise-model fit and the detector-onset figure, to widen the range of
+# count levels those are constrained on. They are never scored as sweeps.
+pool_all_scans: true
+
+analysis_range:
+  enabled: true
+  min: 400
+  max: 1800
+
+preprocessing:
+  baseline:
+    method: arpls
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol
+    savgol: {window: 11, polyorder: 3}
+
+# ---------------------------------------------------------------------------
+# Noise model.  sigma^2 = read^2 + gain * N
+#
+# A healthy photon-counting detector obeys this exactly, so it is the reference
+# every scan is judged against. It is FITTED, not assumed: robust least squares
+# over the pooled sliding windows of every scan whose local level is below
+# fit_max_counts, i.e. over data that cannot itself be saturated. The two terms
+# matter for opposite ends of the sweep - the read term is why a 2 s scan is
+# noisy, the gain term is why a 20 s scan is not.
+# ---------------------------------------------------------------------------
+noise_model:
+  window_cm1: 100          # width of the sliding window sigma is measured in
+  fit_max_counts: 30000    # windows above this are excluded from the fit
+  fit_iterations: 6        # robust re-weighting passes (3-sigma trimming)
+
+# ---------------------------------------------------------------------------
+# Acceptance thresholds -> the traffic lights in the verdict grid.
+# A criterion is a VETO: the recommendation is the longest exposure with no
+# `fail`. Warns are reported as caveats but do not disqualify, because the
+# degradation before the cliff is gradual and a warn is still usable data.
+# ---------------------------------------------------------------------------
+quality:
+  # (1) NOISE EXCESS - measured sigma divided by the model sigma at the same
+  # count level. Dimensionless, ~1 for a healthy scan whatever the exposure.
+  # Scored on the 90th percentile over windows, not the maximum: the maximum is
+  # an order statistic over ~14 windows and flips on a single cosmic ray.
+  noise_excess_warn: 2.0
+  noise_excess_fail: 3.0
+
+  # (2) COUNT HEADROOM, scored on the MEDIAN of the spectrum, not its maximum.
+  # The failure is driven by how much of the detector is full, not by one tall
+  # peak - measured here, every failing scan has a median above 25k and every
+  # passing scan below 20k, while their maxima overlap heavily (a 68k-max scan
+  # passes, a 61k-max scan fails).
+  median_counts_warn: 20000
+  median_counts_fail: 25000
+
+  # (3) LINEARITY - departure of counts/second from the value extrapolated from
+  # the two shortest exposures, as a percentage, worst probe window.
+  linearity_warn_pct: 15.0
+  linearity_fail_pct: 30.0
+
+  # (4) SNR - the "too short" side. Scored on the MEDIAN SNR across the CV
+  # bands rather than on any single band: individual weak bands scatter badly
+  # at one spot per exposure, and a single noisy band should not cast a veto.
+  snr_bands: [cv_806, cv_914, cv_1175, cv_1375, cv_1620]
+  snr_warn: 15.0
+  snr_fail: 8.0
+
+  # Probe windows for the linearity test - the fluorescence shoulder, the flat
+  # middle, and the rising tail.
+  probe_windows:
+    - {name: "450",  min: 445,  max: 455}
+    - {name: "1300", min: 1295, max: 1305}
+    - {name: "1700", min: 1695, max: 1705}
+
+# ---------------------------------------------------------------------------
+# Excess-noise spectrum. The extra noise on a saturating scan is NOT white: it
+# is concentrated in a band of spatial frequencies. These bands (in cm-1 of
+# ripple period) are the histogram it is measured on. `signature_band` is where
+# the excess lives, `white_band` is the short-period reference that stays
+# quiet - their ratio is the "how far from white noise is this" statistic.
+#
+# This matters practically, not just descriptively: noise at ~10 cm-1 has the
+# same width as a narrow Raman band, so it survives Savitzky-Golay smoothing
+# and is fitted as a peak.
+# ---------------------------------------------------------------------------
+excess_noise:
+  period_bands_cm1: [[2, 4], [4, 6], [6, 8], [8, 10], [10, 13], [13, 17], [17, 25], [25, 40], [40, 80]]
+  signature_band_cm1: [6, 25]
+  white_band_cm1: [2, 4]
+  measure_window_cm1: [400, 800]   # where the detector fills first
+
+# Bands scored and plotted. Names must exist in exp1_cv_report.BANDS, except
+# `paper_1095`, which the report adds itself - on paper the ~1095 feature is
+# carbonate filler in the sheet, NOT an analyte band.
+bands: [cv_806, cv_914, cv_1175, cv_1375, cv_1620, paper_1095]
+
+# THE REFERENCE BAND is the dye band: `cv_1620`, nominal 1620 and observed at
+# 1616-1617 on these prints. It is the strongest CV feature by a wide margin
+# (81-189 counts/s against 14 for the 1587 shoulder, which is absent altogether
+# on both white sweeps), and it is the signal the exposure has to serve - an
+# exposure is only "good enough" if it is good enough on the analyte.
+reference_band: cv_1620
+
+# Bands the calibration curve (figure 11) is drawn for, dye band first.
+#
+# paper_1095 is kept as the SECOND row rather than dropped. It is carbonate
+# filler in the sheet, so its true intensity cannot change with the dye, with
+# photobleaching or with how much analyte landed on that spot - which makes it
+# the one trace that shows the exposure response and nothing else. Where the two
+# rows agree, the dye curve is reading exposure; where they diverge, something
+# sample-side is moving and the dye curve alone would not tell you which.
+calibration_bands: [cv_1620, paper_1095]
+
+# Fraction of the achievable SNR gain that counts as "enough" - the point marked
+# on the calibration curve as the knee.
+calibration_knee_fraction: 0.90
+
+plotting:
+  dpi: 200

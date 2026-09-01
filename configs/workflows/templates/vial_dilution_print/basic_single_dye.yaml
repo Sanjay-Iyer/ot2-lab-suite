@@ -1,0 +1,66 @@
+# Basic AI demo: one dye vial -> configurable dilution series -> paper print.
+# The agent copies this template and edits the copy, not this baseline.
+deck:
+  tuberack: {slot: 7, load_name: tuberack_3dprint_20ml_8vials_v2, namespace: custom_beta, version: 1}
+  plate: {slot: 4, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  paper: {slot: 5, load_name: corning_96_wellplate_360ul_custom, namespace: custom_beta, version: 1}
+  tiprack: {slot: 9, load_name: opentrons_96_tiprack_300ul}
+pipette: {name: p300_multi_gen2, mount: right, single_start: A1}
+sources:
+  water_vial: A1
+  food_coloring_vial: A2
+  blue_dye_vial: A2
+  orange_dye_vial: A3
+  vial_aspirate_height_mm: 4.0
+dilution:
+  enabled: true
+  destination_column: "9"
+  total_volume_ul: 200.0
+  factors: {mode: explicit, explicit: [1, 2, 5, 10], step_factor: 2, start: 1, end: 10, count: 4}
+  mix_reps: 3
+  mix_volume_ul: 120.0
+  water_setup_tip: H12
+  setup_tip: H11
+  single_tip_columns: [12, 11]
+printing:
+  enabled: true
+  source_column: "9"
+  droplet_volume_ul: 30.0
+  num_replicates: 1
+  paper_start_column: 1
+  dispense_z_mm: 1.0
+  air_gap_ul: 5.0
+  air_gap_height_mm: 20.0
+  post_dispense_delay_s: 0.5
+  move_speed_mm_per_s: 50.0
+  replicate_spacing_mm: {x: 9.0, y: 0.0, z: 0.0}
+  print_block_column: 1
+  blow_out: true
+  touch_tip: false
+tips: {return_tips: true}
+camera:
+  enabled: true
+  capture_before: true
+  capture_after: true
+  capture_mid_rows: [C, H]
+  robot_image_dir: /data/vision/vial_dilution_print
+  robot_api_url: "http://localhost:31950/camera/picture"
+  capture_timeout_s: 5
+flow_rates: {aspirate: 20.0, dispense: 80.0, mix: null}
+cv:
+  expected_droplets: 4
+  min_circularity_ok: 0.6
+  detection: {threshold_method: otsu, min_area: 250, invert: true}
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_well_count: 8
+  expected_diameter_mm: 28.0
+  expected_depth_mm: 55.0
+  expected_row_spacing_mm: 34.0
+  expected_col_spacing_mm: 31.0
+  geometry_tolerance_mm: 0.5
+  pipette_min_accurate_ul: 20.0
+  expected_plate_well_count: 96
+  tiprack_rows_per_column: 8
+  pipette_max_volume_ul: 300.0
+run_modes: {dry_run: true, do_dilution: true, do_print: true}

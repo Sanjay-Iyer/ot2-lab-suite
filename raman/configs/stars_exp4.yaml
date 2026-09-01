@@ -1,0 +1,213 @@
+# =============================================================================
+# CONFIG: gold nanostar SERS dilution panels + bipyramid rerun - exp 4 (083126)
+# -----------------------------------------------------------------------------
+# The exp-2 design with a third arm. Same CV dye ladder (2x -> 200x), but three
+# conditions instead of two:
+#
+#   stars     9a, column 1 - stock gold nanostars + dye
+#   stars5x   9b, column 2 - 40 uL stars + 200 uL water (5:1) + dye
+#   dyeonly   dye alone, the control every gain is measured against
+#
+# plus a rerun of the 082726 bipyramid print (condition `bp`) at fixed exposure.
+#
+# Scan -> condition -> dilution comes from the bench notes; nothing in the
+# exports carries it (Comment, ProductId, BatchId, Container are all empty).
+# Every series below is written out explicitly rather than derived from a start
+# scan and a stride, because several were cut short on purpose - the operator
+# stopped once the band was gone into noise - and a stride would silently
+# relabel the survivors.
+#
+# THREE THINGS THE NOTES AND THE FILES DISAGREE ON, or leave open:
+#
+#   1. Scans 823-827 are NOT in this dump. The notes place the white 10 s stock
+#      -star series at 823-830; only 828-830 are present, so that series keeps
+#      just its three most dilute points. Everything else is complete.
+#   2. Scans 820-822 are noted as 8 s. The instrument recorded IntTime 10.00 and
+#      OpName "10S" on all three. The file wins here - it is the acquisition
+#      parameter, not a transcription - and the report reads exposure from the
+#      file regardless, so this note is FYI. Scan 847 really is 8 s.
+#   3. The rerun blocks are written "2x - 20x" in the notes, but the operator
+#      has since confirmed the three spots are the FIRST THREE COLUMNS of the
+#      print - 2x, 5x, 10x - not 2x/10x/20x. All four bipyramid series below
+#      carry [2x, 5x, 10x]. This is the correction of 090126; every bipyramid
+#      number in an earlier run of this report was labelled one or two rungs
+#      too dilute.
+# =============================================================================
+name: "stars_exp4"
+description: "Gold nanostars stock vs 5:1 diluted vs dye-only across a 2x-200x CV ladder, offwhite and white paper, plus the 082726 bipyramid rerun. 083126."
+
+io:
+  raw_root: raw/083126_Raman_TimeSeries/083126_Raman_TimeSeries
+  output_dir: results/exp4_stars
+
+# The noise law used to screen these scans is exp 3's, fitted on all 84 scans in
+# this dump. Not refitted here: refitting on a subset would let the scans under
+# test shape the law they are judged against.
+screen:
+  noise_model_from: results/exp3_timeseries/noise_model.json
+  timeseries_config: timeseries_exp3.yaml
+
+conditions:
+  stars:   {label: "Stars stock + CV",            color: "#a8322d", marker: "o"}
+  stars5x: {label: "Stars:water 1:5 + CV",        color: "#1e8b57", marker: "^"}
+  bp:      {label: "Bipyramids + CV",             color: "#7b4ea8", marker: "D"}
+  dyeonly: {label: "CV",                          color: "#8c8c94", marker: "s"}
+control_condition: dyeonly
+
+# The full ladder. Individual series carry their own subset of it.
+dilution_ladder: ["2x", "5x", "10x", "20x", "30x", "50x", "100x", "200x"]
+
+# ---------------------------------------------------------------------------
+# One row per contiguous block of scans. `scans` and `dilutions` must be the
+# same length - the report refuses to run if they are not, which is the check
+# that catches a mistyped range.
+# ---------------------------------------------------------------------------
+series:
+  # --- Offwhite, 10 s -----------------------------------------------------
+  - {key: ow-10, folder: offwhite_NP_STARS, paper: offwhite, particle: stars,
+     condition: stars,   scans: "803-810", dilutions: ["2x", "5x", "10x", "20x", "30x", "50x", "100x", "200x"]}
+  - {key: ow-10, folder: offwhite_NP_STARS, paper: offwhite, particle: stars,
+     condition: stars5x, scans: "811-815", dilutions: ["2x", "5x", "10x", "20x", "30x"],
+     note: "stopped at 30x - past that it was noise"}
+  - {key: ow-10, folder: offwhite_NP_STARS, paper: offwhite, particle: stars,
+     condition: dyeonly, scans: "816-819", dilutions: ["2x", "5x", "10x", "20x"],
+     note: "first four only - past that it was noise"}
+
+  # --- White, 10 s --------------------------------------------------------
+  - {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+     condition: stars,   scans: "828-830", dilutions: ["50x", "100x", "200x"],
+     note: "2x-30x are scans 823-827, which are not in this dump"}
+  - {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+     condition: stars5x, scans: "831-838", dilutions: ["2x", "5x", "10x", "20x", "30x", "50x", "100x", "200x"]}
+  - {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+     condition: dyeonly, scans: "839-846", dilutions: ["2x", "5x", "10x", "20x", "30x", "50x", "100x", "200x"]}
+
+  # --- White, 6 s (the 10 s panel saturated, so the strong end was redone) --
+  - {key: w-6, folder: white_NP_STARS/6, paper: white, particle: stars,
+     condition: stars,   scans: "848-850", dilutions: ["2x", "5x", "10x"]}
+  - {key: w-6, folder: white_NP_STARS/6, paper: white, particle: stars,
+     condition: stars5x, scans: "851-853", dilutions: ["2x", "5x", "10x"]}
+  - {key: w-6, folder: white_NP_STARS/6, paper: white, particle: stars,
+     condition: dyeonly, scans: "854-856", dilutions: ["2x", "5x", "10x"]}
+
+  # --- Bipyramid rerun of the 082726 print --------------------------------
+  - {key: bp-w-10, folder: bypyramids_rerun, paper: white, particle: bipyramids,
+     condition: bp,      scans: "820-822", dilutions: ["2x", "5x", "10x"],
+     note: "noted as 8 s; the files record 10.00 s. No dye-only control at this exposure."}
+  - {key: bp-w-6, folder: bypyramids_rerun, paper: white, particle: bipyramids,
+     condition: bp,      scans: "857-859", dilutions: ["2x", "5x", "10x"]}
+  - {key: bp-w-6, folder: bypyramids_rerun, paper: white, particle: bipyramids,
+     condition: dyeonly, scans: "860-862", dilutions: ["2x", "5x", "10x"]}
+  - {key: bp-ow-10, folder: bypyramids_rerun, paper: offwhite, particle: bipyramids,
+     condition: bp,      scans: "863-865", dilutions: ["2x", "5x", "10x"]}
+  - {key: bp-ow-10, folder: bypyramids_rerun, paper: offwhite, particle: bipyramids,
+     condition: dyeonly, scans: "866-868", dilutions: ["2x", "5x", "10x"]}
+
+panel_label:
+  ow-10:    "Offwhite stars, 10 s"
+  w-10:     "White stars, 10 s"
+  w-6:      "White stars, 6 s"
+  bp-w-10:  "Bipyramid rerun, white, 10 s"
+  bp-w-6:   "Bipyramid rerun, white, 6 s"
+  bp-ow-10: "Bipyramid rerun, offwhite, 10 s"
+
+# Every raw folder to load. Listed separately from `series:` so that scans which
+# belong to no series - see `unassigned:` - are still read and still screened,
+# instead of vanishing because no series happened to name their folder.
+folders:
+  - offwhite_NP_STARS
+  - white_NP_STARS/10s
+  - white_NP_STARS/8s
+  - white_NP_STARS/6
+  - bypyramids_rerun
+
+# Scans present in those folders but deliberately left out of every series.
+unassigned:
+  847: "8 s single probe, taken between the 10 s and 6 s white panels"
+
+# Scans the bench notes place in a series but that are absent from this dump.
+# They are in no `series:` above - there is nothing to load - but the scan key
+# carries them as flagged placeholders so the hole in the white 10 s stock-star
+# ladder is visible rather than looking like a series that began at 50x.
+missing_scans:
+  823: {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+        condition: stars, dilution: "2x"}
+  824: {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+        condition: stars, dilution: "5x"}
+  825: {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+        condition: stars, dilution: "10x"}
+  826: {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+        condition: stars, dilution: "20x"}
+  827: {key: w-10, folder: white_NP_STARS/10s, paper: white, particle: stars,
+        condition: stars, dilution: "30x"}
+
+analysis_range:
+  enabled: true
+  min: 400
+  max: 1800
+
+preprocessing:
+  baseline:
+    method: arpls
+    arpls: {lam: 100000.0, ratio: 1.0e-6, niter: 50}
+  smoothing:
+    method: savgol
+    savgol: {window: 11, polyorder: 3}
+
+quality:
+  min_snr: 3.0
+  # Saturated scans are dropped from every gain and every fitted trend, but are
+  # still drawn - hollow - so the exclusion is visible rather than silent.
+  exclude_failed_from_gains: true
+
+  # WHAT "SATURATED" IS SCORED ON.
+  #
+  #   band  the noise windows overlapping the band being plotted (default)
+  #   scan  the 90th percentile over the whole 400-1800 range, as in exp 3
+  #
+  # Saturation on these scans starts at the low-wavenumber end, where the
+  # fluorescence background is highest, and it does not always reach the dye
+  # band. Scan 854 rings at 7.6x the model noise below 800 cm-1 and sits at
+  # 1.6x at 1620 - quieter there than 849, which passes on both counts. Under
+  # `scan` its 1620 point is discarded because of a region it is not read at;
+  # under `band` it is kept and scored where it is used. 831/832/839 still fail
+  # under either: on those the ringing does reach 1620 (6-9x).
+  #
+  # This is a scope change, not a loosening: the thresholds are the same 2.0
+  # and 3.0, and the SNR behind every band height was already local, taken from
+  # a shoulder 60 cm-1 outside the band on the unsmoothed trace. Both verdicts
+  # are written to scan_screen.csv whichever scope is in force.
+  screen_scope: band
+
+# `paper_1095` is carbonate filler in the sheet, NOT analyte. It is carried so a
+# "gain" that is really just a brighter patch of paper shows up as such.
+bands: [cv_806, cv_914, cv_1175, cv_1375, cv_1620, paper_1095]
+sers_band: cv_1620
+substrate_band: paper_1095
+
+plotting:
+  dpi: 200
+  # Every arm of this experiment measured 2x, 5x and 10x, and only the offwhite
+  # nanostar ladders went further. The figures are held to the three all four
+  # arms share so paper, particle and dilution can be read against each other
+  # without a missing cell anywhere. The CSVs and the audit figures keep the
+  # full ladder out to 200x - this trims the plots, not the record.
+  active_dilutions: ["2x", "5x", "10x"]
+  # Each output folder is one paper at one exposure.  The white 10 s series,
+  # the white 8 s probe, and the unmatched white bipyramid 10 s scans remain in
+  # the audit tables but are deliberately excluded from active figures.
+  paper_focus:
+    offwhite: {key: ow-10, dilution: "10x", output_dir: offwhite_10s}
+    white:    {key: w-6,  dilution: "10x", output_dir: white_6s}
+  # Particle-shape comparison uses matched exposures within each paper.
+  # The white 6 s panels avoid the saturated 10 s concentrated end.
+  #
+  # These same three panels drive the dilution figures (11, 12, 13). Figures 12
+  # and 13 compare the arms only at dilutions all four measured - offwhite
+  # 2x/10x/20x, white 2x/10x, since the bipyramid ladder is 2x/10x/20x and the
+  # nanostar ladder is 2x/5x/10x. Add `dilutions: [...]` to a paper below to
+  # pin that set by hand instead; the report then refuses to run if any arm is
+  # missing one of them.
+  particle_comparison:
+    offwhite: {nanostars_key: ow-10, bipyramids_key: bp-ow-10, exposure_s: 10}
+    white:    {nanostars_key: w-6,  bipyramids_key: bp-w-6,  exposure_s: 6}

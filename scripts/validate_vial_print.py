@@ -369,13 +369,20 @@ def _build_cases(workflow_cfg: dict) -> list:
     ]
     # The end-of-print summary lists PRINT GROUP names, which only coincide with the
     # series names for legacy configs (where each series migrates to one group).
-    series_prints = [
+    explicit_prints = [
         f"{g['name']} paper columns"
         for g in workflow_cfg.get("print_groups", []) if g.get("name")
-    ] or [
-        f"{str(series.get('name', 'dye')).lower()} paper columns"
-        for series in color_series
     ]
+    if explicit_prints:
+        series_prints = explicit_prints
+    elif workflow_cfg.get("color_series"):
+        series_prints = [
+            f"{str(series.get('name', 'dye')).lower()} paper columns"
+            for series in color_series
+        ]
+    else:
+        # The builder gives a legacy single-series flat print the name "print".
+        series_prints = ["print paper columns"]
 
     # Layout-specific motion assertions. A P20-only config has no column_8up group and
     # therefore never emits the 8-tip strings; asserting them unconditionally made any

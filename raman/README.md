@@ -236,6 +236,97 @@ and the target-region indicator. The configuration snapshot records the exact
 user input; `resolved_config.yaml` also records defaults and automatic shared
 axis limits.
 
+## Experiment reports
+
+Alongside the general processor there is one standalone report script per
+experiment. Each is driven by its own YAML in `configs/` and writes to
+`results/<experiment>/`. All four score against the same band definitions,
+which live in `exp1_cv_report.BANDS`.
+
+| script | config | question |
+|---|---|---|
+| `exp1_cv_report.py` | `peaks_cv_sers.yaml` | which paper/concentration gives the best CV SERS signal |
+| `exp2_dilution_report.py` | `peaks_cv_sers_exp2*.yaml` | how far the dye can be diluted before the band is lost |
+| `exp3_timeseries_report.py` | `timeseries_exp3.yaml` | which integration time to use |
+| `exp4_stars_report.py` | `stars_exp4.yaml` | do gold nanostars boost the dye signal |
+
+Run any of them from `raman/`:
+
+```powershell
+python raman\exp3_timeseries_report.py
+```
+
+### Exp 3 - integration time (083126)
+
+One spot per sweep, exposure swept 20 s → 2 s with AutoInt off, on offwhite and
+white paper for both particle types. The metric that decides is the **noise
+excess**: measured σ divided by the σ predicted by the detector's own noise law
+`σ² = read² + gain·N`, which the script fits on every sliding window in the dump
+below 30 000 counts. Healthy scans sit at ≈1 whatever the exposure; saturating
+ones run to 3–28.
+
+This matters because saturation here has no visible tell — the exports never
+clip, and a saturated scan still looks like a spectrum and still yields fitted
+peaks. Run the report before trusting any scan taken at a new exposure.
+
+**The reference band is the dye band**, `cv_1620` (nominal 1620, observed
+1616–1617) — set by `reference_band:` in the config. The 1095 cm⁻¹ paper filler
+band is carried beside it in the calibration figure as a control rather than as
+the reference: its true intensity cannot move with the dye, with photobleaching
+or with how much analyte landed on the spot, so where the two curves agree the
+dye curve is reading exposure and where they diverge something sample-side is
+moving.
+
+`figures/11_calibration_curve.png` is the calibration curve proper: SNR against
+exposure with the fitted model, normalised so the four sweeps overlay against
+the ∝t and ∝√t references, and a decision panel showing the percentage of the
+achievable SNR gain captured at each exposure.
+
+`results/exp3_timeseries/all_scans_screen.csv` carries the saturation verdict
+for every scan in the dump, and `noise_model.json` the fitted law that exp 4
+reuses.
+
+### Exp 4 - nanostars + bipyramid rerun (083126)
+
+The exp-2 design with a third arm: the same CV ladder (2x → 200x) scored for
+stock nanostars, 5:1 diluted nanostars and dye alone, on both papers, plus a
+rerun of the 082726 bipyramid print. Every gain is a spot minus its **own**
+dye-only control — same paper, same exposure, same dilution. Nothing is
+compared across papers.
+
+Two things make this report worth reading before the numbers:
+
+- **The saturation screen runs first, and it is scored at the band.** Ten scans
+  ring somewhere in the spectrum, and they are the concentrated end of each
+  ladder — exactly where enhancement shows up. But the ringing starts at the low
+  wavenumbers and often never reaches the dye band: scan 854 is at 7.6× the
+  model noise below 800 cm⁻¹ and 1.6× at 1620, quieter there than scans that
+  pass outright. So the verdict the figures obey is scored on the windows
+  overlapping the band being plotted (`quality.screen_scope: band`), and only
+  831 and 839 still fail. Both verdicts are in `scan_screen.csv`. Separately,
+  a band that is quiet but sits above the count level the noise law was fitted
+  below can still be compressed — those carry `band_above_fit_ceiling`, are
+  hatched in the bar figures, and should be read as lower bounds.
+- **Two of the six bands are internal controls.** 1095 is carbonate filler in
+  the sheet and 1375 is cellulose-dominated on paper, so neither can be
+  enhanced. Both come out at 0.85x while the strong CV bands run 1.8–2.8x,
+  which is the evidence that the gain is on the dye rather than on the paper.
+
+The scan → condition → dilution map is in `configs/stars_exp4.yaml`, written out
+per series rather than derived from a stride: several series were stopped early
+on purpose, and a stride would silently relabel the survivors. The loader
+refuses to run if a series' scan count and dilution count disagree.
+
+Every arm measured 2x, 5x and 10x; only the offwhite nanostar ladders went
+further. The figures are held to those three via `plotting.active_dilutions`,
+so paper, particle and dilution can be read against each other with no missing
+cell — the CSVs keep the full ladder out to 200x. The bipyramid rerun blocks
+are written "2x - 20x" in the bench notes but are the first three columns of
+the print, 2x/5x/10x; that was corrected on 090126, so bipyramid points in any
+earlier copy of this report are labelled one or two rungs too dilute.
+`scan_key.csv` and `scan_key_4_tabs.xlsx` are generated from the same config on
+every run, so a corrected dilution reaches the key and the figures together.
+
 ## Warnings and limitations
 
 - A missing width at half prominence means the crossings were under-resolved or
