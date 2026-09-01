@@ -405,7 +405,8 @@ def _shoulders(x: np.ndarray, lo: float, hi: float, pad: float = 60.0):
 
 
 def local_baseline_height(x: np.ndarray, y: np.ndarray, lo: float, hi: float,
-                          pad: float = 60.0) -> tuple[float, float, bool]:
+                          pad: float = 60.0,
+                          at_cm1: float | None = None) -> tuple[float, float, bool]:
     """(centre, height, at_edge) against a straight line drawn under the band.
 
     A narrow band here sits a few percent above a very large fluorescence
@@ -418,8 +419,14 @@ def local_baseline_height(x: np.ndarray, y: np.ndarray, lo: float, hi: float,
 
     The line is fitted through the MEDIAN of each shoulder at the shoulder's
     mean position - medians rather than means so a cosmic ray in a flank cannot
-    tilt the baseline under the peak. Falls back to the global-corrected trace
-    only if a shoulder is too short to be trustworthy.
+    tilt the baseline under the peak.
+
+    `at_cm1` fixes WHERE the height is read. Peak identification is a separate
+    job from peak quantitation and stays on the arPLS trace: re-locating the
+    maximum on the locally-baselined trace moves it a few cm-1, which is
+    harmless in itself but flips the narrow `lit` acceptance windows and would
+    silently change which bands count as detected. Callers that already know the
+    centre pass it here; only a trace with no arPLS counterpart locates its own.
     """
     left = (x >= lo - pad) & (x < lo)
     right = (x > hi) & (x <= hi + pad)
@@ -428,7 +435,36 @@ def local_baseline_height(x: np.ndarray, y: np.ndarray, lo: float, hi: float,
     xl, yl = float(x[left].mean()), float(np.median(y[left]))
     xr, yr = float(x[right].mean()), float(np.median(y[right]))
     slope = (yr - yl) / (xr - xl) if xr != xl else 0.0
-    return window_peak(x, y - (yl + slope * (x - xl)), lo, hi)
+    corrected = y - (yl + slope * (x - xl))
+    if at_cm1 is None:
+        return window_peak(x, corrected, lo, hi)
+    j = int(np.argmin(np.abs(x - at_cm1)))
+    return float(x[j]), float(corrected[j]), False
+
+
+def fixed_window_height(x: np.ndarray, y: np.ndarray, centre: float,
+                        left: tuple, right: tuple) -> tuple[float, float]:
+    """(height, baseline value) at `centre` over a line through two FIXED windows.
+
+    Differs from local_baseline_height only in where the anchors come from: the
+    same two Raman-shift windows for every spectrum, chosen once because they
+    are empirically flat, instead of a pad either side of the band. Peak
+    identification is not touched - the height is read at the centre the arPLS
+    logic already found.
+
+    Median within each window, mean shift as its position, so a stray point
+    cannot tilt the line.
+    """
+    lm = (x >= left[0]) & (x <= left[1])
+    rm = (x >= right[0]) & (x <= right[1])
+    if lm.sum() < 5 or rm.sum() < 5:
+        return float("nan"), float("nan")
+    xl, yl = float(x[lm].mean()), float(np.median(y[lm]))
+    xr, yr = float(x[rm].mean()), float(np.median(y[rm]))
+    slope = (yr - yl) / (xr - xl) if xr != xl else 0.0
+    j = int(np.argmin(np.abs(x - centre)))
+    b = yl + slope * (x[j] - xl)
+    return float(y[j] - b), float(b)
 
 
 def band_metrics(rec: dict, cfg: dict) -> list[dict]:
@@ -442,8 +478,12 @@ def band_metrics(rec: dict, cfg: dict) -> list[dict]:
         # shoulders. The arPLS-corrected trace is still produced and plotted, but
         # no single global stiffness parameter sets a reported number any more.
         pad = 60.0
-        centre, height, at_edge = local_baseline_height(x, rec["smooth_cps_raw"],
-                                                        lo, hi, pad)
+        # Identification UNCHANGED - centre and at_edge still come from the arPLS
+        # trace, so center_cm1 / in_lit_window / detected are untouched by this
+        # patch. Only the HEIGHT moves to the local baseline.
+        centre, _, at_edge = window_peak(x, smooth, lo, hi)
+        _, height, _ = local_baseline_height(x, rec["smooth_cps_raw"], lo, hi, pad,
+                                             at_cm1=centre)
         # Noise definition UNCHANGED: second-difference MAD over the same
         # shoulders, on the unsmoothed arPLS-corrected trace. The second
         # difference is blind to a smooth background, so this number is
@@ -455,6 +495,7 @@ def band_metrics(rec: dict, cfg: dict) -> list[dict]:
         # it could move if the global baseline were chosen differently.
         arpls_heights = {lam: window_peak(x, trace, lo, hi)[1]
                          for lam, trace in rec.get("arpls_alt", {}).items()}
+
         row = {
             "scan_number": rec["scan_number"], "key": rec["key"],
             "int_time_s": rec["int_time_s"], "peak_name": band,
@@ -489,6 +530,27 @@ def band_metrics(rec: dict, cfg: dict) -> list[dict]:
             100.0 * (max(pool) - min(pool)) / denom
             if len(pool) > 1 and denom > 0 else np.nan)
         row["sensitivity_floored"] = floored
+
+        # PARALLEL COMPARISON, reference band only. Adds columns; changes
+        # nothing. height_cps / snr above stay the primary values.
+        fw = cfg.get("fixed_window_1620") or {}
+        if fw and band == fw.get("band"):
+            denom = max(abs(height), sigma if np.isfinite(sigma) and sigma > 0
+                        else 0.0)
+            for tag, win in fw["pairs"].items():
+                h, b = fixed_window_height(x, rec["smooth_cps_raw"], centre,
+                                           win["left"], win["right"])
+                suffix = "" if tag == fw.get("primary_pair") else "_" + tag
+                row["height_fixedwin_1620%s_cps" % suffix] = h
+                row["baseline_fixedwin_1620%s_cps" % suffix] = b
+                if tag == fw.get("primary_pair"):
+                    snr_fw = (h / sigma if sigma and np.isfinite(sigma)
+                              else np.nan)
+                    row["snr_fixedwin_1620"] = snr_fw
+                    row["height_fixedwin_minus_current_cps"] = h - height
+                    row["height_fixedwin_pct_diff"] = (
+                        100.0 * (h - height) / denom if denom > 0 else np.nan)
+                    row["snr_fixedwin_minus_current"] = snr_fw - row["snr"]
         out.append(row)
     return out
 
@@ -1161,6 +1223,55 @@ def calibration_table(bands, df, verdict, model, cfg) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def fig12_fixedwindow_compare(bands, verdict, cfg, path):
+    """1620 SNR: current shoulder-pad local baseline vs the fixed windows.
+
+    Whiskers, not a shaded band: a filled region between two baseline estimates
+    reads as replicate scatter, and there are no replicates here - one spot per
+    exposure. The whisker is labelled for what it is.
+    """
+    fw = cfg["fixed_window_1620"]
+    band = fw["band"]
+    fig, axes = plt.subplots(1, len(cfg["sweeps"]),
+                             figsize=(4.4 * len(cfg["sweeps"]), 4.6), sharey=False)
+    for ax, spec in zip(np.atleast_1d(axes), cfg["sweeps"]):
+        g = (bands[(bands["key"] == spec["key"]) & (bands["peak_name"] == band)]
+             .sort_values("int_time_s"))
+        v = (verdict[verdict["key"] == spec["key"]]
+             .set_index("int_time_s")["overall"].to_dict())
+        t = g["int_time_s"].to_numpy(float)
+        sig = g["sigma_cps"].to_numpy(float)
+        lo = g["height_arpls_min_cps"].to_numpy(float) / sig
+        hi = g["height_arpls_max_cps"].to_numpy(float) / sig
+        ax.vlines(t, lo, hi, color="0.7", lw=1.2, zorder=0)
+        ax.plot(t, g["snr"], color="#2f6ea8", lw=1.5, marker="o", ms=6,
+                label="current (shoulder pad)")
+        ax.plot(t, g["snr_fixedwin_1620"], color="#c07a2a", lw=1.5, marker="s",
+                ms=6, label="fixed windows %s / %s"
+                % (fw["pairs"][fw["primary_pair"]]["left"],
+                   fw["pairs"][fw["primary_pair"]]["right"]))
+        bad = [i for i, tt in enumerate(t) if v.get(tt) == "fail"]
+        if bad:
+            ax.scatter(t[bad], g["snr"].to_numpy()[bad], facecolor="white",
+                       edgecolor="#2f6ea8", s=60, zorder=3, linewidth=1.6)
+        ax.set_xticks(t)
+        ax.set_xticklabels(["%g" % q for q in t])
+        ax.set_xlabel("Integration time (s)")
+        ax.set_ylim(bottom=0)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.set_title("%s · %s" % (spec["paper"].capitalize(),
+                                        spec["particle"]), fontsize=11)
+    np.atleast_1d(axes)[0].set_ylabel("SNR at %d cm$^{-1}$"
+                                      % ALL_BANDS[band]["nominal"])
+    np.atleast_1d(axes)[0].legend(frameon=False, fontsize=8)
+    fig.suptitle("12  1620 cm$^{-1}$ SNR by baseline method. Grey whiskers = arPLS "
+                 "$\lambda$ 1e4-1e6 range (baseline-method sensitivity, NOT replicate "
+                 "error). Open markers failed the raw QC vetoes.", fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    fig.savefig(path, dpi=cfg["plotting"]["dpi"])
+    plt.close(fig)
+
+
 def fig11_calibration(cal, cfg, model, path):
     """The calibration curve: SNR vs exposure, with the plateau marked."""
     knee = cfg["calibration_knee_fraction"]
@@ -1667,6 +1778,8 @@ def main() -> int:
     cal = calibration_table(bands, df, verdict, model, cfg)
     cal.to_csv(out / "calibration_curve.csv", index=False)
     fig11_calibration(cal, cfg, model, fig_dir / "11_calibration_curve.png")
+    fig12_fixedwindow_compare(bands, verdict, cfg,
+                              fig_dir / "12_fixed_window_comparison.png")
 
     write_findings(df, verdict, allscreen, model, bands, cfg, out / "FINDINGS.md")
     (out / "run_context.json").write_text(json.dumps({

@@ -136,6 +136,27 @@ excess_noise:
 baseline_sensitivity:
   arpls_lambdas: [10000.0, 100000.0, 1000000.0]
 
+# ---------------------------------------------------------------------------
+# COMPARISON METHOD for the 1620 band only - not used for any decision.
+#
+# The primary local baseline takes its shoulders from a fixed pad either side of
+# the band's search window, which for 1620 lands the left shoulder on 1546-1606.
+# That stretch is NOT clean: it holds the cv_1587 band and the rising flank of
+# 1620 itself. These fixed windows are further out and empirically flat, and are
+# scored in parallel so the two can be compared before anything is switched.
+#
+# Pair A is the main test. B and C move one window each, to show whether the
+# answer depends on exactly where a clean window is placed. The pair that gives
+# the highest SNR is NOT selected - agreement between them is the result.
+# ---------------------------------------------------------------------------
+fixed_window_1620:
+  band: cv_1620
+  pairs:
+    A: {left: [1500, 1550], right: [1650, 1700]}
+    B: {left: [1525, 1575], right: [1650, 1700]}
+    C: {left: [1500, 1550], right: [1700, 1750]}
+  primary_pair: A
+
 # An exposure counts as being on the SNR plateau if its band SNR is at least
 # this fraction of the best admissible exposure's. 0.75 is deliberately loose:
 # with one spot per exposure the SNR carries roughly +/-25% of scan-to-scan

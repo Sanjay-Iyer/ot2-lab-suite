@@ -327,9 +327,17 @@ def gain_table(scans, screen, cfg) -> pd.DataFrame:
             # Adding delta to the control height and calling that the test
             # height would be wrong whenever the two peaks sit at slightly
             # different wavenumbers, which on a shifting SERS band they do.
-            _, test_cps, _ = ts.local_baseline_height(grid, test_raw, lo, hi)
-            _, ref, _ = ts.local_baseline_height(grid, ctrl_raw, lo, hi)
-            _, delta, _ = ts.local_baseline_height(grid, test_raw - ctrl_raw, lo, hi)
+            # Peak identification stays on the arPLS traces, exactly as before;
+            # only the heights are re-read against each spectrum's own local
+            # baseline at that same position.
+            c_t, _, _ = ts.window_peak(grid, test["smooth_cps"], lo, hi)
+            c_c, _, _ = ts.window_peak(grid, base, lo, hi)
+            c_d, _, _ = ts.window_peak(grid, diff, lo, hi)
+            _, test_cps, _ = ts.local_baseline_height(grid, test_raw, lo, hi,
+                                                      at_cm1=c_t)
+            _, ref, _ = ts.local_baseline_height(grid, ctrl_raw, lo, hi, at_cm1=c_c)
+            _, delta, _ = ts.local_baseline_height(grid, test_raw - ctrl_raw,
+                                                   lo, hi, at_cm1=c_d)
             rows.append({
                 "key": key, "condition": cond, "dilution": dil,
                 "factor": float(str(dil)[:-1]), "peak_name": band,
