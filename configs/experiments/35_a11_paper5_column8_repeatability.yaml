@@ -1,0 +1,142 @@
+# =============================================================================
+# 35 - REPEATABILITY: BRAND A11 -> PAPER SLOT 5, COLUMN 8, ONE SETTING x8
+# =============================================================================
+# No sweep. Every row of column 8 gets the SAME settings, so the only thing
+# that varies is chance:
+#
+#   all 8 rows   A8 B8 C8 D8 E8 F8 G8 H8
+#     release      3.0 mm
+#     touch-down   1.6 mm
+#     hold         5 s
+#     droplet      5 uL
+#
+# This is eight replicates of exactly the condition script 34 put on row H of
+# column 9 (release 3.0 mm, touch-down 1.6 mm, 5 s). Column 9 said what that
+# setting does once; this column says how reliably it does it.
+#
+# Per-deposit sequence, identical for every row:
+#
+#   aspirate 5 uL  ->  1.5 uL air gap  ->  dispense at 3.0 mm
+#   ->  blow out at 3.0 mm  ->  LOWER TO 1.6 mm  ->  HOLD 5 s
+#   ->  lift away, next row
+#
+# 8 deposits x 5 uL = 40 uL, all from BRAND well A11. One tip, one layer.
+# About 4 minutes.
+#
+# ---------------------------------------------------------------------------
+# WHAT TO LOOK FOR: spread between the eight spots -- diameter, shape, whether
+# any row missed entirely. Eight identical spots means the setting is usable.
+# Scatter means it is marginal even if the single row-H spot on column 9 looked
+# good, and the release/touch-down pair needs to move before anything is built
+# on it.
+#
+# TWO THINGS ARE NOT ACTUALLY CONSTANT down the column, and both bias A -> H in
+# the same direction, so read a monotonic trend with suspicion:
+#   * the tip gets progressively wetter -- it descends into each droplet it
+#     places and carries that back into the source on the next aspirate
+#   * the source drains 40 uL over the run while aspirate_height_mm stays at
+#     0.5 mm
+# A random-looking scatter is repeatability; a clean drift from A8 to H8 is
+# more likely one of these two.
+#
+# THE SHEET SO FAR, read right to left:
+#   column 12  (script 30)  release 0.8 -> 1.5 mm   no touch-down
+#   column 11  (script 32)  release 1.5 -> 2.2 mm   touch-down 0.8 mm, 5 s
+#   column 10  (script 33)  release 2.3 -> 3.0 mm   touch-down 0.8 mm, 5 s
+#   column  9  (script 34)  release 3.0 mm          touch-down 0.9 -> 1.6 mm, 5 s
+#   column  8  (this one)   release 3.0 mm          touch-down 1.6 mm, 5 s, x8
+#
+# ONE GROUP, NOT EIGHT: every row shares the same release height and the same
+# touch-down, so both are set once -- dispense_height_mm and
+# post_dispense_dwell in the `printing:` block below apply to the whole run.
+# The eight rows are just the target list of a single group. That the config
+# has no per-row settings at all IS the experiment.
+#
+# READ THE WELL NAMES CAREFULLY:
+#   source A11     = well A11 of the BRAND plate in SLOT 1  (the liquid)
+#   targets A8..H8 = column 8 of the PAPER in SLOT 5        (paper spots)
+# `source_wells: {5: A11}` binds the paper in slot 5 to the BRAND well.
+#
+# TIP: B1 -- the tip that belongs to BRAND well A11, the same one scripts 32,
+# 33 and 34 used. It already carries A11's own liquid and nothing else. Do not
+# use A1 here: A1 is A9's tip in scripts 29 and 31.
+#
+# SOURCE VOLUME: 40 uL drawn + 20 uL reserve = 60 uL minimum in BRAND A11 at
+# the start of THIS run. That well feeds every sweep -- 40 uL each from scripts
+# 30, 32, 33, 34 and this one, plus another 40 uL if script 29 runs. A BRAND
+# well holds 350 uL. Top it up before this run in particular: a repeatability
+# column is the worst place to let the source run low, because a draining well
+# turns into exactly the A -> H drift described above. The 100 below is a
+# planning assumption, not a measurement.
+#
+# DECK (from the machine profile; nothing here may move it):
+#   slot 1  BRAND 781662 96-well plate   source, well A11
+#   slot 5  paper sheet                  the same sheet carrying columns 12,
+#                                        11, 10 and 9, which must not have moved
+#   slot 9  opentrons_96_tiprack_20ul    tip B1
+#
+# SIMULATION LAPTOP (local build + simulation only; no robot contact):
+#   conda activate ai
+#   python scripts/build_print_from_vial.py --config configs/experiments/35_a11_paper5_column8_repeatability.yaml
+#
+# REAL ROBOT LAPTOP (after review, commit/push, and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py a11-paper5-column8-repeatability --live
+#
+# Physical execution requires the real robot laptop and explicit readiness
+# confirmation. Creating or locally simulating this config does not run it live.
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: a11_paper5_column8_repeatability
+
+# The generated protocol moves liquid. The named runner requires --live.
+run_modes: {dry_run: false}
+
+# --- source: well A11 of the BRAND 781662 plate, slot 1 ------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [A11]
+  material: A11 print liquid
+  # 40 uL drawn + 20 uL reserve = 60 uL minimum. See the SOURCE VOLUME note --
+  # top this well up before a repeatability run.
+  loaded_volume_ul: 100.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destination: one paper sheet, slot 5 --------------------------------------
+substrate:
+  slot: 5
+
+# --- printing behaviour ---------------------------------------------------------
+# BOTH heights are fixed for the whole run, so both live here and nothing is
+# set per group. This is the single condition being repeated eight times.
+printing:
+  droplet_volume_ul: 5.0
+  dispense_height_mm: 3.0     # release height, every row
+  post_dispense_dwell:        # touch-down, every row
+    height_mm: 1.6
+    hold_s: 5.0
+  inter_drop_delay_s: 0.0     # no extra pause on top of the 5 s hold
+  inter_layer_delay_s: 0.0    # unused: one droplet per group means one layer
+  initial_delay_s: 0.0        # no hold before the first drop
+
+# --- the eight replicates: one group, all eight rows ----------------------------
+# targets are PAPER positions in column 8; source_wells binds slot 5 to BRAND
+# well A11. No per-group overrides anywhere -- every row runs the settings
+# above, in order A8 -> H8.
+print_groups:
+  - source_well: A11
+    source_wells: {5: A11}
+    targets: [A8, B8, C8, D8, E8, F8, G8, H8]
+    droplets: 1
+
+# --- tip behaviour -------------------------------------------------------------
+# One source well, so one tip for all eight replicates -- which is what makes
+# them replicates. B1 -- see the TIP note above.
+tips:
+  pipette_tip_reuse: true
+  print_tip: B1
+  return_tips: true
