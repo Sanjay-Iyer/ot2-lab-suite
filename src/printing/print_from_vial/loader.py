@@ -121,16 +121,29 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             raise PrintFromVialLoadError(
                 f"{path}: print_groups[{index}] must declare targets"
             )
-        normalized_groups.append(
-            {
-                "source_well": str(
-                    group.get("source_well") or default_source_well
-                ).upper(),
-                "source_wells_by_slot": group.get("source_wells") or {},
-                "targets": [str(t).upper() for t in targets],
-                "droplets": int(group.get("droplets", 1)),
-            }
-        )
+        normalized_group = {
+            "source_well": str(
+                group.get("source_well") or default_source_well
+            ).upper(),
+            "source_wells_by_slot": group.get("source_wells") or {},
+            "targets": [str(t).upper() for t in targets],
+            "droplets": int(group.get("droplets", 1)),
+        }
+        # Optional per-group print height. Absent (the normal case) the group
+        # prints at the machine profile's validated print_release height, so
+        # nothing changes. Present, it overrides that standoff for this group's
+        # targets only -- which is how a height sweep puts a different
+        # dispense height on each row of one column. The executor validates it.
+        group_height = group.get("dispense_height_mm")
+        if group_height is not None:
+            try:
+                normalized_group["dispense_height_mm"] = float(group_height)
+            except (TypeError, ValueError) as exc:
+                raise PrintFromVialLoadError(
+                    f"{path}: print_groups[{index}].dispense_height_mm must be "
+                    f"a number, got {group_height!r}"
+                ) from exc
+        normalized_groups.append(normalized_group)
 
     if "slot" in substrate and "slots" in substrate:
         raise PrintFromVialLoadError(

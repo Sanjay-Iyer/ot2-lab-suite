@@ -30,6 +30,13 @@ from the same laboratory-owned machine profile the standard workflow uses
 Coordinate model: one droplet is dispensed at the well's own bottom (offset by
 printing.dispense_height_mm), no sub-well offset.
 
+PER-GROUP PRINT HEIGHT (optional). A print group may carry its own
+`dispense_height_mm`, which overrides the profile standoff for that group's
+targets only. Omitted -- the normal case, and every config written before this
+existed -- the group prints at printing.dispense_height_mm exactly as before.
+This is what a height sweep needs: one group per paper row, each at its own
+height above the paper. The overprint pass always uses the profile standoff.
+
 LAYERED EXECUTION. Each print group declares how many droplets its targets get.
 The executor runs LAYER BY LAYER across all groups, not target by target: every
 target that still owes a droplet gets one in layer 1, then the whole pass rests
@@ -284,11 +291,35 @@ def _preflight(protocol, labware, p20):
                     f"{label}: source well {source_well} for {role} is not listed "
                     f"in source.wells ({', '.join(declared_wells)})"
                 )
+        # Per-group print height. Default: the machine profile's validated
+        # print_release standoff, identical for every group (the behaviour this
+        # protocol has always had). A group may override it to print its own
+        # targets at a different height above the paper -- a height sweep is one
+        # group per row, each with its own dispense_height_mm.
+        group_height = group.get("dispense_height_mm")
+        if group_height is None:
+            group_height = float(pr["dispense_height_mm"])
+        else:
+            try:
+                group_height = float(group_height)
+            except (TypeError, ValueError):
+                errors.append(
+                    f"{label}: dispense_height_mm must be a number, "
+                    f"got {group_height!r}"
+                )
+                group_height = float(pr["dispense_height_mm"])
+            else:
+                if not (0.0 <= group_height <= 40.0):
+                    errors.append(
+                        f"{label}: dispense_height_mm must be in [0, 40] mm, "
+                        f"got {group_height:g}"
+                    )
         resolved_groups.append(
             {
                 "targets": targets,
                 "droplets": int(droplets),
                 "source_wells": source_wells,
+                "dispense_height_mm": float(group_height),
             }
         )
 
@@ -484,9 +515,15 @@ def _report_plan(protocol, resolved):
             f"slot {CONFIG['deck'][role]['slot']} <- {source_well}"
             for role, source_well in group["source_wells"].items()
         )
+        height = float(group["dispense_height_mm"])
+        height_note = (
+            "" if height == float(pr["dispense_height_mm"])
+            else f" at {height:g} mm above the paper"
+        )
         protocol.comment(
             f"  group {index}: {sources} -> "
             f"{', '.join(group['targets'])} x {group['droplets']} droplet(s)"
+            f"{height_note}"
         )
     if initial_delay > 0:
         protocol.comment(
@@ -650,7 +687,9 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         use_source(source_well_name)
                     else:
                         fresh_tip(source_well_name)
-                    destination = paper[target].bottom(z)
+                    # Per-group standoff; equals `z` unless the group overrode it.
+                    group_z = float(group.get("dispense_height_mm", z))
+                    destination = paper[target].bottom(group_z)
                     if chase > 0:
                         p20.aspirate(chase, source_well.bottom(aspirate_height))
                     p20.aspirate(volume, source_well.bottom(aspirate_height))
@@ -670,7 +709,8 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         f"{CONFIG['deck'][paper_role]['slot']} {target} <- "
                         f"{source_well_name} "
                         f"(drop {display_layer}/"
-                        f"{group['droplets'] + layer_offset})"
+                        f"{group['droplets'] + layer_offset}, "
+                        f"z={group_z:g} mm)"
                     )
                     if drop_delay > 0:
                         protocol.delay(seconds=drop_delay)
