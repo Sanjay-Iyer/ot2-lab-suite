@@ -316,6 +316,12 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
             "layer_number_offset": int(
                 printing.get("layer_number_offset", 0) or 0
             ),
+            # Optional post-dispense dwell: after the drop is released and
+            # blown out at the print height, lower the tip to `height_mm` above
+            # the same paper well and hold there for `hold_s` before moving on.
+            # Absent, nothing changes -- the tip leaves straight from the print
+            # height, exactly as before. Passed through; the executor validates.
+            "post_dispense_dwell": printing.get("post_dispense_dwell"),
         },
         "print_groups": normalized_groups,
         "tips": {

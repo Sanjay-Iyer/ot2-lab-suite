@@ -193,6 +193,42 @@ def _preflight(protocol, labware, p20):
             "printing.dispense_height_mm must be <= 40 mm, got "
             f"{float(pr['dispense_height_mm']):g}"
         )
+
+    # Optional post-dispense dwell. Absent (the normal case) the tip leaves
+    # straight from the print height and nothing below changes behaviour.
+    dwell_raw = pr.get("post_dispense_dwell") or None
+    resolved_dwell = None
+    if dwell_raw is not None:
+        if not isinstance(dwell_raw, dict):
+            errors.append("printing.post_dispense_dwell must be a mapping")
+        else:
+            try:
+                dwell_z = float(dwell_raw["height_mm"])
+            except (KeyError, TypeError, ValueError):
+                errors.append(
+                    "printing.post_dispense_dwell.height_mm is required and "
+                    "must be a number"
+                )
+                dwell_z = 0.0
+            else:
+                if not (0.0 <= dwell_z <= 40.0):
+                    errors.append(
+                        "printing.post_dispense_dwell.height_mm must be in "
+                        f"[0, 40] mm, got {dwell_z:g}"
+                    )
+            try:
+                dwell_hold = float(dwell_raw.get("hold_s", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                errors.append(
+                    "printing.post_dispense_dwell.hold_s must be a number"
+                )
+                dwell_hold = 0.0
+            else:
+                if dwell_hold < 0:
+                    errors.append(
+                        "printing.post_dispense_dwell.hold_s must be >= 0"
+                    )
+            resolved_dwell = {"height_mm": dwell_z, "hold_s": dwell_hold}
     if float(src.get("park_height_mm", 5.0)) < 0:
         errors.append("source.park_height_mm must be >= 0")
     layer_number_offset = pr.get("layer_number_offset", 0)
@@ -457,6 +493,7 @@ def _preflight(protocol, labware, p20):
         "max_layers": max(g["droplets"] for g in resolved_groups),
         "deposits": deposits,
         "overprint": resolved_overprint,
+        "post_dispense_dwell": resolved_dwell,
     }
 
 
@@ -510,6 +547,13 @@ def _report_plan(protocol, resolved):
             f"Layers: {resolved['max_layers']} "
             f"(delay between layers: {layer_delay:g} s)"
         )
+    dwell = resolved.get("post_dispense_dwell")
+    if dwell:
+        protocol.comment(
+            f"Post-dispense dwell: after each drop, lower to "
+            f"{dwell['height_mm']:g} mm over the same well and hold "
+            f"{dwell['hold_s']:g} s"
+        )
     overprint = resolved.get("overprint")
     if overprint:
         protocol.comment(
@@ -562,6 +606,25 @@ def _print_from_vial(protocol, labware, p20, resolved):
     initial_delay = float(pr.get("initial_delay_s", 0.0) or 0.0)
     layer_offset = int(pr.get("layer_number_offset", 0) or 0)
     return_tips = bool(CONFIG["tips"].get("return_tips", True))
+    dwell = resolved.get("post_dispense_dwell")
+
+    def dwell_after(paper, target):
+        """Optional touch-down: drop to a lower height and hold there.
+
+        Runs after the droplet has been dispensed and blown out at the print
+        height. The tip descends to `height_mm` above the SAME paper well, sits
+        for `hold_s` with no plunger motion, then the next deposit's travel
+        lifts it away. Configured absent, this is a no-op.
+        """
+        if not dwell:
+            return
+        p20.move_to(paper[target].bottom(dwell["height_mm"]))
+        protocol.comment(
+            f"  dwell: lowered to {dwell['height_mm']:g} mm over {target}, "
+            f"holding {dwell['hold_s']:g} s"
+        )
+        if dwell["hold_s"] > 0:
+            protocol.delay(seconds=dwell["hold_s"])
 
     if initial_delay > 0:
         protocol.comment(
@@ -673,6 +736,7 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         p20.dispense(piston, destination)
                     if blow_out:
                         p20.blow_out(destination)
+                    dwell_after(paper, target)
                     printed += 1
                     protocol.comment(
                         f"layer {display_layer}: {paper_role} slot "
@@ -733,6 +797,7 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         p20.dispense(piston, destination)
                     if blow_out:
                         p20.blow_out(destination)
+                    dwell_after(paper, target)
                     printed += 1
                     protocol.comment(
                         f"overprint: {paper_role} slot "
