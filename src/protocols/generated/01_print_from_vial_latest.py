@@ -76,7 +76,7 @@ DEFAULT_DO_PRINT = True
 
 
 # >>> CONFIG START >>> (auto-generated from YAML; edit the YAML, not this file)
-CONFIG = { 'protocol_label': 'a11_paper5_column10_height_sweep',
+CONFIG = { 'protocol_label': 'a11_paper5_column9_dwell_sweep',
   'deck': { 'source': { 'slot': 1,
                         'load_name': 'brand_96_wellplate_350ul_flat_781662',
                         'namespace': 'custom_beta',
@@ -97,7 +97,7 @@ CONFIG = { 'protocol_label': 'a11_paper5_column10_height_sweep',
               'aspirate_height_mm': 0.5,
               'park_height_mm': 5.0},
   'printing': { 'droplet_volume_ul': 5.0,
-                'dispense_height_mm': 1.1,
+                'dispense_height_mm': 3.0,
                 'pre_air_chase_ul': 0.0,
                 'air_gap_ul': 1.5,
                 'air_gap_height_mm': 5.0,
@@ -107,46 +107,46 @@ CONFIG = { 'protocol_label': 'a11_paper5_column10_height_sweep',
                 'inter_layer_delay_s': 0.0,
                 'initial_delay_s': 0.0,
                 'layer_number_offset': 0,
-                'post_dispense_dwell': {'height_mm': 0.8, 'hold_s': 5.0}},
+                'post_dispense_dwell': None},
   'print_groups': [ { 'source_well': 'A11',
-                      'targets': ['A10'],
+                      'targets': ['A9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.3,
+                      'post_dispense_dwell': {'height_mm': 0.9, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['B10'],
+                      'targets': ['B9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.4,
+                      'post_dispense_dwell': {'height_mm': 1.0, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['C10'],
+                      'targets': ['C9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.5,
+                      'post_dispense_dwell': {'height_mm': 1.1, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['D10'],
+                      'targets': ['D9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.6,
+                      'post_dispense_dwell': {'height_mm': 1.2, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['E10'],
+                      'targets': ['E9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.7,
+                      'post_dispense_dwell': {'height_mm': 1.3, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['F10'],
+                      'targets': ['F9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.8,
+                      'post_dispense_dwell': {'height_mm': 1.4, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['G10'],
+                      'targets': ['G9'],
                       'droplets': 1,
-                      'dispense_height_mm': 2.9,
+                      'post_dispense_dwell': {'height_mm': 1.5, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}},
                     { 'source_well': 'A11',
-                      'targets': ['H10'],
+                      'targets': ['H9'],
                       'droplets': 1,
-                      'dispense_height_mm': 3.0,
+                      'post_dispense_dwell': {'height_mm': 1.6, 'hold_s': 5.0},
                       'source_wells': {'paper': 'A11'}}],
   'tips': { 'print_tip': 'B1',
             'return_tips': True,
@@ -183,6 +183,39 @@ def _set_flow_rates(p20):
         p20.flow_rate.aspirate = float(rates["aspirate"])
     if rates.get("dispense"):
         p20.flow_rate.dispense = float(rates["dispense"])
+
+
+def _resolve_dwell(raw, label, errors):
+    """Validate one post-dispense dwell block; return it resolved, or None.
+
+    Shared by the run-level `printing.post_dispense_dwell` and any per-group
+    override, so both are checked by exactly the same rule.
+    """
+    if not raw:
+        return None
+    if not isinstance(raw, dict):
+        errors.append(f"{label} must be a mapping")
+        return None
+    try:
+        height = float(raw["height_mm"])
+    except (KeyError, TypeError, ValueError):
+        errors.append(f"{label}.height_mm is required and must be a number")
+        height = 0.0
+    else:
+        if not (0.0 <= height <= 40.0):
+            errors.append(
+                f"{label}.height_mm must be in [0, 40] mm, got {height:g}"
+            )
+    try:
+        hold = float(raw.get("hold_s", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        errors.append(f"{label}.hold_s must be a number")
+        hold = 0.0
+    else:
+        if hold < 0:
+            errors.append(f"{label}.hold_s must be >= 0")
+            hold = 0.0
+    return {"height_mm": height, "hold_s": hold}
 
 
 # ── Pre-flight ──────────────────────────────────────────────────────────────────
@@ -243,39 +276,9 @@ def _preflight(protocol, labware, p20):
 
     # Optional post-dispense dwell. Absent (the normal case) the tip leaves
     # straight from the print height and nothing below changes behaviour.
-    dwell_raw = pr.get("post_dispense_dwell") or None
-    resolved_dwell = None
-    if dwell_raw is not None:
-        if not isinstance(dwell_raw, dict):
-            errors.append("printing.post_dispense_dwell must be a mapping")
-        else:
-            try:
-                dwell_z = float(dwell_raw["height_mm"])
-            except (KeyError, TypeError, ValueError):
-                errors.append(
-                    "printing.post_dispense_dwell.height_mm is required and "
-                    "must be a number"
-                )
-                dwell_z = 0.0
-            else:
-                if not (0.0 <= dwell_z <= 40.0):
-                    errors.append(
-                        "printing.post_dispense_dwell.height_mm must be in "
-                        f"[0, 40] mm, got {dwell_z:g}"
-                    )
-            try:
-                dwell_hold = float(dwell_raw.get("hold_s", 0.0) or 0.0)
-            except (TypeError, ValueError):
-                errors.append(
-                    "printing.post_dispense_dwell.hold_s must be a number"
-                )
-                dwell_hold = 0.0
-            else:
-                if dwell_hold < 0:
-                    errors.append(
-                        "printing.post_dispense_dwell.hold_s must be >= 0"
-                    )
-            resolved_dwell = {"height_mm": dwell_z, "hold_s": dwell_hold}
+    resolved_dwell = _resolve_dwell(
+        pr.get("post_dispense_dwell"), "printing.post_dispense_dwell", errors
+    )
     if float(src.get("park_height_mm", 5.0)) < 0:
         errors.append("source.park_height_mm must be >= 0")
     layer_number_offset = pr.get("layer_number_offset", 0)
@@ -367,12 +370,25 @@ def _preflight(protocol, labware, p20):
                         f"{label}: dispense_height_mm must be in [0, 40] mm, "
                         f"got {group_height:g}"
                     )
+        # Per-group post-dispense dwell. Absent, the group inherits the
+        # run-level dwell (which may itself be absent, meaning no dwell at all).
+        # Present, it overrides it for this group's targets -- which is how a
+        # sweep varies the touch-down height row by row while the release
+        # height stays fixed.
+        group_dwell_raw = group.get("post_dispense_dwell")
+        if group_dwell_raw is None:
+            group_dwell = resolved_dwell
+        else:
+            group_dwell = _resolve_dwell(
+                group_dwell_raw, f"{label}.post_dispense_dwell", errors
+            )
         resolved_groups.append(
             {
                 "targets": targets,
                 "droplets": int(droplets),
                 "source_wells": source_wells,
                 "dispense_height_mm": float(group_height),
+                "post_dispense_dwell": group_dwell,
             }
         )
 
@@ -574,10 +590,19 @@ def _report_plan(protocol, resolved):
             "" if height == float(pr["dispense_height_mm"])
             else f" at {height:g} mm above the paper"
         )
+        # Only call out a group dwell that differs from the run-level one; a
+        # shared dwell is already reported once, below.
+        group_dwell = group.get("post_dispense_dwell")
+        dwell_note = (
+            f", then down to {group_dwell['height_mm']:g} mm for "
+            f"{group_dwell['hold_s']:g} s"
+            if group_dwell and group_dwell != resolved.get("post_dispense_dwell")
+            else ""
+        )
         protocol.comment(
             f"  group {index}: {sources} -> "
             f"{', '.join(group['targets'])} x {group['droplets']} droplet(s)"
-            f"{height_note}"
+            f"{height_note}{dwell_note}"
         )
     if initial_delay > 0:
         protocol.comment(
@@ -653,25 +678,27 @@ def _print_from_vial(protocol, labware, p20, resolved):
     initial_delay = float(pr.get("initial_delay_s", 0.0) or 0.0)
     layer_offset = int(pr.get("layer_number_offset", 0) or 0)
     return_tips = bool(CONFIG["tips"].get("return_tips", True))
+    # Run-level dwell. Each print group carries its own resolved copy (which is
+    # this one unless the group overrode it); the overprint pass uses this one.
     dwell = resolved.get("post_dispense_dwell")
 
-    def dwell_after(paper, target):
+    def dwell_after(paper, target, spec):
         """Optional touch-down: drop to a lower height and hold there.
 
         Runs after the droplet has been dispensed and blown out at the print
         height. The tip descends to `height_mm` above the SAME paper well, sits
         for `hold_s` with no plunger motion, then the next deposit's travel
-        lifts it away. Configured absent, this is a no-op.
+        lifts it away. Called with spec None, this is a no-op.
         """
-        if not dwell:
+        if not spec:
             return
-        p20.move_to(paper[target].bottom(dwell["height_mm"]))
+        p20.move_to(paper[target].bottom(spec["height_mm"]))
         protocol.comment(
-            f"  dwell: lowered to {dwell['height_mm']:g} mm over {target}, "
-            f"holding {dwell['hold_s']:g} s"
+            f"  dwell: lowered to {spec['height_mm']:g} mm over {target}, "
+            f"holding {spec['hold_s']:g} s"
         )
-        if dwell["hold_s"] > 0:
-            protocol.delay(seconds=dwell["hold_s"])
+        if spec["hold_s"] > 0:
+            protocol.delay(seconds=spec["hold_s"])
 
     if initial_delay > 0:
         protocol.comment(
@@ -783,7 +810,7 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         p20.dispense(piston, destination)
                     if blow_out:
                         p20.blow_out(destination)
-                    dwell_after(paper, target)
+                    dwell_after(paper, target, group.get("post_dispense_dwell"))
                     printed += 1
                     protocol.comment(
                         f"layer {display_layer}: {paper_role} slot "
@@ -844,7 +871,7 @@ def _print_from_vial(protocol, labware, p20, resolved):
                         p20.dispense(piston, destination)
                     if blow_out:
                         p20.blow_out(destination)
-                    dwell_after(paper, target)
+                    dwell_after(paper, target, dwell)
                     printed += 1
                     protocol.comment(
                         f"overprint: {paper_role} slot "

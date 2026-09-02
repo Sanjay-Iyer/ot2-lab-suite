@@ -1,0 +1,143 @@
+# =============================================================================
+# 34 - TOUCH-DOWN SWEEP: BRAND A11 -> PAPER SLOT 5, COLUMN 9
+# =============================================================================
+# The variable flips here. Scripts 30, 32 and 33 held the touch-down fixed and
+# swept the RELEASE height. This one holds the release height fixed at 3.0 mm
+# for all eight rows and sweeps the TOUCH-DOWN height instead:
+#
+#   paper row   target   release    touch-down   hold
+#     A          A9       3.0 mm      0.9 mm      5 s
+#     B          B9       3.0 mm      1.0 mm      5 s
+#     C          C9       3.0 mm      1.1 mm      5 s
+#     D          D9       3.0 mm      1.2 mm      5 s
+#     E          E9       3.0 mm      1.3 mm      5 s
+#     F          F9       3.0 mm      1.4 mm      5 s
+#     G          G9       3.0 mm      1.5 mm      5 s
+#     H          H9       3.0 mm      1.6 mm      5 s
+#
+# Per-deposit sequence, identical for every row except the touch-down height:
+#
+#   aspirate 5 uL  ->  1.5 uL air gap  ->  dispense at 3.0 mm
+#   ->  blow out at 3.0 mm  ->  LOWER TO THIS ROW'S TOUCH-DOWN HEIGHT
+#   ->  HOLD 5 s  ->  lift away, next row
+#
+# 8 deposits x 5 uL = 40 uL, all from BRAND well A11. One tip, one layer.
+# About 4 minutes.
+#
+# ---------------------------------------------------------------------------
+# WHAT THIS ASKS: 3.0 mm is the top of script 33's band, high enough that the
+# droplet probably does not reach the paper on release alone -- so on this
+# column the touch-down is doing all the transferring. Sweeping it answers how
+# close the tip has to come before the drop actually lands, and whether coming
+# closer makes the spot better or just smears it. Row A (0.9 mm) is nearly the
+# 0.8 mm touch-down that columns 11 and 10 used, so it ties this column back to
+# those two.
+#
+# A row that comes out blank, or that leaves liquid on the tip and drags it to
+# the next spot, IS the result. Watch the first few rows before walking away.
+#
+# THE SHEET SO FAR, read right to left:
+#   column 12  (script 30)  release 0.8 -> 1.5 mm   no touch-down
+#   column 11  (script 32)  release 1.5 -> 2.2 mm   touch-down 0.8 mm, 5 s
+#   column 10  (script 33)  release 2.3 -> 3.0 mm   touch-down 0.8 mm, 5 s
+#   column  9  (this one)   release 3.0 mm fixed    touch-down 0.9 -> 1.6 mm, 5 s
+#
+# The tip descends INTO the droplet it just placed, so it comes back up wet and
+# carries that into the source on the next aspirate. Harmless here: one tip
+# serves one well for the whole run, so nothing crosses between liquids.
+#
+# READ THE WELL NAMES CAREFULLY -- this column is the worst one for it:
+#   source A11  = well A11 of the BRAND plate in SLOT 1   (the liquid)
+#   targets A9..H9 = column 9 of the PAPER in SLOT 5      (paper spots)
+# Paper target "A9" is NOT the BRAND well A9 that scripts 29 and 31 print from.
+# They are unrelated grids that share a name. `source_wells: {5: A11}` is what
+# binds the paper in slot 5 to the BRAND well; `targets:` are paper positions.
+#
+# WHY EIGHT GROUPS: post_dispense_dwell is settable PER GROUP, so one row per
+# group is the only way to give each row its own touch-down. The release height
+# is the same for all eight, so it is set once at printing.dispense_height_mm
+# rather than repeated on every group. All groups ask for 1 droplet, so this is
+# a single layer running top to bottom, A9 -> H9.
+#
+# TIP: B1 -- the tip that belongs to BRAND well A11, the same one scripts 32
+# and 33 used. It already carries A11's own liquid and nothing else. Do not use
+# A1 here: A1 is A9's tip in scripts 29 and 31.
+#
+# SOURCE VOLUME: 40 uL drawn + 20 uL reserve = 60 uL minimum in BRAND A11 at
+# the start of THIS run. That well feeds every sweep -- 40 uL each from scripts
+# 30, 32, 33 and this one, plus another 40 uL if script 29 runs. A BRAND well
+# holds 350 uL, so top it up rather than running it down; the last rows must
+# still cover the 0.5 mm aspiration height. The 100 below is a planning
+# assumption, not a measurement.
+#
+# DECK (from the machine profile; nothing here may move it):
+#   slot 1  BRAND 781662 96-well plate   source, well A11
+#   slot 5  paper sheet                  the same sheet carrying columns 12,
+#                                        11 and 10, which must not have moved
+#   slot 9  opentrons_96_tiprack_20ul    tip B1
+#
+# SIMULATION LAPTOP (local build + simulation only; no robot contact):
+#   conda activate ai
+#   python scripts/build_print_from_vial.py --config configs/experiments/34_a11_paper5_column9_dwell_sweep.yaml
+#
+# REAL ROBOT LAPTOP (after review, commit/push, and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py a11-paper5-column9-dwell-sweep --live
+#
+# Physical execution requires the real robot laptop and explicit readiness
+# confirmation. Creating or locally simulating this config does not run it live.
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: a11_paper5_column9_dwell_sweep
+
+# The generated protocol moves liquid. The named runner requires --live.
+run_modes: {dry_run: false}
+
+# --- source: well A11 of the BRAND 781662 plate, slot 1 ------------------------
+source:
+  type: well_plate
+  slot: 1
+  wells: [A11]
+  material: A11 print liquid
+  # 40 uL drawn + 20 uL reserve = 60 uL minimum. See the SOURCE VOLUME note.
+  loaded_volume_ul: 100.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destination: one paper sheet, slot 5 --------------------------------------
+substrate:
+  slot: 5
+
+# --- printing behaviour ---------------------------------------------------------
+# The release height is FIXED for this whole column and set here once. The
+# touch-down is what varies, so it lives on each group instead.
+printing:
+  droplet_volume_ul: 5.0
+  dispense_height_mm: 3.0     # release height, same for all eight rows
+  inter_drop_delay_s: 0.0     # no extra pause on top of the 5 s hold
+  inter_layer_delay_s: 0.0    # unused: one droplet per group means one layer
+  initial_delay_s: 0.0        # no hold before the first drop
+
+# --- the ladder: one group per paper row, one touch-down per group --------------
+# targets are PAPER positions in column 9; source_wells binds slot 5 to BRAND
+# well A11. Every group releases at the 3.0 mm set above; only the
+# post_dispense_dwell height differs between them. The hold is 5 s throughout.
+print_groups:
+  - {source_well: A11, source_wells: {5: A11}, targets: [A9], droplets: 1, post_dispense_dwell: {height_mm: 0.9, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [B9], droplets: 1, post_dispense_dwell: {height_mm: 1.0, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [C9], droplets: 1, post_dispense_dwell: {height_mm: 1.1, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [D9], droplets: 1, post_dispense_dwell: {height_mm: 1.2, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [E9], droplets: 1, post_dispense_dwell: {height_mm: 1.3, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [F9], droplets: 1, post_dispense_dwell: {height_mm: 1.4, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [G9], droplets: 1, post_dispense_dwell: {height_mm: 1.5, hold_s: 5.0}}
+  - {source_well: A11, source_wells: {5: A11}, targets: [H9], droplets: 1, post_dispense_dwell: {height_mm: 1.6, hold_s: 5.0}}
+
+# --- tip behaviour -------------------------------------------------------------
+# One source well, so one tip for the whole run: the same tip prints all eight
+# touch-downs, which is part of the point. B1 -- see the TIP note above.
+tips:
+  pipette_tip_reuse: true
+  print_tip: B1
+  return_tips: true

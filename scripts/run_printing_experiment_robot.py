@@ -171,6 +171,9 @@ WORKFLOWS = {
     "a11-paper5-column10-height-sweep": (
         "standard",
         "configs/experiments/33_a11_paper5_column10_height_sweep.yaml"),
+    "a11-paper5-column9-dwell-sweep": (
+        "standard",
+        "configs/experiments/34_a11_paper5_column9_dwell_sweep.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (

@@ -134,6 +134,12 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         # nothing changes. Present, it overrides that standoff for this group's
         # targets only -- which is how a height sweep puts a different
         # dispense height on each row of one column. The executor validates it.
+        # Optional per-group touch-down. Absent, the group inherits the
+        # run-level printing.post_dispense_dwell (itself optional). Present, it
+        # overrides it for this group's targets -- which is how a sweep varies
+        # the touch-down height row by row. The executor validates it.
+        if group.get("post_dispense_dwell") is not None:
+            normalized_group["post_dispense_dwell"] = group["post_dispense_dwell"]
         group_height = group.get("dispense_height_mm")
         if group_height is not None:
             try:
