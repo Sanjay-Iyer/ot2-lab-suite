@@ -1,45 +1,42 @@
 # =============================================================================
-# 31 - COLUMN 7 BUILD-UP: 1.5 h HOLD, THEN A9 REPEATS ONTO PAPER SLOT 5
+# 31 - COLUMN 7: PRINT, HOLD 1 h 30 min, THEN BUILD UP ROWS A/B/C
 # =============================================================================
-# The second half of script 29, split out into its own run. Script 29 puts one
-# 5 uL drop on every row of paper columns 5, 6 and 7. This script waits for
-# those to dry, then adds repeat drops to the first three rows of column 7:
+# All of the column-7 work, in one run, from A9 (BRAND plate, slot 1) onto the
+# paper in slot 5. Script 29 does columns 5 and 6 and never touches column 7.
 #
-#   HOLD 1 HOUR 30 MINUTES (5400 s), no tip attached, no motion
-#     then
+#   FIRST PASS
+#   A9  ->  A7 B7 C7 D7 E7 F7 G7 H7        1 drop each, all 8 rows
+#
+#     ---- HOLD 1 HOUR 30 MINUTES (5400 s), no tip attached, no motion ----
+#
+#   BUILD-UP
 #   A9  ->  A7   2 more drops
 #   A9  ->  B7   4 more drops
 #   A9  ->  C7   8 more drops
 #
-# 14 deposits x 5 uL = 70 uL, all from A9, all at 1.5 mm.
+# 8 + 14 = 22 deposits x 5 uL = 110 uL, all from A9, all at 1.5 mm.
 #
-# FINAL DROP COUNT IN COLUMN 7, counting script 29's first pass:
-#   A7    3 drops   (15 uL)
-#   B7    5 drops   (25 uL)
-#   C7    9 drops   (45 uL)
-#   D7-H7 1 drop each, untouched by this script
+# FINAL DROP COUNT IN COLUMN 7
+#   A7      3 drops   (15 uL)
+#   B7      5 drops   (25 uL)
+#   C7      9 drops   (45 uL)
+#   D7-H7   1 drop each (5 uL)
 # Columns 5 and 6 are not touched by this script at all.
 #
 # ---------------------------------------------------------------------------
-# RUN THIS IMMEDIATELY AFTER SCRIPT 29 FINISHES. The 1.5 hour hold is built in
-# as initial_delay_s, so start it as soon as 29 ends and the robot waits for
-# you -- it sits idle with NO tip attached, then picks up A1 and prints. If you
-# would rather time the wait yourself and start this later, set
-# initial_delay_s to 0.
+# HOW THE MID-RUN HOLD WORKS: the first pass is a single layer, so
+# inter_layer_delay_s never fires. The hold and the build-up are the
+# `overprint:` block -- the one mechanism that runs AFTER every layer is
+# finished. It puts the tip back, waits delay_s with nothing attached, then
+# picks A1 up again and deposits its target list in order. Listing a target
+# more than once in that list is how a position gets more than one repeat drop:
+# A7 twice, B7 four times, C7 eight times.
 #
-# DEPOSITION ORDER is layer-major, which is what the group droplet counts mean:
-#
-#   layer 1   A7 B7 C7        layer 5   C7
-#   layer 2   A7 B7 C7        layer 6   C7
-#   layer 3      B7 C7        layer 7   C7
-#   layer 4      B7 C7        layer 8   C7
-#
-# inter_layer_delay_s is 0, so the layers run back to back with no drying
-# between them -- but a spot still gets the other rows printed in between its
-# own repeats rather than 8 drops in a row, which helps the liquid soak in.
-# C7 still ends up with 40 uL added in about two minutes and will spread past
-# its 9 mm cell; if you want real drying time between repeats, raise
-# inter_layer_delay_s (it fires between every layer, so N seconds costs 7N).
+# BUILD-UP ORDER is target-major and back to back: A7 A7, then B7 B7 B7 B7,
+# then C7 eight times. C7 therefore takes 40 uL in about two minutes on one
+# 9 mm paper cell and will pool and spread past it. If you want time between
+# the repeat drops, raise printing.inter_drop_delay_s -- note it applies to
+# EVERY deposit in the run, including the first pass.
 #
 # PRINT HEIGHT: 1.5 mm for every drop, same as script 29, set once at
 # printing.dispense_height_mm. The machine profile still says 1.1 mm and is not
@@ -47,22 +44,26 @@
 #
 # TIP: A1 -- the SAME tip script 29 used for A9 and returned to the rack. Same
 # well, same liquid, so the tip is reused deliberately: it carries only A9's
-# own residue. One source well means one tip for this whole run. If A1 is not
-# in the rack or is visibly clogged, move print_tip to a clean tip.
+# own residue. One source well means one tip for this whole run; it is put back
+# for the 90 minute hold and picked up again for the build-up, so nothing sits
+# loaded and drying during the wait. If A1 is not in the rack or is visibly
+# clogged, move print_tip to a clean tip.
 #
-# SOURCE VOLUME: A9 gives up 70 uL here and holds 20 uL back, so it needs at
-# least 90 uL when this script starts. If A9 began script 29 at the 250 uL that
-# config declares, it is at 170 uL now, which is the number below. Correct it
-# to the real level -- this well has already been drawn from once.
+# SOURCE VOLUME: A9 gives up 110 uL here and holds 20 uL back, so it needs at
+# least 130 uL when this script starts. If A9 began script 29 at the 250 uL
+# that config declares, it is at 210 uL now, which is the number below. Correct
+# it to the real level -- this well has already been drawn from once.
 #
-# DECK: unchanged from script 29. Leave everything on the deck exactly where it
-# was; this run depends on the paper in slot 5 not having moved between runs,
-# because it prints on top of spots script 29 made.
+# DECK: unchanged from script 29. Leave everything exactly where it was; the
+# build-up prints on top of spots this same run made 90 minutes earlier, so the
+# paper in slot 5 must not move.
 #   slot 1  BRAND 781662 96-well plate   source, well A9
 #   slot 5  paper sheet                  the only substrate
 #   slot 9  opentrons_96_tiprack_20ul    tip A1
 #
-# RUN TIME: 90 minutes of hold, then about 4 minutes of printing.
+# RUN TIME: about 2 minutes of printing, 90 minutes of hold, then about 3
+# minutes of build-up -- a little over 1 h 35 min as ONE run. Start it and walk
+# away.
 #
 # SIMULATION LAPTOP (local build + simulation only; no robot contact):
 #   conda activate ai
@@ -78,7 +79,7 @@
 
 machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
 
-protocol_label: a9_paper5_column7_repeats
+protocol_label: a9_paper5_column7
 
 # The generated protocol moves liquid. The named runner requires --live.
 run_modes: {dry_run: false}
@@ -89,9 +90,9 @@ source:
   slot: 1
   wells: [A9]
   material: A9 print liquid
-  # What A9 has LEFT after script 29 drew 80 uL from a 250 uL start.
-  # 70 uL drawn here + 20 uL reserve = 90 uL minimum.
-  loaded_volume_ul: 170.0
+  # What A9 has LEFT after script 29 drew 40 uL from a 250 uL start.
+  # 110 uL drawn here + 20 uL reserve = 130 uL minimum.
+  loaded_volume_ul: 210.0
   minimum_remaining_ul: 20.0
   aspirate_height_mm: 0.5
 
@@ -104,18 +105,44 @@ printing:
   droplet_volume_ul: 5.0
   dispense_height_mm: 1.5     # THE PRINT HEIGHT, same as script 29
   inter_drop_delay_s: 0.0     # no pause between individual droplets
-  inter_layer_delay_s: 0.0    # repeats run back to back; see the note above
-  initial_delay_s: 5400.0     # 1 HOUR 30 MINUTES of drying BEFORE any tip is
-                              # picked up and before the first drop
+  inter_layer_delay_s: 0.0    # unused: the first pass is a single layer
+  initial_delay_s: 0.0        # no hold up front; the hold is after the first
+                              # pass, in the overprint block below
 
-# --- the repeats: one group per row, droplets = how many repeats ---------------
-# The layer loop is what stacks these: a group takes part in layer N only while
-# its droplets count is >= N, so A7 stops after 2, B7 after 4, C7 after 8.
-# source_wells: {5: A9} is the explicit per-slot binding the loader needs.
+# --- first pass: one drop on all eight rows of column 7 -------------------------
+# One group, 1 droplet, so this is a single layer and the inter-layer delay
+# never fires. source_wells: {5: A9} is the explicit per-slot binding the
+# loader needs; a bare source_well is overridden by the config-level default.
 print_groups:
-  - {source_well: A9, source_wells: {5: A9}, targets: [A7], droplets: 2}
-  - {source_well: A9, source_wells: {5: A9}, targets: [B7], droplets: 4}
-  - {source_well: A9, source_wells: {5: A9}, targets: [C7], droplets: 8}
+  - source_well: A9
+    source_wells: {5: A9}
+    targets: [A7, B7, C7, D7, E7, F7, G7, H7]
+    droplets: 1
+
+# --- the 1.5 hour hold, then the build-up ---------------------------------------
+# Runs once the first pass is complete: tip A1 goes back in the rack, the robot
+# holds for delay_s with NOTHING attached, then A1 is picked back up and the
+# target list below is deposited in order, one 5 uL drop per entry.
+# A7 x2, B7 x4, C7 x8 = 14 deposits, 70 uL, all from A9.
+overprint:
+  delay_s: 5400             # 1 HOUR 30 MINUTES after the last first-pass drop
+  source_well: A9           # same liquid, same dedicated tip A1
+  droplets: 1               # one drop per list entry; the repeats are the list
+  targets:
+    - A7
+    - A7                    # row A: 2 repeat drops
+    - B7
+    - B7
+    - B7
+    - B7                    # row B: 4 repeat drops
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7                    # row C: 8 repeat drops
 
 # --- tip behaviour -------------------------------------------------------------
 # One source well, so one tip for the whole run. A1 is A9's tip, carried over

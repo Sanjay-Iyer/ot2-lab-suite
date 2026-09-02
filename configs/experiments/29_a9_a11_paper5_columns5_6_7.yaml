@@ -1,28 +1,27 @@
 # =============================================================================
-# 29 - PRINTING DEMO: A9 + A11 (BRAND plate, slot 1) -> PAPER SLOT 5, COLUMNS 5/6/7
+# 29 - PRINTING DEMO: A9 + A11 (BRAND plate, slot 1) -> PAPER SLOT 5, COLUMNS 5/6
 # =============================================================================
 # User notation "9A"/"11a" = Opentrons well names A9 / A11 (row A, columns 9
 # and 11 of the BRAND 781662 plate in slot 1). One paper sheet only, slot 5.
 #
-# THREE PRINTS, IN THIS ORDER, ALL 5 uL PER DROP, ALL AT 1.5 mm:
+# TWO PRINTS, IN THIS ORDER, ALL 5 uL PER DROP, ALL AT 1.5 mm:
 #
 #   1.  A9   ->  paper column 5, all 8 rows   A5 B5 C5 D5 E5 F5 G5 H5   1 drop each
 #   2.  A11  ->  paper column 6, all 8 rows   A6 B6 C6 D6 E6 F6 G6 H6   1 drop each
-#   3.  A9   ->  paper column 7, all 8 rows   A7 B7 C7 D7 E7 F7 G7 H7   1 drop each
 #
-#   24 deposits x 5 uL = 120 uL onto the one sheet, every position one drop.
-#     from A9   16 deposits =  80 uL   (columns 5 and 7)
+#   16 deposits x 5 uL = 80 uL onto the one sheet, every position one drop.
+#     from A9    8 deposits =  40 uL   (column 5)
 #     from A11   8 deposits =  40 uL   (column 6)
 #
-# The run ENDS here. It is short (about 5 minutes), has no delays in it, and
-# leaves both tips back in the rack.
+# The run ENDS here. It is short (about 3 minutes), has no delays in it, uses
+# exactly two tips, and leaves both back in the rack.
 #
-# THE COLUMN-7 BUILD-UP IS A SEPARATE SCRIPT NOW:
+# COLUMN 7 IS NOT PART OF THIS SCRIPT. All of the column-7 work -- the first
+# pass, the 1 h 30 min hold, and the build-up -- lives in its own script:
 #   configs/experiments/31_a9_paper5_column7_repeats.yaml
 #   python scripts/run_printing_experiment_robot.py a9-paper5-column7-repeats --live
-# That script holds 1 h 30 min and then adds 2 more drops to A7, 4 more to B7
-# and 8 more to C7. Run it after this one; it draws a further 70 uL from A9,
-# which the volume note below already accounts for.
+# Run it after this one; it draws a further 110 uL from A9, which the volume
+# note below already accounts for.
 #
 # ---------------------------------------------------------------------------
 # PRINT HEIGHT: 1.5 mm above the paper for every drop in this run, set once at
@@ -32,23 +31,22 @@
 # 1.5 mm is later confirmed as the lab standard, change the profile and delete
 # the override here.
 #
-# TIPS: 2, starting at A1, one per source well, as requested.
-#   A1  ->  A9   (columns 5 and 7)
-#   B1  ->  A11  (column 6 only)
-# return_tips: true, so each tip goes back to its own rack position and is
-# picked up again by name. The A9 tip is A1 every single time it is used, and
-# it never enters A11; the A11 tip is B1 and never enters A9. The run picks up
-# A1 -> B1 -> A1 and returns A1 at the end. Both tips must be clean and unused
-# before the run. Script 31 picks A1 back up for the same well, so leave it in
-# the rack.
+# TIPS: 2, starting at A1, one per source well.
+#   A1  ->  A9   (column 5)
+#   B1  ->  A11  (column 6)
+# return_tips: true, so each tip goes back to its own rack position. The A9 tip
+# is A1 and never enters A11; the A11 tip is B1 and never enters A9. This run
+# picks up A1, returns it, picks up B1, returns it -- two pickups, no swapping
+# back and forth. Both tips must be clean and unused before the run. Script 31
+# picks A1 back up for the same well, so leave it in the rack.
 #
 # SOURCE VOLUME: loaded_volume_ul applies to BOTH wells. A9 is the binding one.
 # Counting script 31, which follows this one:
-#     this script   80 uL from A9
-#     script 31     70 uL from A9
-#     reserve       20 uL
+#     this script    40 uL from A9
+#     script 31     110 uL from A9
+#     reserve        20 uL
 #     A9 must start at 170 uL MINIMUM, before this run.
-# The 250 declared below leaves A9 at 170 uL when this script ends and 100 uL
+# The 250 declared below leaves A9 at 210 uL when this script ends and 100 uL
 # when script 31 ends (about 2.6 mm deep in a 6.94 mm bore, well clear of the
 # 0.5 mm aspiration height). A11 gives up only 40 uL and needs 60 uL. Correct
 # the number to the smaller of the two real starting levels before running.
@@ -72,7 +70,7 @@
 
 machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
 
-protocol_label: a9_a11_paper5_columns5_6_7
+protocol_label: a9_a11_paper5_columns5_6
 
 # The generated protocol moves liquid. The named runner requires --live.
 run_modes: {dry_run: false}
@@ -81,10 +79,10 @@ run_modes: {dry_run: false}
 source:
   type: well_plate
   slot: 1
-  # A9 feeds columns 5 and 7; A11 feeds column 6. Each gets its own tip
-  # automatically (one tip per source well).
+  # A9 feeds column 5; A11 feeds column 6. Each gets its own tip automatically
+  # (one tip per source well).
   wells: [A9, A11]
-  material: A9 print liquid (columns 5 and 7) + A11 print liquid (column 6)
+  material: A9 print liquid (column 5) + A11 print liquid (column 6)
   # See the SOURCE VOLUME note above: 250 covers this run AND script 31.
   loaded_volume_ul: 250.0
   minimum_remaining_ul: 20.0
@@ -103,10 +101,10 @@ printing:
   inter_layer_delay_s: 0.0    # unused: every group is a single layer
   initial_delay_s: 0.0        # no hold before the first drop
 
-# --- the three prints: one layer, in the order requested ------------------------
-# Every group asks for 1 droplet, so there is exactly one layer and no
-# inter-layer delay ever fires. Groups run in list order, so the sheet is
-# filled column 5, then column 6, then column 7.
+# --- the two prints: one layer, in the order requested --------------------------
+# Both groups ask for 1 droplet, so there is exactly one layer and no
+# inter-layer delay ever fires. Groups run in list order: column 5, then
+# column 6.
 #
 # The `source_wells: {5: ...}` line on every group is REQUIRED, not decorative:
 # a bare `source_well:` is silently overridden by the config-level default
@@ -114,7 +112,7 @@ printing:
 # column 6 from A9 and collapse the run onto one tip. The explicit per-slot
 # binding is the same style scripts 26 and 27 use.
 print_groups:
-  # 1. A9 -> column 5, all eight rows.
+  # 1. A9 -> column 5, all eight rows. Tip A1.
   - source_well: A9
     source_wells: {5: A9}
     targets: [A5, B5, C5, D5, E5, F5, G5, H5]
@@ -124,12 +122,6 @@ print_groups:
   - source_well: A11
     source_wells: {5: A11}
     targets: [A6, B6, C6, D6, E6, F6, G6, H6]
-    droplets: 1
-
-  # 3. A9 -> column 7, all eight rows. Tip swaps back B1 -> A1.
-  - source_well: A9
-    source_wells: {5: A9}
-    targets: [A7, B7, C7, D7, E7, F7, G7, H7]
     droplets: 1
 
 # --- tip behaviour -------------------------------------------------------------
