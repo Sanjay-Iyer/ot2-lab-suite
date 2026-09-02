@@ -1,0 +1,183 @@
+# =============================================================================
+# 29 - PRINTING DEMO: A9 + A11 (BRAND plate, slot 1) -> PAPER SLOT 5, COLUMNS 5/6/7
+# =============================================================================
+# User notation "9A"/"11a" = Opentrons well names A9 / A11 (row A, columns 9
+# and 11 of the BRAND 781662 plate in slot 1). One paper sheet only, slot 5.
+#
+# THREE PRINTS, IN THIS ORDER, ALL 5 uL PER DROP:
+#
+#   1.  A9   ->  paper column 5, all 8 rows   A5 B5 C5 D5 E5 F5 G5 H5   1 drop each
+#   2.  A11  ->  paper column 6, all 8 rows   A6 B6 C6 D6 E6 F6 G6 H6   1 drop each
+#   3.  A9   ->  paper column 7, all 8 rows   A7 B7 C7 D7 E7 F7 G7 H7   1 drop each
+#
+#         ---- HOLD 1 HOUR 30 MINUTES (5400 s), no tip attached, no motion ----
+#
+#   4.  A9   ->  column 7 repeats, back to back:
+#                  A7   2 more drops
+#                  B7   4 more drops
+#                  C7   8 more drops
+#
+# FINAL DROP COUNT PER PAPER POSITION
+#   column 5   A5-H5    1 drop each   (5 uL)
+#   column 6   A6-H6    1 drop each   (5 uL)
+#   column 7   A7       3 drops       (15 uL)   = 1 before the hold + 2 after
+#              B7       5 drops       (25 uL)   = 1 before the hold + 4 after
+#              C7       9 drops       (45 uL)   = 1 before the hold + 8 after
+#              D7-H7    1 drop each   (5 uL)
+#
+#   38 deposits x 5 uL = 190 uL onto the one sheet.
+#     from A9   30 deposits = 150 uL   (columns 5 and 7)
+#     from A11   8 deposits =  40 uL   (column 6)
+#
+# ---------------------------------------------------------------------------
+# ASSUMPTION TO CHECK BEFORE RUNNING: print 3 was requested as "column 7, 5 uL
+# drops" without naming rows, so it is read the same way as prints 1 and 2 --
+# ALL EIGHT ROWS get one drop. If column 7 was meant to start with only rows
+# A/B/C, shorten the third group's targets to [A7, B7, C7]; that removes 5
+# deposits and 25 uL from A9 and changes nothing else.
+#
+# PHYSICAL NOTE, NOT A CONFIG ERROR: the post-hold repeats are back to back
+# with no drying time between them, so C7 receives 8 x 5 uL = 40 uL inside
+# about two minutes on one 9 mm paper cell. That will pool and spread past the
+# cell. If time between the repeat drops is wanted, raise
+# printing.inter_drop_delay_s (it applies to every deposit in the run,
+# including prints 1-3).
+#
+# HOW THE HOLD IS EXPRESSED: prints 1-3 are one layer, so inter_layer_delay_s
+# never fires. The hold + repeats are the `overprint:` block, which is the one
+# mechanism that runs AFTER every layer is finished: it drops the tip, waits
+# delay_s with nothing attached, then deposits its target list. Listing a
+# target more than once in that list is how a position gets more than one
+# repeat drop -- A7 twice, B7 four times, C7 eight times.
+#
+# TIPS: 2, starting at A1, one per source well, as requested.
+#   A1  ->  A9   (column 5, column 7, and every post-hold repeat)
+#   B1  ->  A11  (column 6 only)
+# return_tips: true, so each tip goes back to its own rack position and is
+# picked up again by name. The A9 tip is A1 every single time it is used, and
+# it never enters A11; the A11 tip is B1 and never enters A9. The run picks up
+# A1 -> B1 -> A1, then drops A1 for the 1.5 h hold and picks A1 back up for the
+# repeats. Both tips must be clean and unused before the run; afterwards they
+# carry their own well's residue.
+#
+# SOURCE VOLUME: loaded_volume_ul applies to BOTH wells. A9 is the binding
+# one -- it gives up 150 uL and must still cover the 0.5 mm aspiration height
+# at the last pull. A11 gives up only 40 uL. Correct the number below to the
+# smaller of the two real starting levels before a physical run.
+#
+# DECK (from the machine profile; nothing here may move it):
+#   slot 1  BRAND 781662 96-well plate   source, wells A9 and A11
+#   slot 5  paper sheet                  the only substrate
+#   slot 9  opentrons_96_tiprack_20ul    tips A1 and B1
+#
+# RUN TIME: roughly 5 min of printing, then 90 min of hold, then about 2 min of
+# repeats -- a little over 1 h 40 min as ONE run. Start it and walk away.
+#
+# SIMULATION LAPTOP (local build + simulation only; no robot contact):
+#   conda activate ai
+#   python scripts/build_print_from_vial.py --config configs/experiments/29_a9_a11_paper5_columns5_6_7.yaml
+#
+# REAL ROBOT LAPTOP (after review, commit/push, and pull):
+#   conda activate llm
+#   python scripts/run_printing_experiment_robot.py a9-a11-paper5-columns5-6-7 --live
+#
+# Physical execution requires the real robot laptop and explicit readiness
+# confirmation. Creating or locally simulating this config does not run it live.
+# =============================================================================
+
+machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
+
+protocol_label: a9_a11_paper5_columns5_6_7
+
+# The generated protocol moves liquid. The named runner requires --live.
+run_modes: {dry_run: false}
+
+# --- source: two row-A wells of the BRAND 781662 plate in slot 1 ---------------
+source:
+  type: well_plate
+  slot: 1
+  # A9 feeds columns 5 and 7; A11 feeds column 6. Each gets its own tip
+  # automatically (one tip per source well).
+  wells: [A9, A11]
+  material: A9 print liquid (columns 5 and 7) + A11 print liquid (column 6)
+  # Applies to BOTH wells. A9 needs 150 uL drawn + 20 uL reserve = 170 uL
+  # minimum; the 250 declared here leaves 100 uL (about 2.6 mm deep in a
+  # 6.94 mm well) still in A9 at the end, comfortably above the 0.5 mm
+  # aspiration height. A11 needs only 40 + 20 = 60 uL.
+  loaded_volume_ul: 250.0
+  minimum_remaining_ul: 20.0
+  aspirate_height_mm: 0.5
+
+# --- destination: one paper sheet, slot 5 --------------------------------------
+substrate:
+  slot: 5
+
+# --- printing behaviour ---------------------------------------------------------
+printing:
+  droplet_volume_ul: 5.0
+  inter_drop_delay_s: 0.0     # no pause between individual droplets
+  inter_layer_delay_s: 0.0    # unused: prints 1-3 are a single layer
+  initial_delay_s: 0.0        # no hold before the first drop
+
+# --- prints 1-3: one layer, in the order requested ------------------------------
+# Every group asks for 1 droplet, so there is exactly one layer and no
+# inter-layer delay ever fires. Groups run in list order, so the sheet is
+# filled column 5, then column 6, then column 7.
+#
+# The `source_wells: {5: ...}` line on every group is REQUIRED, not decorative:
+# a bare `source_well:` is silently overridden by the config-level default
+# (the first entry of source.wells) for every paper slot, which would print
+# column 6 from A9 and collapse the run onto one tip. The explicit per-slot
+# binding is the same style scripts 26 and 27 use.
+print_groups:
+  # 1. A9 -> column 5, all eight rows.
+  - source_well: A9
+    source_wells: {5: A9}
+    targets: [A5, B5, C5, D5, E5, F5, G5, H5]
+    droplets: 1
+
+  # 2. A11 -> column 6, all eight rows. Tip swaps A1 -> B1 here.
+  - source_well: A11
+    source_wells: {5: A11}
+    targets: [A6, B6, C6, D6, E6, F6, G6, H6]
+    droplets: 1
+
+  # 3. A9 -> column 7, all eight rows. Tip swaps back B1 -> A1.
+  - source_well: A9
+    source_wells: {5: A9}
+    targets: [A7, B7, C7, D7, E7, F7, G7, H7]
+    droplets: 1
+
+# --- the 1.5 hour hold, then the column-7 repeats -------------------------------
+# Runs once prints 1-3 are complete: the A11 tip is put back, the robot holds
+# for delay_s with NOTHING attached, then the A9 tip (A1) is picked back up and
+# the target list below is deposited in order, one 5 uL drop per entry.
+# A7 x2, B7 x4, C7 x8 = 14 deposits, 70 uL, all from A9.
+overprint:
+  delay_s: 5400             # 1 HOUR 30 MINUTES after the last column-7 drop
+  source_well: A9           # same liquid, same dedicated tip A1
+  droplets: 1               # one drop per list entry; the repeats are the list
+  targets:
+    - A7
+    - A7                    # row A: 2 repeat drops
+    - B7
+    - B7
+    - B7
+    - B7                    # row B: 4 repeat drops
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7
+    - C7                    # row C: 8 repeat drops
+
+# --- tip behaviour -------------------------------------------------------------
+# One tip per source well, starting at A1: A9 -> A1, A11 -> B1. Two tips total.
+# single_tip_all_sources stays off (default) -- turning it on would put ONE tip
+# in both wells, which is exactly what was not wanted here.
+tips:
+  pipette_tip_reuse: true
+  print_tip: A1
+  return_tips: true

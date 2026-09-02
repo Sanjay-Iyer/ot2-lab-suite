@@ -156,6 +156,9 @@ WORKFLOWS = {
     "dye-e11-redo-paper5-e1": (
         "standard",
         "configs/experiments/28_dye_e11_redo_paper5_e1.yaml"),
+    "a9-a11-paper5-columns5-6-7": (
+        "standard",
+        "configs/experiments/29_a9_a11_paper5_columns5_6_7.yaml"),
     "add-dye": (
         "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
