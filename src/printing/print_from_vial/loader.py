@@ -291,7 +291,16 @@ def load_print_from_vial_config(reference: str | Path) -> tuple[dict[str, Any], 
         },
         "printing": {
             "droplet_volume_ul": float(printing.get("droplet_volume_ul", 5.0)),
-            "dispense_height_mm": float(release["dispense_height_mm"]),
+            # Run-level print height. Defaults to the machine profile's
+            # validated print_release standoff. An experiment may override it
+            # for the whole run (a print group's own dispense_height_mm still
+            # wins over this for that group's targets). Overriding here is a
+            # deliberate, recorded experiment choice -- it does NOT edit the
+            # laboratory-owned profile, which stays the default for every other
+            # config.
+            "dispense_height_mm": float(
+                printing.get("dispense_height_mm", release["dispense_height_mm"])
+            ),
             "pre_air_chase_ul": float(release.get("pre_air_chase_ul", 0.0) or 0.0),
             "air_gap_ul": float(release.get("trailing_air_gap_ul", 0.0) or 0.0),
             "air_gap_height_mm": float(release.get("air_gap_height_mm", 0.0) or 0.0),

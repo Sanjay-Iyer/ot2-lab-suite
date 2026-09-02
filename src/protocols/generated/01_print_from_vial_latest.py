@@ -97,7 +97,7 @@ CONFIG = { 'protocol_label': 'a9_a11_paper5_columns5_6_7',
               'aspirate_height_mm': 0.5,
               'park_height_mm': 5.0},
   'printing': { 'droplet_volume_ul': 5.0,
-                'dispense_height_mm': 1.1,
+                'dispense_height_mm': 1.5,
                 'pre_air_chase_ul': 0.0,
                 'air_gap_ul': 1.5,
                 'air_gap_height_mm': 5.0,
@@ -124,24 +124,7 @@ CONFIG = { 'protocol_label': 'a9_a11_paper5_columns5_6_7',
             'pipette_tip_reuse': True,
             'single_tip_all_sources': False},
   'flow_rates': {'p20': {'aspirate_ul_s': 3.0, 'dispense_ul_s': 3.0}},
-  'safety': {'p20_max_volume_ul': 20.0},
-  'overprint': { 'source_well': 'A9',
-                 'targets': [ 'A7',
-                              'A7',
-                              'B7',
-                              'B7',
-                              'B7',
-                              'B7',
-                              'C7',
-                              'C7',
-                              'C7',
-                              'C7',
-                              'C7',
-                              'C7',
-                              'C7',
-                              'C7'],
-                 'droplets': 1,
-                 'delay_s': 5400.0}}
+  'safety': {'p20_max_volume_ul': 20.0}}
 # <<< CONFIG END <<<
 
 
@@ -223,6 +206,11 @@ def _preflight(protocol, labware, p20):
     ):
         if float(pr.get(key, 0.0) or 0.0) < 0:
             errors.append(f"printing.{key} must be >= 0")
+    if float(pr["dispense_height_mm"]) > 40.0:
+        errors.append(
+            "printing.dispense_height_mm must be <= 40 mm, got "
+            f"{float(pr['dispense_height_mm']):g}"
+        )
     if float(src.get("park_height_mm", 5.0)) < 0:
         errors.append("source.park_height_mm must be >= 0")
     layer_number_offset = pr.get("layer_number_offset", 0)

@@ -188,6 +188,11 @@ def _preflight(protocol, labware, p20):
     ):
         if float(pr.get(key, 0.0) or 0.0) < 0:
             errors.append(f"printing.{key} must be >= 0")
+    if float(pr["dispense_height_mm"]) > 40.0:
+        errors.append(
+            "printing.dispense_height_mm must be <= 40 mm, got "
+            f"{float(pr['dispense_height_mm']):g}"
+        )
     if float(src.get("park_height_mm", 5.0)) < 0:
         errors.append("source.park_height_mm must be >= 0")
     layer_number_offset = pr.get("layer_number_offset", 0)
