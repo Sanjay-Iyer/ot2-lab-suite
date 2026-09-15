@@ -2,12 +2,66 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from nicegui import events, ui
 
 from src.agents.dye_demo import render
+from src.agents.dye_demo.columns import paper_columns_printed
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter
+from src.agents.dye_demo.model import fmt_factor, format_slot, material_label, material_spec, slot_of
+from src.agents.dye_demo.plan import build_plan
+
+REPO = Path(__file__).resolve().parents[4]
+DEFAULT_REFERENCE_IMAGES = {
+    "96-WELL PLATE": REPO / "visualization" / "96_well_plate.jpg",
+    "PAPER SUBSTRATE / HOLDER": REPO / "visualization" / "paper.jpg",
+    "20 ML VIAL RACK": REPO / "visualization" / "20ml_vial_rack.jpg",
+}
+_PHYSICAL_LABELS = {
+    "Dilution plate": "96-well plate",
+    "Paper print plate": "Paper substrate / holder",
+    "Vial rack": "20 mL vial rack",
+}
+CHAT_TITLE = "AI Agent Chatbox"
+CHAT_HISTORY_HEIGHT_PX = 560
+
+
+@dataclass(frozen=True)
+class FlowStep:
+    title: str
+    source: str
+    destination: str
+
+
+def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
+    """High-level material path derived from the same config and Plan as the detailed sections."""
+    plan = build_plan(config)
+    wells = " | ".join(well.well for well in plan.wells) or "none"
+    factors = " | ".join(fmt_factor(well.factor) for well in plan.wells) or "none"
+    steps: list[FlowStep] = []
+    if plan.do_dilution:
+        dye, water = material_spec(config, "sample"), material_spec(config, "solvent")
+        sources = (f"{material_label(config, 'sample')} (vial {dye.get('vial')}) + "
+                   f"{material_label(config, 'solvent')} (vial {water.get('vial')})")
+        steps.append(FlowStep(
+            "STEP 1 — PREPARE DILUTIONS",
+            f"{sources} · 20 mL vial rack, {format_slot(slot_of(config, 'tuberack'))}",
+            f"96-well plate, {format_slot(slot_of(config, 'plate'))} · wells {wells} · dilutions {factors}",
+        ))
+    if plan.do_print:
+        columns = " | ".join(map(str, paper_columns_printed(config))) or "none"
+        drops = int(config["print"].get("droplets_per_spot", 1))
+        number = "drop" if drops == 1 else "drops"
+        steps.append(FlowStep(
+            f"STEP {len(steps) + 1} — PRINT",
+            f"96-well plate, {format_slot(slot_of(config, 'plate'))} · dilution wells {wells}",
+            f"Paper substrate / holder, {format_slot(slot_of(config, 'paper'))} · columns {columns} · "
+            f"{drops} {number} per position",
+        ))
+    return steps
 
 
 def build_page(adapter: DemoGuiAdapter) -> None:
@@ -19,7 +73,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .plan-card { min-height: 180px; }
         .plan-grid { display:grid; grid-template-columns:minmax(150px, .8fr) minmax(180px, 1.2fr); gap:4px 14px; }
         .plan-label { color:#64748b; }
-        .chat-scroll { height: 520px; }
+        .chat-scroll { min-height: 0; }
+        .section-chat { border: 3px solid #111827; border-radius: 10px; box-shadow: none; }
+        .section-plan { border: 1px solid #5b8db8; box-shadow: none; }
+        .section-tool { border: 1px solid #6f9b7a; box-shadow: none; }
+        .flow-step { border-left: 3px solid #8ab1d2; background: #f8fbfe; }
     """)
 
     with ui.column().classes("w-full max-w-screen-2xl mx-auto p-4 gap-4"):
@@ -28,28 +86,32 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
         ui.label("Simulation-only prototype · changes require an explicit proposal approval").classes("text-slate-500")
 
-        with ui.row().classes("w-full items-stretch gap-4"):
-            current_box = ui.card().classes("plan-card grow basis-1/2 p-5")
-            with ui.card().classes("grow basis-1/2 p-5"):
-                ui.label("AI CHAT").classes("text-lg font-semibold")
-                chat_box = ui.column().classes("w-full chat-scroll overflow-auto gap-2")
-                with ui.row().classes("w-full items-end"):
-                    chat_input = ui.input(placeholder="Type a natural-language instruction…").classes("grow")
-                    send_button = ui.button("Send")
+        with ui.card().classes("section-chat w-full p-5"):
+            ui.label(CHAT_TITLE).classes("text-xl font-semibold")
+            ui.label("Describe the experiment or ask for a change in your own words.").classes(
+                "text-sm text-slate-500")
+            chat_box = ui.column().classes("w-full chat-scroll overflow-y-auto gap-2")
+            chat_box.style(f"height: {CHAT_HISTORY_HEIGHT_PX}px; min-height: {CHAT_HISTORY_HEIGHT_PX}px")
+            with ui.row().classes("w-full items-end"):
+                chat_input = ui.input(placeholder="Tell the AI what you want to prepare or print…").classes("grow")
+                send_button = ui.button("Send")
 
-        proposed_box = ui.card().classes("w-full p-5")
+        current_box = ui.card().classes("section-plan plan-card w-full p-5")
 
-        with ui.card().classes("w-full p-5"):
+        proposed_box = ui.card().classes("section-plan w-full p-5")
+
+        with ui.card().classes("section-tool w-full p-5"):
             ui.label("GUI PARAMETER CONTROLS").classes("text-lg font-semibold")
             ui.label("Optional structured input; Submit creates a proposal and does not mutate the Current Plan.").classes(
                 "text-sm text-slate-500")
             controls = _controls(adapter.snapshot().current)
             submit_controls = ui.button("Submit as proposal", icon="tune")
 
-        ui.label("LABWARE / REFERENCE IMAGES").classes("text-lg font-semibold")
-        with ui.row().classes("w-full gap-4"):
-            for title in ("96-WELL PLATE", "PAPER SUBSTRATE", "8-VIAL RACK"):
-                _reference_card(title)
+        with ui.card().classes("section-tool w-full p-5"):
+            ui.label("LABWARE / REFERENCE IMAGES").classes("text-lg font-semibold")
+            with ui.row().classes("w-full gap-4"):
+                for title, image_path in DEFAULT_REFERENCE_IMAGES.items():
+                    _reference_card(title, image_path)
 
         with ui.row().classes("w-full justify-center gap-3"):
             ui.button("Validate", icon="fact_check", on_click=adapter.validate).props("outline")
@@ -65,6 +127,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             with ui.row().classes("w-full items-center justify-between"):
                 ui.label("CURRENT PLAN").classes("text-lg font-semibold")
                 ui.badge(f"ACTIVE · revision {snapshot.revision}", color="positive")
+            _experiment_flow(snapshot.current)
             _plan(snapshot.current_sections)
             if snapshot.validation != "All plan checks passed.":
                 ui.label(snapshot.validation).classes("w-full whitespace-pre-wrap bg-amber-50 text-amber-900 p-3 rounded")
@@ -73,11 +136,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     def render_proposed() -> None:
         snapshot = adapter.snapshot()
         proposed_box.clear()
+        proposed_box.set_visibility(snapshot.proposed is not None)
         with proposed_box:
-            if snapshot.proposed is None:
-                ui.label("PROPOSED PLAN").classes("text-lg font-semibold")
-                ui.label("No proposal is waiting.").classes("text-slate-500")
-            else:
+            if snapshot.proposed is not None:
                 with ui.row().classes("w-full items-center justify-between"):
                     ui.label(f"PROPOSED PLAN #{snapshot.proposal_id}").classes("text-lg font-semibold")
                     ui.badge("WAITING FOR APPROVAL", color="warning")
@@ -142,8 +203,25 @@ def _section(section: render.PlanSection) -> None:
                     ui.label(" | ".join(cells))
             else:
                 label, value = item
-                ui.label(label).classes("plan-label")
+                ui.label(_PHYSICAL_LABELS.get(label, label)).classes("plan-label")
                 ui.label(value)
+
+
+def _experiment_flow(config: dict[str, Any]) -> None:
+    ui.label("EXPERIMENT FLOW · FROM → TO").classes("font-semibold text-blue-800 mt-2")
+    steps = experiment_flow(config)
+    if not steps:
+        ui.label("No dilution or printing step is enabled.").classes("text-slate-500")
+        return
+    with ui.row().classes("w-full gap-3 items-stretch"):
+        for step in steps:
+            with ui.card().classes("flow-step grow basis-1/2 p-4 shadow-none"):
+                ui.label(step.title).classes("font-semibold text-sm")
+                ui.label("FROM").classes("text-xs font-semibold text-slate-500 mt-1")
+                ui.label(step.source)
+                ui.icon("south", size="1.15rem").classes("text-blue-600")
+                ui.label("TO").classes("text-xs font-semibold text-slate-500")
+                ui.label(step.destination)
 
 
 def _controls(config: dict[str, Any]) -> dict[str, Any]:
@@ -157,10 +235,10 @@ def _controls(config: dict[str, Any]) -> dict[str, Any]:
         drops = ui.number("Drops per position", value=printing["droplets_per_spot"], min=1, step=1)
     with ui.row().classes("w-full gap-4"):
         options = list(range(1, 12))
-        plate = ui.select(options, value=deck["plate"]["slot"], label="Dilution plate slot")
-        paper = ui.select(options, value=deck["paper"]["slot"], label="Paper plate slot")
-        tuberack = ui.select(options, value=deck["tuberack"]["slot"], label="Vial rack slot")
-        tiprack = ui.select(options, value=deck["tiprack"]["slot"], label="Tip rack slot")
+        plate = ui.select(options, value=deck["plate"]["slot"], label="96-well plate slot")
+        paper = ui.select(options, value=deck["paper"]["slot"], label="Paper substrate / holder slot")
+        tuberack = ui.select(options, value=deck["tuberack"]["slot"], label="20 mL vial rack slot")
+        tiprack = ui.select(options, value=deck["tiprack"]["slot"], label="P20 tip rack slot")
     return {"factors": factors, "dilution": dilution_enabled, "printing": printing_enabled,
             "first_column": first_column, "replicates": replicates, "drops": drops,
             "plate": plate, "paper": paper, "tuberack": tuberack, "tiprack": tiprack}
@@ -198,13 +276,12 @@ def _sync_controls(controls: dict[str, Any], config: dict[str, Any]) -> None:
         controls[name].value = value
 
 
-def _reference_card(title: str) -> None:
-    with ui.card().classes("grow basis-1/3 p-4"):
+def _reference_card(title: str, default_image: Path) -> None:
+    with ui.card().classes("grow basis-1/3 p-4 shadow-none border border-slate-200"):
         ui.label(title).classes("font-semibold")
         image_box = ui.column().classes("w-full h-52 items-center justify-center bg-slate-100 rounded")
         with image_box:
-            ui.icon("image", size="4rem").classes("text-slate-300")
-            ui.label("No image uploaded").classes("text-slate-400")
+            ui.image(default_image).classes("w-full h-52 object-contain rounded")
 
         async def uploaded(event: events.UploadEventArguments) -> None:
             content_type = event.file.content_type.lower()
@@ -212,11 +289,15 @@ def _reference_card(title: str) -> None:
                 ui.notify("Please choose a PNG or JPG image.", type="negative")
                 return
             data = await event.file.read()
-            encoded = base64.b64encode(data).decode("ascii")
             image_box.clear()
             with image_box:
-                ui.image(f"data:{content_type};base64,{encoded}").classes("max-h-52 object-contain")
+                ui.image(_image_data_uri(content_type, data)).classes("max-h-52 object-contain")
             ui.notify(f"{title.title()} reference updated.", type="positive")
 
         ui.upload(label="Upload or replace PNG/JPG", on_upload=uploaded, auto_upload=True,
                   max_file_size=5_000_000).props('accept=".png,.jpg,.jpeg,image/png,image/jpeg"').classes("w-full")
+
+
+def _image_data_uri(content_type: str, data: bytes) -> str:
+    """A session-only browser source used when a default reference is replaced."""
+    return f"data:{content_type};base64,{base64.b64encode(data).decode('ascii')}"

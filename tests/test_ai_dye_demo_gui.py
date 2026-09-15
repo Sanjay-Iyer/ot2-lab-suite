@@ -3,8 +3,18 @@ from __future__ import annotations
 
 import time
 import json
+from copy import deepcopy
+import inspect
 from types import SimpleNamespace
 
+from src.agents.dye_demo.gui.app import (
+    CHAT_HISTORY_HEIGHT_PX,
+    CHAT_TITLE,
+    DEFAULT_REFERENCE_IMAGES,
+    _image_data_uri,
+    build_page,
+    experiment_flow,
+)
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter
 from src.agents.dye_demo.llm import LLMClient
 from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config
@@ -112,3 +122,55 @@ def test_shared_plan_model_drives_both_snapshots(tmp_path):
     printing = next(section for section in proposed.proposed_sections if section.title == "PRINTING")
     assert printing.value("Drops per position").startswith("2")
     adapter.stop()
+
+
+def test_repository_reference_images_are_the_defaults_and_load():
+    assert set(DEFAULT_REFERENCE_IMAGES) == {
+        "96-WELL PLATE", "PAPER SUBSTRATE / HOLDER", "20 ML VIAL RACK"}
+    for path in DEFAULT_REFERENCE_IMAGES.values():
+        assert path.is_file()
+        assert path.suffix.lower() == ".jpg"
+        assert path.read_bytes()[:2] == b"\xff\xd8"
+
+
+def test_chat_is_named_tall_scrollable_and_full_width_without_a_splitter():
+    assert CHAT_TITLE == "AI Agent Chatbox"
+    assert CHAT_HISTORY_HEIGHT_PX >= 500
+    source = inspect.getsource(build_page)
+    assert "ui.splitter" not in source
+    assert 'section-chat w-full' in source
+    assert 'chat-scroll overflow-y-auto' in source
+    assert source.index('section-chat w-full') < source.index('section-plan plan-card w-full')
+
+
+def test_uploaded_reference_bytes_can_replace_the_default_for_the_session():
+    assert _image_data_uri("image/png", b"png") == "data:image/png;base64,cG5n"
+
+
+def test_experiment_flow_comes_from_the_authoritative_plan():
+    config = load_config(DEFAULT_CONFIG)
+    flow = experiment_flow(config)
+    assert [step.title for step in flow] == ["STEP 1 — PREPARE DILUTIONS", "STEP 2 — PRINT"]
+    assert "vial A2" in flow[0].source and "vial A1" in flow[0].source and "Slot 7" in flow[0].source
+    assert "Slot 4" in flow[0].destination and "A11 | B11" in flow[0].destination and "16×" in flow[0].destination
+    assert "Slot 4" in flow[1].source and "A11 | B11" in flow[1].source
+    assert flow[1].destination.endswith("Slot 5 · columns 1 · 1 drop per position")
+
+    changed = deepcopy(config)
+    changed["dilution"].update({"factors": [2, 5, 10], "start_row": "C", "plate_column": "3"})
+    changed["print"].update({"paper_start_column": 4, "replicates": 2, "droplets_per_spot": 3})
+    changed["deck"]["plate"]["slot"] = 6
+    changed["deck"]["paper"]["slot"] = 8
+    changed_flow = experiment_flow(changed)
+    assert "C3 | D3 | E3" in changed_flow[0].destination
+    assert "2× | 5× | 10×" in changed_flow[0].destination
+    assert "Slot 6" in changed_flow[1].source
+    assert changed_flow[1].destination.endswith("Slot 8 · columns 4 | 5 · 3 drops per position")
+
+
+def test_experiment_flow_omits_disabled_steps():
+    config = load_config(DEFAULT_CONFIG)
+    config["print"]["enabled"] = False
+    assert [step.title for step in experiment_flow(config)] == ["STEP 1 — PREPARE DILUTIONS"]
+    config["dilution"]["enabled"] = False
+    assert experiment_flow(config) == []
