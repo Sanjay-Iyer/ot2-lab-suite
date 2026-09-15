@@ -226,7 +226,8 @@ class SubprocessExecutor:
     Ctrl-C reaches this process and the robot runner together (they share the console). The runner owns the robot run:
     it asks the OT-2 to stop and reports back, so this side never dies on the interrupt. It keeps relaying the runner's
     output, waits for it to exit, and reads the runner's status file (did the robot run start, did the OT-2 confirm the
-    stop) into `last_status`.
+    stop) into `last_status`. A caller without a console (the NiceGUI page) uses `request_stop()`, which writes the
+    runner's --stop-file; the runner handles that exactly like Ctrl-C.
     """
 
     def __init__(self, *, robot_host: str | None = None, emit: Callable[[str], None] = print,
@@ -235,8 +236,11 @@ class SubprocessExecutor:
         self.emit = emit
         self.popen = popen
         self.last_status: dict[str, Any] | None = None
+        self.active = False                     # a build or robot runner is running
+        self._stop_file: Path | None = None     # the running live run's --stop-file
 
-    def command(self, config_path: Path, simulate: bool, status_file: Path | None = None) -> list[str]:
+    def command(self, config_path: Path, simulate: bool, status_file: Path | None = None,
+                stop_file: Path | None = None) -> list[str]:
         script = "scripts/build_vial_dilution_print.py" if simulate else "scripts/run_vial_print_robot.py"
         command = [sys.executable, script, "--config", str(config_path)]
         if not simulate:
@@ -248,41 +252,69 @@ class SubprocessExecutor:
             command += ["--robot-host", self.robot_host]
         if status_file is not None and not simulate:
             command += ["--status-file", str(status_file)]
+        if stop_file is not None and not simulate:
+            command += ["--stop-file", str(stop_file)]
         return command
+
+    def check_robot(self) -> str | None:
+        """Find and verify the OT-2 the way the robot runner does before it uploads (configs/robot.yaml, mDNS, last
+        known address, discovery; the /health serial must match). None when the robot answered, else what went wrong."""
+        from src.lab.robot_connection import connection_summary, resolve_host, verify_host
+        try:
+            host = resolve_host(self.robot_host)
+            verify_host(host)
+        except Exception as exc:  # noqa: BLE001 - an unreachable robot is reported to the operator, never raised
+            return str(exc) or type(exc).__name__
+        self.emit(connection_summary(host))
+        return None
+
+    def request_stop(self) -> bool:
+        """Ask the running robot runner to stop the OT-2 run exactly as Ctrl-C would. False when no live run is running."""
+        stop_file = self._stop_file
+        if not self.active or stop_file is None:
+            return False
+        stop_file.write_text(_now() + "\n", encoding="utf-8")
+        return True
 
     def __call__(self, config_path: Path, simulate: bool, log: SessionLog) -> int:
         status_file = None if simulate else Path(log.directory) / "robot_run_status.json"
-        if status_file is not None and status_file.exists():
-            status_file.unlink()
+        stop_file = None if simulate else Path(log.directory) / "robot_stop_request"
+        for stale in (status_file, stop_file):
+            if stale is not None and stale.exists():
+                stale.unlink()
         self.last_status = None
-        command = self.command(config_path, simulate, status_file)
+        command = self.command(config_path, simulate, status_file, stop_file)
         log.write("command_started", command=command)
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"       # the child prints µ and ×; read it back as UTF-8
-        process = self.popen(command, cwd=str(REPO), stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                             errors="replace", env=env)
-        assert process.stdout is not None
-        interrupted = False
-        while True:
-            try:
-                for line in process.stdout:
-                    self.emit(line.rstrip("\r\n"))
-                    log.write("command_output", line=line.rstrip("\r\n"))
-                break
-            except KeyboardInterrupt:
-                if not interrupted:
+        self._stop_file, self.active = stop_file, True
+        try:
+            process = self.popen(command, cwd=str(REPO), stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+                                 errors="replace", env=env)
+            assert process.stdout is not None
+            interrupted = False
+            while True:
+                try:
+                    for line in process.stdout:
+                        self.emit(line.rstrip("\r\n"))
+                        log.write("command_output", line=line.rstrip("\r\n"))
+                    break
+                except KeyboardInterrupt:
+                    if not interrupted:
+                        interrupted = True
+                        log.write("command_interrupted")
+                        self.emit("[interrupt] Ctrl-C received. Stopping the simulation." if simulate else
+                                  "[interrupt] Ctrl-C received. Waiting for the robot runner to ask the OT-2 to stop "
+                                  "this run and report back. Do not close this window.")
+            while True:
+                try:
+                    code = process.wait()
+                    break
+                except KeyboardInterrupt:
                     interrupted = True
-                    log.write("command_interrupted")
-                    self.emit("[interrupt] Ctrl-C received. Stopping the simulation." if simulate else
-                              "[interrupt] Ctrl-C received. Waiting for the robot runner to ask the OT-2 to stop this "
-                              "run and report back. Do not close this window.")
-        while True:
-            try:
-                code = process.wait()
-                break
-            except KeyboardInterrupt:
-                interrupted = True
+        finally:
+            self.active = False
         self.last_status = _read_status(status_file)
         if interrupted and code not in (0, RUN_ABORTED_EXIT_CODE, RUN_NOT_STARTED_EXIT_CODE):
             # the child died on the interrupt without reporting: assume the worst unless it said the run never started
@@ -304,6 +336,9 @@ class SessionSettings:
     llm_description: str = ""
     raise_errors: bool = False
     skip_llm_startup: bool = False      # test and red-team harness only: the client is already connected
+    # The NiceGUI page's run button label. When set, a run starts only from that button (typed run is refused), a live
+    # run first checks that the OT-2 answers, and the stop instruction points at the page's Stop button.
+    run_button: str = ""
 
 
 @dataclass
@@ -355,6 +390,7 @@ class DemoSession:
         # A live run that may have moved the robot but did not finish: the next live run asks that the robot was checked.
         self.unverified_run: dict[str, Any] | None = None
         self._last_discarded: tuple[int, str] | None = None
+        self._from_button = False
 
     # ── small helpers ────────────────────────────────────────────────────────
 
@@ -673,6 +709,11 @@ class DemoSession:
             self._ask_start_over(text)
             return
         if kind == "run":
+            if self.settings.run_button and not self._from_button:
+                self.say(f"agent> Nothing has started. To start the run, check the plan and press "
+                         f"{self.settings.run_button}.")
+                self._event("refusal", reason="typed run in the GUI")
+                return
             if self._after_hypothetical and " ".join(analysis.text.lower().split()).strip(" .!") != TRIGGER:
                 self.say("agent> Nothing has started. Your last message was a hypothetical or quoted text, so it did not "
                          "change the plan, and a run would use the plan exactly as it is now. To make that change, say "
@@ -689,7 +730,8 @@ class DemoSession:
                              text, analysis, purpose="claim", original=text, payload={"instruction": instruction})
             return
         if kind == "run_like":
-            self.say(f"agent> Nothing has started. To start the run, check the plan and then type {TRIGGER} by itself.")
+            how = f"press {self.settings.run_button}" if self.settings.run_button else f"type {TRIGGER} by itself"
+            self.say(f"agent> Nothing has started. To start the run, check the plan and then {how}.")
             self._event("hint", reason="run-like wording")
             return
         if kind == "undo":
@@ -1361,6 +1403,16 @@ class DemoSession:
         self._propose_direct(changes, original=request, source="gui-form", title="PROPOSED PLAN", notes=[],
                              evidence=request)
 
+    def run_from_button(self) -> None:
+        """The GUI's run button: the typed run command, through the same turn record, checks and robot path. The GUI
+        calls this on the worker thread that owns ``run()``, only while nothing is waiting for an answer."""
+        self.log.write("gui_run_button", revision=self.state.revision)
+        self._from_button = True
+        try:
+            self._handle(TRIGGER)
+        finally:
+            self._from_button = False
+
     def _propose_direct(self, changes: list[dict[str, Any]], *, original: str, source: str, title: str,
                         notes: list[str], physical: dict[str, Any] | None = None, evidence: str = "") -> None:
         empty = TurnAnalysis(normalize_text(original), kind="instruction")
@@ -1813,6 +1865,18 @@ class DemoSession:
         config = self.state.config
         plan = build_plan(config)
         if not self.settings.simulate:
+            if self.settings.run_button and hasattr(self.executor, "check_robot"):
+                self.say("agent> Checking that the OT-2 answers before anything is uploaded ...")
+                problem = self.executor.check_robot()
+                if problem:
+                    self.say(render.attention(
+                        "Cannot reach the OT-2, so nothing was run. The plan is unchanged.", "", problem, "",
+                        f"Check that the robot is on and connected to this laptop, then press {self.settings.run_button} "
+                        "again."))
+                    self.log.write("run_refused", errors=["robot not reachable"], detail=problem)
+                    self._event("refusal", reason="robot not reachable")
+                    return
+                self.log.write("robot_reachable")
             if self.unverified_run is not None:
                 previous = self.unverified_run
                 if not self._yes_no(f"Run {previous['run']} did not finish ({previous['status']}), so the plate, paper and "
@@ -1844,7 +1908,8 @@ class DemoSession:
         self.say("\n" + render.render_run_banner(config, simulate=self.settings.simulate, operator=self.operator,
                                                  session_label=self.settings.session_label, run_number=run_number))
         if not self.settings.simulate:
-            self.say("\nTo stop the robot, press Ctrl-C once: the runner then asks the OT-2 to stop this run and waits "
+            how = "press Stop at the top of the page" if self.settings.run_button else "press Ctrl-C once"
+            self.say(f"\nTo stop the robot, {how}: the runner then asks the OT-2 to stop this run and waits "
                      "for the robot to report it stopped. If that is not confirmed, stop the run in the Opentrons App.")
         self.say(render.RULE)
         executed = self._file_config()
@@ -1891,6 +1956,12 @@ class DemoSession:
         operator confirms the robot was checked (nothing from this run was recorded as done)."""
         status, number = record["status"], record["run"]
         started = robot.get("started") if isinstance(robot, dict) and "started" in robot else None
+        if status == "failed" and started is False:
+            # e.g. the robot could not be reached, or the build or upload failed: no robot run was ever played
+            reason = robot.get("error") if isinstance(robot, dict) else None
+            self.say(render.attention(f"Run {number} did not start on the OT-2, so nothing ran on the robot. The plan is "
+                                      "unchanged.", *([f"Reason: {reason}"] if reason else [])))
+            return
         if status == "interrupted before start" or started is False:
             self.say(f"Run {number} was interrupted before the robot run started, so nothing ran on the OT-2.")
             return

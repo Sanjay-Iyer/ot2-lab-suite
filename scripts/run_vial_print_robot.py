@@ -11,6 +11,8 @@ Ctrl-C: before a run is created, nothing is sent to the robot (exit code 4). Onc
 a run exists, the runner sends the OT-2 a stop action for it, waits for the robot
 to report a finished state, and exits with 130 (4 if the run had not been
 started). --status-file writes what happened as JSON for a calling program.
+--stop-file lets a calling program without a console (the NiceGUI demo) ask for
+the same stop: when that file appears, it is handled exactly like Ctrl-C.
 """
 from __future__ import annotations
 
@@ -124,6 +126,7 @@ EXIT_RUN_ABORTED = 130               # Ctrl-C after the run was started: a stop 
 EXIT_NOT_STARTED = 4                 # Ctrl-C before the run was started: nothing ran on the OT-2
 STOP_ATTEMPTS = 3
 STOP_CONFIRM_TIMEOUT_S = 120.0
+STOP_CHECK_S = 0.5                   # how often --stop-file is looked for while the robot run is monitored
 
 
 class _StatusFile:
@@ -142,6 +145,29 @@ class _StatusFile:
             self.path.write_text(json.dumps(self.data, indent=2, default=str) + "\n", encoding="utf-8")
         except OSError:
             pass
+
+
+class StopRequested(KeyboardInterrupt):
+    """The calling program asked for a stop through --stop-file: handled exactly like Ctrl-C."""
+
+
+def _check_stop(stop_file: Path | None) -> None:
+    if stop_file is not None and stop_file.exists():
+        raise StopRequested
+
+
+def _wait(seconds: float, stop_file: Path | None) -> None:
+    """Sleep between status polls, looking for a stop request every STOP_CHECK_S."""
+    if stop_file is None:
+        time.sleep(seconds)
+        return
+    deadline = time.monotonic() + seconds
+    while True:
+        _check_stop(stop_file)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        time.sleep(min(STOP_CHECK_S, remaining))
 
 
 @contextlib.contextmanager
@@ -197,14 +223,15 @@ def _wait_for_terminal(robot_ip: str, run_id: str, *, timeout_s: float = STOP_CO
 
 
 def _abort_after_interrupt(robot_ip: str | None, run_id: str | None, started: bool, run_log, status_file: _StatusFile,
-                           *, poll_s: float = 1.0, timeout_s: float = STOP_CONFIRM_TIMEOUT_S) -> int:
-    """Ctrl-C: stop the robot run if one exists, confirm it with the robot, and record the outcome."""
+                           *, poll_s: float = 1.0, timeout_s: float = STOP_CONFIRM_TIMEOUT_S,
+                           source: str = "Ctrl-C") -> int:
+    """Ctrl-C or a stop request: stop the robot run if one exists, confirm it with the robot, and record the outcome."""
     with _interrupts_ignored():
-        print("\n[interrupt] Ctrl-C received.")
+        print(f"\n[interrupt] {source} received.")
         if not robot_ip or not run_id:
             if status_file.data.get("stage") == "creating_run":
-                print("The run was being created when you pressed Ctrl-C; it was never started, so the robot did not "
-                      "move for it. If the Opentrons App shows an idle run, cancel it there.")
+                print(f"The run was being created when the {source} arrived; it was never started, so the robot did "
+                      "not move for it. If the Opentrons App shows an idle run, cancel it there.")
             else:
                 print("No run was created on the robot, so nothing was started on the OT-2.")
             status_file.update(stage="interrupted", started=False, stop_requested=False, exit_code=EXIT_NOT_STARTED)
@@ -689,7 +716,7 @@ def _play_run(robot_ip: str, run_id: str) -> None:
     _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
 
 
-def _monitor(robot_ip: str, run_id: str, poll_s: float) -> str:
+def _monitor(robot_ip: str, run_id: str, poll_s: float, stop_file: Path | None = None) -> str:
     print("\n[monitor]")
     last = None
     while True:
@@ -701,7 +728,7 @@ def _monitor(robot_ip: str, run_id: str, poll_s: float) -> str:
             last = current
         if status in TERMINAL_STATUSES:
             return status
-        time.sleep(poll_s)
+        _wait(poll_s, stop_file)
 
 
 def _resolve_ssh_key(cli_key: str | None) -> str:
@@ -845,11 +872,15 @@ def main() -> int:
     parser.add_argument("--status-file", default=None, metavar="JSON",
                         help="Write the run's stage and outcome (started, stop requested, robot status) to this JSON "
                              "file, for a calling program.")
+    parser.add_argument("--stop-file", default=None, metavar="PATH",
+                        help="Stop exactly as on Ctrl-C when this file appears, for a calling program without a "
+                             "console (the NiceGUI demo).")
     args = parser.parse_args()
     run_log = RobotRunLog(Path(__file__).name)
     print(f"Run log   : {run_log.path}")
     status_file = _StatusFile(args.status_file)
     status_file.update(stage="preparing", started=False)
+    stop_file = Path(args.stop_file) if args.stop_file else None
     robot_ip: str | None = None
     run_id: str | None = None
     started = False
@@ -889,6 +920,7 @@ def main() -> int:
 
         protocol_path = Path(
             args.protocol or _protocol_for_config(args.config)).resolve()
+        _check_stop(stop_file)
         if not args.skip_build:
             run_log.event("local_step", label="build + simulate")
             build_cmd = [sys.executable, "scripts/build_vial_dilution_print.py"]
@@ -974,8 +1006,10 @@ def main() -> int:
         if images_enabled:
             print(f"Images    : will pull {_remote_image_dir()} to {LOCAL_VISION_BASE / image_run_id} after the run.")
 
+        _check_stop(stop_file)
         protocol_id = _upload_protocol(robot_ip, protocol_path)
         run_log.event("protocol_uploaded", protocol_id=protocol_id)
+        _check_stop(stop_file)
         status_file.update(stage="creating_run", protocol_id=protocol_id)
         run_id = _create_run(
             robot_ip,
@@ -998,12 +1032,13 @@ def main() -> int:
         if images_enabled and not args.no_clean_remote_images:
             _prepare_remote_image_dir(robot_ip, args.ssh_key, run_log)
 
+        _check_stop(stop_file)
         # From the play request on, the robot may be moving: an interrupt must stop the run on the robot.
         started = True
         status_file.update(stage="started", started=True)
         _play_run(robot_ip, run_id)
         run_log.event("run_started", run_id=run_id)
-        status = _monitor(robot_ip, run_id, args.poll_seconds)
+        status = _monitor(robot_ip, run_id, args.poll_seconds, stop_file)
         print(f"\nRun finished with status: {status}")
         if status != "succeeded":
             _report_run_error(robot_ip, run_id, run_log)
@@ -1013,9 +1048,9 @@ def main() -> int:
         status_file.update(stage="finished", robot_status=status, exit_code=exit_code)
         run_log.finish(status, exit_code=exit_code)
         return exit_code
-    except KeyboardInterrupt:
-        return _abort_after_interrupt(robot_ip, run_id, started, run_log, status_file,
-                                      poll_s=args.poll_seconds)
+    except KeyboardInterrupt as exc:
+        return _abort_after_interrupt(robot_ip, run_id, started, run_log, status_file, poll_s=args.poll_seconds,
+                                      source="Stop request" if isinstance(exc, StopRequested) else "Ctrl-C")
     except Exception as exc:
         status_file.update(stage="error", error=str(exc), exit_code=1)
         run_log.finish("error", exit_code=1, error=str(exc))

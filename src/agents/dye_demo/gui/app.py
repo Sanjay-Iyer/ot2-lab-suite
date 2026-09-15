@@ -1,4 +1,4 @@
-"""Minimal NiceGUI page for the simulation-only dye demo."""
+"""Minimal NiceGUI page for the dye demo: build the experiment, then run it on the OT-2."""
 from __future__ import annotations
 
 import base64
@@ -10,7 +10,7 @@ from nicegui import events, ui
 
 from src.agents.dye_demo import render
 from src.agents.dye_demo.columns import paper_columns_printed
-from src.agents.dye_demo.gui.adapter import DemoGuiAdapter
+from src.agents.dye_demo.gui.adapter import DemoGuiAdapter, GuiSnapshot
 from src.agents.dye_demo.model import fmt_factor, format_slot, material_label, material_spec, slot_of
 from src.agents.dye_demo.plan import build_plan
 
@@ -27,6 +27,7 @@ _PHYSICAL_LABELS = {
 }
 CHAT_TITLE = "AI Agent Chatbox"
 CHAT_HISTORY_HEIGHT_PX = 560
+OUTPUT_LINES = 3000
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
 def build_page(adapter: DemoGuiAdapter) -> None:
     """Build one browser page. Business logic remains in ``DemoSession``."""
     adapter.start()
+    live = not adapter.session.settings.simulate
     ui.colors(primary="#315c4d", secondary="#64748b", accent="#b56a35")
     ui.add_css("""
         body { background: #f5f7f6; color: #1f2937; }
@@ -74,17 +76,27 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .plan-grid { display:grid; grid-template-columns:minmax(150px, .8fr) minmax(180px, 1.2fr); gap:4px 14px; }
         .plan-label { color:#64748b; }
         .chat-scroll { min-height: 0; }
+        .chat-scroll .q-message-text-content div { white-space: pre-wrap; }
+        .chat-scroll .mono .q-message-text-content div { font-family: Consolas, ui-monospace, monospace; font-size: 12px; }
+        .page-header { position: sticky; top: 0; z-index: 100; background: #f5f7f6; padding: 6px 0; }
         .section-chat { border: 3px solid #111827; border-radius: 10px; box-shadow: none; }
         .section-plan { border: 1px solid #5b8db8; box-shadow: none; }
+        .section-run { border: 2px solid #b91c1c; box-shadow: none; }
         .section-tool { border: 1px solid #6f9b7a; box-shadow: none; }
         .flow-step { border-left: 3px solid #8ab1d2; background: #f8fbfe; }
     """)
 
     with ui.column().classes("w-full max-w-screen-2xl mx-auto p-4 gap-4"):
-        with ui.row().classes("w-full items-center justify-between"):
+        with ui.row().classes("page-header w-full items-center justify-between"):
             ui.label("OT-2 Dye Dilution & Paper Printing").classes("text-2xl font-semibold")
-            status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
-        ui.label("Simulation-only prototype · changes require an explicit proposal approval").classes("text-slate-500")
+            with ui.row().classes("items-center gap-3"):
+                ui.badge("LIVE · REAL OT-2" if live else "SIMULATION ONLY",
+                         color="negative" if live else "secondary").classes("text-sm px-3 py-2")
+                status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
+                stop_button = ui.button("Stop robot", icon="stop", color="negative").classes("text-lg")
+                stop_button.set_visibility(False)
+        ui.label("The OT-2 is contacted only when you press Run on OT-2 · every change needs an explicit Apply" if live
+                 else "Simulation-only session · changes require an explicit proposal approval").classes("text-slate-500")
 
         with ui.card().classes("section-chat w-full p-5"):
             ui.label(CHAT_TITLE).classes("text-xl font-semibold")
@@ -92,6 +104,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                 "text-sm text-slate-500")
             chat_box = ui.column().classes("w-full chat-scroll overflow-y-auto gap-2")
             chat_box.style(f"height: {CHAT_HISTORY_HEIGHT_PX}px; min-height: {CHAT_HISTORY_HEIGHT_PX}px")
+            with ui.row().classes("w-full items-center gap-3 bg-amber-50 p-3 rounded") as answer_row:
+                question_label = ui.label().classes("grow font-semibold text-amber-900 whitespace-pre-wrap")
+                yes_button = ui.button("Yes", icon="check", color="positive")
+                no_button = ui.button("No", icon="close", color="negative").props("outline")
+            answer_row.set_visibility(False)
             with ui.row().classes("w-full items-end"):
                 chat_input = ui.input(placeholder="Tell the AI what you want to prepare or print…").classes("grow")
                 send_button = ui.button("Send")
@@ -99,6 +116,20 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         current_box = ui.card().classes("section-plan plan-card w-full p-5")
 
         proposed_box = ui.card().classes("section-plan w-full p-5")
+
+        with ui.card().classes("section-run w-full p-5"):
+            with ui.row().classes("w-full items-center justify-between"):
+                with ui.column().classes("gap-0"):
+                    ui.label("RUN ON OT-2" if live else "SIMULATE").classes("text-lg font-semibold")
+                    ui.label("Check the Current Plan above and the deck, then start the real run. The robot is "
+                             "contacted only now." if live else
+                             "Builds and simulates the Current Plan on this laptop; no robot is contacted.").classes(
+                        "text-sm text-slate-500")
+                run_button = ui.button(adapter.run_label, icon="precision_manufacturing" if live else "play_arrow",
+                                       color="negative" if live else "primary").classes("text-lg")
+            ui.label("ROBOT RUNNER OUTPUT" if live else "BUILD AND SIMULATION OUTPUT").classes(
+                "text-sm font-semibold text-slate-500 mt-2")
+            output_log = ui.log(max_lines=OUTPUT_LINES).classes("w-full h-72 text-xs")
 
         with ui.card().classes("section-tool w-full p-5"):
             ui.label("GUI PARAMETER CONTROLS").classes("text-lg font-semibold")
@@ -113,11 +144,16 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                 for title, image_path in DEFAULT_REFERENCE_IMAGES.items():
                     _reference_card(title, image_path)
 
-        with ui.row().classes("w-full justify-center gap-3"):
-            ui.button("Validate", icon="fact_check", on_click=adapter.validate).props("outline")
-            ui.button("Simulate", icon="play_arrow", on_click=adapter.simulate)
+    with ui.dialog() as confirm_run, ui.card().classes("p-6 max-w-lg"):
+        ui.label("Start the real OT-2 run?").classes("text-xl font-semibold")
+        ui.label("The software now connects to the OT-2, builds and simulates the protocol for the Current Plan, "
+                 "uploads it and starts it. The robot moves as soon as the run starts. Check the deck, tips, liquids "
+                 "and paper against the Current Plan first.").classes("text-slate-600")
+        with ui.row().classes("w-full justify-end gap-3 mt-4"):
+            ui.button("Cancel", on_click=confirm_run.close).props("flat")
+            start_button = ui.button("Start run", icon="precision_manufacturing", color="negative")
 
-    last = {"revision": -1, "proposal": object()}
+    last = {"revision": -1, "proposal": object(), "messages": 0, "output": 0, "state": None}
 
     @ui.refreshable
     def render_current() -> None:
@@ -153,28 +189,89 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                     ui.button("Discard", icon="close", on_click=lambda: adapter.submit_text("no"), color="negative").props(
                         "outline")
 
-    def send() -> None:
-        if adapter.submit_text(str(chat_input.value or "")):
-            chat_input.value = ""
+    busy_note = "finish the current step first (answer the question, or apply or discard the proposal)."
 
-    send_button.on("click", send)
-    chat_input.on("keydown.enter", send)
+    def send() -> None:
+        text = str(chat_input.value or "").strip()
+        if not text:
+            return
+        if adapter.submit_text(text):
+            chat_input.value = ""
+        else:
+            ui.notify("Please wait: the agent is still working.", type="warning")
+
+    def answer(text: str) -> None:
+        if not adapter.submit_text(text):
+            ui.notify("Nothing is waiting for an answer.", type="info")
+
+    def press_run() -> None:
+        if adapter.running or adapter.waiting != "idle":
+            ui.notify("Not yet: " + busy_note, type="warning")
+        elif live:
+            confirm_run.open()
+        else:
+            start_run()
+
+    def start_run() -> None:
+        confirm_run.close()
+        if not adapter.run():
+            ui.notify("The run was not started: " + busy_note, type="warning")
+
+    def stop() -> None:
+        if adapter.request_stop():
+            ui.notify("Stop requested. Waiting for the OT-2 to report that the run stopped.", type="warning")
+        else:
+            ui.notify("No robot run is running.", type="info")
+
     def submit_form() -> None:
         try:
-            adapter.propose_form(_control_values(controls))
+            values = _control_values(controls)
         except (TypeError, ValueError):
             ui.notify("Dilution factors must be comma-separated numbers and numeric controls must be filled in.",
                       type="negative")
+            return
+        if adapter.waiting != "idle":
+            ui.notify("Not yet: " + busy_note, type="warning")
+            return
+        adapter.propose_form(values)
 
+    send_button.on("click", send)
+    chat_input.on("keydown.enter", send)
+    yes_button.on("click", lambda: answer("yes"))
+    no_button.on("click", lambda: answer("no"))
+    run_button.on("click", press_run)
+    start_button.on("click", start_run)
+    stop_button.on("click", stop)
     submit_controls.on("click", submit_form)
 
     def refresh() -> None:
-        for message in adapter.drain_messages():
+        messages = adapter.messages(last["messages"])
+        for message in messages:
             with chat_box:
-                ui.chat_message(message.text, name="You" if message.role == "user" else "Assistant",
-                                sent=message.role == "user")
+                bubble = ui.chat_message(message.text, name="You" if message.role == "user" else "Assistant",
+                                         sent=message.role == "user")
+            if "\n" in message.text:
+                bubble.classes("mono")
+        if messages:
+            last["messages"] += len(messages)
+            ui.run_javascript(f"const el = getHtmlElement({chat_box.id}); if (el) el.scrollTop = el.scrollHeight;")
+        lines = adapter.output(last["output"])
+        for line in lines:
+            output_log.push(line)
+        last["output"] += len(lines)
         snapshot = adapter.snapshot()
-        status_badge.text = snapshot.status
+        state = (snapshot.status, snapshot.waiting, snapshot.running, snapshot.question)
+        if state != last["state"]:
+            last["state"] = state
+            status_badge.text = snapshot.status
+            status_badge.props(f"color={_status_color(snapshot)}")
+            stop_button.set_visibility(snapshot.live and snapshot.running)
+            idle = snapshot.waiting == "idle" and not snapshot.running
+            run_button.set_enabled(idle)
+            submit_controls.set_enabled(idle)
+            send_button.set_enabled(snapshot.waiting != "busy")
+            answer_row.set_visibility(snapshot.waiting == "question")
+            question_label.text = snapshot.question
         if (snapshot.revision, snapshot.proposal_id) != (last["revision"], last["proposal"]):
             if snapshot.revision != last["revision"] and last["revision"] != -1:
                 _sync_controls(controls, snapshot.current)
@@ -185,6 +282,14 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     render_current()
     render_proposed()
     ui.timer(0.25, refresh)
+
+
+def _status_color(snapshot: GuiSnapshot) -> str:
+    if snapshot.running or snapshot.status in {"RUN FAILED", "RUN STOPPED", "SESSION ENDED"}:
+        return "negative"
+    if snapshot.waiting in {"operator", "question", "proposal", "clarify"}:
+        return "warning"
+    return "positive" if snapshot.status in {"RUN COMPLETE", "SIMULATION COMPLETE"} else "primary"
 
 
 def _plan(sections: list[render.PlanSection]) -> None:

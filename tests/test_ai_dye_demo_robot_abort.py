@@ -203,6 +203,39 @@ def test_the_live_run_of_protocol_v19_still_sends_no_runtime_parameters(runner_e
     assert any("--set-dry-run" in command and "false" in command for command in runner_env.built)
 
 
+def test_the_stop_file_stops_a_started_run_exactly_like_ctrl_c(runner_env, tmp_path, capsys):
+    stop = tmp_path / "robot_stop_request"
+    runner_env.monkeypatch.setattr(sys, "argv", [*sys.argv, "--stop-file", str(stop)])
+    clock = SimpleNamespace(now=0.0)
+
+    def sleep(seconds):
+        if ("POST", "/runs/run-1/actions", {"data": {"actionType": "play"}}) in runner_env.robot.calls:
+            stop.write_text("stop\n", encoding="utf-8")         # the operator presses Stop while the robot runs
+        clock.now += seconds
+
+    runner_env.monkeypatch.setattr(runner, "time", SimpleNamespace(sleep=sleep, monotonic=lambda: clock.now))
+    code = runner.main()
+    out = capsys.readouterr().out
+    assert code == runner.EXIT_RUN_ABORTED == 130
+    assert runner_env.robot.actions() == ["play", "stop"]
+    assert "[interrupt] Stop request received." in out and "[stop] The OT-2 reports the run as stopped." in out
+    status = json.loads(runner_env.status.read_text(encoding="utf-8"))
+    assert status["stop_requested"] is True and status["stop_confirmed"] is True and status["exit_code"] == 130
+    assert runner_env.logs[0].finished == ("aborted", 130)
+
+
+def test_a_stop_file_before_any_robot_run_sends_nothing(runner_env, tmp_path, capsys):
+    stop = tmp_path / "robot_stop_request"
+    stop.write_text("stop\n", encoding="utf-8")
+    runner_env.monkeypatch.setattr(sys, "argv", [*sys.argv, "--stop-file", str(stop)])
+    code = runner.main()
+    out = capsys.readouterr().out
+    assert code == runner.EXIT_NOT_STARTED and runner_env.robot.calls == [] and runner_env.built == []
+    assert "[interrupt] Stop request received." in out and "nothing was started on the OT-2" in out
+    status = json.loads(runner_env.status.read_text(encoding="utf-8"))
+    assert status["started"] is False and status["stop_requested"] is False
+
+
 # ── the session's subprocess executor ───────────────────────────────────────────
 
 class FakeStdout:
@@ -270,6 +303,48 @@ def test_the_session_executor_waits_for_the_runner_to_stop_the_run(tmp_path):
 def test_a_runner_killed_by_the_interrupt_is_never_reported_as_a_clean_failure(tmp_path, status, expected):
     executor, _, _ = executor_for(["[play]", KeyboardInterrupt], 3221225786, status)
     assert executor(tmp_path / "working.yaml", False, SessionLog(tmp_path / "run")) == expected
+
+
+def test_request_stop_writes_the_runners_stop_file_only_while_a_live_run_runs(tmp_path):
+    seen = {}
+
+    def popen(command, **kwargs):
+        stop_file = Path(command[command.index("--stop-file") + 1])
+
+        def lines():
+            seen["stale_removed"] = not stop_file.exists()
+            yield "[play]\n"
+            seen["requested"] = executor.request_stop()
+            seen["written"] = stop_file.is_file()
+            yield "[stop] The OT-2 reports the run as stopped.\n"
+
+        return SimpleNamespace(stdout=lines(), wait=lambda: 130)
+
+    executor = SubprocessExecutor(popen=popen, emit=lambda line: None)
+    log = SessionLog(tmp_path / "run")
+    (tmp_path / "run" / "robot_stop_request").write_text("left over from an earlier run\n", encoding="utf-8")
+    assert executor.request_stop() is False                          # nothing is running
+    assert executor(tmp_path / "working.yaml", False, log) == 130
+    assert seen == {"stale_removed": True, "requested": True, "written": True}
+    assert executor.active is False and executor.request_stop() is False
+    assert "--stop-file" not in executor.command(tmp_path / "working.yaml", True, None, tmp_path / "stop")
+
+
+def test_check_robot_reports_an_unreachable_robot_without_raising(monkeypatch):
+    import src.lab.robot_connection as connection
+
+    def unreachable(host=None):
+        raise RuntimeError("Could not discover and verify the configured OT-2.")
+
+    emitted: list[str] = []
+    monkeypatch.setattr(connection, "resolve_host", unreachable)
+    assert SubprocessExecutor(emit=emitted.append).check_robot() == "Could not discover and verify the configured OT-2."
+    assert emitted == []
+    monkeypatch.setattr(connection, "resolve_host", lambda host=None: "robot.test")
+    monkeypatch.setattr(connection, "verify_host", lambda host, **kwargs: ("192.0.2.10", {"robot_serial": "test"}))
+    monkeypatch.setattr(connection, "connection_summary", lambda host: f"Robot: test at {host}")
+    assert SubprocessExecutor(emit=emitted.append).check_robot() is None
+    assert emitted == ["Robot: test at robot.test"]
 
 
 # ── the session ─────────────────────────────────────────────────────────────────
@@ -358,6 +433,16 @@ def test_an_interrupt_before_the_robot_started_needs_no_check(tmp_path):
     assert "interrupted before the robot run started, so nothing ran on the OT-2" in text
     assert "Have you checked the robot" not in text and len(executor.calls) == 2
     assert [run["status"] for run in session.state.runs] == ["interrupted before start", "succeeded"]
+
+
+def test_a_run_that_failed_before_the_robot_started_keeps_the_plan_and_needs_no_check(tmp_path):
+    not_started = (1, {"started": False, "stage": "error", "error": "Could not discover and verify the configured OT-2."})
+    executor = ScriptedExecutor(not_started, SUCCEEDED)
+    session, text, _ = live_session(tmp_path, executor, ["run", "run", "quit"])
+    assert "Run 1 did not start on the OT-2, so nothing ran on the robot. The plan is unchanged." in text
+    assert "Reason: Could not discover and verify the configured OT-2." in text
+    assert "Have you checked the robot" not in text and len(executor.calls) == 2
+    assert session.unverified_run is None and [run["status"] for run in session.state.runs] == ["failed", "succeeded"]
 
 
 def test_an_interrupted_simulation_is_not_a_robot_abort(tmp_path):
