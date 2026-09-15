@@ -1,0 +1,26 @@
+name: model_extra_field_with_copied_evidence_001
+description: >-
+  The model added "return used tips to the rack = yes" to a request about drops and copied the whole request as its
+  evidence, which made the unrelated change look verified. Fields the message never mentions are now always flagged
+  under CHECK THESE, whatever evidence the model claims.
+found_by: {seed: 1255, persona: adversarial_user, goal: skip_without_prerequisite, chaos: 0.4, live_logic: false}
+invariant: unrelated_change_applied_unflagged
+fixed_in: src/agents/dye_demo/state.py (_FIELD_HINTS checked before value verification)
+messages:
+- text: Print 2 drops per spot.
+  label:
+    category: set_drops
+    intended: [{path: print.droplets_per_spot, value: 2}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "print.droplets_per_spot", "value": 2, "evidence": "Print 2 drops per spot."}, {"path": "tips.return_tips", "value": true, "evidence": "Print 2 drops per spot."}], "explanation": "simulated interpretation", "clarification": ""}'
+    chaos: unrelated_extra
+- text: 'no'
+  label: {category: reject, may_propose: false}
+expected:
+  final: {revision: 0, pending: null}
+  turns:
+  - turn: 1
+    proposal_paths: [print.droplets_per_spot, tips.return_tips]
+    unverified: [tips.return_tips]
+    output_contains: ["CHECK THESE"]

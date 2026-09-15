@@ -26,3 +26,6 @@ scipy
 # --- Computer Vision ---
 opencv-python>=4.8
 rich>=13.0
+
+# --- Local prototype UI ---
+nicegui>=3.16,<4

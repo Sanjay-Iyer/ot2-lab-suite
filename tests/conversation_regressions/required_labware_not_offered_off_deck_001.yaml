@@ -1,0 +1,24 @@
+name: required_labware_not_offered_off_deck_001
+description: >-
+  Found in the 2026-09-14 code review: moving the dilution plate and the paper print plate into the same empty slot
+  listed "or OFF DECK" as a valid location, although this plan needs both, and said '"OFF DECK" means the that labware
+  has been physically removed'. OFF DECK is now offered only for labware no step of the requested plan needs, and the
+  conflict names each required labware and why.
+found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/render.py (render_conflict, _conflict_example)
+messages:
+- text: Move the dilution plate and the paper print plate to slot 6.
+  label: {category: double_move, may_propose: false}
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.plate.slot", "value": 6, "evidence": "dilution plate to slot 6"}, {"path": "deck.paper.slot", "value": 6, "evidence": "paper print plate to slot 6"}], "explanation": "Proposes moving both plates to slot 6.", "clarification": ""}'
+expected:
+  final: {revision: 0, pending: null}
+  final_config: {deck.plate.slot: 4, deck.paper.slot: 5}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["The 96-well dilution plate and the Paper print plate cannot all go to Slot 6.",
+                      "Not OFF DECK: the 96-well dilution plate is needed", "the Paper print plate is needed (printing needs the paper)"]
+    output_excludes: ["or OFF DECK", "the that labware"]

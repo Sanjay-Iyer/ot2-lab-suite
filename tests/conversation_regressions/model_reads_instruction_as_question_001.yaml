@@ -1,0 +1,27 @@
+name: model_reads_instruction_as_question_001
+description: >-
+  Found in the Gemini interpreter campaign (seed 404000005): in "I've been reading about SERS substrates ... I want 5
+  dilutions Let me know what you think." the deterministic analysis found the instruction, but the model returned
+  intent "question" with a SERS answer and a clarification about the factors. The agent answered twice and the request
+  silently vanished. A model "question" reading of actionable text now asks the model's clarification instead.
+found_by: {seed: 404000005, persona: verbose_user, goal: unit_confusion, chaos: 0.0, live_logic: false, interpreter: gemini}
+invariant: response_quality
+fixed_in: src/agents/dye_demo/session.py (_interpret)
+messages:
+- text: I've been reading about SERS substrates and honestly the enhancement factors seem too good to be true. I want 5 dilutions Let me know what you think.
+  label:
+    category: set_count
+    intended: [{path: dilution.factors, op: set_count, count: 5}]
+  llm:
+  - kind: ask
+    reply: SERS enhancement factors can reach 10^6 to 10^10 on good substrates, so large numbers are not unusual.
+  - kind: interpret
+    reply: '{"intent": "question", "changes": [], "clarification": "Could you please specify the dilution factors you would like to use for the 5 dilutions?", "answer": "SERS enhancement factors can indeed be quite high.", "explanation": "The user requested 5 dilutions but did not provide the fold factors."}'
+expected:
+  final: {revision: 0, pending: null, clarifying: true}
+  turns:
+  - turn: 1
+    classification: mixed
+    no_proposal: true
+    output_contains: ["Before I change anything: Could you please specify the dilution factors"]
+    output_excludes: ["SERS enhancement factors can indeed be quite high."]

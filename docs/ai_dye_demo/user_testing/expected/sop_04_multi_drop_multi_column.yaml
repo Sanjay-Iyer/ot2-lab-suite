@@ -1,0 +1,90 @@
+# Expected final state of user-test SOP 4 (multiple drop counts, multiple columns). See sop_01_basic_dilution.yaml
+# for the format. Two runs in one session: the checker compares the last two successful runs, in order.
+sop: 4
+title: Multiple drop counts and multiple columns
+difficulty: 4
+start_config: configs/workflows/defaults/ai_agent_dilution_print_demo.yaml
+ignored: [materials.sample.label, materials.solvent.label]
+runs:
+  - name: run 1 (make four dilutions, one drop in paper columns 1 and 2)
+    settings:
+      deck.plate.slot: 4
+      deck.paper.slot: 5
+      deck.tuberack.slot: 7
+      deck.tiprack.slot: 9
+      materials.sample.vial: A2
+      materials.solvent.vial: A1
+      dilution.enabled: true
+      dilution.factors: [4, 8, 16, 32]
+      dilution.plate_column: "6"
+      dilution.start_row: A
+      dilution.total_volume_ul: 200
+      dilution.prepared_volume_ul: null
+      mixing.reps: 2
+      mixing.volume_ul: 15
+      print.enabled: true
+      print.droplet_volume_ul: 5
+      print.droplets_per_spot: 1
+      print.replicates: 2
+      print.paper_start_column: 1
+      tips.start_tip: A1
+      tips.return_tips: false
+      tips.policy: per_liquid
+    plan:
+      makes_dilutions: true
+      prints: true
+      source_wells: {A6: 4, B6: 8, C6: 16, D6: 32}
+      print_steps:
+        - [A6, A1, 1, 5]
+        - [A6, A2, 1, 5]
+        - [B6, B1, 1, 5]
+        - [B6, B2, 1, 5]
+        - [C6, C1, 1, 5]
+        - [C6, C2, 1, 5]
+        - [D6, D1, 1, 5]
+        - [D6, D2, 1, 5]
+      transfers: 44
+      total_drops: 8
+      tips: [A1, B1, C1, D1, E1, F1]
+  - name: run 2 (print only from the same wells, three stacked drops in paper columns 4 and 5)
+    settings:
+      deck.plate.slot: 4
+      deck.paper.slot: 5
+      deck.tuberack.slot: 7
+      deck.tiprack.slot: 9
+      materials.sample.vial: A2
+      materials.solvent.vial: A1
+      dilution.enabled: false
+      dilution.factors: [4, 8, 16, 32]
+      dilution.plate_column: "6"
+      dilution.start_row: A
+      dilution.total_volume_ul: 200
+      mixing.reps: 2
+      mixing.volume_ul: 15
+      print.enabled: true
+      print.droplet_volume_ul: 5
+      print.droplets_per_spot: 3
+      print.replicates: 2
+      print.paper_start_column: 4
+      tips.return_tips: false
+      tips.policy: per_liquid
+    choices:
+      dilution.prepared_volume_ul: {between: [180, 190]}    # 200 µL made, 2 × 5 µL printed in run 1: 190 µL
+      tips.start_tip: {at_or_after: G1}                      # run 1 used A1-F1
+    plan:
+      makes_dilutions: false
+      prints: true
+      source_wells: {A6: 4, B6: 8, C6: 16, D6: 32}
+      print_steps:
+        - [A6, A4, 3, 5]
+        - [A6, A5, 3, 5]
+        - [B6, B4, 3, 5]
+        - [B6, B5, 3, 5]
+        - [C6, C4, 3, 5]
+        - [C6, C5, 3, 5]
+        - [D6, D4, 3, 5]
+        - [D6, D5, 3, 5]
+      transfers: 0
+      total_drops: 24
+      tips_count: 4
+      tips_exclude: [A1, B1, C1, D1, E1, F1]

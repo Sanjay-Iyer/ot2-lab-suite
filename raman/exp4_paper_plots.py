@@ -338,7 +338,7 @@ def band_windows(scans, screen, cfg, paper, path):
     _save(fig, path, cfg, rect=(0, 0, 1, 0.93))
 
 
-def band_intensity(bands, screen, cfg, paper, path):
+def band_intensity(bands, screen, cfg, paper, path, *, total_counts=False):
     focus = _focus_rows(screen, cfg, paper)
     scan_of = focus.set_index("condition")["scan_number"].astype(int).to_dict()
     focus_spec = _focus_spec(cfg, paper)
@@ -358,7 +358,7 @@ def band_intensity(bands, screen, cfg, paper, path):
         colour, _, label = _style(cfg, condition)
         ax.bar(
             x + i * width - 0.4 + width / 2,
-            rows["height_cps"],
+            rows["height_cps"] * (float(screen.loc[screen["scan_number"] == scan_of[condition], "int_time_s"].iloc[0]) if total_counts else 1.0),
             width,
             color=colour,
             edgecolor="white",
@@ -368,7 +368,7 @@ def band_intensity(bands, screen, cfg, paper, path):
     ax.set_xticks(x)
     ax.set_xticklabels([str(ALL_BANDS[b]["nominal"]) for b in order])
     ax.set_xlabel("CV band (cm$^{-1}$)")
-    ax.set_ylabel("Baseline-corrected peak height (counts s$^{-1}$)")
+    ax.set_ylabel("Baseline-corrected peak height (counts)" if total_counts else "Baseline-corrected peak height (counts s$^{-1}$)")
     ax.set_title(
         "%s - matched %s intensity of the 1620 cm$^{-1}$ CV band"
         % (_view_label(cfg, paper), focus_spec["dilution"]),
@@ -376,7 +376,9 @@ def band_intensity(bands, screen, cfg, paper, path):
     )
     ax.legend(fontsize=9, frameon=False)
     ax.grid(axis="y", alpha=0.3)
-    _save(fig, path, cfg)
+    if total_counts:
+        fig.text(0.5, 0.01, "Counts = corrected counts/s x exposure time; peak height, not integrated band area.", ha="center", fontsize=8, color="0.35")
+    _save(fig, path, cfg, rect=(0, 0.04, 1, 1) if total_counts else None)
 
 
 def difference_spectra(scans, screen, cfg, paper, path):
@@ -1099,7 +1101,7 @@ def particles_at_each_dilution(scans, screen, cfg, paper, path):
     _save(fig, path, cfg, rect=(0, 0.07, 1, 0.94))
 
 
-def dilution_intensity_bars(bands, screen, cfg, paper, path):
+def dilution_intensity_bars(bands, screen, cfg, paper, path, *, total_counts=False):
     """Figure 13 - 1620 cm-1 height, grouped by dilution and nanoparticle."""
     block = _dilution_block(screen, cfg, paper)
     shared = _shared_dilutions(block, cfg, paper)
@@ -1125,6 +1127,8 @@ def dilution_intensity_bars(bands, screen, cfg, paper, path):
             [heights.get(int(rows.loc[d, "scan_number"]), np.nan) for d in shared],
             dtype=float,
         )
+        if total_counts:
+            values *= np.asarray([float(rows.loc[d, "int_time_s"]) for d in shared])
         ax.bar(
             offsets,
             values,
@@ -1138,7 +1142,7 @@ def dilution_intensity_bars(bands, screen, cfg, paper, path):
     ax.set_xticklabels(shared)
     ax.set_xlabel("CV dilution")
     ax.set_ylabel(
-        "Baseline-corrected %d cm$^{-1}$ peak height (counts s$^{-1}$)" % nominal
+        ("Baseline-corrected %d cm$^{-1}$ peak height (counts)" if total_counts else "Baseline-corrected %d cm$^{-1}$ peak height (counts s$^{-1}$)") % nominal
     )
     ax.legend(fontsize=9, frameon=False)
     ax.grid(axis="y", alpha=0.3)
@@ -1149,7 +1153,9 @@ def dilution_intensity_bars(bands, screen, cfg, paper, path):
         ),
         loc="left",
     )
-    _save(fig, path, cfg)
+    if total_counts:
+        fig.text(0.5, 0.01, "Counts = corrected counts/s x exposure time; peak height, not integrated band area.", ha="center", fontsize=8, color="0.35")
+    _save(fig, path, cfg, rect=(0, 0.04, 1, 1) if total_counts else None)
 
 
 def generate(scans, screen, bands, gain, cfg, figure_dir):
@@ -1212,6 +1218,16 @@ def generate(scans, screen, bands, gain, cfg, figure_dir):
         )
         dilution_intensity_bars(
             bands, screen, cfg, paper, out / "13_1620_intensity_by_dilution.png"
+        )
+
+
+        band_intensity(
+            bands, screen, cfg, paper,
+            out / "04b_1620_intensity_by_condition_total_counts.png", total_counts=True,
+        )
+        dilution_intensity_bars(
+            bands, screen, cfg, paper,
+            out / "13b_1620_intensity_by_dilution_total_counts.png", total_counts=True,
         )
 
 

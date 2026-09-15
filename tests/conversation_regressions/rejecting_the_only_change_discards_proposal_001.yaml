@@ -1,0 +1,33 @@
+name: rejecting_the_only_change_discards_proposal_001
+description: >-
+  Found in the 2026-09-14 code review: with only a plate move waiting, "Actually, keep the plate where it is." was
+  answered "I could not match that to the changes in proposal #1" although it matched the only change. Rejecting every
+  change of a waiting proposal now discards it and says what stays; a later yes applies nothing.
+found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/session.py (_partial)
+messages:
+- text: Move the dilution plate to slot 8.
+  label:
+    category: move_labware
+    intended: [{path: deck.plate.slot, value: 8}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.plate.slot", "value": 8, "evidence": "dilution plate to slot 8"}], "explanation": "Proposes moving the dilution plate to slot 8.", "clarification": ""}'
+- text: Actually, keep the plate where it is.
+  label: {category: negation, may_propose: false}
+- text: 'yes'
+  label: {category: stale_yes, may_propose: false}
+expected:
+  final: {revision: 0, pending: null, clarifying: false}
+  final_config: {deck.plate.slot: 4}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.plate.slot]
+  - turn: 2
+    pending_after: null
+    output_contains: ["Discarded proposal #1. Nothing was changed.",
+                      "96-well dilution plate location stays Slot 4"]
+    output_excludes: ["could not match"]
+  - turn: 3
+    output_contains: ["There is no proposed change waiting for approval"]

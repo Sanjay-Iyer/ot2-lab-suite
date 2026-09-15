@@ -1,0 +1,35 @@
+name: paper_column_answer_replaces_refused_columns_001
+description: >-
+  Found in the 2026-09-14 code review: "Print in paper columns 3 and 5." was correctly refused (not side by side) with
+  "Which side-by-side paper columns should this run print?", but the answer "Columns 3 and 4." was appended to the
+  refused request ("Print in paper columns 3 and 5 Columns 3 and 4."), which was refused again until the session gave
+  up. A short column answer now replaces the refused columns in the request.
+found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/session.py (_answer_columns), src/agents/dye_demo/columns.py (column_answer, rewrite_paper_columns)
+messages:
+- text: Print in paper columns 3 and 5.
+  label: {category: instruction, may_propose: false}
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "print.paper_start_column", "value": 3, "evidence": "paper columns 3"}, {"path": "print.replicates", "value": 2, "evidence": "paper columns 3 and 5"}], "explanation": "Proposes paper columns 3 and 5.", "clarification": ""}'
+- text: Columns 3 and 4.
+  label:
+    category: clarification_answer
+    may_propose: null
+    intended: [{path: print.paper_start_column, value: 3}, {path: print.replicates, value: 2}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "print.paper_start_column", "value": 3, "evidence": "paper columns 3"}, {"path": "print.replicates", "value": 2, "evidence": "paper columns 3 and 4"}], "explanation": "Proposes paper columns 3 and 4.", "clarification": ""}'
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null, clarifying: false}
+  final_config: {print.paper_start_column: 3, print.replicates: 2}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["Paper columns 3, 5 are not side by side", "Which side-by-side paper columns should this run print?"]
+  - turn: 2
+    proposal_paths: [print.paper_start_column, print.replicates]
+    output_excludes: ["not side by side"]

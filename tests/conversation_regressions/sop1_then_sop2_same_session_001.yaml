@@ -1,0 +1,55 @@
+name: sop1_then_sop2_same_session_001
+description: >-
+  Guards the documented lab procedure end to end (SOP 1 then SOP 2 in one live-mode session, recording executor):
+  three dilutions printed in paper column 1, the post-run starting tip F1 accepted, then "The three dye dilutions are
+  already made, so skip the dilution step ..." shows the dilution step skipped, three stacked drops from paper column
+  2, and the run asks whether A11-C11 hold the dilutions. It also checks that a physical report mixed with plan changes
+  is not described as only updating the record.
+found_by: {seed: 0, persona: SOP_AI_Dye_Three_Dilutions_Paper_Print, goal: null, chaos: 0.0, live_logic: true}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/session.py (_reconcile titles and notes for mixed reports), src/agents/dye_demo/render.py
+settings: {live_logic: true}
+messages:
+- text: >-
+    Make three dilutions by diluting dye with water. Use dilution factors 2x, 5x, and 10x, with a final total volume of
+    100 uL in each dilution well. Start at row A in plate column 11. Put the paper in deck slot 5. Print one 5 uL drop
+    of each dilution starting in paper column 1. Use one replicate and start from tip A1.
+  label: {category: instruction, intended: null}
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "explanation": "Proposed.", "clarification": "", "changes": [{"path": "dilution.factors", "value": [2, 5, 10], "evidence": "2x, 5x, and 10x"}, {"path": "dilution.total_volume_ul", "value": "100 uL", "evidence": "100 uL"}, {"path": "dilution.plate_column", "value": "11", "evidence": "plate column 11"}, {"path": "dilution.start_row", "value": "A", "evidence": "row A"}, {"path": "deck.paper.slot", "value": 5, "evidence": "paper in deck slot 5"}, {"path": "print.droplet_volume_ul", "value": "5 uL", "evidence": "5 uL drop"}, {"path": "print.paper_start_column", "value": 1, "evidence": "paper column 1"}, {"path": "print.replicates", "value": 1, "evidence": "one replicate"}, {"path": "tips.start_tip", "value": "A1", "evidence": "tip A1"}]}'
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: run
+  label: {category: run, may_run: true, may_propose: false}
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: >-
+    The three dye dilutions are already made, so skip the dilution step. Each well now holds about 95 uL. Print three
+    separate 5 uL drops stacked on each spot, starting in paper column 2, and start from tip F1.
+  label: {category: physical_report, may_propose: null, intended: []}
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "explanation": "Proposed.", "clarification": "", "changes": [{"path": "dilution.enabled", "value": false, "evidence": "skip the dilution step"}, {"path": "dilution.prepared_volume_ul", "value": "95 uL", "evidence": "about 95 uL"}, {"path": "print.droplets_per_spot", "value": 3, "evidence": "three separate 5 uL drops stacked"}, {"path": "print.paper_start_column", "value": 2, "evidence": "paper column 2"}, {"path": "tips.start_tip", "value": "F1", "evidence": "tip F1"}]}'
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: run
+  label: {category: run, may_run: true, may_propose: false}
+  gates: ['yes']
+expected:
+  final: {revision: 3, runs: 2}
+  final_config: {dilution.enabled: false, dilution.factors: [2, 5, 10], print.droplets_per_spot: 3,
+                 print.paper_start_column: 2, tips.start_tip: F1}
+  turns:
+  - turn: 3
+    run: true
+    output_contains: ["Tips A1-E1 were used by this run, so the next unused tip is F1."]
+  - turn: 5
+    output_contains: ["PROPOSED PLAN #3", "SKIPPED - already in the plate", "  Drops per position    3  (stacked)",
+                      "  Paper columns         2", "  Tip start             F1",
+                      "Warning: this run does not make dilutions: it assumes plate wells A11-C11 already hold them",
+                      "the other changes are to the plan"]
+    output_excludes: ["this updates the record, and the robot does not move", " -> "]
+  - turn: 7
+    run: true
+    output_contains: ["Do plate wells A11-C11 already hold the dilutions?", "Tips F1-H1 were used by this run"]

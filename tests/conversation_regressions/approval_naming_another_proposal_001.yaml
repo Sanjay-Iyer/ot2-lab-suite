@@ -1,0 +1,34 @@
+name: approval_naming_another_proposal_001
+description: >-
+  Companion to approval_with_new_request_keeps_proposal_001: an approval that names a proposal other than the one
+  waiting ("I approve proposal #1." while #2 waits, #1 having been discarded) applies nothing and says which proposal
+  is waiting; the same approval with nothing waiting says the proposal is not waiting.
+found_by: {seed: 505000000, persona: careful_scientist, goal: stale_proposal_overwrite, chaos: 0.0, live_logic: false}
+invariant: stale_proposal_applied
+fixed_in: src/agents/dye_demo/session.py (_with_pending, _dispatch)
+messages:
+- text: Move the dilution plate to slot 6.
+  label:
+    category: move
+    intended: [{path: deck.plate.slot, value: 6}]
+- text: 'no'
+  label: {category: reject, may_propose: false}
+- text: Move the vial rack to slot 8.
+  label:
+    category: move
+    intended: [{path: deck.tuberack.slot, value: 8}]
+- text: 'I approve proposal #1.'
+  label: {category: stale_yes, may_propose: false}
+- text: 'no'
+  label: {category: reject, may_propose: false}
+- text: 'I approve proposal #2.'
+  label: {category: stale_yes, may_propose: false}
+expected:
+  final: {revision: 0, pending: null}
+  final_config: {deck.plate.slot: 4, deck.tuberack.slot: 7}
+  turns:
+  - turn: 4
+    pending_after: 2
+    output_contains: ["That approves proposal #1, but proposal #2 is the one waiting"]
+  - turn: 6
+    output_contains: ["Proposal #2 is not waiting"]

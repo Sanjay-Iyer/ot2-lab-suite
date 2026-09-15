@@ -1,0 +1,21 @@
+name: both_racks_one_slot_conflict_001
+description: >-
+  Over-strict fix, found by the red-team helpfulness analysis: "Put both racks in slot 8." was answered with "which
+  labware should go to slot 8?" because "both racks" did not count as naming the two racks. It now reaches the full
+  resulting-state check and is refused as a deck conflict with the free slots and OFF DECK listed; nothing is moved
+  automatically.
+found_by: {seed: 20003, persona: careful_scientist, goal: double_occupancy, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/state.py (named_labware)
+messages:
+- text: Put both racks in slot 8.
+  label:
+    category: double_move
+    intended: [{path: deck.tuberack.slot, value: 8}, {path: deck.tiprack.slot, value: 8}]
+expected:
+  final: {revision: 0, pending: null}
+  final_config: {deck.tuberack.slot: 7, deck.tiprack.slot: 9}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["cannot all go to Slot 8", "OFF DECK"]

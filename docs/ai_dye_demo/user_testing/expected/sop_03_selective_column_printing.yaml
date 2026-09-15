@@ -1,0 +1,46 @@
+# Expected final state of user-test SOP 3 (selective column printing). See sop_01_basic_dilution.yaml for the format.
+# Plate well D3 prints onto paper positions D3 and D4: same names, different labware.
+sop: 3
+title: Selective column printing
+difficulty: 3
+start_config: configs/workflows/defaults/ai_agent_dilution_print_demo.yaml
+ignored: [materials.sample.label, materials.solvent.label]
+runs:
+  - name: run 1 (rows D-F of plate column 3, paper columns 3 and 4)
+    settings:
+      deck.plate.slot: 4
+      deck.paper.slot: 5
+      deck.tuberack.slot: 7
+      deck.tiprack.slot: 9
+      materials.sample.vial: A2
+      materials.solvent.vial: A1
+      dilution.enabled: true
+      dilution.factors: [3, 6, 12]
+      dilution.plate_column: "3"
+      dilution.start_row: D
+      dilution.total_volume_ul: 150
+      dilution.prepared_volume_ul: null
+      mixing.reps: 2
+      mixing.volume_ul: 15
+      print.enabled: true
+      print.droplet_volume_ul: 5
+      print.droplets_per_spot: 1
+      print.replicates: 2
+      print.paper_start_column: 3
+      tips.start_tip: A1
+      tips.return_tips: false
+      tips.policy: per_liquid
+    plan:
+      makes_dilutions: true
+      prints: true
+      source_wells: {D3: 3, E3: 6, F3: 12}
+      print_steps:
+        - [D3, D3, 1, 5]
+        - [D3, D4, 1, 5]
+        - [E3, E3, 1, 5]
+        - [E3, E4, 1, 5]
+        - [F3, F3, 1, 5]
+        - [F3, F4, 1, 5]
+      transfers: 25
+      total_drops: 6
+      tips: [A1, B1, C1, D1, E1]

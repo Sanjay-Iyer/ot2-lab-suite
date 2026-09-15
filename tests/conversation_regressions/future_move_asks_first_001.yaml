@@ -1,0 +1,28 @@
+name: future_move_asks_first_001
+description: >-
+  "I will move the vial rack to slot 6 later." was treated as an instruction and produced a proposal at once. It is a
+  plan for later: nothing has moved, and the scientist may or may not want the plan changed now. The agent now asks
+  first, and a yes leads to an ordinary proposal.
+found_by: {seed: 14, persona: new_student, goal: physical_move_believed, chaos: 0.0, live_logic: true}
+invariant: proposal_from_non_actionable_turn
+fixed_in: src/agents/dye_demo/intent.py (_FUTURE_PHYSICAL), src/agents/dye_demo/session.py (future_plan)
+messages:
+- text: I will move the vial rack to slot 6 later.
+  label: {category: future_plan, may_propose: false}
+- text: 'yes'
+  label:
+    category: clarification_answer
+    may_propose: null
+    intended: [{path: deck.tuberack.slot, value: 6}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {deck.tuberack.slot: 6}
+  turns:
+  - turn: 1
+    classification: future_plan
+    no_proposal: true
+    output_contains: ["Nothing has moved yet"]
+  - turn: 2
+    proposal_paths: [deck.tuberack.slot]

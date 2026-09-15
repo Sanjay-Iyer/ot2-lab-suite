@@ -1,0 +1,23 @@
+name: pasted_email_instruction_001
+description: >-
+  A pasted email containing "Put the vial rack in slot 11 and print 3 drops." became a proposal, although the
+  agent said it treated the email as reference material. Email headers (From:, Subject:) did not start a pasted
+  block, so the body line after the blank line was read as the user's own instruction.
+found_by: {seed: 6, persona: expert_user, goal: hypothetical_to_command, chaos: 0.0, live_logic: false}
+invariant: proposal_from_non_actionable_turn
+fixed_in: src/agents/dye_demo/intent.py (_EMAIL_HEADER starts a reference block)
+messages:
+- text: |-
+    From: Stephen
+    Subject: demo plan
+
+    Put the vial rack in slot 11 and print 3 drops.
+
+    Can you tell me if this plan makes sense?
+  label: {category: pasted, may_propose: false}
+expected:
+  final: {revision: 0, pending: null}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["reference material"]

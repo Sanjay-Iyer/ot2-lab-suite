@@ -1,0 +1,22 @@
+name: voice_slot_ate_001
+description: >-
+  Voice transcription "could you move the vial rack to slot ate for me?" was read as an unfinished request because
+  the homophone after "slot" was only normalized at the end of a sentence. "ate" followed by "for me" is now read as
+  slot 8, and the correction is shown to the scientist.
+found_by: {seed: 20005, persona: voice_user, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/intent.py (normalize_text)
+messages:
+- text: could you move the vial rack to slot ate for me?
+  label:
+    category: move
+    intended: [{path: deck.tuberack.slot, value: 8}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {deck.tuberack.slot: 8}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.tuberack.slot]
+    output_contains: ['"slot ate" as "slot 8"']

@@ -774,6 +774,8 @@ def main() -> int:
     slots: dict = {}
     for role, spec in config.get("deck", {}).items():
         s = spec.get("slot")
+        if isinstance(s, str) and s.strip().upper() == "OFF_DECK":
+            continue    # physically removed from the deck; the protocol does not load it
         if s in slots:
             print(f"CONFIG VALIDATION FAILED: deck slot {s} shared by '{slots[s]}' and '{role}'.")
             return 1

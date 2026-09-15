@@ -1,0 +1,32 @@
+name: model_moves_labware_user_did_not_name_001
+description: >-
+  The user was answering "where should the vial rack go?" with "slot 6", and the model proposed moving the dilution
+  plate to slot 6 instead. The slot check only looked for the number, so the wrong labware was verified and could be
+  approved without a warning. A slot change now needs its labware named as the object of the move; a change to other
+  labware than the one named is flagged, and a proposal made only of such changes is refused.
+found_by: {seed: 1015, persona: new_student, goal: question_changes_state, chaos: 0.4, live_logic: false}
+invariant: unrelated_change_applied_unflagged
+fixed_in: src/agents/dye_demo/state.py (_verify, named_labware, slot_numbers)
+messages:
+- text: Move the vial rack.
+  label:
+    category: move
+    intended: [{path: deck.tuberack.slot, value: 6}]
+- text: slot 6
+  label:
+    category: clarification_answer
+    may_propose: null
+    intended: [{path: deck.tuberack.slot, value: 6}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.plate.slot", "value": 6, "evidence": "slot 6"}], "explanation": "simulated interpretation", "clarification": ""}'
+    chaos: wrong_labware
+expected:
+  final: {revision: 0, pending: null}
+  turns:
+  - turn: 1
+    classification: incomplete
+    no_proposal: true
+  - turn: 2
+    no_proposal: true
+    output_contains: ["did not mention the 96-well dilution plate location"]

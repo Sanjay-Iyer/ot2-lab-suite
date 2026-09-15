@@ -6,14 +6,21 @@ This uses the robot HTTP API instead of opentrons_execute. By default it creates
 a dry run. Pass --live to run the real liquid-handling print. Protocol v3 targets
 API 2.15 and bakes run modes into the generated file because runtime parameters
 are unavailable at that API level.
+
+Ctrl-C: before a run is created, nothing is sent to the robot (exit code 4). Once
+a run exists, the runner sends the OT-2 a stop action for it, waits for the robot
+to report a finished state, and exits with 130 (4 if the run had not been
+started). --status-file writes what happened as JSON for a calling program.
 """
 from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import json
 import os
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -112,6 +119,123 @@ LOCAL_VISION_BASE = REPO / "vision_runs" / "vial_dilution_print"
 DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
 HEADERS = {"opentrons-version": "*"}
 TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
+# Exit codes for an operator interrupt (shared with src/agents/dye_demo/session.py; keep in sync).
+EXIT_RUN_ABORTED = 130               # Ctrl-C after the run was started: a stop was requested from the OT-2
+EXIT_NOT_STARTED = 4                 # Ctrl-C before the run was started: nothing ran on the OT-2
+STOP_ATTEMPTS = 3
+STOP_CONFIRM_TIMEOUT_S = 120.0
+
+
+class _StatusFile:
+    """Best-effort JSON record of the run for a calling program (--status-file); never raises."""
+
+    def __init__(self, path: str | None):
+        self.path = Path(path) if path else None
+        self.data: dict[str, Any] = {"started": False}
+
+    def update(self, **fields: Any) -> None:
+        self.data.update(fields)
+        if self.path is None:
+            return
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(self.data, indent=2, default=str) + "\n", encoding="utf-8")
+        except OSError:
+            pass
+
+
+@contextlib.contextmanager
+def _interrupts_ignored():
+    """A second Ctrl-C must not cut the stop request short."""
+    try:
+        previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    except (ValueError, OSError):           # not the main thread: nothing to change
+        previous = None
+    try:
+        yield
+    finally:
+        if previous is not None:
+            try:
+                signal.signal(signal.SIGINT, previous)
+            except (ValueError, OSError):
+                pass
+
+
+def _stop_run(robot_ip: str, run_id: str, *, attempts: int = STOP_ATTEMPTS) -> str | None:
+    """Ask the robot server to stop the run; None when the request was accepted (or the run had already ended)."""
+    error = None
+    for attempt in range(attempts):
+        try:
+            _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "stop"}})
+            return None
+        except Exception as exc:  # noqa: BLE001 - reported to the operator, retried
+            error = f"{type(exc).__name__}: {exc}"
+            try:
+                if str(_run_status(robot_ip, run_id).get("status")) in TERMINAL_STATUSES:
+                    return None             # a finished run rejects a stop; there is nothing left to stop
+            except Exception:  # noqa: BLE001
+                pass
+            if attempt + 1 < attempts:
+                time.sleep(1.0)
+    return error
+
+
+def _wait_for_terminal(robot_ip: str, run_id: str, *, timeout_s: float = STOP_CONFIRM_TIMEOUT_S,
+                       poll_s: float = 1.0) -> str | None:
+    """The run's finished state as the robot reports it, or None if it did not report one in time."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        try:
+            status = str(_run_status(robot_ip, run_id).get("status", "unknown"))
+        except Exception:  # noqa: BLE001 - keep asking until the deadline
+            status = "unknown"
+        if status in TERMINAL_STATUSES:
+            return status
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(poll_s)
+
+
+def _abort_after_interrupt(robot_ip: str | None, run_id: str | None, started: bool, run_log, status_file: _StatusFile,
+                           *, poll_s: float = 1.0, timeout_s: float = STOP_CONFIRM_TIMEOUT_S) -> int:
+    """Ctrl-C: stop the robot run if one exists, confirm it with the robot, and record the outcome."""
+    with _interrupts_ignored():
+        print("\n[interrupt] Ctrl-C received.")
+        if not robot_ip or not run_id:
+            if status_file.data.get("stage") == "creating_run":
+                print("The run was being created when you pressed Ctrl-C; it was never started, so the robot did not "
+                      "move for it. If the Opentrons App shows an idle run, cancel it there.")
+            else:
+                print("No run was created on the robot, so nothing was started on the OT-2.")
+            status_file.update(stage="interrupted", started=False, stop_requested=False, exit_code=EXIT_NOT_STARTED)
+            run_log.finish("interrupted_before_run", exit_code=EXIT_NOT_STARTED)
+            return EXIT_NOT_STARTED
+        print(f"[stop] Asking the OT-2 to stop run {run_id} ...")
+        run_log.event("stop_requested", run_id=run_id, started=started)
+        stop_error = _stop_run(robot_ip, run_id)
+        robot_status = None if stop_error else _wait_for_terminal(robot_ip, run_id, timeout_s=timeout_s,
+                                                                  poll_s=min(max(poll_s, 0.1), 2.0))
+        if started and robot_status == "succeeded":
+            print("The run had already finished before the stop request arrived.")
+            status_file.update(stage="finished", started=True, stop_requested=True, robot_status=robot_status,
+                               stop_confirmed=False, exit_code=0)
+            run_log.finish("succeeded", exit_code=0)
+            return 0
+        code = EXIT_RUN_ABORTED if started else EXIT_NOT_STARTED
+        if robot_status in {"stopped", "failed"}:
+            print(f"[stop] The OT-2 reports the run as {robot_status}.")
+        else:
+            print("\n*** THE OT-2 DID NOT CONFIRM THAT THE RUN STOPPED "
+                  f"({stop_error or 'no finished state reported in time'}). ***\n"
+                  "*** Check the robot now and stop the run in the Opentrons App if it is still moving. ***")
+        if not started:
+            print("The run had been created but not started, so the robot did not move for it.")
+        status_file.update(stage="interrupted", started=started, stop_requested=True, stop_error=stop_error,
+                           robot_status=robot_status, stop_confirmed=robot_status in {"stopped", "failed"},
+                           exit_code=code)
+        run_log.event("stop_result", run_id=run_id, robot_status=robot_status, error=stop_error)
+        run_log.finish("aborted" if started else "interrupted_before_start", exit_code=code)
+        return code
 
 
 def _api_url(robot_ip: str, path: str) -> str:
@@ -301,8 +425,24 @@ def _embedded_load_names(protocol_path: Path) -> list[str]:
     return names
 
 
+def _describe_ai_demo(config: dict) -> None:
+    """v19 conversational demo: the plan read back from the built protocol, in the same layout as the CURRENT PLAN
+    the operator approved (the session's `steps` command lists every FROM/TO movement)."""
+    try:
+        from src.agents.dye_demo import render
+    except ImportError as exc:
+        print(f"\n(could not load the demo plan: {exc}; check the deck against the YAML by hand)")
+        return
+    session = config.get("session") or {}
+    subtitle = f"{session.get('operator')} | {session.get('session_label')}" if session else ""
+    print("\n" + render.render_plan(config, title="PLAN IN THE BUILT PROTOCOL", subtitle=subtitle, record=False))
+
+
 def _describe_deck(config: dict) -> None:
     """Print the deck layout, vial assignments and tip plan from the embedded CONFIG."""
+    if int(config.get("protocol_version", 0) or 0) == 19:
+        _describe_ai_demo(config)
+        return
     deck = config.get("deck", {})
     role_labels = {"tuberack": "vial rack", "plate": "mixing plate", "paper": "paper",
                    "tiprack": "P300 tips", "tiprack_p20": "P20 tips"}
@@ -702,9 +842,17 @@ def main() -> int:
     parser.add_argument("--ssh-key", default=None, help="SSH key for image pullback. Default: ROBOT_SSH_KEY_PATH or ~/.ssh/id_rsa_opentrons.")
     parser.add_argument("--no-pull-images", action="store_true", help="Do not pull camera images from the robot after a live run.")
     parser.add_argument("--no-clean-remote-images", action="store_true", help="Do not clear the robot image folder before starting a live run.")
+    parser.add_argument("--status-file", default=None, metavar="JSON",
+                        help="Write the run's stage and outcome (started, stop requested, robot status) to this JSON "
+                             "file, for a calling program.")
     args = parser.parse_args()
     run_log = RobotRunLog(Path(__file__).name)
     print(f"Run log   : {run_log.path}")
+    status_file = _StatusFile(args.status_file)
+    status_file.update(stage="preparing", started=False)
+    robot_ip: str | None = None
+    run_id: str | None = None
+    started = False
 
     try:
         robot_ip = resolve_host(args.robot_host)
@@ -828,6 +976,7 @@ def main() -> int:
 
         protocol_id = _upload_protocol(robot_ip, protocol_path)
         run_log.event("protocol_uploaded", protocol_id=protocol_id)
+        status_file.update(stage="creating_run", protocol_id=protocol_id)
         run_id = _create_run(
             robot_ip,
             protocol_id,
@@ -839,6 +988,7 @@ def main() -> int:
             send_runtime_parameters=version not in API_215_VERSIONS,
         )
         run_log.event("run_created", protocol_id=protocol_id, run_id=run_id)
+        status_file.update(stage="created", run_id=run_id)
 
         if args.no_start:
             print(f"\nCreated run but did not start it. Run ID: {run_id}")
@@ -848,6 +998,9 @@ def main() -> int:
         if images_enabled and not args.no_clean_remote_images:
             _prepare_remote_image_dir(robot_ip, args.ssh_key, run_log)
 
+        # From the play request on, the robot may be moving: an interrupt must stop the run on the robot.
+        started = True
+        status_file.update(stage="started", started=True)
         _play_run(robot_ip, run_id)
         run_log.event("run_started", run_id=run_id)
         status = _monitor(robot_ip, run_id, args.poll_seconds)
@@ -857,9 +1010,14 @@ def main() -> int:
         if images_enabled:
             _pull_images(robot_ip, args.ssh_key, image_run_id, run_log)
         exit_code = 0 if status == "succeeded" else 1
+        status_file.update(stage="finished", robot_status=status, exit_code=exit_code)
         run_log.finish(status, exit_code=exit_code)
         return exit_code
+    except KeyboardInterrupt:
+        return _abort_after_interrupt(robot_ip, run_id, started, run_log, status_file,
+                                      poll_s=args.poll_seconds)
     except Exception as exc:
+        status_file.update(stage="error", error=str(exc), exit_code=1)
         run_log.finish("error", exit_code=1, error=str(exc))
         raise
 

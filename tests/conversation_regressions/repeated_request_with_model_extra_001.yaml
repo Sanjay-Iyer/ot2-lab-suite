@@ -1,0 +1,32 @@
+name: repeated_request_with_model_extra_001
+description: >-
+  Repeating an already-applied request ("move the paper print plate to slot 11") while the model added an unrelated
+  "return used tips" change produced a proposal containing only that unrelated change. A proposal whose every change
+  is to a field the message never mentions is now refused.
+found_by: {seed: 5198, persona: copy_paste_user, goal: duplicate_operation, chaos: 0.7, live_logic: false}
+invariant: duplicate_proposal
+fixed_in: src/agents/dye_demo/state.py (propose refuses unmentioned-only proposals)
+messages:
+- text: Could you move the paper print plate to slot 11 for me?
+  label:
+    category: move
+    intended: [{path: deck.paper.slot, value: 11}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: Could you move the paper print plate to slot 11 for me?
+  label:
+    category: duplicate
+    intended: [{path: deck.paper.slot, value: 11}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.paper.slot", "value": 11, "evidence": "Could you move the paper print plate to slot 11 for me?"}, {"path": "tips.return_tips", "value": true, "evidence": "Could you move the paper print plate to slot 11 for me?"}], "explanation": "simulated interpretation", "clarification": ""}'
+    chaos: unrelated_extra
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {deck.paper.slot: 11, tips.return_tips: false}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.paper.slot]
+  - turn: 3
+    no_proposal: true
+    output_contains: ["did not mention the return used tips to the rack"]

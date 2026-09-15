@@ -1,0 +1,20 @@
+name: proposal_meta_request_is_not_a_question_001
+description: >-
+  Found by the Gemini user agent and judge (seed 505000000): "... Can you set that up as a proposal for me?" after an
+  instruction was answered as a question ("please provide it as a direct instruction") while the same message was
+  being turned into a proposal, which the judge read as contradictory. Asking for a proposal is now part of the
+  instruction, and chatter around an instruction ("No, sorry for the confusion.") gets no separate model answer.
+found_by: {seed: 505000000, persona: careful_scientist, goal: reverse_source_destination, chaos: 0.0, live_logic: false, interpreter: gemini+gemini-user}
+invariant: response_quality
+fixed_in: src/agents/dye_demo/intent.py (_PROPOSAL_META), src/agents/dye_demo/session.py (_dispatch mixed answers)
+messages:
+- text: No, sorry for the confusion. Move the vial rack to slot 8. Can you set that up as a proposal for me?
+  label:
+    category: move
+    intended: [{path: deck.tuberack.slot, value: 8}]
+expected:
+  final: {revision: 0, pending: 1}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.tuberack.slot]
+    output_excludes: ["ASK MODE"]

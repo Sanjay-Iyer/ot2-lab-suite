@@ -1,0 +1,33 @@
+name: self_correction_keeps_labware_001
+description: >-
+  Over-strict fix, found by the red-team helpfulness analysis: after slot changes were required to name their
+  labware, "Move the dilution plate to slot 6 - sorry, I meant slot 11." was refused, because the labware name was in
+  the corrected-away half of the sentence. The labware named anywhere in the message now counts; the slot still has
+  to come from the final, corrected text, so a model that picks the corrected-away value is still refused.
+found_by: {seed: 20007, persona: indecisive_user, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/state.py (_verify uses the whole request for the labware, the final text for the slot)
+messages:
+- text: Move the dilution plate to slot 6 — sorry, I meant slot 11.
+  label:
+    category: self_correction
+    intended: [{path: deck.plate.slot, value: 11}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: Move the vial rack to slot 8, actually slot 2.
+  label:
+    category: self_correction
+    intended: [{path: deck.tuberack.slot, value: 2}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.tuberack.slot", "value": 8, "evidence": "Move the vial rack to slot 8"}], "explanation": "simulated interpretation", "clarification": ""}'
+    chaos: superseded_value
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {deck.plate.slot: 11, deck.tuberack.slot: 7}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.plate.slot]
+  - turn: 3
+    no_proposal: true
+    output_contains: ["You corrected yourself, so I will not use 8"]

@@ -1,0 +1,37 @@
+name: approval_with_new_request_keeps_proposal_001
+description: >-
+  Found by the Gemini user agent and judge (seed 505000000): "Yes, I approve proposal #1. Now, please ..." was not read
+  as approval, and the new request then discarded proposal #1 - the proposal the user had just approved. An approval
+  that names the waiting proposal now applies it when nothing else is asked; together with a new request, nothing is
+  applied and the proposal stays waiting until a plain yes.
+found_by: {seed: 505000000, persona: careful_scientist, goal: reverse_source_destination, chaos: 0.0, live_logic: false, interpreter: gemini+gemini-user}
+invariant: response_quality
+fixed_in: src/agents/dye_demo/intent.py (named_approval), src/agents/dye_demo/session.py (_with_pending)
+messages:
+- text: Move the dilution plate to slot 6.
+  label:
+    category: move
+    intended: [{path: deck.plate.slot, value: 6}]
+- text: 'Yes, I approve proposal #1. Now please move the vial rack to slot 8.'
+  label: {category: approval_with_request, may_propose: false}
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: Move the vial rack to slot 8.
+  label:
+    category: move
+    intended: [{path: deck.tuberack.slot, value: 8}]
+- text: 'Yes, I approve proposal #2. Thanks.'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 2, pending: null}
+  final_config: {deck.plate.slot: 6, deck.tuberack.slot: 8}
+  turns:
+  - turn: 2
+    pending_after: 1
+    no_proposal: true
+    output_contains: ["Your message approves proposal #1 and also asks for something else", "proposal #1 is still waiting"]
+    output_excludes: ["was discarded"]
+  - turn: 3
+    output_contains: ["APPLIED proposal #1. This is now the current plan", "CURRENT PLAN"]
+  - turn: 5
+    output_contains: ["APPLIED proposal #2. This is now the current plan", "CURRENT PLAN"]

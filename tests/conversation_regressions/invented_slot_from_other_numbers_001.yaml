@@ -1,0 +1,26 @@
+name: invented_slot_from_other_numbers_001
+description: >-
+  The model invented "move the paper print plate to slot 1" for a message that only mentioned "1 drops" and "paper
+  position". The slot check found a "1" and the word "paper" somewhere in the message and verified the move. Slot
+  numbers now have to be written as slots ("slot 8", "to 8"), and "paper position" does not name the paper print
+  plate as something to move, so the invented move is flagged.
+found_by: {seed: 9037, persona: fast_user, goal: question_changes_state, chaos: 0.7, live_logic: false}
+invariant: unrelated_change_applied_unflagged
+fixed_in: src/agents/dye_demo/state.py (named_labware, slot_numbers)
+messages:
+- text: could you move the dilution plate to slot 8 for me, stack 2 drops on each paper position.
+  label:
+    category: multi_change
+    intended: [{path: deck.plate.slot, value: 8}, {path: print.droplets_per_spot, value: 2}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.plate.slot", "value": 8, "evidence": "move the dilution plate to slot 8"}, {"path": "print.droplets_per_spot", "value": 2, "evidence": "stack 2 drops"}, {"path": "deck.paper.slot", "value": 2, "evidence": "2 drops on each paper position"}], "explanation": "simulated interpretation", "clarification": ""}'
+    chaos: invent_slot
+- text: 'no'
+  label: {category: reject, may_propose: false}
+expected:
+  final: {revision: 0, pending: null}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.plate.slot, print.droplets_per_spot, deck.paper.slot]
+    unverified: [deck.paper.slot]

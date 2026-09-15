@@ -1,0 +1,43 @@
+name: reversed_liquid_path_is_explained_001
+description: >-
+  Found by the Gemini user agent and judge (seed 505000000): "Can you please prepare 4 dilutions, 2x, 4x, 8x, and 16x
+  ... using the dye from the paper print plate as the source ...?" was read as a question (the verb "prepare" was not
+  known), the preamble "I need to set up a dilution series first." became the instruction and got a useless "what
+  should the dilution factors be?", and the impossible source was left to the model's improvised explanations. The
+  request is now an instruction, the fixed liquid path is explained deterministically, and the supported factors are
+  still proposed. "I want to make sure we are pulling from the right place." is not a request.
+found_by: {seed: 505000000, persona: careful_scientist, goal: reverse_source_destination, chaos: 0.0, live_logic: false, interpreter: gemini+gemini-user}
+invariant: response_quality
+fixed_in: src/agents/dye_demo/intent.py (_VERBS, _DESIRE_TO_KNOW, _UNSUPPORTED liquid path), src/agents/dye_demo/session.py (_dispatch)
+messages:
+- text: >-
+    Hello. I need to set up a dilution series first. Can you please prepare 4 dilutions, 2x, 4x, 8x, and 16x, with a
+    total volume of 150uL each, using the dye from the paper print plate as the source and transferring it to the
+    dilution plate? I want to make sure we are pulling from the right place.
+  label:
+    category: set_factors
+    intended: [{path: dilution.factors, value: [2, 4, 8, 16]}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "dilution.factors", "value": [2, 4, 8, 16], "evidence": "4 dilutions, 2x, 4x, 8x, and 16x"}], "clarification": "", "explanation": "Proposes four dilutions of 2x, 4x, 8x and 16x."}'
+- text: 'no'
+  label: {category: reject, may_propose: false}
+- text: Use the paper as the source and the plate as the destination.
+  label: {category: reverse_flow, may_propose: false}
+- text: Print from the paper back into the plate.
+  label: {category: reverse_flow, may_propose: false}
+expected:
+  final: {revision: 0, pending: null}
+  turns:
+  - turn: 1
+    proposal_paths: [dilution.factors]
+    output_contains: ["The liquid path is fixed", "That part of your message changes nothing", "PROPOSED PLAN #1"]
+    output_excludes: ["ASK MODE", "What should the dilution factors be?"]
+  - turn: 3
+    classification: unsupported
+    no_proposal: true
+    output_contains: ["The liquid path is fixed"]
+  - turn: 4
+    classification: unsupported
+    no_proposal: true
+    output_contains: ["The liquid path is fixed"]

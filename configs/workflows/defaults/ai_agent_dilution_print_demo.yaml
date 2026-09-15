@@ -5,16 +5,18 @@
 # down one plate column, then one 5 uL drop of each onto paper column 1.
 #
 #   configs/workflows/defaults/ai_agent_dilution_print_demo.yaml   <- this file
-#        |  the agent copies it, edits the copy from conversation, validates
+#        |  the agent copies it; every change is proposed, validated and
+#        |  applied only after the operator types yes (src/agents/dye_demo/)
 #        v
 #   configs/workflows/user/ai_dye_demo_<timestamp>.yaml
 #        |  scripts/build_vial_dilution_print.py (embeds YAML, simulates)
 #        v
 #   src/protocols/generated/ai_agent_dilution_print_demo_latest.py  <- uploaded
 #
-# Everything under deck, materials, dilution, mixing, print and tips is meant to be
-# changed by talking to the agent. The pipette, the release geometry inside `print`
-# and everything under `safety` are laboratory-owned and stay fixed.
+# Conversation may change: deck slots (or OFF_DECK), vials and material names,
+# the dilution series, mixing counts, the print plan, and the tip settings. The
+# pipette, every height, the air handling, blow-out, dwell, transfer size and the
+# safety limits are laboratory-owned and stay fixed (src/agents/dye_demo/model.py).
 
 protocol_version: 19
 
@@ -22,6 +24,8 @@ protocol_version: 19
 run_modes: {dry_run: false, do_dilution: true, do_print: true}
 
 # --- where things sit on the deck ----------------------------------------------
+# slot: 1-11, or OFF_DECK for labware physically removed from the robot. The run
+# refuses to start if a step needs labware that is OFF_DECK.
 deck:
   tuberack:
     slot: 7
@@ -46,7 +50,10 @@ deck:
 pipette: {name: p20_single_gen2, mount: left}
 
 # --- what is in the vial rack ---------------------------------------------------
-# role "solvent" = the diluent, role "sample" = the thing being diluted.
+# role "solvent" = the diluent, role "sample" = the thing being diluted. An
+# optional `label` (e.g. "crystal violet") is the name shown in summaries.
+# aspirate_height_mm is lab-owned: 4.0 mm needs ~2.46 mL in a 28 mm vial to stay
+# submerged, so the summary tells the operator the minimum to load.
 materials:
   water: {role: solvent, vial: A1, aspirate_height_mm: 4.0}
   dye:   {role: sample,  vial: A2, aspirate_height_mm: 4.0}
@@ -56,20 +63,24 @@ materials:
 # factor N means "1 part dye in N parts total": 150 uL at 4x is 37.5 uL dye
 # + 112.5 uL water. 1 to 8 factors; the P20 needs at least 1 uL of dye per well,
 # so 150 uL total allows fold factors up to 150x — but this default stops at 16x,
-# where every dye transfer is still 9 uL or more and therefore accurate. Ask the
-# agent for a steeper series (2-fold to 128x, say) if a wider range matters more
-# than precision at the dilute end.
+# where every dye transfer is still 9 uL or more and therefore accurate.
+# `enabled: false` means the dilutions already exist; `prepared_volume_ul` (optional)
+# is then the volume now in each well, used for the liquid-depth checks.
 dilution:
   enabled: true
   plate_column: '11'
   start_row: A
   factors: [1, 2, 3, 4, 6, 8, 12, 16]
   total_volume_ul: 150.0
-  max_transfer_ul: 20.0        # P20 ceiling per transfer chunk
-  solvent_dispense_from_top_mm: -2.0
-  sample_dispense_from_top_mm: -1.0
+  max_transfer_ul: 20.0        # lab-owned: P20 ceiling per transfer
+  solvent_dispense_from_top_mm: -2.0   # lab-owned: dispense above the liquid
+  sample_dispense_from_top_mm: -1.0    # lab-owned: dispense above the liquid
+  # Lab-owned. Blow out after every dilution dispense, in air at the dispense
+  # position. The P20 GEN2's default push-out is 0 uL, so without this the end of
+  # each transfer can stay in the tip. See docs/ai_dye_demo/liquid_handling_parameters.md.
+  blow_out_after_dispense: true
 
-# Mix the source well immediately before each print aspiration.
+# Mix the source well immediately before each print aspiration (height lab-owned).
 mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
 
 # --- printing the dilutions onto paper ------------------------------------------
@@ -89,17 +100,22 @@ print:
   # From configs/machines/ot2_standard_printing_p20_v1.yaml: paper dispense 1.1 mm
   # off the bottom, 1.5 uL trailing air gap released 5 mm up, 3.0 uL push-out,
   # blow-out on, and a 2 s dwell so the drop separates from the tip.
+  # 0.5 mm is the last physically confirmed release height; 1.1 mm was requested
+  # on 2026-08-31 and its physical revalidation is pending.
   z_mm: 1.1
-  aspirate_height_mm: 1.0       # inside the dilution well
+  aspirate_height_mm: 1.0       # inside the dilution well (inherited from v6)
   air_gap_ul: 1.5
   air_gap_height_mm: 5.0
   push_out_ul: 3.0
   blow_out: true
   post_dispense_delay_s: 2.0
 
-# Tips are taken in rack order from start_tip: one solvent tip, one sample tip,
-# then a fresh tip for every dilution row that gets printed.
-tips: {start_tip: A1, return_tips: false}
+# Tips are taken in rack order from start_tip, one pick-up per tip group:
+#   per_liquid              one tip for all water transfers, one for all dye
+#                           transfers, one per dilution for printing
+#   new_tip_every_transfer  a fresh tip for every transfer and paper position
+# A step that does not run takes no tips.
+tips: {start_tip: A1, return_tips: false, policy: per_liquid}
 
 flow_rates: {aspirate: 3.0, dispense: 3.0}
 

@@ -1,0 +1,24 @@
+name: mixed_question_names_the_field_001
+description: >-
+  Self-inflicted regression caught by reviewing the intent tables: after fields never mentioned in a request were
+  flagged (and proposals made only of them refused), "Why are we using 8 dilutions, and actually change it to 4."
+  was refused, because "dilutions" is in the question half and the actionable half is only "change it to 4". The
+  question half of a mixed message may now show which field is meant; the value still has to be in the instruction.
+found_by: {seed: 0, persona: test_mixed_question_and_instruction_answers_then_proposes, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/state.py (propose context), src/agents/dye_demo/session.py (_interpret)
+messages:
+- text: Why are we using 8 dilutions, and actually change it to 4.
+  label:
+    category: mixed
+    intended: [{path: dilution.factors, op: set_count, count: 4}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {dilution.factors: [1, 2, 3, 4]}
+  turns:
+  - turn: 1
+    classification: mixed
+    proposal_paths: [dilution.factors]
+    output_contains: ["ASK MODE", "PROPOSED PLAN #1"]

@@ -1,0 +1,34 @@
+name: model_well_contradiction_hidden_as_already_set_001
+description: >-
+  Found while writing the minimum robustness tests: "Start tips at A10." answered by a model that returned A1 (the
+  current starting tip) was reported as "Those values are already set", hiding the A10 -> A1 mix-up. Unchanged values
+  are now still checked against what the scientist typed, and a contradiction is reported.
+found_by: {seed: 0, persona: test_14_a_model_that_turns_a10_into_a1_is_caught, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/state.py (propose checks unchanged requested values for contradictions)
+messages:
+- text: Start tips at A10.
+  label:
+    category: set_tip
+    intended: [{path: tips.start_tip, value: A10}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "tips.start_tip", "value": "A1", "evidence": "tips at A10"}], "explanation": "scripted", "clarification": ""}'
+    chaos: superseded_value
+- text: 'yes'
+  label:
+    category: clarification_answer
+    may_propose: null
+    intended: [{path: tips.start_tip, value: A10}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {tips.start_tip: A10}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["You typed A10, but the proposal used A1", "Should the starting tip be A10?"]
+    output_excludes: ["already set"]
+  - turn: 2
+    proposal_paths: [tips.start_tip]

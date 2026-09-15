@@ -1,0 +1,24 @@
+name: model_explanation_claims_change_001
+description: >-
+  Found in the Gemini interpreter campaign (seed 404000005): the model's explanation "The tip rack slot was updated from
+  9 to 8 as requested." was printed right above "PROPOSED CHANGES #1 (not applied yet ...)". An explanation written as
+  if the change were already made is now replaced with "Here is the change as I understood it. Nothing has been applied
+  yet."
+found_by: {seed: 404000005, persona: verbose_user, goal: unit_confusion, chaos: 0.0, live_logic: false, interpreter: gemini}
+invariant: response_quality
+fixed_in: src/agents/dye_demo/session.py (_show_proposal), src/agents/dye_demo/intent.py (explanation_claims_change)
+messages:
+- text: Put the tip rack in slot 8.
+  label:
+    category: move
+    intended: [{path: deck.tiprack.slot, value: 8}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.tiprack.slot", "value": 8, "evidence": "Put the tip rack in slot 8"}], "clarification": "", "explanation": "The tip rack slot was updated from 9 to 8 as requested."}'
+expected:
+  final: {revision: 0, pending: 1}
+  turns:
+  - turn: 1
+    proposal_paths: [deck.tiprack.slot]
+    output_contains: ["Here is the change as I understood it. Nothing has been applied yet."]
+    output_excludes: ["was updated from 9 to 8"]

@@ -1,0 +1,36 @@
+name: print_plate_is_labware_not_the_print_step_001
+description: >-
+  Found in the 2026-09-14 code review: "Don't move the paper print plate." and "Keep the paper print plate where it
+  is." were answered "this plan still prints in this run ... say skip printing" because any word "print" was read as
+  the print step. They now confirm where the paper print plate stays. A model reply that turns printing off for a
+  message about the print plate is refused, because nothing in the words asks to skip printing.
+found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/intent.py (negated_step, step_off_request), src/agents/dye_demo/state.py (_verify_step)
+messages:
+- text: Don't move the paper print plate.
+  label: {category: negation, may_propose: false}
+- text: Keep the paper print plate where it is.
+  label: {category: negation, may_propose: false}
+- text: Move the paper print plate to slot 6.
+  label:
+    category: move_labware
+    intended: [{path: deck.paper.slot, value: 6}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "deck.paper.slot", "value": 6, "evidence": "paper print plate to slot 6"}, {"path": "print.enabled", "value": false, "evidence": "paper print plate"}], "explanation": "Proposes moving the paper print plate.", "clarification": ""}'
+expected:
+  final: {revision: 0, pending: null}
+  final_config: {deck.paper.slot: 5, print.enabled: true}
+  turns:
+  - turn: 1
+    classification: negated
+    output_contains: ["Paper print plate location stays Slot 5"]
+    output_excludes: ["still prints", "skip printing"]
+  - turn: 2
+    classification: negated
+    output_contains: ["Paper print plate location stays Slot 5"]
+    output_excludes: ["still prints", "skip printing"]
+  - turn: 3
+    no_proposal: true
+    output_contains: ["You did not ask to skip printing, so I did not turn printing off."]

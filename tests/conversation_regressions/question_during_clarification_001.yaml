@@ -1,0 +1,30 @@
+name: question_during_clarification_001
+description: >-
+  While the agent waited for a clarification, "Explain recursion simply." (a question without a question mark) was
+  appended to the pending request as if it were the answer, and the combined text produced a proposal. Questions are
+  now answered and the clarification keeps waiting.
+found_by: {seed: 1069, persona: distracted_user, goal: partial_approval_exploit, chaos: 0.4, live_logic: true}
+invariant: proposal_from_non_actionable_turn
+fixed_in: src/agents/dye_demo/session.py (_with_clarifying)
+messages:
+- text: Start tips at B3.
+  label:
+    category: set_tip
+    intended: [{path: tips.start_tip, value: B3}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "unclear", "changes": [], "explanation": "", "clarification": "Do you mean the starting tip for the next run?"}'
+    chaos: drop_evidence
+- text: Explain recursion simply.
+  label: {category: question_while_clarifying, may_propose: false}
+expected:
+  final: {revision: 0, pending: null, clarifying: true}
+  turns:
+  - turn: 1
+    no_proposal: true
+    clarifying_after: true
+  - turn: 2
+    classification: question
+    no_proposal: true
+    clarifying_after: true
+    output_contains: ["Still waiting for your answer"]

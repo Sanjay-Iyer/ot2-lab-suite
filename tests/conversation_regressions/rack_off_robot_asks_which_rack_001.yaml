@@ -1,0 +1,41 @@
+name: rack_off_robot_asks_which_rack_001
+description: >-
+  "I took the rack off the robot." was recorded as the vial rack going OFF DECK, although the tip rack is also a rack.
+  A physical report that names a bare "rack" or "plate" now asks which one. Replaying the fix exposed a second,
+  more serious gap: when the clarified report could not be recorded (the plan cannot run without the vial rack), the
+  report was forgotten and a following "run" would have started with the rack physically missing. A physical report
+  that is not in the record now blocks runs until the scientist says how the robot actually is.
+found_by: {seed: 9206, persona: overconfident_user, goal: physical_move_believed, chaos: 0.0, live_logic: false}
+invariant: run_with_unreconciled_physical_report
+fixed_in: >-
+  src/agents/dye_demo/intent.py (_extract_facts), src/agents/dye_demo/session.py (_reconcile, unreconciled_report,
+  _run)
+messages:
+- text: I took the rack off the robot.
+  label: {category: physical_report, may_propose: false, intended: []}
+- text: '1'
+  label: {category: clarification_answer, may_propose: null, intended: []}
+- text: run
+  label: {category: run, may_propose: false, may_run: true}
+- text: The vial rack is back in slot 7.
+  label: {category: physical_report, may_propose: null, intended: []}
+- text: run
+  label: {category: run, may_propose: false, may_run: true}
+expected:
+  final: {revision: 0, pending: null, runs: 1}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["Which rack do you mean?"]
+  - turn: 2
+    no_proposal: true
+    output_contains: ["I did not update the record", "Vial rack is OFF DECK"]
+  - turn: 3
+    run: false
+    output_contains: ["Not running: you told me"]
+    output_excludes: ["STARTING"]
+  - turn: 4
+    no_proposal: true
+    output_contains: ["Nothing needs to change"]
+  - turn: 5
+    run: true

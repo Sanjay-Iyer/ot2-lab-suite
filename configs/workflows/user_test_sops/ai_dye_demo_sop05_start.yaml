@@ -1,0 +1,89 @@
+# User-test SOP 5 (deck reconfiguration) starting configuration for scripts/ai_dye_demo.py.
+#
+#   python scripts\ai_dye_demo.py --simulate --config configs\workflows\user_test_sops\ai_dye_demo_sop05_start.yaml
+#
+# Identical to configs/workflows/defaults/ai_agent_dilution_print_demo.yaml except that the P20 tip rack
+# starts in deck slot 8 (the default is slot 9), so "move the dilution plate to slot 8" meets an occupied
+# slot. tests/test_ai_dye_demo_user_test_sops.py fails if this file drifts from the default in any other way:
+# after a lab-owned value changes in the default, copy the default here again and set the tip rack to slot 8.
+#
+# See docs/ai_dye_demo/user_testing/SOP_05_deck_reconfiguration.md.
+
+protocol_version: 19
+
+# DEFAULT IS LIVE. --simulate on the command line is what makes a run harmless.
+run_modes: {dry_run: false, do_dilution: true, do_print: true}
+
+# --- where things sit on the deck ----------------------------------------------
+deck:
+  tuberack:
+    slot: 7
+    load_name: tuberack_3dprint_20ml_8vials_v2
+    namespace: custom_beta
+    version: 1
+  plate:
+    slot: 4
+    load_name: corning_96_wellplate_360ul_custom
+    namespace: custom_beta
+    version: 1
+  paper:
+    slot: 5
+    load_name: paper_print_96_flat
+    namespace: custom_beta
+    version: 1
+  tiprack:
+    slot: 8                     # SOP 5: occupies the slot the dilution plate must move to
+    load_name: opentrons_96_tiprack_20ul
+
+# Laboratory-owned. The whole workflow is single-channel P20.
+pipette: {name: p20_single_gen2, mount: left}
+
+# --- what is in the vial rack ---------------------------------------------------
+materials:
+  water: {role: solvent, vial: A1, aspirate_height_mm: 4.0}
+  dye:   {role: sample,  vial: A2, aspirate_height_mm: 4.0}
+
+# --- the dilution series --------------------------------------------------------
+dilution:
+  enabled: true
+  plate_column: '11'
+  start_row: A
+  factors: [1, 2, 3, 4, 6, 8, 12, 16]
+  total_volume_ul: 150.0
+  max_transfer_ul: 20.0        # lab-owned: P20 ceiling per transfer
+  solvent_dispense_from_top_mm: -2.0   # lab-owned: dispense above the liquid
+  sample_dispense_from_top_mm: -1.0    # lab-owned: dispense above the liquid
+  blow_out_after_dispense: true        # lab-owned
+
+# Mix the source well immediately before each print aspiration (height lab-owned).
+mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
+
+# --- printing the dilutions onto paper ------------------------------------------
+print:
+  enabled: true
+  droplet_volume_ul: 5.0
+  droplets_per_spot: 1          # stacked drops on the same spot
+  replicates: 1                 # side-by-side paper columns per volume
+  paper_start_column: 1
+  paper_columns: 12
+
+  # --- laboratory-owned release geometry; do not tune these for a demo ---------
+  z_mm: 1.1
+  aspirate_height_mm: 1.0
+  air_gap_ul: 1.5
+  air_gap_height_mm: 5.0
+  push_out_ul: 3.0
+  blow_out: true
+  post_dispense_delay_s: 2.0
+
+tips: {start_tip: A1, return_tips: false, policy: per_liquid}
+
+flow_rates: {aspirate: 3.0, dispense: 3.0}
+
+# --- laboratory-owned limits ----------------------------------------------------
+safety:
+  expected_tuberack_load_name: tuberack_3dprint_20ml_8vials_v2
+  expected_well_count: 8
+  p20_max_volume_ul: 20.0
+  p20_min_volume_ul: 1.0
+  max_well_fill_ul: 340.0

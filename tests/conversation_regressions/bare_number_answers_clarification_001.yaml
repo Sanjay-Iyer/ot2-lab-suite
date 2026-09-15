@@ -1,0 +1,33 @@
+name: bare_number_answers_clarification_001
+description: >-
+  Self-inflicted regression caught while reviewing red-team transcripts: after questions without a question mark
+  were made to keep a clarification waiting, a bare "3" answering "How many drops exactly?" was also classified as a
+  question (every informational turn was), so it was answered instead of used. Plain chat such as "3" or "the vial
+  rack" is now classified as chat and can answer the waiting question.
+found_by: {seed: 90000, persona: confused_user, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/intent.py (analyze_turn kind composition)
+messages:
+- text: Print a couple drops per spot.
+  label:
+    category: vague
+    may_propose: false
+    intended: [{path: print.droplets_per_spot, value: 3}]
+- text: '3'
+  label:
+    category: clarification_answer
+    may_propose: null
+    intended: [{path: print.droplets_per_spot, value: 3}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {print.droplets_per_spot: 3}
+  turns:
+  - turn: 1
+    classification: vague_quantity
+    no_proposal: true
+    output_contains: ["How many drops exactly?"]
+  - turn: 2
+    classification: chat
+    proposal_paths: [print.droplets_per_spot]

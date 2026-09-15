@@ -1,0 +1,31 @@
+name: setting_to_number_is_not_a_slot_001
+description: >-
+  Found while writing the minimum robustness tests: "Set the drop volume to 10." was asked "Did you mean OT-2 deck
+  SLOT 10?", because "set ... to 10" looked like a labware move. When the message names a setting and no labware, the
+  slot question is skipped; the missing unit is then clarified instead of assumed.
+found_by: {seed: 0, persona: test_16_missing_units_are_clarified_not_assumed, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/language.py (find_ambiguities skips the slot question when a setting is named)
+messages:
+- text: Set the drop volume to 10.
+  label:
+    category: set_drop_volume
+    may_propose: false
+    intended: [{path: print.droplet_volume_ul, value: 10}]
+- text: 'yes'
+  label:
+    category: clarification_answer
+    may_propose: null
+    intended: [{path: print.droplet_volume_ul, value: '10 µL'}]
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 1, pending: null}
+  final_config: {print.droplet_volume_ul: 10.0}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["without a unit", "Do you mean 10 µL for the drop volume?"]
+    output_excludes: ["SLOT"]
+  - turn: 2
+    proposal_paths: [print.droplet_volume_ul]

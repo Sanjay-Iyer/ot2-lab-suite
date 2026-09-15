@@ -1,0 +1,39 @@
+name: sop2_new_session_prepared_dilutions_001
+description: >-
+  Found by replaying the documented lab procedure (GUIDE Run 2 in a new session): "The three dye dilutions are
+  already made ... Their factors are 2x, 5x, and 10x ..." was refused as "different factors in A11 (2x planned, 1x
+  recorded)", and the unrecorded report then blocked run. The prepared-dilutions record was built from the plan before
+  the message's own factor changes. It is now built from the plan the proposal produces, and the proposal is titled
+  PROPOSED PLAN (not a record-only reconciliation) because it also changes the plan.
+found_by: {seed: 0, persona: GUIDE_AI_Dye_Three_Dilutions_Paper_Print Run 2 (new session), goal: null, chaos: 0.0, live_logic: true}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/state.py (PREPARED_FROM_PLAN), src/agents/dye_demo/session.py (_reconcile)
+settings: {live_logic: true}
+messages:
+- text: >-
+    The three dye dilutions are already made, so skip the dilution step. Each well now holds about 95 uL. Print three
+    separate 5 uL drops stacked on each spot, starting in paper column 2, and start from tip F1. Their factors are 2x,
+    5x, and 10x, each with a final total volume of 100 uL, starting at row A in plate column 11.
+  label: {category: physical_report, may_propose: null, intended: []}
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "explanation": "Proposed.", "clarification": "", "changes": [{"path": "dilution.enabled", "value": false, "evidence": "skip the dilution step"}, {"path": "dilution.prepared_volume_ul", "value": "95 uL", "evidence": "about 95 uL"}, {"path": "print.droplets_per_spot", "value": 3, "evidence": "three separate 5 uL drops stacked"}, {"path": "print.paper_start_column", "value": 2, "evidence": "paper column 2"}, {"path": "tips.start_tip", "value": "F1", "evidence": "tip F1"}, {"path": "dilution.factors", "value": [2, 5, 10], "evidence": "2x, 5x, and 10x"}, {"path": "dilution.total_volume_ul", "value": "100 uL", "evidence": "100 uL"}]}'
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: run
+  label: {category: run, may_run: true, may_propose: false}
+  gates: ['yes']
+expected:
+  final: {revision: 1, runs: 1}
+  final_config: {dilution.enabled: false, dilution.factors: [2, 5, 10], print.droplets_per_spot: 3,
+                 print.paper_start_column: 2}
+  turns:
+  - turn: 1
+    output_contains: ["PROPOSED PLAN #1",
+                      "Saying yes records plate wells A11-C11 as already holding the dilutions (2× | 5× | 10×",
+                      "SKIPPED - already in the plate", "  Drops per position    3  (stacked)",
+                      "  Paper columns         2"]
+    output_excludes: ["I did not update the record", " -> "]
+  - turn: 3
+    run: true
+    output_contains: ["Do plate wells A11-C11 already hold the dilutions?"]

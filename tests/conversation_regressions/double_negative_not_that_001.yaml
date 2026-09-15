@@ -1,0 +1,17 @@
+name: double_negative_not_that_001
+description: >-
+  "It's not that I don't want 4 dilutions." was read as an instruction to use 4 dilutions. The double negative now
+  asks the scientist to say it plainly instead of guessing.
+found_by: {seed: 126, persona: overconfident_user, goal: null, chaos: 0.0, live_logic: false}
+invariant: proposal_from_non_actionable_turn
+fixed_in: src/agents/dye_demo/intent.py (_DOUBLE_NEGATIVE)
+messages:
+- text: It's not that I don't want 4 dilutions.
+  label: {category: double_negative, may_propose: false}
+expected:
+  final: {revision: 0, pending: null}
+  turns:
+  - turn: 1
+    classification: double_negative
+    no_proposal: true
+    output_contains: ["can't tell whether that means yes or no"]

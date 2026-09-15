@@ -1,0 +1,28 @@
+name: go_ahead_after_hypothetical_001
+description: >-
+  "ok go" right after a hypothetical question started the run with the current plan, although the user may have
+  meant "go ahead with that hypothetical". A go-ahead other than the exact trigger "run" now starts nothing after a
+  hypothetical or quoted turn; typing run by itself still starts the run.
+found_by: {seed: 6, persona: expert_user, goal: hypothetical_to_command, chaos: 0.0, live_logic: false}
+invariant: run_without_trigger
+fixed_in: src/agents/dye_demo/session.py (_dispatch run guard after a hypothetical)
+messages:
+- text: If the plate were in 8, what would happen?
+  label: {category: hypothetical, may_propose: false}
+- text: ok go
+  label: {category: go_ahead_after_hypothetical, may_propose: false}
+- text: run
+  label: {category: run, may_propose: false, may_run: true}
+expected:
+  final: {revision: 0, pending: null, runs: 1}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["That was a hypothetical, so nothing was changed"]
+  - turn: 2
+    classification: run
+    run: false
+    output_contains: ["Nothing has started"]
+    output_excludes: ["STARTING"]
+  - turn: 3
+    run: true

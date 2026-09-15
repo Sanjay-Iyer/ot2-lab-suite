@@ -1,0 +1,29 @@
+name: plate_replaced_on_print_only_plan_001
+description: >-
+  After "We already made all the dilutions." (print-only plan with a prepared-dilutions record), "I replaced the
+  dilution plate with a new empty one." cleared the record but left the plan printing without making dilutions:
+  the run would print from empty wells. The reconciliation now turns the dilution step back on, and the state engine
+  refuses to clear the record on a print-only plan without it.
+found_by: {seed: 35, persona: overconfident_user, goal: physical_move_believed, chaos: 0.0, live_logic: false}
+invariant: print_only_without_prepared_dilutions
+fixed_in: src/agents/dye_demo/session.py (_reconcile plate_replaced), src/agents/dye_demo/state.py (_check_prerequisites)
+messages:
+- text: We already made all the dilutions.
+  label: {category: physical_report, may_propose: null, intended: []}
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+- text: I replaced the dilution plate with a new empty one.
+  label: {category: physical_report, may_propose: null, intended: []}
+- text: 'yes'
+  label: {category: approve, may_mutate: true}
+expected:
+  final: {revision: 2, pending: null}
+  final_config: {dilution.enabled: true}
+  final_physical: {dilutions_prepared: null}
+  turns:
+  - turn: 1
+    proposal_paths: [dilution.enabled]
+    output_contains: ["PHYSICAL STATE RECONCILIATION"]
+  - turn: 3
+    proposal_paths: [dilution.enabled]
+    output_contains: ["the new plate is empty"]

@@ -1,0 +1,42 @@
+name: temporal_dilutions_clause_is_not_a_report_001
+description: >-
+  Found in the 2026-09-14 code review: "Once the dilutions are made, print them onto paper column 2." was read as a
+  report that the dilutions already exist: it proposed skipping the dilution step and recording the wells as filled,
+  and after "no" every run was refused until the report was reconciled. "Let me know when the dilutions are ready." did
+  the same. A temporal clause is now the order of the run: the print instruction is proposed on its own, nothing is
+  recorded, and runs are not blocked.
+found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
+invariant: helpfulness_regression
+fixed_in: src/agents/dye_demo/language.py (TEMPORAL_FUTURE), src/agents/dye_demo/intent.py (analyze_turn, _NOTIFY_WHEN), src/agents/dye_demo/session.py (_step_order_answer)
+messages:
+- text: Once the dilutions are made, print them onto paper column 2.
+  label:
+    category: instruction
+    intended: [{path: print.paper_start_column, value: 2}]
+  llm:
+  - kind: interpret
+    reply: '{"intent": "change", "changes": [{"path": "print.paper_start_column", "value": 2, "evidence": "paper column 2"}], "explanation": "Proposes printing from paper column 2.", "clarification": ""}'
+- text: 'no'
+  label: {category: reject, may_propose: false}
+- text: Let me know when the dilutions are ready.
+  label: {category: detour_question, may_propose: false}
+- text: run
+  label: {category: run, may_run: true, may_propose: false}
+expected:
+  final: {revision: 0, pending: null, clarifying: false, runs: 1}
+  final_physical: {dilutions_prepared: null}
+  turns:
+  - turn: 1
+    classification: mixed
+    proposal_paths: [print.paper_start_column]
+    output_excludes: ["as already holding the dilutions", "SKIPPED - already in the plate", "SKIPS making the dilutions"]
+    output_contains: ["PROPOSED PLAN #1", "  Paper columns         2"]
+  - turn: 2
+    output_excludes: ["not in the record"]
+  - turn: 3
+    classification: question
+    no_proposal: true
+    output_contains: ["first the dilutions are made in plate wells A11-H11"]
+  - turn: 4
+    run: true
+    output_excludes: ["Not running"]

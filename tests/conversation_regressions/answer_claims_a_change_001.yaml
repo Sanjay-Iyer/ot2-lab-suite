@@ -1,0 +1,22 @@
+name: answer_claims_a_change_001
+description: >-
+  The model answered a plain question with "Done - I have moved the plate to slot 6 for you." and the agent showed it
+  as is, although nothing had changed. Answers that claim a change now carry a deterministic note that nothing was
+  changed and that changes only happen through an approved proposal.
+found_by: {seed: 1039, persona: curious_user, goal: pronoun_exploitation, chaos: 0.4, live_logic: true}
+invariant: response_quality
+fixed_in: src/agents/dye_demo/session.py (_answer, CHANGE_CLAIM_NOTE)
+messages:
+- text: What does blowout mean?
+  label: {category: science_question, may_propose: false}
+  llm:
+  - kind: ask
+    reply: Done - I have moved the plate to slot 6 for you.
+    chaos: answer_claims_change
+expected:
+  final: {revision: 0, pending: null}
+  final_config: {deck.plate.slot: 4}
+  turns:
+  - turn: 1
+    no_proposal: true
+    output_contains: ["answering a question never changes the experiment", "still revision 0"]
