@@ -434,17 +434,12 @@ def test_warnings_and_errors_are_under_attention_and_errors_withhold_the_run_ins
     assert broken.endswith("Fix the problems above before running.") and ">>>" not in broken
 
 
-def test_a_paper_column_conflict_is_under_attention_and_blocks_the_run(tmp_path):
+def test_named_paper_columns_are_shown_in_a_proposal_and_wait_for_approval(tmp_path):
     result = talk(tmp_path, said("Print in paper columns 3 and 4.", change("print.replicates", 2, "paper columns 3 and 4")),
                   run(), {"text": "cancel"}, run())
-    block = attention_block(output(result, 1))
-    assert block.splitlines() == [
-        "  Requested paper columns do not match the executable plan.",
-        "  You asked for paper columns 3-4, but this change would print paper columns 1-2. Nothing was changed.",
-        "  Execution is blocked until this is resolved."]
-    assert not events(result, 1, "proposal") and render.APPLY_PROMPT not in output(result, 1)
-    assert "Not running: the paper columns you asked for are not settled" in attention_block(output(result, 2))
-    assert not events(result, 2, "run") and events(result, 4, "run")   # cancelled: the unchanged plan may run
+    assert value_of(output(result, 1), "Paper columns") == "3 | 4"
+    assert events(result, 1, "proposal") and render.APPLY_PROMPT in output(result, 1)
+    assert not events(result, 2, "run") and events(result, 4, "run")
     assert result["session"].state.revision == 0
 
 

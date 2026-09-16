@@ -3,8 +3,8 @@ description: >-
   Found in the 2026-09-14 code review: "Print in paper columns 3 and 4." answered by the model with only
   "replicates: 2" was a verified proposal (nothing under CHECK THESE) that printed paper columns 1-2, and the proposal
   never showed which paper columns would be printed. The paper columns named are now compared with the columns the
-  plan prints: a difference blocks the proposal and offers the exact layout as a question, no run starts while that is
-  unsettled, and the proposal shows the resulting paper columns.
+  plan prints: the explicit destinations now determine a proposal directly, no run starts before approval, and the proposal
+  shows the resulting paper columns.
 found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
 invariant: helpfulness_regression
 fixed_in: src/agents/dye_demo/columns.py (column_conflict), src/agents/dye_demo/state.py (propose), src/agents/dye_demo/session.py (_ask_paper_columns, _with_clarifying), src/agents/dye_demo/render.py (_printing, the Paper columns row)
@@ -19,22 +19,14 @@ messages:
 - text: run
   label: {category: run, may_run: true, may_propose: false}
 - text: 'yes'
-  label: {category: clarification_answer, may_propose: null}
-- text: 'yes'
   label: {category: approve, may_mutate: true}
 expected:
   final: {revision: 1, pending: null, clarifying: false, runs: 0}
   final_config: {print.paper_start_column: 3, print.replicates: 2}
   turns:
   - turn: 1
-    no_proposal: true
-    output_contains: ["You asked for paper columns 3-4, but this change would print paper columns 1-2.",
-                      "Should this run print paper columns 3-4 (first paper column 3, 2 side-by-side replicate columns)?"]
-  - turn: 2
-    run: false
-    output_contains: ["Not running: the paper columns you asked for are not settled"]
-  - turn: 3
     proposal_paths: [print.paper_start_column, print.replicates]
     unverified: []
     output_contains: ["PROPOSED PLAN #", "  Paper columns         3 | 4", "  Print positions       16   (8 rows × 2 columns)"]
-    output_excludes: [" -> "]
+  - turn: 2
+    run: false

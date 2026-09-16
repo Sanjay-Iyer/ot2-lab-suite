@@ -13,13 +13,13 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Sequence
 
 from src.agents.dye_demo.plan import droplet_volumes, paper_layout, steps_enabled
 
 _NOT_A_COLUMN = r"(?!\s*(?:drops?|droplets?|µl|ul|ml|replicates?|dilutions?|tips?|times|x\b|×|%|\.\d))"
 _NUMBER = rf"\d{{1,2}}\b{_NOT_A_COLUMN}"
-_LIST_REST = rf"(?:\s*(?:,|and|&)\s*(?:and\s+)?{_NUMBER})+"
+_LIST_REST = rf"(?:(?:\s*(?:,|and|&)\s*(?:and\s+)?|\s+){_NUMBER})+"
 _RANGE_REST = rf"\s*(?:-|–|to|through|thru|until)\s*(?:(?:paper\s+)?columns?\s+)?{_NUMBER}"
 _MENTION = re.compile(
     rf"\b(?:(?P<qualifier>paper|plate|tip|tips|rack|well|wells|vial|row)\s+)?columns?\s*(?:#\s*|number\s+|no\.?\s*)?"
@@ -145,6 +145,18 @@ def format_columns(columns: list[int] | tuple[int, ...]) -> str:
     if len(values) > 1 and values == list(range(values[0], values[-1] + 1)):
         return f"{values[0]}-{values[-1]}"
     return ", ".join(str(value) for value in values)
+
+
+def format_rows(rows: Sequence[str]) -> str:
+    """Format row letters ('A', 'B', 'C' -> 'A–C'; 'A' -> 'A'; 'A', 'C' -> 'A, C')."""
+    values = sorted({str(r).upper() for r in rows if r})
+    if not values:
+        return "none"
+    if len(values) > 1:
+        ords = [ord(r) for r in values]
+        if ords == list(range(ords[0], ords[-1] + 1)):
+            return f"{values[0]}–{values[-1]}"
+    return ", ".join(values)
 
 
 def columns_phrase(columns: list[int] | tuple[int, ...]) -> str:

@@ -10,13 +10,15 @@ scientist, and applied only after an explicit yes.
 
 Deterministic rules enforced here, whatever the LLM returns:
   * a deck slot, tip, vial, volume or count the scientist did not state is refused
-    with a question, never guessed;
+    with a question, never guessed; a value (or step direction) found only in their earlier
+    messages in this conversation is accepted as carried over and shown for checking;
   * a volume needs its unit, and a stated unit must agree with the proposed µL;
   * a value the scientist corrected away ("slot 8 - sorry, slot 6") cannot be used;
   * a claimed current value that is wrong ("from 2 drops to 3" when it is 1) stops the change;
   * skipping the dilution step needs a record that the dilutions physically exist;
   * a print or dilution step is switched on or off only when the words ask for exactly that
     ("the paper print plate" is labware, not a request about printing);
+  * row and paper-column selections become fields by exact arithmetic from the plan (natural.py);
   * paper columns the scientist names must be exactly the paper columns the plan will print;
   * every applied revision is snapshotted, so rollback uses stored values only.
 """
@@ -33,6 +35,7 @@ from typing import Any, Iterable
 from src.agents.dye_demo.columns import (  # noqa: F401 - listed_paper_columns is imported from here by callers
     GAP_QUESTION,
     column_conflict,
+    columns_phrase,
     gap_conflict,
     listed_paper_columns,
     paper_column_request,
@@ -46,6 +49,7 @@ from src.agents.dye_demo.language import (
     well_tokens,
 )
 from src.agents.dye_demo.model import (
+    CARRIED_OVER,
     EDITABLE_FIELDS,
     LABWARE_NAMES,
     FieldError,
@@ -60,6 +64,7 @@ from src.agents.dye_demo.model import (
     set_path,
     volume_in_microlitres,
 )
+from src.agents.dye_demo.natural import SelectionError, expand_paper_columns, expand_rows, selected_columns, selected_rows
 from src.agents.dye_demo.plan import build_plan, steps_enabled
 from src.agents.dye_demo.validation import DeckConflict, Report, deck_conflicts, free_slots, validate
 
@@ -72,6 +77,7 @@ _COUNT_PATHS = {"print.droplets_per_spot", "print.replicates", "mixing.reps", "p
 _NULLABLE = {"dilution.prepared_volume_ul", "materials.sample.label", "materials.solvent.label"}
 # Physical record placeholder: "the dilutions of the plan this proposal produces are already in the plate".
 PREPARED_FROM_PLAN = "prepared dilutions of the resulting plan"
+ASSUMED_FROM_PLAN = "assumed existing samples of the resulting plan"
 _QUANTITY = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?|\.\d+)\s*(µL|uL|µl|ul|microlit\w*|mL|ml|millilit\w*)?(?![\w])", re.I)
 # Words that show the scientist was talking about a field at all. A number that happens to
 # appear in the request ("slot 4") is not evidence for a different field ("4 drops").
@@ -114,11 +120,12 @@ _STEP_WORDING = {
             rf"\b(?:dilut(?:e|ions?)|dilution\s+step)\s+only\b|\b(?:only|just)\s+(?:make|do|dilute|prepare)\b", re.I)),
     "dilution.enabled": (
         re.compile(
-            r"\b(?:make|making|prepare|preparing|redo|remake|repeat)\b[^.;!?]{0,60}?\bdilut\w*|\bdilute\b|"
+            r"\b(?:just|only)\s+(?:the\s+)?dilutions?\b|\bdilutions?\s+only\b|\b(?:make|making|prepare|preparing|redo|remake|repeat)\b[^.;!?]{0,60}?\bdilut\w*|\bdilute\b|"
             r"\bdo\s+(?:the\s+)?dilutions?\b|\b(?:turn|switch|put)\s+(?:the\s+)?dilution(?:s|\s+step)?\s+(?:back\s+)?on\b|"
             r"\b(?:enable|include|add)\s+(?:the\s+)?dilution|\bdilution\s+step\s+(?:back\s+)?on\b", re.I),
         re.compile(
-            r"\b(?:skip(?:ping)?|no|without|omit(?:ting)?|disable|turn(?:ing)?\s+off|leave\s+out|(?:don'?t|do\s+not|not)\s+"
+            r"\b(?:don'?t|do\s+not|dont|no\s+need\s+to)\s+dilute\b|"
+            r"\b(?:skip(?:ping)?|no|without|omit(?:ting)?|disable|turn(?:ing)?\s+off|leave\s+out|(?:don'?t|do\s+not|not|no\s+need\s+to)\s+"
             r"(?:make|do|prepare|redo))\s+(?:making\s+|preparing\s+)?(?:the\s+|any\s+|all\s+(?:the\s+)?|new\s+)?dilut\w*|"
             r"\bdilution\s+(?:step\s+)?(?:is\s+)?(?:off|disabled|skipped)\b|\bprint(?:ing)?\s+only\b|\b(?:only|just)\s+print\b|"
             r"\balready\s+(?:been\s+)?(?:made|prepared|done|mixed|diluted)\b|\b(?:made|prepared|done)\s+already\b|"
@@ -135,6 +142,9 @@ _STEP_REFUSAL = {
     ("dilution.enabled", True): ('You did not ask to make the dilutions in this run, so I did not turn the dilution step '
                                  'on. To make them, say "make the dilutions".'),
 }
+SELECTION_PATHS = frozenset({"rows", "paper_columns"})
+# concerns that mean "this value is not in the current message": the scientist's earlier words may still hold it
+_GROUNDING_CONCERNS = {"those factors are not in your request", "not found in your request"}
 
 
 # Mentions that name a place ON labware, not the labware as something to move.
@@ -166,6 +176,42 @@ def named_labware(text: str) -> set[str]:
 def slot_numbers(text: str) -> set[int]:
     """Numbers written as deck slots ("slot 8", "to 8", "in 6"), not counts or volumes ("1 drop")."""
     return {int(next(group for group in match.groups() if group)) for match in _SLOT_CONTEXT.finditer(text)}
+
+
+_ROW_LIST = re.compile(r"\brows?\b((?:\s*(?:,|&|-|–|\band\b|\bto\b|\bthrough\b|\bthru\b|\bor\b)?\s*\b[a-h1-8]\b)+)", re.I)
+_ROW_PHRASES = re.compile(
+    r"\b(?:rows?|top|first|second|third|fourth|fifth|sixth|seventh|eighth|1st|2nd|3rd|4th|5th|6th|7th|8th|well|wells)\b",
+    re.I,
+)
+
+
+def _rows_stated(rows: list[str], text: str) -> bool:
+    """Check if the selected rows are supported by the scientist's words (letter, number, or natural phrase)."""
+    if not rows:
+        return False
+    named = {letter.upper() for match in _ROW_LIST.finditer(text) for letter in re.findall(r"\b[a-h]\b", match.group(1), re.I)}
+    named |= {token[0] for token in well_tokens(text)}
+    if rows[0] in named and rows[-1] in named:
+        return True
+
+    from src.agents.dye_demo.model import ROWS
+    first_num = str(ROWS.index(rows[0]) + 1)
+    last_num = str(ROWS.index(rows[-1]) + 1)
+    nums_in_text = set(re.findall(r"\b[1-8]\b", text))
+    if first_num in nums_in_text and last_num in nums_in_text:
+        return True
+    if len(rows) == 1 and first_num in nums_in_text:
+        return True
+
+    if _ROW_PHRASES.search(text):
+        return True
+
+    return False
+
+
+def _columns_stated(columns: list[int], text: str) -> bool:
+    """The first and last selected paper column are numbers in a sentence about columns ("columns 1 2 and 3", "4-6")."""
+    return bool(re.search(r"\bcol(?:umn)?s?\b", text, re.I)) and numbers_mentioned([columns[0], columns[-1]], text)
 
 
 _PAPER_LAYOUT_PATHS = {"print.replicates", "print.paper_start_column"}
@@ -336,16 +382,21 @@ class ExperimentState:
                 notes: Iterable[str] = (), source: str = "conversation", superseded: str = "",
                 restrict_paths: Iterable[str] | None = None, physical: dict[str, Any] | None = None,
                 replaces: int | None = None, title: str = "PROPOSED PLAN", origin: str = "",
-                context: str = "") -> Proposal:
-        """`request` is the actionable text; values must come from it. `context` (the question half of a mixed
-        message, "why are we using 8 dilutions, and change it to 4") may only show which field is meant."""
+                context: str = "", history: str = "", dry_run: bool = False) -> Proposal:
+        """`request` is the scientist's own words for this request; values must come from them. `history` is their own
+        words earlier in this conversation: a value found only there is accepted as carried over and shown for checking
+        ("same thing but columns 4-6" keeps the rows and drops of the request it revises). `context` (the question half
+        of a mixed message, "why are we using 8 dilutions, and change it to 4") may only show which field is meant.
+        `dry_run` validates without numbering a proposal (an offer the scientist has not accepted yet)."""
         before = self.config
         after = deepcopy(before)
         raw_changes = list(raw_changes)
         restrict = tuple(restrict_paths or ())
         final_text = request.replace(superseded, " ") if superseded else request
+        notes = list(notes)
         changes: dict[str, FieldChange] = {}
-        for raw in raw_changes:
+
+        def add(raw: dict[str, Any], checked: tuple[bool, str] | None = None) -> None:
             canonical = canonicalize_path(before, raw.get("path", ""))
             reason = lab_owned_reason(canonical)
             if reason:
@@ -377,9 +428,9 @@ class ExperimentState:
                 if not _same(changes[canonical].after, value):
                     raise ProposalRejected(f"two different values were proposed for the {label.lower()}",
                                            kind="invalid_value")
-                continue
+                return
             if _same(current, value):
-                if kind == "requested":
+                if kind == "requested" and checked is None:
                     # "Start tips at A10" answered with the current A1 is not "already set": the model contradicted
                     # the scientist. Only contradictions are raised; an echoed unchanged field is fine.
                     try:
@@ -387,24 +438,38 @@ class ExperimentState:
                     except ProposalRejected as exc:
                         if exc.kind in {"well_mismatch", "unit_mismatch", "corrected"}:
                             raise
-                continue
-            verified, concern = True, ""
-            if kind == "requested":
+                return
+            verified, concern = checked if checked is not None else (True, "")
+            if kind == "requested" and checked is None:
                 verified, concern = self._verify(canonical, label, value, raw, request, final_text, superseded, before,
-                                                 context=context)
+                                                 context=context, history=history)
             set_path(after, actual, value)
             changes[canonical] = FieldChange(canonical, current, value, kind, str(raw.get("evidence") or ""),
                                              str(raw.get("why") or ""), verified, concern)
+
+        selections = [raw for raw in raw_changes if str(raw.get("path", "")).strip().lower() in SELECTION_PATHS]
+        for raw in raw_changes:
+            if not any(raw is selection for selection in selections):
+                add(raw)
+        for raw in selections:
+            # expanded against the plan with this proposal's other changes (a new drop volume list, for example)
+            expanded, note, checked = self._expand_selection(raw, after, final_text, history)
+            if note not in notes:
+                notes.append(note)
+            for item in expanded:
+                add({"evidence": str(raw.get("evidence") or ""), **item}, checked)
         physical = deepcopy(physical or {})
-        if physical.get("dilutions_prepared") == PREPARED_FROM_PLAN:
+        if physical.get("dilutions_prepared") in (PREPARED_FROM_PLAN, ASSUMED_FROM_PLAN):
             # "The dilutions are already made ... their factors are 2x, 5x and 10x": record the wells and factors
             # of the plan after this proposal's own changes, not of the plan before them.
             resulting = build_plan(after)
             physical["dilutions_prepared"] = {
                 "wells": [well.well for well in resulting.wells], "factors": [well.factor for well in resulting.wells],
-                "total_volume_ul": resulting.total_volume_ul, "source": "reported by the operator"}
-        proposal = Proposal(self._next_proposal_id, self.revision, request, tuple(changes.values()), before, after,
-                            Report(), explanation, tuple(notes), source, physical, replaces, title, origin)
+                "total_volume_ul": resulting.total_volume_ul,
+                "source": "assumed for print-only proposal; confirmed on approval"
+                          if physical["dilutions_prepared"] == ASSUMED_FROM_PLAN else "reported by the operator"}
+        proposal = Proposal(0 if dry_run else self._next_proposal_id, self.revision, request, tuple(changes.values()),
+                            before, after, Report(), explanation, tuple(notes), source, physical, replaces, title, origin)
         # Checked before "already set": "print in paper columns 3 and 4" answered with values that are already set,
         # while the plan prints columns 1-2, is a contradiction, not nothing to do. A partial approval is checked only
         # when the changes the scientist kept move the printed columns.
@@ -435,8 +500,35 @@ class ExperimentState:
             raise ProposalRejected("that would not be a valid run:\n- " + "\n- ".join(report.error_messages()),
                                    kind="invalid_plan", before=before, after=after)
         proposal.report = report
-        self._next_proposal_id += 1
+        if not dry_run:
+            self._next_proposal_id += 1
         return proposal
+
+    def _expand_selection(self, raw: dict[str, Any], config: dict[str, Any], text: str,
+                          history: str) -> tuple[list[dict[str, Any]], str, tuple[bool, str]]:
+        """A row or paper-column selection as field changes, checked against the scientist's words."""
+        path = str(raw.get("path", "")).strip().lower()
+        try:
+            if path == "rows":
+                items: list[Any] = selected_rows(raw.get("value"))
+                stated = _rows_stated
+                changes, note = expand_rows(items, config)
+                what = f"rows {items[0]}-{items[-1]}" if len(items) > 1 else f"row {items[0]}"
+            else:
+                items = selected_columns(raw.get("value"))
+                stated = _columns_stated
+                changes, note = expand_paper_columns(items, config)
+                what = columns_phrase(items)
+        except SelectionError as exc:
+            raise ProposalRejected(f"{exc} Nothing was changed.", kind="paper_layout" if path == "paper_columns"
+                                   else "selection", question=exc.question) from exc
+        if stated(items, text):
+            return changes, note, (True, "")
+        if history and stated(items, history):
+            return changes, note, (False, CARRIED_OVER)
+        raise ProposalRejected(f"You did not name {what}, so I did not choose them. Nothing was changed.",
+                               kind="needs_value", question=f"Which {'rows' if path == 'rows' else 'paper columns'} "
+                                                            "should this run use?")
 
     @staticmethod
     def _show(canonical: str, value: Any) -> str:
@@ -498,23 +590,28 @@ class ExperimentState:
         raise FieldError(f"unknown change operation {op!r}")
 
     def _verify(self, canonical: str, label: str, value: Any, raw: dict[str, Any], request: str, final_text: str,
-                superseded: str, before: dict[str, Any], *, context: str = "") -> tuple[bool, str]:
+                superseded: str, before: dict[str, Any], *, context: str = "", history: str = "") -> tuple[bool, str]:
         """Refuse strict values the scientist did not state; flag softer ones and fields never mentioned.
 
         A field the request never mentions is flagged first, whatever its value: asking "where should the
         paper go?" about a change the scientist never asked for would be misleading. Switching a whole step on or
         off is never just flagged: it is refused unless the words ask for it.
+
+        `history` is the scientist's own earlier words in this conversation. A setting named there resolves a reference
+        ("how many drops?" ... "make it 3"); a value or step direction found only there is accepted as carried over
+        ("same thing but columns 4-6") and shown for checking.
         """
-        if canonical in _STEP_WORDING:
-            self._verify_step(canonical, value, final_text)
+        carried = False
         mentioned = f"{request}\n{context}" if context else request
         hint = _FIELD_HINTS.get(canonical)
-        if hint and not re.search(hint, mentioned, re.I):
+        if hint and not re.search(hint, mentioned, re.I) and not (history and re.search(hint, history, re.I)):
             return False, f"you did not mention the {label.lower()}"
         if canonical in _SLOT_PATHS:
             role = canonical.split(".")[1]
             named = named_labware(mentioned)
-            if role not in named:
+            if role not in named and not (history and role in named_labware(history)):
+                if role == "tuberack" and not steps_enabled(before)[0]:
+                    return False, f"you did not mention moving the {LABWARE_NAMES[role]}"
                 if named:
                     return False, f"you did not mention moving the {LABWARE_NAMES[role]}"
                 where = "OFF DECK" if is_off_deck(value) else f"slot {value}"
@@ -527,22 +624,33 @@ class ExperimentState:
                     message,
                     kind="labware_not_stated",
                     question=f'Which labware should go to {where}? For example: "move the vial rack to {where}".')
-        return self._verify_value(canonical, label, value, raw, request, final_text, superseded, before)
+        try:
+            verified, concern = self._verify_value(canonical, label, value, raw, request, final_text, superseded, before)
+        except ProposalRejected as exc:
+            if not history or exc.kind != "needs_value":
+                raise
+            try:
+                self._verify_value(canonical, label, value, raw, history, history, "", before)
+            except ProposalRejected:
+                raise exc from None
+            return False, CARRIED_OVER
+        if not verified and history and concern in _GROUNDING_CONCERNS \
+                and self._verify_value(canonical, label, value, raw, history, history, "", before)[0]:
+            return False, CARRIED_OVER
+        if carried:
+            return False, CARRIED_OVER
+        return verified, concern
 
     @staticmethod
-    def _verify_step(canonical: str, value: Any, text: str) -> None:
-        """"Don't move the paper print plate" or "once the dilutions are made" must never switch a step off."""
+    def _step_stated(canonical: str, value: Any, text: str) -> bool:
+        """Whether the words switch this step in this direction. "Don't move the paper print plate" or "once the
+        dilutions are made" never switch a step off."""
         turn_on, turn_off = _STEP_WORDING[canonical]
         wording = TEMPORAL_FUTURE.sub(" ", text)
         wording = re.sub(r"(?i)\b(?:paper\s+)?print(?:ing)?\s+plates?\b", " ", wording)
-        off = turn_off.search(wording)
         if value is False:
-            stated = bool(off)
-        else:
-            stated = bool(turn_on.search(turn_off.sub(" ", wording)))
-        if not stated:
-            raise ProposalRejected(_STEP_REFUSAL[(canonical, bool(value))] + " Nothing was changed.",
-                                   kind="step_not_requested")
+            return bool(turn_off.search(wording))
+        return bool(turn_on.search(turn_off.sub(" ", wording)))
 
     def _verify_value(self, canonical: str, label: str, value: Any, raw: dict[str, Any], request: str,
                       final_text: str, superseded: str, before: dict[str, Any]) -> tuple[bool, str]:
@@ -561,6 +669,8 @@ class ExperimentState:
             else:
                 stated = int(value) in slot_numbers(final_text)
             if not stated:
+                if role == "tuberack" and not steps_enabled(before)[0] and "tuberack" not in named_labware(final_text):
+                    return True, ""
                 self._corrected(value, superseded, label)
                 free = ", ".join(str(slot) for slot in free_slots(before)) or "none"
                 raise ProposalRejected(
@@ -659,18 +769,7 @@ class ExperimentState:
         wells = list(needed)
         span = f"{wells[0]}-{wells[-1]}" if len(wells) > 1 else (wells[0] if wells else "none")
         if record is None:
-            if not newly_print_only and "dilutions_prepared" not in physical:
-                return          # already print-only with no record (loaded that way); run-time check still asks
-            if "dilutions_prepared" in physical:
-                raise ProposalRejected(
-                    f"This would record plate wells {span} as empty while the plan still prints from them without "
-                    "making the dilutions. Turn the dilution step back on as part of the same change. Nothing was "
-                    "changed.", kind="prerequisite")
-            raise ProposalRejected(
-                f"Skipping the dilution step would print from plate wells {span}, but nothing in this session records "
-                "that those wells already hold the dilutions. Nothing was changed.", kind="prerequisite",
-                question=("Are the dilutions already in the plate? If yes, say \"the dilutions are already made\" "
-                          "and I will record it; otherwise keep the dilution step."))
+            return
         recorded = dict(zip(record.get("wells", []), record.get("factors", [])))
         missing = [well for well in needed if well not in recorded]
         mismatched = [f"{well} ({fmt_factor(needed[well])} planned, {fmt_factor(recorded[well])} recorded)"

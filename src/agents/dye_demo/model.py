@@ -46,6 +46,11 @@ class FieldError(ValueError):
     """A proposed value that cannot be used for its field."""
 
 
+# A proposed value found only in the scientist's earlier messages ("same thing but columns 4-6" keeps the rows of the
+# request it revises): accepted, and shown for checking.
+CARRIED_OVER = "carried over from earlier in the conversation"
+
+
 # ── formatting shared by the plan, the checks and the renderers ─────────────────
 
 def fmt_num(value: float) -> str:

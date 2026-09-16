@@ -328,10 +328,21 @@ def find_ambiguities(text: str, config: dict[str, Any]) -> list[Ambiguity]:
     plate_side = bool(_PLATE_SIDE.search(re.sub(r"(?i)paper\s+(print\s+)?plate", "paper", text)))
     for match in _COLUMN.finditer(text):
         number = int(match.group(1))
-        if _previous_word(text, match.start()) in _QUALIFIERS or not 1 <= number <= 12:
+        if not 1 <= number <= 12:
             continue
-        if paper_side != plate_side:
-            continue            # the sentence itself says which column it means
+        prev = _previous_word(text, match.start())
+        if prev in _QUALIFIERS or prev in {"source", "destination", "first", "starting"}:
+            continue
+        after = text[match.end():match.end() + 25].lower()
+        if re.match(r"^\s*(?:on|of|in|for|from|to)\s+(?:the\s+)?(paper|plate|well|vial|tip|deck|rack)\b", after):
+            continue
+        if paper_side and not plate_side:
+            continue
+        if plate_side and not paper_side:
+            continue
+        snippet = text[max(0, match.start() - 25):min(len(text), match.end() + 25)].lower()
+        if ("paper" in snippet and "plate" in snippet) or "source" in snippet or "destination" in snippet:
+            continue
         found.append(Ambiguity(match.start(), match.end(), match.group(0),
                                f'You said "{match.group(0)}." Which column do you mean?',
                                _numbered((f"PAPER column {number} (where drops print)", f"paper column {number}"),

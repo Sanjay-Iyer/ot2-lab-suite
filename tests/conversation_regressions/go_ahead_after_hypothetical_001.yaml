@@ -18,7 +18,7 @@ expected:
   turns:
   - turn: 1
     no_proposal: true
-    output_contains: ["That was a hypothetical, so nothing was changed"]
+    output_excludes: ["PROPOSED PLAN"]   # answered conversationally (the old "say it as an instruction" footer is gone)
   - turn: 2
     classification: run
     run: false

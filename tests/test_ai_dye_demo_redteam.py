@@ -96,8 +96,12 @@ def test_invariants_catch_a_hypothetical_that_becomes_a_proposal(tmp_path, monke
         return analysis
 
     monkeypatch.setattr(session_module, "analyze_turn", careless)
+    # a model that also reads the hypothetical as a change (a faithful simulated model would only answer it)
+    move = ('{"route": "experiment_change", "changes": [{"path": "deck.plate.slot", "value": 6, '
+            '"evidence": "moved the dilution plate to slot 6"}]}')
     result = replay([{"text": "What if we moved the dilution plate to slot 6?",
-                      "label": {"category": "hypothetical", "may_propose": False}}], workdir=tmp_path)
+                      "label": {"category": "hypothetical", "may_propose": False},
+                      "llm": [{"kind": "route", "reply": move}]}], workdir=tmp_path)
     assert "proposal_from_non_actionable_turn" in invariants(result)
 
 

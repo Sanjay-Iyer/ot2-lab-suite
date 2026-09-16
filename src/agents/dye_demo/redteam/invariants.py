@@ -239,7 +239,7 @@ def check_turn(tracker: Tracker, session, label: UserTurn, record: dict[str, Any
         if record["classification"] == "physical_report" and event.get("source") != "physical-report":
             tracker.fail("physical_report_not_reconciled", number,
                          f"a physical report produced a {event.get('source')} proposal instead of a reconciliation")
-        if event.get("physical") and event.get("source") not in {"physical-report", "partial-approval"}:
+        if event.get("physical") and event.get("source") not in {"physical-report", "partial-approval", "print-only-assumption"}:
             tracker.fail("physical_change_without_reconciliation", number,
                          f"proposal #{event['id']} changes physical records but came from {event.get('source')}")
         tracker.proposals[event["id"]] = {"event": event, "turn": number, "label": label,

@@ -15,8 +15,9 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
-from src.agents.dye_demo.columns import format_columns, paper_columns_printed
+from src.agents.dye_demo.columns import columns_phrase, format_columns, paper_columns_printed
 from src.agents.dye_demo.model import (
+    CARRIED_OVER,
     DECK_SLOTS,
     LABWARE_NAMES,
     LABWARE_ROLES,
@@ -462,12 +463,62 @@ def render_numbered_changes(changes: Sequence[Any]) -> str:
                      for number, change in enumerate(changes, start=1))
 
 
+def interpretation_lines(proposal: Any) -> list[str]:
+    """What a proposal does, in the scientist's terms: the "I interpreted that as" summary. Built from the validated
+    changes and the resulting plan, never from the model's own description of them."""
+    after = proposal.after
+    paths = [change.path for change in proposal.changes]
+    plan = build_plan(after)
+    wells = _range([well.well for well in plan.wells])
+    lines: list[str] = []
+    if "dilution.enabled" in paths:
+        lines.append("make the dilutions in this run" if plan.do_dilution else
+                     f"skip dilution preparation - print from the samples already in plate wells {wells}")
+    if "print.enabled" in paths:
+        lines.append("print in this run" if plan.do_print else "skip printing - make the dilutions only")
+    if {"dilution.start_row", "dilution.factors"} & set(paths) and plan.wells:
+        rows = [well.row for well in plan.wells]
+        factors = pipes(fmt_factor(well.factor) for well in plan.wells)
+        if "dilution.start_row" in paths:
+            lines.append((f"rows {rows[0]}-{rows[-1]}" if len(rows) > 1 else f"row {rows[0]}")
+                         + f" - plate wells {wells} ({factors})")
+        else:
+            lines.append(f"{len(rows)} dilution{'s' if len(rows) != 1 else ''}: {factors} (plate wells {wells})")
+    if {"print.paper_start_column", "print.replicates"} & set(paths) and plan.do_print:
+        lines.append(f"print {columns_phrase(paper_columns_printed(after))}")
+    shown = {"dilution.enabled", "print.enabled", "dilution.start_row", "dilution.factors", "print.paper_start_column",
+             "print.replicates"}
+    for change in proposal.changes:
+        if change.path in shown:
+            continue
+        if change.path == "print.droplets_per_spot":
+            lines.append(f"{change.after} drop{'s' if change.after != 1 else ''} at each paper position")
+        elif change.path.startswith("deck."):
+            role = change.path.split(".")[1]
+            lines.append(f"take the {LABWARE_NAMES[role]} off the deck" if is_off_deck(change.after)
+                         else f"{LABWARE_NAMES[role]} in {format_slot(change.after)}")
+        else:
+            lines.append(f"{field_label(change.path).lower()}: {format_value(change.path, change.after)}")
+    return lines
+
+
+def render_answer(answer: str) -> str:
+    """A conversational reply: the model's words, with nothing about modes or commands around them."""
+    paragraphs = [paragraph.strip() for paragraph in answer.strip().split("\n")]
+    body = "\n       ".join(paragraphs)
+    return f"agent> {body}"
+
+
 def _proposal_attention(proposal: Any) -> list[str]:
     items: list[str] = []
-    unverified = [change for change in proposal.changes if not change.verified]
+    unverified = [change for change in proposal.changes if not change.verified and change.concern != CARRIED_OVER]
+    carried = [change for change in proposal.changes if not change.verified and change.concern == CARRIED_OVER]
     if unverified:
         items.append("CHECK THESE - I could not find them in what you typed:")
         items += [f"  - {field_label(change.path)}: {format_value(change.path, change.after)}" for change in unverified]
+    if carried:
+        items.append("CARRIED OVER FROM EARLIER IN THE CONVERSATION - check these still apply:")
+        items += [f"  - {field_label(change.path)}: {format_value(change.path, change.after)}" for change in carried]
     warned = {issue.code for issue in proposal.report.warnings}
     for change in proposal.changes:
         if change.path == "dilution.enabled" and change.after is False and "print.assumes_prepared" not in warned:

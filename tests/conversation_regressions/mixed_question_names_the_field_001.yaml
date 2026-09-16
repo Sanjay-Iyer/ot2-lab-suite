@@ -21,4 +21,4 @@ expected:
   - turn: 1
     classification: mixed
     proposal_paths: [dilution.factors]
-    output_contains: ["ASK MODE", "PROPOSED PLAN #1"]
+    output_contains: ["PROPOSED PLAN #1"]   # one router reply answers and proposes; no separate ask-mode screen

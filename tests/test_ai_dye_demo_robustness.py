@@ -107,7 +107,7 @@ def test_01_normal_science_question_does_not_change_state(tmp_path):
     for turn in (1, 2, 3):
         assert c.unchanged(turn) and not c.proposals(turn)
         assert c.record(turn)["classification"] == "question"
-        assert "ASK MODE" in c.out(turn)
+        assert c.out(turn).lstrip().startswith("agent> ") and "ASK MODE" not in c.out(turn)   # a plain answer
     assert c.state.revision == 0
 
 
@@ -171,10 +171,12 @@ def test_06_polite_requests_generate_proposals(tmp_path, text):
 
 
 def test_mixed_question_and_instruction_answers_then_proposes(tmp_path):
-    c = talk(tmp_path, ("Why are we using 8 dilutions, and actually change it to 4.",
-                        reply(item("dilution.factors", None, "change it to 4", op="set_count", count=4))))
+    # one router reply carries both the answer and the change
+    answered = reply(item("dilution.factors", None, "change it to 4", op="set_count", count=4)) | {
+        "answer": "Eight dilutions cover the whole range."}
+    c = talk(tmp_path, ("Why are we using 8 dilutions, and actually change it to 4.", answered))
     assert c.record(1)["classification"] == "mixed"
-    assert "ASK MODE" in c.out(1) and "PROPOSED PLAN #1" in c.out(1)
+    assert "Eight dilutions cover the whole range." in c.out(1) and "PROPOSED PLAN #1" in c.out(1)
     assert [event["paths"] for event in c.proposals(1)] == [["dilution.factors"]]
     assert c.unchanged(1) and c.config["dilution"]["factors"] == DEFAULT["dilution"]["factors"]
 
@@ -249,11 +251,11 @@ def test_12_off_deck_works_for_a_print_only_run_and_is_refused_when_a_step_needs
 
 # 13
 def test_13_pronoun_ambiguity_asks_rather_than_guesses(tmp_path):
+    # With nothing earlier to refer to, the router asks which labware (in its own words) instead of guessing.
     c = talk(tmp_path, "Move it to slot 7.", "none", "Take that off the deck.")
     assert not c.proposals(1) and c.session.turns[0]["clarifying_after"]
-    assert 'You said "it". Which labware do you mean?' in c.out(1)
-    assert "the 96-well dilution plate (slot 4)" in c.out(1) and "the Vial rack (slot 7)" in c.out(1)
-    assert c.state.revision == 0 and not c.proposals(3)
+    assert [event for event in c.rows[0]["events"] if event["type"] == "clarification"]
+    assert c.state.revision == 0 and not c.proposals(2) and not c.proposals(3)
 
 
 def test_13_pronoun_with_one_recent_referent_is_resolved_and_said_out_loud(tmp_path):
@@ -293,8 +295,9 @@ def test_15_invalid_well_in_conversation_changes_nothing(tmp_path):
 def test_16_missing_units_are_clarified_not_assumed(tmp_path):
     c = talk(tmp_path, ("Set the drop volume to 10.", reply(item("print.droplet_volume_ul", 10, "drop volume to 10"))))
     assert not c.proposals(1) and "without a unit" in c.out(1) and "Do you mean 10 µL" in c.out(1)
+    # a bare number with nothing earlier to refer to: the router asks what it means
     c = talk(tmp_path, "Use 10.", "Make it 5.")
-    assert c.record(1)["classification"] == "ambiguous_number" and 'What does "10" refer to?' in c.out(1)
+    assert c.record(1)["classification"] == "ambiguous_number" and c.session.turns[0]["clarifying_after"]
     assert not c.proposals(1) and not c.proposals(2) and c.state.revision == 0
 
 
@@ -483,11 +486,12 @@ def test_29_false_completion_claims_go_through_reconciliation(tmp_path):
 
 
 # 30
-def test_30_printing_before_the_dilutions_exist_is_clarified(tmp_path):
+def test_30_print_only_assumption_is_proposed_before_becoming_authoritative(tmp_path):
     c = talk(tmp_path, ("Skip making the dilutions and just print.",
                         reply(item("dilution.enabled", False, "skip making the dilutions"))))
-    assert not c.proposals(1) and "nothing in this session records" in c.out(1)
-    assert "already hold the dilutions" in c.out(1) and c.state.revision == 0
+    assert c.proposals(1) and "I interpreted this as a print-only run using the existing prepared samples" in c.out(1)
+    assert c.state.physical["dilutions_prepared"] is None and c.state.revision == 0
+    assert c.session.pending.physical["dilutions_prepared"]["source"] == "assumed for print-only proposal; confirmed on approval"
     c = talk(tmp_path, "Print the 10× dilution.", "Make the second serial dilution.")
     assert c.record(1)["classification"] == "unsupported" and c.record(2)["classification"] == "unsupported"
     assert c.unchanged(1) and c.unchanged(2)
@@ -528,7 +532,7 @@ def test_33_empty_input_is_safe(tmp_path, text):
 def test_34_incomplete_command_is_safe(tmp_path, text):
     c = talk(tmp_path, text)
     assert c.unchanged(1) and not c.proposals(1)
-    assert "Before I change anything" in c.out(1)
+    assert c.session.turns[0]["clarifying_after"]          # asked what is missing (in the router's own words)
 
 
 # 35

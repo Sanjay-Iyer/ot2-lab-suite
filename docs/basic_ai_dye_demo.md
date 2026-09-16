@@ -8,23 +8,42 @@ python scripts\ai_dye_demo.py --simulate   # local only; never contacts a robot
 python scripts\ai_dye_demo.py              # real OT-2, after you type run
 ```
 
-### Simulation-only NiceGUI prototype
+### NiceGUI page (build the experiment, then Run on OT-2)
 
-On the home/simulation laptop, the browser interface is:
+On the work laptop:
 
 ```powershell
-conda activate ai
-python scripts\ai_dye_demo_gui.py --simulate
+conda activate llm
+python scripts\ai_dye_demo_gui.py --session-label "Demo 2"
 ```
 
-It runs the same `DemoSession` as the terminal in a background thread. Chat,
-Apply/Discard and Simulate are sent through the session's normal input; direct
-controls create validated proposals and never mutate the Current Plan before
-Apply. Plate, paper and vial-rack PNG/JPG references are held only in browser
-session memory. The launcher refuses to start without `--simulate`; it contains
-no live-robot option. `--offline` starts the page without an LLM for UI rehearsal,
-so terminal-style plan commands and direct controls work but natural-language
-interpretation does not.
+Launching never contacts the robot: the page only needs the LLM login. Build the
+experiment in the AI Agent Chatbox or with the GUI controls, and Apply each proposal.
+The Current Plan card is what will run.
+
+**Run on OT-2** (after a confirmation dialog) is the only way to start a run from the
+page; typing `run` in the chat is refused. It then:
+
+1. checks that the OT-2 answers (`configs/robot.yaml`, mDNS, last known address,
+   discovery; the `/health` serial must match). If it does not, the page says
+   **Cannot reach the OT-2, so nothing was run. The plan is unchanged.**, and you can
+   press Run on OT-2 again once it is connected;
+2. asks the terminal demo's safety questions when they apply (deck changed, print
+   without dilutions, previous run did not finish), with Yes/No buttons;
+3. runs the terminal demo's robot path unchanged (`scripts/run_vial_print_robot.py
+   --live`: build + simulate, upload over the HTTP API, start, monitor). Its output
+   streams into ROBOT RUNNER OUTPUT and the server window.
+
+While the robot runs, **Stop robot** stays at the top of the page. It asks the runner
+to stop exactly as Ctrl-C does in the terminal: the runner sends the OT-2 a stop
+action, waits for the robot to report it stopped, and the page shows the outcome.
+If the OT-2 does not confirm, stop the run in the Opentrons App. Use the Stop button
+rather than closing the server window during a run.
+
+`--operator NAME` skips the name question in the chat. `--simulate` rehearses on any
+laptop: the button builds and simulates only (`--offline` adds no-LLM rehearsal).
+Plate, paper and vial-rack PNG/JPG references are held only in browser memory.
+Logs go to `runs\ai_dye_demo_gui\YYYYMMDD_HHMMSS\` (same files as the terminal demo).
 
 The agent never writes robot Python. It proposes explicit parameter changes. Python
 checks every change against the P20's real limits and the deck, shows exactly what

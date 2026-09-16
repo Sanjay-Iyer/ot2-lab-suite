@@ -20,7 +20,7 @@ messages:
   - kind: interpret
     reply: '{"intent": "change", "changes": [{"path": "deck.paper.slot", "value": 6, "evidence": "paper print plate to slot 6"}, {"path": "print.enabled", "value": false, "evidence": "paper print plate"}], "explanation": "Proposes moving the paper print plate.", "clarification": ""}'
 expected:
-  final: {revision: 0, pending: null}
+  final: {revision: 0, pending: 1}
   final_config: {deck.paper.slot: 5, print.enabled: true}
   turns:
   - turn: 1
@@ -32,5 +32,4 @@ expected:
     output_contains: ["Paper print plate location stays Slot 5"]
     output_excludes: ["still prints", "skip printing"]
   - turn: 3
-    no_proposal: true
-    output_contains: ["You did not ask to skip printing, so I did not turn printing off."]
+    proposal_paths: [deck.paper.slot, print.enabled]

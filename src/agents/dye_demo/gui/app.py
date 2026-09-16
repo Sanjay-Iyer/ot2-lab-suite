@@ -9,10 +9,16 @@ from typing import Any
 from nicegui import events, ui
 
 from src.agents.dye_demo import render
-from src.agents.dye_demo.columns import paper_columns_printed
+from src.agents.dye_demo.columns import format_columns, format_rows, paper_columns_printed
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter, GuiSnapshot
 from src.agents.dye_demo.model import fmt_factor, format_slot, material_label, material_spec, slot_of
 from src.agents.dye_demo.plan import build_plan
+
+from src.agents.dye_demo.gui.labware_svg import (
+    render_paper_svg,
+    render_plate_svg,
+    render_tuberack_svg,
+)
 
 REPO = Path(__file__).resolve().parents[4]
 DEFAULT_REFERENCE_IMAGES = {
@@ -25,7 +31,7 @@ _PHYSICAL_LABELS = {
     "Paper print plate": "Paper substrate / holder",
     "Vial rack": "20 mL vial rack",
 }
-CHAT_TITLE = "AI Agent Chatbox"
+CHAT_TITLE = "Chat"
 CHAT_HISTORY_HEIGHT_PX = 560
 OUTPUT_LINES = 3000
 
@@ -35,6 +41,24 @@ class FlowStep:
     title: str
     source: str
     destination: str
+
+
+def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION") -> None:
+    plate_svg = render_plate_svg(config)
+    tuberack_svg = render_tuberack_svg(config)
+    paper_svg = render_paper_svg(config)
+
+    ui.label(title).classes("font-semibold text-slate-700 mt-4 mb-1 text-base")
+    with ui.row().classes("w-full gap-4 items-start flex-wrap"):
+        if plate_svg:
+            with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+                ui.html(plate_svg).classes("w-full")
+        if tuberack_svg:
+            with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+                ui.html(tuberack_svg).classes("w-full")
+        if paper_svg:
+            with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+                ui.html(paper_svg).classes("w-full")
 
 
 def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
@@ -53,14 +77,15 @@ def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
             f"96-well plate, {format_slot(slot_of(config, 'plate'))} · wells {wells} · dilutions {factors}",
         ))
     if plan.do_print:
-        columns = " | ".join(map(str, paper_columns_printed(config))) or "none"
+        columns = format_columns(paper_columns_printed(config))
+        rows = format_rows([well.row for well in plan.wells])
         drops = int(config["print"].get("droplets_per_spot", 1))
         number = "drop" if drops == 1 else "drops"
         steps.append(FlowStep(
             f"STEP {len(steps) + 1} — PRINT",
             f"96-well plate, {format_slot(slot_of(config, 'plate'))} · dilution wells {wells}",
             f"Paper substrate / holder, {format_slot(slot_of(config, 'paper'))} · columns {columns} · "
-            f"{drops} {number} per position",
+            f"rows {rows} · {drops} {number} per position",
         ))
     return steps
 
@@ -76,32 +101,50 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .plan-grid { display:grid; grid-template-columns:minmax(150px, .8fr) minmax(180px, 1.2fr); gap:4px 14px; }
         .plan-label { color:#64748b; }
         .chat-scroll { min-height: 0; }
-        .chat-scroll .q-message-text-content div { white-space: pre-wrap; }
-        .chat-scroll .mono .q-message-text-content div { font-family: Consolas, ui-monospace, monospace; font-size: 12px; }
-        .page-header { position: sticky; top: 0; z-index: 100; background: #f5f7f6; padding: 6px 0; }
+        .chat-scroll .q-message-text-content div { white-space: pre-wrap; font-size: 14.5px; line-height: 1.5; }
+        .chat-scroll .mono .q-message-text-content div { font-family: Consolas, ui-monospace, monospace; font-size: 13.5px; }
+        .chat-scroll strong, .chat-scroll b { font-weight: 700; color: #166534; }
+        @media (min-width: 640px) and (min-height: 500px) {
+            .page-header { position: sticky; top: 0; z-index: 100; background: #f5f7f6; padding: 6px 0; }
+        }
         .section-chat { border: 3px solid #111827; border-radius: 10px; box-shadow: none; }
         .section-plan { border: 1px solid #5b8db8; box-shadow: none; }
         .section-run { border: 2px solid #b91c1c; box-shadow: none; }
         .section-tool { border: 1px solid #6f9b7a; box-shadow: none; }
-        .flow-step { border-left: 3px solid #8ab1d2; background: #f8fbfe; }
+        .flow-step { border: 1px solid #c5d2dc; border-left: 4px solid #628098; background: #f3f6f8; }
+        .flow-step-title { font-size: 15px; font-weight: 700; color: #334e62;
+                           border-bottom: 1px solid #c5d2dc; padding-bottom: 10px; margin-bottom: 4px; width: 100%; }
+        .current-user { background: #e5e7eb; color: #374151; white-space: normal; }
+        .run-action.disabled { opacity: 1 !important; }
     """)
 
     with ui.column().classes("w-full max-w-screen-2xl mx-auto p-4 gap-4"):
         with ui.row().classes("page-header w-full items-center justify-between"):
-            ui.label("OT-2 Dye Dilution & Paper Printing").classes("text-2xl font-semibold")
-            with ui.row().classes("items-center gap-3"):
+            ui.label("Agent NanoDrop").classes("text-2xl font-semibold")
+            with ui.row().classes("items-center gap-3 flex-wrap justify-end"):
                 ui.badge("LIVE · REAL OT-2" if live else "SIMULATION ONLY",
                          color="negative" if live else "secondary").classes("text-sm px-3 py-2")
-                status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
+                user_badge = ui.badge("Current User = waiting for chat input", color=None).classes(
+                    "current-user text-sm px-3 py-2")
+                with ui.column().classes("items-center gap-1"):
+                    status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
+                    with ui.row().classes("items-center gap-1") as top_proposal_actions:
+                        top_apply_button = ui.button("Apply", icon="check",
+                                                     on_click=lambda: adapter.submit_text("yes"),
+                                                     color="positive").props("dense size=sm")
+                        top_discard_button = ui.button("Discard", icon="close",
+                                                       on_click=lambda: adapter.submit_text("no"),
+                                                       color="negative").props("outline dense size=sm")
+                top_proposal_actions.set_visibility(False)
+                top_run_button = ui.button(adapter.run_label,
+                                           icon="precision_manufacturing" if live else "play_arrow",
+                                           color="warning").classes("run-action text-lg")
+                top_run_button.set_enabled(False)
                 stop_button = ui.button("Stop robot", icon="stop", color="negative").classes("text-lg")
                 stop_button.set_visibility(False)
-        ui.label("The OT-2 is contacted only when you press Run on OT-2 · every change needs an explicit Apply" if live
-                 else "Simulation-only session · changes require an explicit proposal approval").classes("text-slate-500")
 
         with ui.card().classes("section-chat w-full p-5"):
             ui.label(CHAT_TITLE).classes("text-xl font-semibold")
-            ui.label("Describe the experiment or ask for a change in your own words.").classes(
-                "text-sm text-slate-500")
             chat_box = ui.column().classes("w-full chat-scroll overflow-y-auto gap-2")
             chat_box.style(f"height: {CHAT_HISTORY_HEIGHT_PX}px; min-height: {CHAT_HISTORY_HEIGHT_PX}px")
             with ui.row().classes("w-full items-center gap-3 bg-amber-50 p-3 rounded") as answer_row:
@@ -121,19 +164,20 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             with ui.row().classes("w-full items-center justify-between"):
                 with ui.column().classes("gap-0"):
                     ui.label("RUN ON OT-2" if live else "SIMULATE").classes("text-lg font-semibold")
-                    ui.label("Check the Current Plan above and the deck, then start the real run. The robot is "
+                    ui.label("Check the Experiment Procedure above and the deck, then start the real run. The robot is "
                              "contacted only now." if live else
-                             "Builds and simulates the Current Plan on this laptop; no robot is contacted.").classes(
+                             "Builds and simulates the Experiment Procedure on this laptop; no robot is contacted.").classes(
                         "text-sm text-slate-500")
                 run_button = ui.button(adapter.run_label, icon="precision_manufacturing" if live else "play_arrow",
-                                       color="negative" if live else "primary").classes("text-lg")
+                                       color="warning").classes("run-action text-lg")
+                run_button.set_enabled(False)
             ui.label("ROBOT RUNNER OUTPUT" if live else "BUILD AND SIMULATION OUTPUT").classes(
                 "text-sm font-semibold text-slate-500 mt-2")
             output_log = ui.log(max_lines=OUTPUT_LINES).classes("w-full h-72 text-xs")
 
         with ui.card().classes("section-tool w-full p-5"):
             ui.label("GUI PARAMETER CONTROLS").classes("text-lg font-semibold")
-            ui.label("Optional structured input; Submit creates a proposal and does not mutate the Current Plan.").classes(
+            ui.label("Optional structured input; Submit creates a proposal and does not mutate the Experiment Procedure.").classes(
                 "text-sm text-slate-500")
             controls = _controls(adapter.snapshot().current)
             submit_controls = ui.button("Submit as proposal", icon="tune")
@@ -146,9 +190,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
 
     with ui.dialog() as confirm_run, ui.card().classes("p-6 max-w-lg"):
         ui.label("Start the real OT-2 run?").classes("text-xl font-semibold")
-        ui.label("The software now connects to the OT-2, builds and simulates the protocol for the Current Plan, "
+        ui.label("The software now connects to the OT-2, builds and simulates the protocol for the Experiment Procedure, "
                  "uploads it and starts it. The robot moves as soon as the run starts. Check the deck, tips, liquids "
-                 "and paper against the Current Plan first.").classes("text-slate-600")
+                 "and paper against the Experiment Procedure first.").classes("text-slate-600")
         with ui.row().classes("w-full justify-end gap-3 mt-4"):
             ui.button("Cancel", on_click=confirm_run.close).props("flat")
             start_button = ui.button("Start run", icon="precision_manufacturing", color="negative")
@@ -161,8 +205,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         current_box.clear()
         with current_box:
             with ui.row().classes("w-full items-center justify-between"):
-                ui.label("CURRENT PLAN").classes("text-lg font-semibold")
+                ui.label("EXPERIMENT PROCEDURE").classes("text-lg font-semibold")
                 ui.badge(f"ACTIVE · revision {snapshot.revision}", color="positive")
+            _labware_visualizations(snapshot.current, "LABWARE VISUALIZATION")
             _experiment_flow(snapshot.current)
             _plan(snapshot.current_sections)
             if snapshot.validation != "All plan checks passed.":
@@ -178,6 +223,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                 with ui.row().classes("w-full items-center justify-between"):
                     ui.label(f"PROPOSED PLAN #{snapshot.proposal_id}").classes("text-lg font-semibold")
                     ui.badge("WAITING FOR APPROVAL", color="warning")
+                _labware_visualizations(snapshot.proposed, "PROPOSED LABWARE VISUALIZATION")
                 _plan(snapshot.proposed_sections)
                 if snapshot.proposal_attention:
                     with ui.card().classes("w-full bg-amber-50 text-amber-900"):
@@ -205,7 +251,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             ui.notify("Nothing is waiting for an answer.", type="info")
 
     def press_run() -> None:
-        if adapter.running or adapter.waiting != "idle":
+        if not adapter.snapshot().run_ready:
             ui.notify("Not yet: " + busy_note, type="warning")
         elif live:
             confirm_run.open()
@@ -239,6 +285,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     chat_input.on("keydown.enter", send)
     yes_button.on("click", lambda: answer("yes"))
     no_button.on("click", lambda: answer("no"))
+    top_run_button.on("click", press_run)
     run_button.on("click", press_run)
     start_button.on("click", start_run)
     stop_button.on("click", stop)
@@ -248,7 +295,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         messages = adapter.messages(last["messages"])
         for message in messages:
             with chat_box:
-                bubble = ui.chat_message(message.text, name="You" if message.role == "user" else "Assistant",
+                bubble = ui.chat_message(message.text, name="You" if message.role == "user" else "Agent NanoDrop",
                                          sent=message.role == "user")
             if "\n" in message.text:
                 bubble.classes("mono")
@@ -260,14 +307,20 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             output_log.push(line)
         last["output"] += len(lines)
         snapshot = adapter.snapshot()
-        state = (snapshot.status, snapshot.waiting, snapshot.running, snapshot.question)
+        state = (snapshot.status, snapshot.waiting, snapshot.running, snapshot.question,
+                 snapshot.operator, snapshot.run_ready, snapshot.proposed is not None)
         if state != last["state"]:
             last["state"] = state
+            user_badge.text = f"Current User = {snapshot.operator or 'waiting for chat input'}"
+            status_badge.set_visibility(snapshot.waiting != "operator")
             status_badge.text = snapshot.status
             status_badge.props(f"color={_status_color(snapshot)}")
+            top_proposal_actions.set_visibility(snapshot.proposed is not None)
             stop_button.set_visibility(snapshot.live and snapshot.running)
             idle = snapshot.waiting == "idle" and not snapshot.running
-            run_button.set_enabled(idle)
+            for button in (top_run_button, run_button):
+                button.props(f"color={'positive' if snapshot.run_ready else 'warning'}")
+                button.set_enabled(snapshot.run_ready)
             submit_controls.set_enabled(idle)
             send_button.set_enabled(snapshot.waiting != "busy")
             answer_row.set_visibility(snapshot.waiting == "question")
@@ -321,7 +374,7 @@ def _experiment_flow(config: dict[str, Any]) -> None:
     with ui.row().classes("w-full gap-3 items-stretch"):
         for step in steps:
             with ui.card().classes("flow-step grow basis-1/2 p-4 shadow-none"):
-                ui.label(step.title).classes("font-semibold text-sm")
+                ui.label(step.title).classes("flow-step-title")
                 ui.label("FROM").classes("text-xs font-semibold text-slate-500 mt-1")
                 ui.label(step.source)
                 ui.icon("south", size="1.15rem").classes("text-blue-600")

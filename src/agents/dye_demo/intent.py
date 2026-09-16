@@ -3,13 +3,14 @@
     USER LANGUAGE
         -> normalize_text()   typos, voice transcription, well and unit spellings (all recorded)
         -> analyze_turn()     question / hypothetical / quoted / negated / report / instruction / ...
-        -> TurnAnalysis       only `actionable` text may ever produce a proposed change
+        -> TurnAnalysis       the hard controls and checked facts about the message
 
-The LLM still extracts structured changes from instructions and answers questions,
-but it never decides whether a turn may change the experiment. A question, a
-hypothetical, a quotation, a pasted document, a negation, a physical-state report,
-an injection attempt or a third-party approval cannot become a proposal on its own,
-whatever the model returns.
+The session acts on a few kinds itself, whatever any model says: approvals and rejections of a
+waiting proposal, run words, undo / start over / history, physical-state reports, injection
+attempts and third-party approvals. Every other message is read by the conversational router
+(llm.converse) with the whole conversation. This analysis still supplies facts the session
+enforces on the router's output: quoted and pasted text is reference material that never
+supplies a value, and an explicit what-if gets an answer (and at most an offer), not a proposal.
 """
 from __future__ import annotations
 
@@ -395,7 +396,7 @@ _REPORT_STATE = re.compile(
     r"\b(?:is|are)\s+(?:actually|already|now|currently|really|physically|still|in\s+fact|sitting|back)\s+(?:in|at|on|off)\b|"
     r"\b(?:is|are)\s+(?:now\s+|already\s+)?off\s+(?:the\s+)?(?:deck|robot)\b", re.I)
 _REPORT_DILUTIONS = re.compile(
-    r"\b(?:dilutions?|dilution\s+series|wells?)(?:\s+(?:from|in|of|for|at|on)\b(?:\s+(?!(?:are|were|is|was|have|has)\b)"
+    r"\b(?:dilutions?|dilution\s+series|samples?|wells?)(?:\s+(?:from|in|of|for|at|on)\b(?:\s+(?!(?:are|were|is|was|have|has)\b)"
     r"[\w-]+){1,4})?\s+(?:are|were|is|was|have\s+been|has\s+been)\s+(?:already\s+|all\s+)?"
     r"(?:made|prepared|done|mixed|filled|ready)\b|\b(?:already|manually)\s+(?:made|prepared|did)\s+(?:all\s+)?"
     r"(?:of\s+)?(?:the\s+)?(?:\w+\s+){0,2}dilutions?\b|\b(?:made|prepared|did)\s+(?:all\s+)?(?:of\s+)?(?:the\s+)?"
@@ -545,9 +546,36 @@ def explanation_claims_change(explanation: str) -> bool:
     return False
 
 
+_CLAIMED_RUN = re.compile(
+    r"\b(?:i\s*(?:have|'ve|am|'m)\s+(?:now\s+|just\s+)?(?:started|starting|running|launched|launching|executing|executed)"
+    r"\b|(?:starting|launching|running|executing)\s+(?:the\s+)?(?:run|robot|protocol|experiment|ot-?2)\s+now\b|"
+    r"the\s+(?:robot|ot-?2|run|protocol)\s+(?:is\s+(?:now\s+)?(?:running|moving|starting|started)|has\s+(?:now\s+)?"
+    r"(?:started|begun))\b)", re.I)
+_EXPLICIT_WHAT_IF = re.compile(
+    r"\b(?:what\s+if|what\s+happens\s+if|what\s+(?:would|will)\s+happen|suppose|supposing|imagine|pretend|"
+    r"hypothetical(?:ly)?|let'?s\s+say|in\s+theory|assuming|i\s+(?:was\s+)?wonder(?:ing)?|just\s+curious|"
+    r"out\s+of\s+curiosity|would\s+it\s+be\s+(?:better|worse|possible|ok|okay|safe|a\s+problem))\b|"
+    r"^\s*(?:and\s+|so\s+)?if\s+(?!you\s+(?:can|could)\b)", re.I)
+
+
 def wants_something_else(text: str) -> bool:
     """'I don't want four dilutions anymore' asks for a different value without giving one."""
     return bool(_ANYMORE.search(text))
+
+
+def answer_claims_run(answer: str) -> bool:
+    """A model reply saying the robot is running or was started ("Starting the run now"). Chat never starts a run."""
+    for match in _CLAIMED_RUN.finditer(answer):
+        before = answer[max(0, match.start() - 60):match.start()]
+        if not _NEGATED_BEFORE.search(before) and not _MODAL_BEFORE.search(before):
+            return True
+    return False
+
+
+def explicit_what_if(text: str) -> bool:
+    """A message that explores a possibility instead of asking for it ("What if we moved the plate to slot 6?",
+    "Imagine we used 10 dilutions."). The router may answer it and offer the change, never propose it outright."""
+    return bool(_EXPLICIT_WHAT_IF.search(text))
 
 
 # "print" names the print STEP only as the thing being done or left out; "the paper print plate", "print positions"
@@ -678,6 +706,7 @@ class TurnContext:
     pending: bool = False
     pending_paths: tuple[str, ...] = ()
     recent_labware: tuple[str, ...] = ()
+    recent_paths: tuple[str, ...] = ()
     previous_slots: dict[str, Any] = field(default_factory=dict)
 
 
@@ -964,6 +993,10 @@ def analyze_turn(text: str, context: TurnContext | None = None) -> TurnAnalysis:
         return analysis
 
     remaining, references = _strip_reference_material(value, analysis.flags)
+    # the scientist's own words: only these may ever supply a value for a proposed change
+    analysis.details["own_words"] = re.sub(r"\s*\(quoted text\)\s*", " ", remaining).strip()
+    if references:
+        analysis.details["references"] = [part for part in references if part.strip()]
     informational: list[str] = list(references)
     actionable: list[str] = []
     superseded: list[str] = []
@@ -1158,6 +1191,15 @@ def analyze_turn(text: str, context: TurnContext | None = None) -> TurnAnalysis:
 def _check_actionable(analysis: TurnAnalysis, ctx: TurnContext) -> TurnAnalysis:
     """Turn a message with instructions into instruction/mixed, or a precise clarification."""
     action = analysis.actionable
+    recent_paths = ctx.pending_paths or ctx.recent_paths
+    if (len(recent_paths) == 1 and not recent_paths[0].startswith("deck.")
+            and (_BARE_NUMBER.match(action) or _RELATIVE_ALONE.match(action))):
+        label = field_label(recent_paths[0]).lower()
+        action = re.sub(r"\b(?:it|that)\b", label, action, flags=re.I)
+        if not fields_mentioned(action):
+            action = action.rstrip(".! ") + f" for {label}"
+        analysis.actionable = action
+        analysis.notes.append(f"I interpreted your follow-up as referring to the {label} discussed most recently.")
     report = analysis.kind == "physical_report"
     base_kind = "mixed" if analysis.informational and not report else ("physical_report" if report else "instruction")
     if _incomplete(action):

@@ -218,15 +218,15 @@ PREPARED_DEFAULT = {"wells": [f"{row}11" for row in "ABCDEFGH"], "factors": [1, 
                     "total_volume_ul": 150.0, "source": "reported by the operator"}
 
 
-def test_skipping_the_dilution_step_needs_a_record_that_the_dilutions_exist(state):
-    with pytest.raises(ProposalRejected, match="nothing in this session records") as caught:
-        state.propose([change("dilution.enabled", False, "skip making the dilutions")],
-                      request="skip making the dilutions and just print")
-    assert caught.value.kind == "prerequisite" and caught.value.question
+def test_skipping_the_dilution_step_creates_print_only_proposal(state):
     proposal = state.propose([change("dilution.enabled", False, "skip making the dilutions")],
-                             request="skip making the dilutions and just print",
-                             physical={"dilutions_prepared": PREPARED_DEFAULT})
-    assert proposal.physical["dilutions_prepared"]["wells"][0] == "A11"
+                             request="skip making the dilutions and just print")
+    assert proposal.after["dilution"]["enabled"] is False
+    assert proposal.after["print"]["enabled"] is True
+    proposal_with_record = state.propose([change("dilution.enabled", False, "skip making the dilutions")],
+                                         request="skip making the dilutions and just print",
+                                         physical={"dilutions_prepared": PREPARED_DEFAULT})
+    assert proposal_with_record.physical["dilutions_prepared"]["wells"][0] == "A11"
 
 
 def test_dependent_changes_are_explained(state):
@@ -426,8 +426,14 @@ def test_the_summary_names_both_steps_and_how_to_start(config):
 
 
 def test_the_greeting_and_help_name_the_trigger_and_ask_mode():
-    for text in (GREETING.format(name="Stephen", trigger=TRIGGER), HELP.format(trigger=TRIGGER)):
-        assert f"type {TRIGGER} to start it" in text and "/ask" in text
+    greeting = GREETING.format(name="Stephen", trigger=TRIGGER)
+    help_text = HELP.format(trigger=TRIGGER)
+    for text in (greeting, help_text):
+        assert f"type {TRIGGER} to start it" in text
+    assert "/ask" in help_text
+    assert "What are you working on today — **PRINTING**, **DILUTIONS**, or **BOTH**?" in greeting
+    assert "You can also just tell me what you want to do." in greeting
+    assert "If you'd like more information, ask for help." in greeting
 
 
 # ── deterministic language ──────────────────────────────────────────────────────
@@ -520,8 +526,14 @@ def test_interpretations_are_parsed_strictly():
     assert parse_interpretation('{"intent": "question", "answer": "Because."}').answer == "Because."
     with pytest.raises(LLMError, match="path and a value"):
         parse_interpretation('{"changes": [{"value": 2}]}')
-    with pytest.raises(LLMError, match="JSON object"):
-        parse_interpretation("I would rather write you a protocol in Python.")
+    with pytest.raises(LLMError, match="malformed JSON"):
+        parse_interpretation('Sure! {"changes": [{"path": "deck.plate.slot", "value": 6}')
+    # A router reply with no JSON at all is prose: shown as an answer, and it can never carry a change.
+    prose = parse_interpretation("I would rather write you a protocol in Python.")
+    assert prose.route == "experiment_question" and prose.changes == [] and prose.answer.startswith("I would rather")
+    # an answer or a question never carries changes, whatever else the reply contains
+    assert parse_interpretation('{"route": "general_question", "answer": "Hi.", "changes": [{"path": "deck.plate.slot", '
+                                '"value": 6}]}').changes == []
 
 
 def test_session_labels_carry_the_date(tmp_path):

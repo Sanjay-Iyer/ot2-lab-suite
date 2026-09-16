@@ -46,6 +46,14 @@ class GuiSnapshot:
     waiting: str          # idle, busy, operator, question, proposal or clarify
     question: str         # the yes/no question waiting for an answer
     running: bool         # the build or robot runner is running
+    operator: str         # display the existing session identity
+    validation_ok: bool   # the existing plan validation report, not a separate check
+
+    @property
+    def run_ready(self) -> bool:
+        """UI readiness; the existing run path still performs all execution-time checks."""
+        return (self.waiting == "idle" and not self.running and self.proposed is None
+                and bool(self.operator) and self.validation_ok and self.status != "SESSION ENDED")
 
 
 class DemoGuiAdapter:
@@ -109,7 +117,11 @@ class DemoGuiAdapter:
 
     def _write(self, text: str = "") -> None:
         text = str(text)
-        display = text.strip("\n")
+        display = text.strip("\n").strip()
+        if display.startswith("agent> "):
+            display = display[7:].lstrip()
+        elif display.startswith("agent>"):
+            display = display[6:].lstrip()
         if "PROPOSED PLAN #" in text and render.APPLY_PROMPT in text:
             display = "Proposed Plan updated. Review it below, then choose Apply or Discard."
         elif "CURRENT PLAN" in text and render.RULE in text:
@@ -122,6 +134,12 @@ class DemoGuiAdapter:
                 self._messages.append(ChatMessage("assistant", display))
 
     def _add(self, role: str, text: str) -> None:
+        if role == "assistant":
+            text = text.strip()
+            if text.startswith("agent> "):
+                text = text[7:].lstrip()
+            elif text.startswith("agent>"):
+                text = text[6:].lstrip()
         with self._lock:
             self._messages.append(ChatMessage(role, text))
 
@@ -238,6 +256,8 @@ class DemoGuiAdapter:
             waiting=waiting,
             question=question if waiting == "question" else "",
             running=running,
+            operator=session.operator,
+            validation_ok=report.ok,
         )
 
     def _status(self, waiting: str, running: bool, ended: bool) -> str:

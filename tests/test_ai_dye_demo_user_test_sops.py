@@ -239,7 +239,7 @@ def test_scripted_user_path_reaches_the_expected_final_state(replays, sop, name)
     (1, "confused", 8, 'You said "vial 5". Vials are named A1-B4.'),
     (1, "change_of_mind", 4, "replaces #2"),
     (2, "confused", 1, "The current plan has no 5×, 10×, 20× dilutions"),
-    (2, "confused", 2, "nothing in this session records that those wells already hold the dilutions"),
+    (2, "confused", 2, "I interpreted this as a print-only run using the existing prepared samples"),
     (2, "confused", 8, "did not mention the replicate paper columns"),
     (3, "confused", 1, 'If you meant a column, say "plate column 3"'),
     (3, "confused", 4, "8 dilutions starting at row D run past row H"),      # the series is still 8 long
@@ -285,8 +285,9 @@ def test_a_row_alone_is_a_value_and_its_answer_is_not_lost(tmp_path):
 
 
 def test_an_answer_to_a_what_should_it_be_question_joins_the_request(tmp_path):
+    # the router asks what is missing (in its own words); the bare answer is read with the conversation
     result = talk(tmp_path, "Set the replicate paper columns.", said("2", change("print.replicates", 2, "2")), "yes")
-    assert "What should the replicate paper columns be?" in output(result, 1)
+    assert events(result, 1, "clarification") and not events(result, 1, "proposal")
     assert events(result, 2, "proposal") and result["session"].state.config["print"]["replicates"] == 2
 
 
@@ -344,9 +345,11 @@ def test_leaving_a_step_out_without_an_instruction(text, step):
 
 
 @pytest.mark.parametrize("text", ["Don't print anything this time.", "No printing this run, just dilutions."])
-def test_saying_not_to_print_explains_that_the_plan_still_prints(tmp_path, text):
-    result = talk(tmp_path, {"text": text, "label": {"category": "negation", "may_propose": False}})
-    assert "this plan still prints in this run" in output(result, 1) and 'say "skip printing"' in output(result, 1)
+def test_saying_not_to_print_proposes_disabling_the_step(tmp_path, text):
+    # the router reads leaving out the step as a request (no regex shortcut); validation still checks the wording
+    result = talk(tmp_path, said(text, change("print.enabled", False, text)))
+    assert events(result, 1, "proposal")
+    assert result["session"].pending.after["print"]["enabled"] is False
     record = result["session"].turns[0]
     assert record["state_before"] == record["state_after"] and not events(result, 1, "answer")
 

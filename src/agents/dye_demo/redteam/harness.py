@@ -182,7 +182,8 @@ def run_conversation(spec: ConversationSpec, *, workdir: Path, driver: Any = Non
         marks.append(len(outputs))
         interpreter.turn = len(labels)
         if hasattr(interpreter, "set_oracle"):
-            interpreter.set_oracle(turn.intended if turn.intended else None)
+            interpreter.set_oracle(turn.intended if turn.intended else None,
+                                   inert=turn.may_propose is False and not turn.may_mutate)
         return turn.text
 
     settings = SessionSettings(simulate=not spec.live_logic, config_source=DEFAULT_CONFIG,

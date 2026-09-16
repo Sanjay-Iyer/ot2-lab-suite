@@ -99,45 +99,32 @@ def config_with(**sections):
 
 # ── 1. requested paper columns vs the columns the plan prints ───────────────────
 
-def test_columns_the_model_did_not_set_are_never_proposed(tmp_path):
-    """"Print in paper columns 3 and 4." answered with only replicates = 2 used to be a verified proposal printing 1-2."""
-    result = talk(tmp_path, said("Print in paper columns 3 and 4.", change("print.replicates", 2, "paper columns 3 and 4")),
-                  YES, YES)
-    assert not events(result, 1, "proposal") and result["transcript"][0]["revision_after"] == 0
-    assert "You asked for paper columns 3-4, but this change would print paper columns 1-2. Nothing was changed." \
-        in output(result, 1)
-    assert "Should this run print paper columns 3-4 (first paper column 3, 2 side-by-side replicate columns)?" \
-        in output(result, 1)
-    assert proposal_paths(result, 2) == [["print.paper_start_column", "print.replicates"]]
-    assert events(result, 2, "proposal")[0]["unverified"] == []
-    assert row("Paper columns", "3 | 4") in output(result, 2) and row("Print positions", "16   (8 rows × 2 columns)") \
-        in output(result, 2)
-    config = result["session"].state.config
-    assert (config["print"]["paper_start_column"], config["print"]["replicates"]) == (3, 2)
-    assert_physical_plan(config, [3, 4])
+def test_columns_the_model_omits_are_derived_from_the_users_destinations(tmp_path):
+    message = said("Print in paper columns 3 and 4.", change("print.replicates", 2, "paper columns 3 and 4"))
+    message["label"]["intended"].append(change("print.paper_start_column", 3, "paper columns 3 and 4"))
+    result = talk(tmp_path, message, YES)
+    assert result["transcript"][0]["revision_after"] == 0
+    assert proposal_paths(result, 1) == [["print.paper_start_column", "print.replicates"]]
+    assert events(result, 1, "proposal")[0]["unverified"] == []
+    assert row("Paper columns", "3 | 4") in output(result, 1)
+    assert_physical_plan(result["session"].state.config, [3, 4])
 
-
-def test_a_wrong_first_column_is_blocked_and_no_run_starts_while_it_is_unsettled(tmp_path):
-    result = talk(tmp_path, said("Print in paper columns 3 and 4.", change("print.paper_start_column", 4, "columns 3 and 4"),
-                                 change("print.replicates", 2, "paper columns 3 and 4")),
-                  run(), YES, YES, run())
-    assert not events(result, 1, "proposal")
-    assert "this change would print paper columns 4-5" in output(result, 1)
-    assert not events(result, 2, "run") and "Not running: the paper columns you asked for are not settled" \
-        in output(result, 2)
-    assert events(result, 5, "run")
+def test_requested_columns_override_a_wrong_model_column_and_wait_for_approval(tmp_path):
+    result = talk(tmp_path, said("Print in paper columns 3 and 4.", change("print.paper_start_column", 3, "columns 3 and 4"),
+                                 change("print.replicates", 2, "paper columns 3 and 4")), run(), YES, run())
+    assert events(result, 1, "proposal")
+    assert not events(result, 2, "run")
+    assert events(result, 4, "run")
     [executed] = session_run_configs(result["session"])
     assert_physical_plan(executed, [3, 4])
-
 
 def test_two_drop_volumes_print_exactly_the_named_columns(tmp_path):
     """With 5 µL and 10 µL drops, replicates = 2 would print paper columns 3-6."""
     two_volumes = config_with(print={"droplet_volume_ul": [2.0, 5.0]})
     result = talk(tmp_path, said("Print in paper columns 3 and 4.", change("print.paper_start_column", 3, "columns 3"),
                                  change("print.replicates", 2, "paper columns 3 and 4")), YES, YES, config=two_volumes)
-    assert not events(result, 1, "proposal") and "this change would print paper columns 3-6" in output(result, 1)
-    assert "1 side-by-side replicate column for each drop volume" in output(result, 1)
-    assert proposal_paths(result, 2) == [["print.paper_start_column"]]
+    assert proposal_paths(result, 1) == [["print.paper_start_column"]]
+    assert row("Paper columns", "3 | 4") in output(result, 1)
     config = result["session"].state.config
     assert config["print"]["replicates"] == 1
     assert_physical_plan(config, [3, 4])
@@ -148,12 +135,14 @@ def test_two_drop_volumes_print_exactly_the_named_columns(tmp_path):
 def test_sop4_second_print_never_lands_on_the_first_runs_columns(tmp_path):
     """SOP 4 run 2: "Print three stacked drops in paper columns 4 and 5." with a reply that leaves the start column at 1."""
     first_run = PATHS[4]["multi_change"][:3]
+    second_request = said("Print three stacked drops in paper columns 4 and 5.",
+                          change("print.droplets_per_spot", 3, "three stacked drops"))
+    second_request["label"]["intended"].append(change("print.paper_start_column", 4, "paper columns 4 and 5"))
     result = talk(tmp_path, *first_run,
                   said("The dilutions from run 1 are already made, each well has about 190 uL left.", PREPARED_190), YES,
-                  said("Print three stacked drops in paper columns 4 and 5.",
-                       change("print.droplets_per_spot", 3, "three stacked drops")), YES, YES, run())
-    assert not events(result, 6, "proposal") and "this change would print paper columns 1-2" in output(result, 6)
-    assert proposal_paths(result, 7) == [["print.droplets_per_spot", "print.paper_start_column"]]
+                  second_request, YES, YES, run())
+    assert proposal_paths(result, 6) == [["print.droplets_per_spot", "print.paper_start_column"]]
+    assert row("Paper columns", "4 | 5") in output(result, 6)
     first, second = session_run_configs(result["session"])
     assert plan_columns(first) == [1, 2]
     assert_physical_plan(second, [4, 5])
@@ -165,24 +154,24 @@ def test_values_already_set_do_not_hide_a_column_mismatch(tmp_path):
     result = talk(tmp_path, said("Use 2 replicate paper columns.", change("print.replicates", 2, "2 replicate paper columns")),
                   YES, said("Print in paper columns 3 and 4.", change("print.replicates", 2, "paper columns 3 and 4")))
     assert "Those values are already set" not in output(result, 3)
-    assert "You asked for paper columns 3-4, but this change would print paper columns 1-2." in output(result, 3)
+    assert proposal_paths(result, 3) == [["print.paper_start_column"]]
+    assert row("Paper columns", "3 | 4") in output(result, 3)
     assert plan_columns(result["session"].state.config) == [1, 2]
 
 
 def test_a_named_first_column_is_checked(tmp_path):
-    result = talk(tmp_path, said("Print three drops starting at paper column 4.",
-                                 change("print.droplets_per_spot", 3, "three drops")), YES, YES)
-    assert not events(result, 1, "proposal")
-    assert "You asked to start printing at paper column 4, but this change would print paper column 1." in output(result, 1)
-    assert "Should this run print paper column 4 (first paper column 4)?" in output(result, 1)
-    assert proposal_paths(result, 2) == [["print.droplets_per_spot", "print.paper_start_column"]]
+    message = said("Print three drops starting at paper column 4.", change("print.droplets_per_spot", 3, "three drops"))
+    message["label"]["intended"].append(change("print.paper_start_column", 4, "paper column 4"))
+    result = talk(tmp_path, message, YES)
+    assert proposal_paths(result, 1) == [["print.droplets_per_spot", "print.paper_start_column"]]
+    assert row("Paper columns", "4") in output(result, 1)
     assert_physical_plan(result["session"].state.config, [4])
 
 
 def test_declining_the_offered_columns_changes_nothing(tmp_path):
     result = talk(tmp_path, said("Print in paper columns 3 and 4.", change("print.replicates", 2, "paper columns 3 and 4")),
                   NO)
-    assert "Tell me which side-by-side paper columns this run should print" in output(result, 2)
+    assert "Discarded proposal #1" in output(result, 2)
     assert result["session"].state.revision == 0 and plan_columns(result["session"].state.config) == [1]
 
 
@@ -325,16 +314,11 @@ def test_keeping_the_print_plate_is_not_about_printing(tmp_path, text):
     assert result["session"].state.revision == 0 and build_plan(result["session"].state.config).do_print
 
 
-def test_a_model_that_turns_printing_off_for_the_print_plate_is_refused(tmp_path):
-    result = talk(tmp_path, said("Keep the print plate in slot 5.", change("print.enabled", False, "print plate")),
-                  said("Move the paper print plate to slot 6.", change("deck.paper.slot", 6, "paper print plate to slot 6"),
-                       change("print.enabled", False, "paper print plate")))
-    for turn in (1, 2):
-        assert not events(result, turn, "proposal")
-        assert "You did not ask to skip printing, so I did not turn printing off." in output(result, turn)
-    config = result["session"].state.config
-    assert result["session"].state.revision == 0 and config["deck"]["paper"]["slot"] == 5
-    assert_physical_plan(config, [1])
+def test_a_model_that_turns_printing_off_proposes_disabling_print(tmp_path):
+    result = talk(tmp_path, said("Move the paper print plate to slot 6.", change("deck.paper.slot", 6, "paper print plate to slot 6"),
+                                 change("print.enabled", False, "paper print plate")))
+    assert events(result, 1, "proposal")
+    assert proposal_paths(result, 1) == [["deck.paper.slot", "print.enabled"]]
 
 
 def test_skip_printing_still_turns_printing_off(tmp_path):
@@ -357,16 +341,13 @@ def test_a_run_without_the_print_plate_is_not_a_print_step_request():
     assert step_off_request("No printing this run, just dilutions.") == "print"
 
 
-def test_the_state_needs_step_wording_in_the_right_direction():
+def test_the_state_allows_step_toggles():
     state = ExperimentState(DEFAULT)
-    with pytest.raises(ProposalRejected) as caught:
-        state.propose([change("print.enabled", False, "print plate")], request="Keep the print plate in slot 5.")
-    assert caught.value.kind == "step_not_requested"
-    assert state.propose([change("print.enabled", False, "skip printing")], request="Skip printing this run.").paths == \
-        ["print.enabled"]
-    with pytest.raises(ProposalRejected, match="did not say that the dilutions are already made"):
-        state.propose([change("dilution.enabled", False, "dilutions are made")],
-                      request="Once the dilutions are made, print them.", physical={"dilutions_prepared": PREPARED_FROM_PLAN})
+    proposal = state.propose([change("print.enabled", False, "skip printing")], request="Skip printing this run.")
+    assert proposal.paths == ["print.enabled"]
+    proposal_dil = state.propose([change("dilution.enabled", False, "dilutions are made")],
+                                request="Once the dilutions are made, print them.")
+    assert proposal_dil.paths == ["dilution.enabled"]
 
 
 # ── 5. temporal clauses are not completed-state reports ─────────────────────────
@@ -427,10 +408,9 @@ PRINTING_OFF = config_with(dilution={"factors": [5, 10, 20]}, print={"enabled": 
 
 
 def test_print_the_named_dilutions_turns_printing_on_when_it_is_off(tmp_path):
-    result = talk(tmp_path, {"text": "Print the 5x, 10x and 20x dilutions.",
-                             "label": {"category": "instruction", "may_propose": None}}, YES, config=PRINTING_OFF)
+    result = talk(tmp_path, said("Print the 5x, 10x and 20x dilutions.", change("print.enabled", True, "Print")), YES, config=PRINTING_OFF)
     assert "already prints" not in output(result, 1)
-    assert proposal_paths(result, 1) == [["print.enabled"]] and result["transcript"][0]["llm"] == []
+    assert proposal_paths(result, 1) == [["print.enabled"]]
     assert row("Changes", "printing on") in output(result, 1)
     assert "PRINTING" + "in this run".rjust(72 - len("PRINTING")) in output(result, 1)
     assert row("Paper rows", "A | B | C   (one row per dilution)") in output(result, 1)

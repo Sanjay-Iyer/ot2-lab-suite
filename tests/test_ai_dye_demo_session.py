@@ -158,7 +158,8 @@ def test_spot_is_confirmed_as_a_slot_before_the_llm_interprets_anything(tmp_path
     harness = Harness(tmp_path, ["Stephen", "Move the dilution plate to spot 6.", "yes", "yes", "quit"],
                       replies=[proposal(("deck.plate.slot", 6, "dilution plate to deck slot 6"))]).run()
     assert 'You said "spot 6." Did you mean OT-2 deck SLOT 6?' in harness.text
-    interpreted = harness.llm.calls[1][-1][1]
+    # the router reads the confirmed wording as the message (the conversation it also sees still shows "spot 6")
+    interpreted = harness.llm.calls[1][-1][1].split("SCIENTIST'S MESSAGE:\n")[-1]
     assert "deck slot 6" in interpreted and "spot 6" not in interpreted
     assert harness.state.config["deck"]["plate"]["slot"] == 6
 
@@ -171,11 +172,12 @@ def test_rejecting_the_meaning_of_an_ambiguous_word_changes_nothing(tmp_path):
 
 
 def test_a_question_without_ask_is_answered_and_nothing_changes(tmp_path):
+    # Answered conversationally by the router (no ask-mode screen, no "say it as an instruction" footer).
     harness = Harness(tmp_path, ["Stephen", "why do we mix before printing?", "quit"],
-                      replies=[{"intent": "question", "changes": [], "answer": "So the dye stays mixed."}]).run()
-    assert "ASK MODE — no experiment parameters changed." in harness.text
-    assert "That read as a question, so nothing was changed" in harness.text
-    assert harness.state.revision == 0
+                      replies=[{"route": "experiment_question", "changes": [], "answer": "So the dye stays mixed."}]).run()
+    assert "agent> So the dye stays mixed." in harness.text
+    assert "ASK MODE" not in harness.text and "say it as an instruction" not in harness.text
+    assert harness.state.revision == 0 and harness.session.pending is None
 
 
 def test_resent_unchanged_values_are_dropped_and_the_dilution_plan_survives(tmp_path):

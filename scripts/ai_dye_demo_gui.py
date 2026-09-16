@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     app.on_shutdown(adapter.stop)
     # One session for the whole server: every browser page shows it (the page function runs per page load).
     ui.run(lambda: build_page(adapter), host=args.host, port=args.port, show=not args.no_browser,
-           title="OT-2 Dye Demo", reload=False)
+           title="Agent NanoDrop", reload=False)
     return 0
 
 

@@ -27,7 +27,7 @@ expected:
   - turn: 1
     classification: vague_quantity
     no_proposal: true
-    output_contains: ["How many drops exactly?"]
+    clarifying_after: true        # the conversational router asks how many, in its own words
   - turn: 2
     classification: chat
     proposal_paths: [print.droplets_per_spot]
