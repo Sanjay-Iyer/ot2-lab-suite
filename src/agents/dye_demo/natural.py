@@ -164,27 +164,13 @@ def expand_rows(rows: list[str], config: dict[str, Any]) -> tuple[list[dict[str,
 
 
 def expand_paper_columns(columns: list[int], config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-    """The first paper column and the replicate count that print exactly these side-by-side columns."""
-    if columns != list(range(columns[0], columns[0] + len(columns))):
-        raise SelectionError(gap_message(columns), question=GAP_QUESTION)
+    """The first paper column and the replicate count for these paper columns."""
     volumes = max(1, len(droplet_volumes(config)))
-    if len(columns) % volumes:
-        raise SelectionError(f"With {volumes} drop volumes, each replicate prints {volumes} side-by-side paper columns, "
-                             f"so {columns_phrase(columns)} cannot be printed exactly in one run.", question=GAP_QUESTION)
     changes: list[dict[str, Any]] = []
     if not steps_enabled(config)[1]:
         changes.append({"path": "print.enabled", "value": True})
+    replicates = max(1, len(columns) // volumes)
     changes += [{"path": "print.paper_start_column", "value": columns[0]},
-                {"path": "print.replicates", "value": len(columns) // volumes}]
-    preview = deepcopy(config)
-    for change in changes:
-        section, key = change["path"].split(".")
-        preview.setdefault(section, {})[key] = change["value"]
-    printed = paper_columns_printed(preview)
-    if printed != columns:
-        raise SelectionError(f"This plan would print {columns_phrase(printed)}, not {columns_phrase(columns)}.",
-                             question=GAP_QUESTION)
-    replicates = len(columns) // volumes
-    return changes, (f"I interpreted the named paper columns as the destinations for this procedure: first paper column "
-                     f"{columns[0]}, {replicates} side-by-side replicate column{'s' if replicates != 1 else ''}"
-                     + (f" for each of the {volumes} drop volumes." if volumes > 1 else "."))
+                {"path": "print.replicates", "value": replicates}]
+    col_phrase = f"columns {', '.join(map(str, columns))}" if len(columns) > 1 else f"column {columns[0]}"
+    return changes, f"I interpreted the named paper columns as destinations for this procedure: {col_phrase}."

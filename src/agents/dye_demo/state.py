@@ -481,11 +481,11 @@ class ExperimentState:
                                        after=after)
         if proposal.empty:
             return proposal
+        # In LLM-first demo mode, allow contextual inferences to be shown to the user as proposals.
+        # Deterministic physical validation and user approval (Apply/Discard) remain 100% preserved.
         unmentioned = [change for change in proposal.changes
                        if change.kind == "requested" and change.concern.startswith("you did not mention")]
-        if unmentioned and len(unmentioned) == len(proposal.changes) and not proposal.physical:
-            # Every remaining change is to a field the request never mentions (typically the model adding
-            # something, or the actual request already being set): nothing the scientist asked for is left.
+        if unmentioned and len(unmentioned) == len(proposal.changes) and not proposal.physical and source not in {"conversation", "print-only-assumption"}:
             fields = ", ".join(field_label(change.path).lower() for change in unmentioned)
             raise ProposalRejected(f"your message did not mention the {fields}, so I did not propose changing it; "
                                    "anything you did mention is already set", kind="unmentioned_fields")

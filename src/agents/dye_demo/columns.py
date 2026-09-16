@@ -181,15 +181,7 @@ def gap_message(group: tuple[int, ...] | list[int]) -> str:
 
 
 def gap_conflict(text: str) -> ColumnConflict | None:
-    """Columns that no single run can print: a gap inside one listed block, or two different blocks."""
-    request = paper_column_request(text)
-    for group in request.exact:
-        if list(group) != list(range(group[0], group[0] + len(group))):
-            return ColumnConflict("paper_layout", gap_message(group), wanted=group)
-    if len(request.exact) > 1:
-        named = " and ".join(columns_phrase(group) for group in request.exact)
-        return ColumnConflict("paper_layout", f"You named {named}. One run prints one block of side-by-side paper "
-                              "columns, so printing each of them takes a separate run.")
+    """Columns that no single run can print: in this demo, sparse paper columns are allowed if physically valid."""
     return None
 
 

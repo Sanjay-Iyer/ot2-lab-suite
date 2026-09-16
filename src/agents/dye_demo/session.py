@@ -881,7 +881,9 @@ class DemoSession:
             notes.append("Part of this message is quoted or pasted text (see REFERENCE MATERIAL).")
         if analysis.normalized.corrections:
             notes.append("Typos read as: " + "; ".join(f'"{a}" -> "{b}"' for a, b in analysis.normalized.corrections))
-        if self.clarifying is None and self._clarify_streak:
+        if self.clarifying is not None:
+            notes.append(f'A clarification question was asked: "{self.clarifying.prompt}". The user is responding to that question.')
+        elif self._clarify_streak:
             notes.append(f"You asked {self._clarify_streak} clarifying question(s) in a row and this message answers the "
                          "last one: propose now unless a required value is still missing.")
         if self.unreconciled_report:
@@ -1281,11 +1283,12 @@ class DemoSession:
                 self._answer(analysis)
                 self.say(f"(Still waiting for your answer: {clarifying.prompt})")
                 return
-            self.clarifying = None
             if kind in _HARD_KINDS:
+                self.clarifying = None
                 self._dispatch(text, analysis)
             else:
                 self._converse(text, analysis)
+                self.clarifying = None
             return
         if clarifying.ambiguity is not None:
             choice = resolve_answer(clarifying.ambiguity, text)
@@ -1301,13 +1304,13 @@ class DemoSession:
                     self._refuse(analysis)
                     self.say(f"(Still waiting for your answer: {clarifying.prompt})")
                     return
-                if self._new_request(analysis) or len(text.split()) >= 2 or any(w in text.lower() for w in ("paper", "plate", "column", "row", "vial", "slot", "drop", "wells")):
+                # Natural-language answer: pass clarification context to LLM and clear after interpretation
+                if kind in _HARD_KINDS:
                     self.clarifying = None
                     self._dispatch(text, analysis)
-                    return
-                self.say("Please answer yes or no." if clarifying.ambiguity.yes_no
-                         else "Please answer with one of the numbers above, or none.")
-                self._event("clarification", reason="answer not understood")
+                else:
+                    self._converse(text, analysis)
+                    self.clarifying = None
                 return
             self.clarifying = None
             self._resolve_choice(clarifying, choice)
