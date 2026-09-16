@@ -283,6 +283,17 @@ def normalize_label(value: Any) -> str:
     return text
 
 
+def normalize_rows(value: Any) -> list[str]:
+    from src.agents.dye_demo.natural import selected_rows
+    if isinstance(value, (list, tuple)):
+        result = [str(v).strip().upper() for v in value if str(v).strip().upper() in ROWS]
+        if result:
+            return sorted(set(result), key=ROWS.index)
+    if isinstance(value, str):
+        return selected_rows(value)
+    raise FieldError(f"selected rows must be a list of row letters (A-H), got {value!r}")
+
+
 # ── the fields a conversation may change ────────────────────────────────────────
 # Canonical paths use the material ROLE (sample/solvent); resolve_path() maps them
 # to the configured material key. Everything absent from this table is lab-owned.
@@ -300,6 +311,7 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "dilution.factors": ("Dilution factors", normalize_factors),
     "dilution.plate_column": ("Dilution plate column", normalize_plate_column),
     "dilution.start_row": ("Dilution start row", normalize_row),
+    "dilution.rows": ("Selected rows", normalize_rows),
     "dilution.total_volume_ul": ("Final volume per dilution", normalize_volume),
     "dilution.prepared_volume_ul": ("Volume now in each prepared well", normalize_optional_volume),
     "mixing.reps": ("Mixes before each print", normalize_count),

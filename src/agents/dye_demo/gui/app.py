@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nicegui import events, ui
+from nicegui import app, events, ui
 
 from src.agents.dye_demo import render
 from src.agents.dye_demo.columns import format_columns, format_rows, paper_columns_printed
@@ -92,6 +92,7 @@ def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
 
 def build_page(adapter: DemoGuiAdapter) -> None:
     """Build one browser page. Business logic remains in ``DemoSession``."""
+    app.add_static_files("/visualization", REPO / "visualization")
     adapter.start()
     live = not adapter.session.settings.simulate
     ui.colors(primary="#315c4d", secondary="#64748b", accent="#b56a35")

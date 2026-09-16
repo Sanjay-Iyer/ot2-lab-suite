@@ -223,12 +223,20 @@ def _check_dilution(config: dict[str, Any], report: Report, p20_min: float, max_
         report.error("dilution.count", f"1 to 8 dilutions are possible, got {len(factors)}")
     if any(factor < 1 for factor in factors):
         report.error("dilution.factor_below_1", "every dilution factor must be 1× or greater (1× is neat stock)")
-    start_row = str(dilution.get("start_row", "A")).upper()
-    if start_row not in ROWS:
-        report.error("dilution.start_row", f"the dilution start row must be A-H, got {start_row!r}")
-    elif ROWS.index(start_row) + len(factors) > len(ROWS):
-        report.error("dilution.past_row_h",
-                     f"{len(factors)} dilutions starting at row {start_row} run past row H")
+    explicit_rows = dilution.get("rows")
+    if isinstance(explicit_rows, (list, tuple)) and explicit_rows:
+        rows = [str(r).strip().upper() for r in explicit_rows]
+        if any(r not in ROWS for r in rows):
+            report.error("dilution.rows", f"all dilution rows must be A-H, got {explicit_rows!r}")
+        elif len(rows) != len(factors):
+            report.error("dilution.rows_count", f"number of selected rows ({len(rows)}) must match dilution factors count ({len(factors)})")
+    else:
+        start_row = str(dilution.get("start_row", "A")).upper()
+        if start_row not in ROWS:
+            report.error("dilution.start_row", f"the dilution start row must be A-H, got {start_row!r}")
+        elif ROWS.index(start_row) + len(factors) > len(ROWS):
+            report.error("dilution.past_row_h",
+                         f"{len(factors)} dilutions starting at row {start_row} run past row H")
     column = str(dilution.get("plate_column", ""))
     if not column.isdigit() or not 1 <= int(column) <= 12:
         report.error("dilution.column", f"the dilution plate column must be 1-12, got {column!r}")

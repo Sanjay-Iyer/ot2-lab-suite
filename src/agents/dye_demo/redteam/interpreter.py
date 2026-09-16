@@ -53,7 +53,7 @@ def rule_changes(text: str) -> list[dict[str, Any]]:
         (r"\b(\d|one|two|three|four|five)\s+drops?\b(?!\s+volume)", "print.droplets_per_spot", "int"),
         (r"\b(\d)\s+replicates?\b", "print.replicates", "int"),
         (r"\bpaper\s+column\s+(\d{1,2})\b", "print.paper_start_column", "int"),
-        (r"\bplate\s+column\s+(\d{1,2})\b", "dilution.plate_column", "str"),
+        (r"\b(?:96[-\s]?well\s+)?(?:dilution\s+|source\s+)?plate\s+(?:slot\s+\d+\s+)?column\s+(\d{1,2})\b|\b(?:pull|print|take|samples?)\s+from\s+(?:plate\s+)?column\s+(\d{1,2})\b|\b(?:they'?re\s+in|samples?\s+in|source\s+column)\s+(?:plate\s+)?(?:column\s+)?(\d{1,2})\b|\bcolumn\s+(\d{1,2})\s+instead\b", "dilution.plate_column", "str"),
         (r"\brow\s+([A-H])\b", "dilution.start_row", "str"),
         (r"\btips?\s+(?:at\s+|from\s+)?([A-H]\d{1,2})\b", "tips.start_tip", "str"),
         (r"\b(\d+(?:\.\d+)?)\s*µL\s+(?:total|each|per\s+(?:well|dilution))\b", "dilution.total_volume_ul", "value"),

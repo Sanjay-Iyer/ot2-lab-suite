@@ -40,13 +40,15 @@ _ROW_NUMBERS = {
 
 
 def selected_rows(value: Any) -> list[str]:
-    """["a", "b", "c"], "A-C", "1-3", "first 3", or "row 3" -> ["A", "B", "C"] or ["C"]."""
+    """["a", "c", "e"], "A, C, E", "1 3 5", "first 3", "A5 C5 E5" or "row 3" -> ["A", "C", "E"] or ["C"]."""
     if isinstance(value, (list, tuple)):
         result = []
         for item in value:
             item_str = str(item).strip().upper()
             if item_str in ROWS:
                 result.append(item_str)
+            elif len(item_str) >= 2 and item_str[0] in ROWS and item_str[1:].isdigit():
+                result.append(item_str[0])
             elif item_str in _ROW_NUMBERS:
                 result.append(_ROW_NUMBERS[item_str])
             elif item_str.isdigit() and 1 <= int(item_str) <= 8:
@@ -56,41 +58,51 @@ def selected_rows(value: Any) -> list[str]:
 
     text = " ".join(_items(value)).upper()
 
-    count_match = re.search(r"\b(?:FIRST|1ST|TOP)\s+(?:ROW\s+)?(\d{1,2}|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT)\b", text)
+    # Check for well tokens like A1, C3, E5
+    wells = re.findall(r"\b([A-H])\d{1,2}\b", text, re.I)
+    if wells:
+        return sorted({w.upper() for w in wells}, key=ROWS.index)
+
+    count_match = re.search(
+        r"\b(?:FIRST|1ST|TOP)\s+(?:ROW|WELL|ROWS|WELLS)?\s*(\d{1,2}|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT)\b|\b(?:FIRST|1ST|TOP)\s+(\d{1,2}|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT)\s+(?:ROW|WELL|ROWS|WELLS)?\b",
+        text, re.I)
     if count_match:
-        val = count_match.group(1)
+        val = count_match.group(1) or count_match.group(2)
         num_map = {"ONE": 1, "TWO": 2, "THREE": 3, "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7, "EIGHT": 8}
-        count = num_map.get(val, int(val) if val.isdigit() else 0)
+        count = num_map.get(val.upper(), int(val) if val.isdigit() else 0)
         if 1 <= count <= 8:
             return list(ROWS[:count])
 
-    span_letter = re.fullmatch(r"(?:ROWS?\s+)?([A-H])\s*(?:-|–|TO|THROUGH|THRU)\s*([A-H])", text)
+    span_letter = re.search(r"\b(?:ROWS?|WELLS?)?\s*([A-H])\s*(?:-|–|TO|THROUGH|THRU)\s*([A-H])\b", text, re.I)
     if span_letter:
-        first, last = ROWS.index(span_letter.group(1)), ROWS.index(span_letter.group(2))
+        first, last = ROWS.index(span_letter.group(1).upper()), ROWS.index(span_letter.group(2).upper())
         if first > last:
             raise SelectionError(f"rows {span_letter.group(1)}-{span_letter.group(2)} run backwards")
         return list(ROWS[first:last + 1])
 
-    span_num = re.fullmatch(r"(?:ROWS?\s+)?([1-8])\s*(?:-|–|TO|THROUGH|THRU)\s*([1-8])", text)
+    span_num = re.search(r"\b(?:ROWS?|WELLS?)?\s*([1-8])\s*(?:-|–|TO|THROUGH|THRU)\s*([1-8])\b", text, re.I)
     if span_num:
         first_idx, last_idx = int(span_num.group(1)) - 1, int(span_num.group(2)) - 1
         if first_idx > last_idx:
             raise SelectionError(f"rows {span_num.group(1)}-{span_num.group(2)} run backwards")
         return list(ROWS[first_idx:last_idx + 1])
 
-    single_num = re.fullmatch(r"(?:ROWS?\s+)?([1-8]|1ST|2ND|3RD|4TH|5TH|6TH|7TH|8TH|FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)(?:\s+ROWS?)?", text)
+    digits = [int(token) for token in re.findall(r"\b[1-8]\b", text)]
+    if len(digits) > 1:
+        return sorted({ROWS[d - 1] for d in digits}, key=ROWS.index)
+
+    single_num = re.search(r"\b(?:ROWS?|WELLS?)?\s*([1-8]|1ST|2ND|3RD|4TH|5TH|6TH|7TH|8TH|FIRST|SECOND|THIRD|FOURTH|FIFTH|SIXTH|SEVENTH|EIGHTH)\s*(?:ROWS?|WELLS?)?\b", text, re.I)
     if single_num:
-        key = single_num.group(1)
-        if key.isdigit():
+        key = single_num.group(1).upper()
+        if key.isdigit() and 1 <= int(key) <= 8:
             return [ROWS[int(key) - 1]]
         if key in _ROW_NUMBERS:
             return [_ROW_NUMBERS[key]]
 
-    letters = [token for token in re.findall(r"\b[A-Z]\b", re.sub(r"\bROWS?\b", " ", text))]
+    letters = [token for token in re.findall(r"\b[A-Z]\b", re.sub(r"\b(?:ROWS?|WELLS?)\b", " ", text))]
     if letters and all(letter in ROWS for letter in letters):
         return sorted(set(letters), key=ROWS.index)
 
-    digits = [int(token) for token in re.findall(r"\b[1-8]\b", text)]
     if digits:
         return sorted({ROWS[d - 1] for d in digits}, key=ROWS.index)
 
@@ -120,26 +132,32 @@ def _span(items: list[Any]) -> str:
 
 
 def expand_rows(rows: list[str], config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
-    """The first row and the factors already in those plate wells."""
-    if rows != list(ROWS[ROWS.index(rows[0]):ROWS.index(rows[0]) + len(rows)]):
-        raise SelectionError(f"Rows {', '.join(rows)} are not next to each other. One run uses one block of consecutive "
-                             "plate rows (each prints on the paper row with the same letter).",
-                             question="Which consecutive rows should this run use?")
+    """The selected plate/paper rows and factors."""
     plan = build_plan(config)
     wells = {well.row: well for well in plan.wells}
     missing = [row for row in rows if row not in wells]
     if missing:
-        current = f"rows {_span([well.row for well in plan.wells])}" if plan.wells else "no rows"
-        raise SelectionError(f"The current plan has no dilution in row{'s' if len(missing) > 1 else ''} "
-                             f"{', '.join(missing)} (it uses {current}), so there is no factor to keep there.",
-                             question=f"Which dilution factors should rows {_span(rows)} use?")
-    chosen = [wells[row] for row in rows]
+        existing_factors = [well.factor for well in plan.wells]
+        if not existing_factors:
+            existing_factors = [float(f) for f in (config.get("dilution") or {}).get("factors", [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0])]
+        needed_count = len(rows)
+        factors = list(existing_factors)
+        while len(factors) < needed_count:
+            last = factors[-1] if factors else 1.0
+            factors.append(last * 2.0)
+        chosen_factors = factors[:needed_count]
+    else:
+        chosen = [wells[row] for row in rows if row in wells]
+        chosen_factors = [well.factor for well in chosen]
     why = "use the current plate wells corresponding to the selected paper rows"
-    changes = [{"path": "dilution.start_row", "value": rows[0], "kind": "dependent", "why": why},
-               {"path": "dilution.factors", "value": [well.factor for well in chosen], "kind": "dependent", "why": why}]
-    row_range = f"{rows[0]}–{rows[-1]}" if len(rows) > 1 else f"row {rows[0]}"
+    changes = [
+        {"path": "dilution.rows", "value": rows, "kind": "dependent", "why": why},
+        {"path": "dilution.start_row", "value": rows[0], "kind": "dependent", "why": why},
+        {"path": "dilution.factors", "value": chosen_factors, "kind": "dependent", "why": why},
+    ]
+    row_phrase = ", ".join(rows) if len(rows) > 1 else f"row {rows[0]}"
     if len(rows) > 1:
-        note = f"I interpreted rows {', '.join(rows)} (the first {len(rows)} rows as {row_range}) as paper destinations."
+        note = f"I interpreted rows {row_phrase} as paper destinations."
     else:
         note = f"I interpreted row {ROWS.index(rows[0]) + 1} as row {rows[0]} on the diagram."
     return changes, note

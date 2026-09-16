@@ -109,8 +109,14 @@ def factors_of(config: dict[str, Any]) -> list[float]:
 
 
 def dilution_rows(config: dict[str, Any]) -> list[str]:
-    """Plate rows the series occupies, one per factor, from start_row down."""
-    start = str((config.get("dilution") or {}).get("start_row", "A")).upper()
+    """Plate rows the series occupies, one per factor."""
+    dilution = config.get("dilution") or {}
+    explicit = dilution.get("rows")
+    if isinstance(explicit, (list, tuple)) and explicit:
+        valid = [str(r).strip().upper() for r in explicit if str(r).strip().upper() in ROWS]
+        if valid:
+            return sorted(set(valid), key=ROWS.index)
+    start = str(dilution.get("start_row", "A")).upper()
     if start not in ROWS:
         return []
     first = ROWS.index(start)

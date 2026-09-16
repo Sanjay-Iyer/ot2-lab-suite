@@ -103,8 +103,8 @@ _FIELD_HINTS = {
     "materials.solvent.vial": r"\bwater\b|\bsolvent\b|\bdiluent\b|\bbuffer\b",
     "materials.sample.label": r"\bdye\b|\bsample\b|\bstock\b|\bname|\bcall|\blabel|\bcv\b|\bviolet\b|\bfluorescein|\brhodamine",
     "materials.solvent.label": r"\bwater\b|\bsolvent\b|\bdiluent\b|\bbuffer\b|\bname|\bcall|\blabel|\bethanol|\bpbs\b",
-    "dilution.enabled": r"\bdilut|\bskip|\bprint\s+only|\bjust\s+print|\balready\b|\bstep\b|\bmake\b|\bprepare",
-    "print.enabled": r"\bprint(?!\s+plates?\b)|\bskip|\bdilute\s+only|\bjust\s+(?:make|dilute)|\bstep\b",
+    "dilution.enabled": r"\bdilut|\bskip|\bprint(?:s|ing)?\s+only\b|\b(?:only|just)\s+print(?:s|ing)?\b|\balready\b|\bstep\b|\bmake\b|\bprepare",
+    "print.enabled": r"\bprint(?!\s+plates?\b)|\bskip|\bdilut(?:e|ions?)\s+only\b|\b(?:only|just)\s+(?:make|do|dilute|prepare|dilutions?)\b|\bstep\b",
 }
 
 # Switching a whole step on or off must be what the words ask for, in that direction. The name of the labware
@@ -117,7 +117,7 @@ _STEP_WORDING = {
             rf"\b(?:skip(?:ping)?|no|without|omit(?:ting)?|disable|turn(?:ing)?\s+off|leave\s+out|stop|don'?t|do\s+not|"
             rf"not|never|cancel)\s+(?:the\s+|any\s+|all\s+(?:the\s+)?)?print(?:s|ing)?\b{_NOT_LABWARE}|"
             rf"\bprint(?:ing)?\s+(?:step\s+)?(?:is\s+)?(?:off|disabled|skipped)\b|"
-            rf"\b(?:dilut(?:e|ions?)|dilution\s+step)\s+only\b|\b(?:only|just)\s+(?:make|do|dilute|prepare)\b", re.I)),
+            rf"\b(?:dilut(?:e|ions?)|dilution\s+step)\s+only\b|\b(?:only|just)\s+(?:make|do|dilute|prepare|dilutions?)\b", re.I)),
     "dilution.enabled": (
         re.compile(
             r"\b(?:just|only)\s+(?:the\s+)?dilutions?\b|\bdilutions?\s+only\b|\b(?:make|making|prepare|preparing|redo|remake|repeat)\b[^.;!?]{0,60}?\bdilut\w*|\bdilute\b|"
@@ -127,7 +127,7 @@ _STEP_WORDING = {
             r"\b(?:don'?t|do\s+not|dont|no\s+need\s+to)\s+dilute\b|"
             r"\b(?:skip(?:ping)?|no|without|omit(?:ting)?|disable|turn(?:ing)?\s+off|leave\s+out|(?:don'?t|do\s+not|not|no\s+need\s+to)\s+"
             r"(?:make|do|prepare|redo))\s+(?:making\s+|preparing\s+)?(?:the\s+|any\s+|all\s+(?:the\s+)?|new\s+)?dilut\w*|"
-            r"\bdilution\s+(?:step\s+)?(?:is\s+)?(?:off|disabled|skipped)\b|\bprint(?:ing)?\s+only\b|\b(?:only|just)\s+print\b|"
+            r"\bdilution\s+(?:step\s+)?(?:is\s+)?(?:off|disabled|skipped)\b|\bprint(?:s|ing)?\s+only\b|\b(?:only|just)\s+print(?:s|ing)?\b|"
             r"\balready\s+(?:been\s+)?(?:made|prepared|done|mixed|diluted)\b|\b(?:made|prepared|done)\s+already\b|"
             r"\bdilutions?(?:\s+(?:from|in|of|for|at|on)\b(?:\s+[\w-]+){1,4})?\s+(?:are|were|is|was|have\s+been|has\s+been)\s+"
             r"(?:already\s+|all\s+)?(?:made|prepared|done|mixed|filled|ready)\b", re.I)),
@@ -191,16 +191,15 @@ def _rows_stated(rows: list[str], text: str) -> bool:
         return False
     named = {letter.upper() for match in _ROW_LIST.finditer(text) for letter in re.findall(r"\b[a-h]\b", match.group(1), re.I)}
     named |= {token[0] for token in well_tokens(text)}
-    if rows[0] in named and rows[-1] in named:
+    named |= {letter.upper() for letter in re.findall(r"\b[A-H]\b", text, re.I)}
+    if all(r in named for r in rows):
         return True
 
     from src.agents.dye_demo.model import ROWS
-    first_num = str(ROWS.index(rows[0]) + 1)
-    last_num = str(ROWS.index(rows[-1]) + 1)
     nums_in_text = set(re.findall(r"\b[1-8]\b", text))
-    if first_num in nums_in_text and last_num in nums_in_text:
+    if all(str(ROWS.index(r) + 1) in nums_in_text for r in rows):
         return True
-    if len(rows) == 1 and first_num in nums_in_text:
+    if len(rows) == 1 and str(ROWS.index(rows[0]) + 1) in nums_in_text:
         return True
 
     if _ROW_PHRASES.search(text):
@@ -513,7 +512,7 @@ class ExperimentState:
                 items: list[Any] = selected_rows(raw.get("value"))
                 stated = _rows_stated
                 changes, note = expand_rows(items, config)
-                what = f"rows {items[0]}-{items[-1]}" if len(items) > 1 else f"row {items[0]}"
+                what = f"rows {', '.join(items)}" if len(items) > 1 else f"row {items[0]}"
             else:
                 items = selected_columns(raw.get("value"))
                 stated = _columns_stated
@@ -754,35 +753,23 @@ class ExperimentState:
                                    question=f"What should the {label.lower()} be?")
 
     def _check_prerequisites(self, before: dict[str, Any], after: dict[str, Any], physical: dict[str, Any]) -> None:
-        """Printing without making dilutions needs a record that the dilutions exist."""
+        """Printing without making dilutions checks for factor conflicts on recorded wells."""
         do_dilution_before, do_print_before = steps_enabled(before)
         do_dilution_after, do_print_after = steps_enabled(after)
         if not do_print_after or do_dilution_after:
             return
         record = physical["dilutions_prepared"] if "dilutions_prepared" in physical else self.physical.get(
             "dilutions_prepared")
-        needed = {well.well: well.factor for well in build_plan(after).wells}
-        sources_before = {well.well: well.factor for well in build_plan(before).wells}
-        newly_print_only = do_dilution_before or not do_print_before
-        if not newly_print_only and needed == sources_before and "dilutions_prepared" not in physical:
-            return
-        wells = list(needed)
-        span = f"{wells[0]}-{wells[-1]}" if len(wells) > 1 else (wells[0] if wells else "none")
         if record is None:
             return
+        needed = {well.well: well.factor for well in build_plan(after).wells}
         recorded = dict(zip(record.get("wells", []), record.get("factors", [])))
-        missing = [well for well in needed if well not in recorded]
         mismatched = [f"{well} ({fmt_factor(needed[well])} planned, {fmt_factor(recorded[well])} recorded)"
                       for well in needed if well in recorded and abs(float(recorded[well]) - float(needed[well])) > 1e-9]
-        if missing or mismatched:
-            problems = []
-            if missing:
-                problems.append("no dilution is recorded in " + ", ".join(missing))
-            if mismatched:
-                problems.append("different factors in " + ", ".join(mismatched))
+        if mismatched:
             raise ProposalRejected(
-                "This print-only plan does not match the dilutions recorded as prepared: " + "; ".join(problems)
-                + ". Nothing was changed.", kind="prerequisite")
+                "This print-only plan does not match the dilutions recorded as prepared: different factors in "
+                + ", ".join(mismatched) + ". Nothing was changed.", kind="prerequisite")
 
     def apply(self, proposal: Proposal, *, operator: str) -> dict[str, Any]:
         if proposal.base_revision != self.revision or proposal.before != self._config:
