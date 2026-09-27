@@ -35,6 +35,7 @@ from src.agents.dye_demo.model import (
     material_label,
     material_spec,
     occupancy,
+    positions_text,
     slot_of,
     well_geometry,
 )
@@ -187,22 +188,6 @@ def rows_text(rows: Sequence[str]) -> str:
     if len(indexes) == len(rows) and indexes == list(range(indexes[0], indexes[0] + len(rows))):
         return f"rows {rows[0]}-{rows[-1]}"
     return "rows " + ", ".join(rows)
-
-
-def positions_text(positions: Sequence[str], *, limit: int = 8) -> str:
-    """'A1-A10' for a run along a row or down a column, else the positions (shortened past `limit`)."""
-    names = list(positions)
-    if not names:
-        return "none"
-    rows, columns = [name[0] for name in names], [int(name[1:]) for name in names]
-    if len(names) > 1 and len(set(rows)) == 1 and columns == list(range(columns[0], columns[0] + len(names))):
-        return f"{names[0]}-{names[-1]}"
-    if len(names) > 1 and len(set(columns)) == 1 and \
-            [ROWS.index(row) for row in rows] == list(range(ROWS.index(rows[0]), ROWS.index(rows[0]) + len(names))):
-        return f"{names[0]}-{names[-1]}"
-    if len(names) > limit:
-        return ", ".join(names[:limit - 2]) + f", … , {names[-1]}"
-    return ", ".join(names)
 
 
 def print_map_text(plan: Plan) -> str:
@@ -460,7 +445,7 @@ def render_run_banner(config: dict[str, Any], *, simulate: bool, operator: str, 
         lines = _banner("STARTING THE REAL OT-2", "the robot is about to move")
     lines += _row("Operator", f"{operator} | {session_label} | run {run_number}")
     lines += ["", "DECK"] + _deck_rows(config) + ["", "THIS RUN"]
-    wells = _range([well.well for well in plan.wells])
+    wells = positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)
     if plan.do_dilution:
         lines += _row("Dilutions made", f"{len(plan.wells)}   (plate wells {wells})")
     elif plan.mapped and plan.do_print:
@@ -621,12 +606,14 @@ def _proposal_attention(proposal: Any) -> list[str]:
             items.append("Saying yes SKIPS making the dilutions in the next run.")
         elif change.path == "print.enabled" and change.after is False:
             items.append("Saying yes SKIPS printing in the next run.")
+    if (proposal.physical or {}).get("tips_used") == []:
+        items.append("Saying yes records that the tip rack is full again: tips earlier runs used no longer count as used.")
     record = (proposal.physical or {}).get("dilutions_prepared", ...)
     if record is None:
         items.append("Saying yes records that the plate wells no longer hold dilutions.")
     elif record is not ...:
         wells = [str(well) for well in record.get("wells", [])]
-        items.append(f"Saying yes records plate wells {_range(wells)} as already holding the dilutions "
+        items.append(f"Saying yes records plate wells {positions_text(wells, limit=len(wells) + 1)} as already holding the dilutions "
                      f"({pipes(fmt_factor(factor) for factor in record.get('factors', []))}; made at "
                      f"{fmt_ul(record.get('total_volume_ul', 0))} each; {record.get('source', 'reported')}).")
     reported = reported_roles(proposal.changes)

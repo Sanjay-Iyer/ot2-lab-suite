@@ -18,6 +18,7 @@ from src.agents.dye_demo.grounding import value_stated
 from src.agents.dye_demo.model import (
     ROWS,
     FieldError,
+    fmt_factor,
     normalize_paper_column,
     normalize_paper_rows,
     normalize_source_map,
@@ -171,13 +172,18 @@ def expand_rows(rows: list[str], config: dict[str, Any]) -> tuple[list[dict[str,
     if missing:
         existing_factors = [well.factor for well in plan.wells]
         if not existing_factors:
-            existing_factors = [float(f) for f in (config.get("dilution") or {}).get("factors", [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0])]
-        needed_count = len(rows)
-        factors = list(existing_factors)
-        while len(factors) < needed_count:
-            last = factors[-1] if factors else 1.0
-            factors.append(last * 2.0)
-        chosen_factors = factors[:needed_count]
+            existing_factors = [float(f) for f in (config.get("dilution") or {}).get("factors", [])]
+        if len(rows) > len(existing_factors):
+            # Rows pick or move the dilutions the plan has; more rows than dilutions needs factors nobody gave (the
+            # series was extended with last x 2, a factor the scientist never named, marked as verified).
+            extra = [row for row in rows if row not in wells][-(len(rows) - len(existing_factors)):]
+            have = ", ".join(fmt_factor(factor) for factor in existing_factors) or "none"
+            raise SelectionError(
+                f"The plan has {len(existing_factors)} dilution{'s' if len(existing_factors) != 1 else ''} ({have}), and "
+                f"{len(rows)} plate rows were named ({', '.join(rows)}).",
+                f"Which dilution factor{'s' if len(extra) > 1 else ''} should plate row{'s' if len(extra) > 1 else ''} "
+                f"{', '.join(extra)} hold?")
+        chosen_factors = existing_factors[:len(rows)]
     else:
         chosen = [wells[row] for row in rows if row in wells]
         chosen_factors = [well.factor for well in chosen]

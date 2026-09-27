@@ -403,11 +403,11 @@ _CLAIM = re.compile(
     rf"still\s+|set\s+to\s+|at\s+)?([^\s].{{0,30}}?)\s*[.!]*\s*$", re.I)
 
 # physical-state reports ("I moved it myself", "it is actually in slot 6")
+_REPORT_VERBS = (r"(?:moved|put|placed|relocated|shifted|swapped|took|removed|pulled|lifted|loaded|replaced|changed|"
+                 r"made|prepared|mixed|filled|emptied|refilled|set\s+up|swapped\s+out)")
 _REPORT_ACTION = re.compile(
     r"\b(?:i|we|someone|somebody|stephen|he|she|they|the\s+tech|my\s+(?:labmate|colleague))\s+(?:have\s+|had\s+|"
-    r"'ve\s+|'d\s+)?(?:already\s+|just\s+|manually\s+|actually\s+|physically\s+)*(?:moved|put|placed|relocated|"
-    r"shifted|swapped|took|removed|pulled|lifted|loaded|replaced|changed|made|prepared|mixed|filled|emptied|"
-    r"refilled|set\s+up|swapped\s+out)\b", re.I)
+    rf"'ve\s+|'d\s+)?(?:already\s+|just\s+|manually\s+|actually\s+|physically\s+)*{_REPORT_VERBS}\b", re.I)
 _REPORT_STATE = re.compile(
     r"\b(?:is|are)\s+(?:actually|already|now|currently|really|physically|still|in\s+fact|sitting|back)\s+(?:in|at|on|off)\b|"
     r"\b(?:is|are)\s+(?:now\s+|already\s+)?off\s+(?:the\s+)?(?:deck|robot)\b", re.I)
@@ -648,20 +648,28 @@ def _plan_prints(config: dict[str, Any]) -> bool:
         return True
 
 
-def _named_dilutions_reason(clause: str, config: dict[str, Any]) -> str | None:
+def _named_dilutions_reason(clause: str, config: dict[str, Any], rest: str = "") -> str | None:
     """'Print the 5x, 10x and 20x dilutions onto paper column 2', checked against the dilutions the plan makes.
 
     Only facts about the plan are said here: a dilution the plan does not make ("the plan has no 5x dilution"), and
     naming every dilution with nothing else to change ("every dilution already prints"). Anything else - some of the
     dilutions ("print only the 5x and 10x": a rows selection), "print only the first one", every dilution with how to
     print them - is an ordinary print instruction (None) that the router reads.
+
+    `rest` is the rest of the same message. A dilution it also names may be one the message itself asks for ("Prepare
+    2x, 5x and 10x in A11/C11/E11, but print only 10x"): the plan before the message has no 10x, and that is no reason
+    to refuse; the router reads the whole message.
     """
     try:
         planned = [float(factor) for factor in (config.get("dilution") or {}).get("factors") or []]
         named = sorted({float(first or second) for first, second in _FACTOR_WORD.findall(clause)})
+        elsewhere = {float(first or second) for first, second in _FACTOR_WORD.findall(rest)}
     except (TypeError, ValueError):
         return None
     if not planned or not named:
+        return None
+    if any(all(abs(factor - item) > 1e-9 for item in planned) and any(abs(factor - item) < 1e-9 for item in elsewhere)
+           for factor in named):
         return None
     in_plan = ", ".join(fmt_factor(factor) for factor in planned)
     missing = [factor for factor in named if all(abs(factor - item) > 1e-9 for item in planned)]
@@ -926,7 +934,14 @@ def _labware_options(config: dict[str, Any]) -> tuple[Option, ...]:
     return tuple(options)
 
 
-def _extract_facts(clause: str, ctx: TurnContext) -> list[PhysicalFact]:
+_LABWARE_WORD = r"(?:the\s+)?(?:vial|tube|tip|paper|dilution|well|96|plate|rack)"
+# "I replaced the plate and removed the vial rack": the part after "and" reports other labware (a verb and labware; "and
+# put it in slot 6" goes on about the same labware and stays in its part)
+_OTHER_REPORT = re.compile(rf"\s+and\s+(?={_LABWARE_WORD}|{_REPORT_VERBS}\s+{_LABWARE_WORD})", re.I)
+
+
+def _whole_facts(clause: str) -> list[PhysicalFact]:
+    """Reports about the plate's contents or the tips as a whole: dilutions made, new tips, a new plate."""
     facts: list[PhysicalFact] = []
     if _REPORT_DILUTIONS.search(clause):
         facts.append(PhysicalFact("dilutions_prepared", text=clause))
@@ -936,37 +951,53 @@ def _extract_facts(clause: str, ctx: TurnContext) -> list[PhysicalFact]:
     if _REPORT_PLATE_REPLACED.search(objects) and (_REPORT_ACTION.search(clause) or _REPORT_STATE.search(clause)
                                                   or re.search(r"\b(?:is|are|was|were|now)\b", clause, re.I)):
         facts.append(PhysicalFact("plate_replaced", text=clause))
+    return facts
+
+
+def _extract_facts(clause: str, ctx: TurnContext) -> list[PhysicalFact]:
+    facts = _whole_facts(clause)
     if facts:
+        # The rest of the clause may report other labware: "I replaced the plate and removed the vial rack" recorded the
+        # new plate only, and the next run started with the vial rack recorded in its slot. A part that says where
+        # labware is (a slot, or taken off) is read like a report of its own.
+        for part in _OTHER_REPORT.split(clause)[1:]:
+            if not _whole_facts(part):
+                facts.extend(fact for fact in _part_facts(part, ctx) if fact.slot is not None)
         return facts
     if _REPORT_IDIOM.search(clause) or not (_REPORT_ACTION.search(clause) or _REPORT_STATE.search(clause)):
         return facts
     parts = re.split(r"\s+and\s+(?=(?:the\s+)?(?:vial|tube|tip|paper|dilution|well|96|plate|rack))", clause, flags=re.I)
     for part in parts:
-        # a position on the paper or the plate is part of the plan, not labware on the deck
-        mentions = labware_mentions(_COORDINATE.sub(lambda match: " " * len(match.group(0)), part))
-        roles = list(dict.fromkeys(role for role, _, _ in mentions))
-        bare_plate = any(role == "plate" and re.fullmatch(r"(?i)plates?", part[start:end].strip())
-                         for role, start, end in mentions)
-        bare_rack = any(role == "tuberack" and re.fullmatch(r"(?i)rack", part[start:end].strip())
-                        for role, start, end in mentions)
-        if ctx.config and ((bare_plate and not is_off_deck(slot_of(ctx.config, "paper")))
-                           or (bare_rack and not is_off_deck(slot_of(ctx.config, "tiprack")))):
-            facts.append(PhysicalFact("unclear", None, None, part))
-            continue
-        slot_match = _SLOT_NUMBER.search(part)
-        slot: Any = int(next(group for group in slot_match.groups() if group)) if slot_match else None
-        if slot is None and _OFF.search(part) and re.search(r"\b(?:took|removed|pulled|lifted|off)\b", part, re.I):
-            slot = OFF_DECK
-        used = _USED_TO_BE.search(part)
-        if used and slot is None:
-            for role, _, _ in labware_mentions(used.group(1)):
-                if role in ctx.previous_slots:
-                    slot = ctx.previous_slots[role]
-        if len(roles) == 1 and slot is not None:
-            facts.append(PhysicalFact("location", roles[0], slot, part))
-        elif roles:
-            facts.append(PhysicalFact("unclear", roles[0] if len(roles) == 1 else None, slot, part))
+        facts.extend(_part_facts(part, ctx))
     return facts
+
+
+def _part_facts(part: str, ctx: TurnContext) -> list[PhysicalFact]:
+    """Where the labware one part of a report names is: a location, or unclear (which labware, or where)."""
+    # a position on the paper or the plate is part of the plan, not labware on the deck
+    mentions = labware_mentions(_COORDINATE.sub(lambda match: " " * len(match.group(0)), part))
+    roles = list(dict.fromkeys(role for role, _, _ in mentions))
+    bare_plate = any(role == "plate" and re.fullmatch(r"(?i)plates?", part[start:end].strip())
+                     for role, start, end in mentions)
+    bare_rack = any(role == "tuberack" and re.fullmatch(r"(?i)rack", part[start:end].strip())
+                    for role, start, end in mentions)
+    if ctx.config and ((bare_plate and not is_off_deck(slot_of(ctx.config, "paper")))
+                       or (bare_rack and not is_off_deck(slot_of(ctx.config, "tiprack")))):
+        return [PhysicalFact("unclear", None, None, part)]
+    slot_match = _SLOT_NUMBER.search(part)
+    slot: Any = int(next(group for group in slot_match.groups() if group)) if slot_match else None
+    if slot is None and _OFF.search(part) and re.search(r"\b(?:took|removed|pulled|lifted|off)\b", part, re.I):
+        slot = OFF_DECK
+    used = _USED_TO_BE.search(part)
+    if used and slot is None:
+        for role, _, _ in labware_mentions(used.group(1)):
+            if role in ctx.previous_slots:
+                slot = ctx.previous_slots[role]
+    if len(roles) == 1 and slot is not None:
+        return [PhysicalFact("location", roles[0], slot, part)]
+    if roles:
+        return [PhysicalFact("unclear", roles[0] if len(roles) == 1 else None, slot, part)]
+    return []
 
 
 # ── the analysis ────────────────────────────────────────────────────────────────
@@ -1035,7 +1066,8 @@ def analyze_turn(text: str, context: TurnContext | None = None) -> TurnAnalysis:
     negated: list[str] = []
     claims: list[tuple[str, str]] = []
     claim_clauses: list[str] = []
-    for clause, in_question in _clauses(remaining):
+    clauses = list(_clauses(remaining))
+    for clause, in_question in clauses:
         plain = clause.replace("(quoted text)", "").strip(" ,.;:-")
         if not re.search(r"[A-Za-z0-9]", plain) or _ACKNOWLEDGEMENT.fullmatch(plain) or _PROPOSAL_META.match(plain):
             continue
@@ -1126,7 +1158,8 @@ def analyze_turn(text: str, context: TurnContext | None = None) -> TurnAnalysis:
             continue
         unsupported = next((reason for pattern, reason in _UNSUPPORTED if pattern.search(clause)), None)
         if unsupported == _PRINT_ONE_REASON:
-            unsupported = _named_dilutions_reason(clause, ctx.config) if ctx.config else None
+            others = " ".join(other for other, _ in clauses if other is not clause)
+            unsupported = _named_dilutions_reason(clause, ctx.config, others) if ctx.config else None
             if unsupported is None:          # dilutions of the plan are named: an ordinary print instruction
                 if ctx.config and not _plan_prints(ctx.config):
                     # printing is off, so this asks for it to be turned on (the session proposes that change itself)

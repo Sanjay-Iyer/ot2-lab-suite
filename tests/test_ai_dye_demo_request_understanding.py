@@ -525,7 +525,11 @@ def test_f08_already_made_dilutions_that_differ_from_the_record_are_asked_about(
     assert "does not match the dilutions recorded as prepared" in c.out(5)
     assert "Do plate wells A11, B11, C11 now hold this plan's dilutions (2×, 5×, 10×)?" in c.out(5)
     assert c.proposal_paths(6) and c.config["dilution"]["enabled"] is False
-    assert c.session.state.physical["dilutions_prepared"]["factors"] == [2, 5, 10]
+    record = c.session.state.physical["dilutions_prepared"]
+    recorded = dict(zip(record["wells"], record["factors"]))
+    assert {well: recorded[well] for well in ("A11", "B11", "C11")} == {"A11": 2, "B11": 5, "C11": 10}
+    # the wells the answer did not name still hold what the earlier approval recorded (nobody said they were emptied)
+    assert {well: recorded[well] for well in ("D11", "H11")} == {"D11": 4, "H11": 16}
 
 
 def test_a_count_never_verifies_a_row_selection(tmp_path):

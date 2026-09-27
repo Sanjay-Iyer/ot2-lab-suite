@@ -63,6 +63,7 @@ from src.agents.dye_demo.model import (
     EDITABLE_FIELDS,
     LABWARE_NAMES,
     ROWS,
+    TIP_ORDER,
     FieldError,
     canonicalize_path,
     field_label,
@@ -74,6 +75,7 @@ from src.agents.dye_demo.model import (
     material_label,
     normalize_slot,
     normalize_source_map,
+    positions_text,
     resolve_path,
     set_path,
     slot_of,
@@ -98,7 +100,14 @@ from src.agents.dye_demo.plan import (
     row_factors,
     steps_enabled,
 )
-from src.agents.dye_demo.validation import DeckConflict, Report, deck_conflicts, free_slots, validate
+from src.agents.dye_demo.validation import (
+    DeckConflict,
+    Report,
+    deck_conflicts,
+    free_slots,
+    recorded_liquid_errors,
+    validate,
+)
 
 _SLOT_PATHS = {"deck.plate.slot", "deck.paper.slot", "deck.tuberack.slot", "deck.tiprack.slot"}
 _WELL_PATHS = {"tips.start_tip", "materials.sample.vial", "materials.solvent.vial"}
@@ -112,6 +121,12 @@ _NULLABLE = {"dilution.prepared_volume_ul", "materials.sample.label", "materials
 # Physical record of plate wells the scientist says already hold what they want to print (one confirmation: applying
 # the proposal that uses them records them, and later proposals do not ask again).
 SOURCES_PRESENT = "sources_present"
+# Physical record of the tips live runs of this session picked up: they are no longer in the rack as fresh tips. A run
+# that would pick one again is refused until the starting tip moves past them or a fresh rack is reported.
+TIPS_USED = "tips_used"
+# Physical record of the liquid live runs left in the plate wells they made or printed from: {well: {"volume_ul",
+# "revision", "run"}}. Checked before the next run prints from those wells; a volume the scientist states later wins.
+WELL_VOLUMES = "well_volumes"
 # Physical record placeholder: "the dilutions of the plan this proposal produces are already in the plate".
 PREPARED_FROM_PLAN = "prepared dilutions of the resulting plan"
 ASSUMED_FROM_PLAN = "assumed existing samples of the resulting plan"
@@ -403,6 +418,31 @@ def _follow_series(old: list[tuple[str, float]], new: list[tuple[str, float]]) -
     return None
 
 
+def merged_prepared(old: dict[str, Any] | None, new: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The prepared-dilutions record after `new` (a run that made dilutions, or a report about some wells): the wells it
+    names get its factors, and every other recorded well still holds what it held. A second run in plate column 10 does
+    not empty column 11 (the record was replaced, so a third run could fill A11-E11 again). None stays "no dilutions
+    in the plate" (the plate was replaced)."""
+    if not isinstance(new, dict) or not isinstance(old, dict) or not old.get("wells"):
+        return deepcopy(new)
+    named = set(new.get("wells", []))
+    kept = [(well, factor) for well, factor in zip(old.get("wells", []), old.get("factors", [])) if well not in named]
+    if not kept:
+        return deepcopy(new)
+    sources = {well: (old.get("sources") or {}).get(well, old.get("source", "reported")) for well, _ in kept}
+    sources.update({well: new.get("source", "reported") for well in new.get("wells", [])})
+    pairs = sorted(kept + list(zip(new.get("wells", []), new.get("factors", []))),
+                   key=lambda pair: (int(pair[0][1:]), ROWS.index(pair[0][0])))
+    wells = [well for well, _ in pairs]
+    groups: dict[str, list[str]] = {}
+    for well in wells:
+        groups.setdefault(sources[well], []).append(well)
+    source = next(iter(groups)) if len(groups) == 1 else "; ".join(
+        f"{how} ({', '.join(named_wells)})" for how, named_wells in groups.items())
+    return {**deepcopy(new), "wells": wells, "factors": [factor for _, factor in pairs], "source": source,
+            "sources": {well: sources[well] for well in wells}}
+
+
 def _tidy(value: float) -> int | float:
     value = round(float(value), 4)
     return int(value) if value.is_integer() else value
@@ -562,8 +602,9 @@ class ExperimentState:
         the scientist already answered for this request ("made_not_printed")."""
         before = self.config
         after = deepcopy(before)
-        raw_changes = self._rows_as_selection([self._as_print_map(raw, before) for raw in self._drops(raw_changes, before)],
-                                              before)
+        raw_changes = self._rows_as_selection(
+            self._series_pairs([self._as_print_map(raw, before) for raw in self._drops(raw_changes, before)], before),
+            before)
         restrict = tuple(restrict_paths or ())
         final_text = request.replace(superseded, " ") if superseded else request
         notes = list(notes)
@@ -699,11 +740,12 @@ class ExperimentState:
                 unmapped = deepcopy(after)
                 unmapped["print"]["source_map"] = None
                 series = build_plan(unmapped).wells
-            physical["dilutions_prepared"] = {
+            # the other wells already recorded still hold what they held
+            physical["dilutions_prepared"] = merged_prepared(self.physical.get("dilutions_prepared"), {
                 "wells": [well.well for well in series], "factors": [well.factor for well in series],
                 "total_volume_ul": resulting.total_volume_ul,
                 "source": "assumed for print-only proposal; confirmed on approval"
-                          if physical["dilutions_prepared"] == ASSUMED_FROM_PLAN else "reported by the operator"}
+                          if physical["dilutions_prepared"] == ASSUMED_FROM_PLAN else "reported by the operator"})
         if print_map(after) is not None and steps_enabled(after)[1] and source not in _NO_COLUMN_CHECK_SOURCES:
             # A print map that prints from wells this run does not make: the scientist's statement that they hold the
             # sample is recorded when this proposal is applied (that approval is the confirmation; nothing asks again).
@@ -761,7 +803,8 @@ class ExperimentState:
                 names = ", ".join(printed[:-1]) + f" and {printed[-1]}" if len(printed) > 1 else printed[0]
                 plural = "s" if len(printed) > 1 else ""
                 raise ProposalRejected(
-                    f"This plan would make all {len(made)} dilutions in plate column {column} ({made[0]}-{made[-1]}), "
+                    f"This plan would make all {len(made)} dilutions in plate column {column} "
+                    f"({positions_text(made, limit=len(made) + 1)}), "
                     f"which also fills plate well{plural} {names}, and then print only {names}.",
                     kind="made_not_printed", before=before, after=after,
                     question=f"Is your sample already in plate well{plural} {names}? Yes: skip making the dilutions "
@@ -856,6 +899,87 @@ class ExperimentState:
                 kept.append({"path": "print.source_map", "value": None, "evidence": str(raw.get("evidence") or ""),
                              "kind": "dependent", "why": "the print map was dropped"})
         return kept
+
+    @staticmethod
+    def _series_pairs(raw_changes: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+        """Dilution factors and plate rows named in one request are pairs, in the order the scientist gave them: "10x
+        in E11, 2x in A11 and 5x in C11" is factors [10, 2, 5] with rows [E, A, C]. The plan pairs the factors with the
+        plate rows top to bottom (dilution.rows is kept in plate order), so both lists are put in plate-row order
+        together - rows [A, C, E] with factors [2, 5, 10]. Sorting the rows alone put 10x in A11, 2x in C11 and 5x in
+        E11.
+
+        Rows written as wells keep their plate column: "make them in A5, C5 and E5" of a plan in column 11 is plate
+        column 5 as well (the column was dropped without a word). The series is made in one plate column, so wells in
+        different columns are a question, never a guess."""
+        def items_of(value: Any) -> list[Any] | None:
+            if isinstance(value, (list, tuple)):
+                return list(value)
+            if isinstance(value, str):
+                return [part for part in re.split(r"\s*(?:,|;|&|\band\b|\s)\s*", value.strip(), flags=re.I) if part]
+            return None
+
+        def row_item(item: Any) -> tuple[str, int | None] | None:
+            """'E' -> (E, None), 'E11' -> (E, 11), 5 -> (E, None) (rows 1-8 are A-H); anything else -> None."""
+            if isinstance(item, bool):
+                return None
+            text = str(item).strip().upper()
+            if text in ROWS:
+                return text, None
+            if text.isdigit() and 1 <= int(text) <= len(ROWS):
+                return ROWS[int(text) - 1], None
+            match = re.fullmatch(r"([A-H])(\d{1,2})", text)
+            if match and 1 <= int(match.group(2)) <= 12:
+                return match.group(1), int(match.group(2))
+            return None
+
+        def is_set(raw: dict[str, Any]) -> bool:
+            return str(raw.get("op") or "set").lower() == "set"
+
+        changes = list(raw_changes)
+        factors_at = next((index for index, raw in enumerate(changes)
+                           if canonicalize_path(config, raw.get("path", "")) == "dilution.factors" and is_set(raw)
+                           and isinstance(raw.get("value"), (list, tuple))), None)
+        column_at = next((index for index, raw in enumerate(changes)
+                          if canonicalize_path(config, raw.get("path", "")) == "dilution.plate_column" and is_set(raw)),
+                         None)
+        for index, raw in enumerate(list(changes)):
+            path = str(raw.get("path", "")).strip().lower()
+            if not is_set(raw) or (path != "rows" and canonicalize_path(config, raw.get("path", "")) != "dilution.rows"):
+                continue
+            items = items_of(raw.get("value"))
+            parsed = [row_item(item) for item in items] if items else []
+            if not parsed or None in parsed:
+                continue                        # another form ("first 3", "rows 1-3"): read by the selection as before
+            letters = [letter for letter, _ in parsed]
+            columns = sorted({column for _, column in parsed if column is not None})
+            if len(columns) > 1:
+                wells = ", ".join(str(item).strip().upper() for item in items)
+                raise ProposalRejected(
+                    f"The dilution series is made in one plate column, and {wells} are in plate columns "
+                    f"{', '.join(map(str, columns))}. Nothing was changed.", kind="selection", path="rows",
+                    question="Which plate column should hold the dilutions?")
+            if columns:
+                column = columns[0]
+                stated = changes[column_at].get("value") if column_at is not None else None
+                if stated is not None and str(stated).strip() and \
+                        re.sub(r"(?i)^column\s*", "", str(stated).strip()) != str(column):
+                    raise ProposalRejected(
+                        f"The wells named are in plate column {column}, and the request also names plate column "
+                        f"{stated}. Nothing was changed.", kind="selection", path="rows",
+                        question="Which plate column should hold the dilutions?")
+                if column_at is None and str(config["dilution"].get("plate_column", "")).strip() != str(column):
+                    changes.append({"path": "dilution.plate_column", "value": str(column), "kind": "dependent",
+                                    "evidence": str(raw.get("evidence") or ""),
+                                    "why": f"the wells named are in plate column {column}"})
+                    column_at = len(changes) - 1
+            factors = list(changes[factors_at]["value"]) if factors_at is not None else None
+            if factors is not None and len(factors) == len(letters) and len(set(letters)) == len(letters):
+                order = sorted(range(len(letters)), key=lambda position: ROWS.index(letters[position]))
+                changes[factors_at] = {**changes[factors_at], "value": [factors[position] for position in order]}
+                letters = [letters[position] for position in order]
+                factors_at = None               # paired once: a second row list in the request does not reorder them
+            changes[index] = {**raw, "value": letters}
+        return changes
 
     @staticmethod
     def _rows_as_selection(raw_changes: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1403,7 +1527,9 @@ class ExperimentState:
         if plan.do_dilution and prepared:
             overlap = sorted(set(well.well for well in plan.wells) & set(prepared.get("wells", [])))
             if overlap:
-                return [f"Plate wells {', '.join(overlap)} already hold dilutions ({prepared.get('source')}). Making "
+                sources = prepared.get("sources") or {}
+                how = "; ".join(dict.fromkeys(sources.get(well, prepared.get("source", "reported")) for well in overlap))
+                return [f"Plate wells {', '.join(overlap)} already hold dilutions ({how}). Making "
                         "them again would add liquid to full wells. Skip the dilution step, use another plate column, "
                         "or tell me the plate was replaced."]
         present = self.physical.get(SOURCES_PRESENT) or {}
@@ -1413,7 +1539,47 @@ class ExperimentState:
                 return [f"Plate well{'s' if len(overlap) > 1 else ''} {', '.join(overlap)} already hold"
                         f"{'' if len(overlap) > 1 else 's'} sample you told me about. Making dilutions there would add "
                         "liquid to it. Use another plate column or rows, or tell me the plate was replaced."]
+        used = set(self.physical.get(TIPS_USED) or ())
+        again = [assignment.tip for assignment in plan.tips if assignment.tip in used]
+        if again:
+            last = max(TIP_ORDER.index(tip) for tip in used)
+            unused = TIP_ORDER[last + 1] if last + 1 < len(TIP_ORDER) else None
+            where = (f"Set the starting tip to {unused} (the first tip after the used ones), or tell me a fresh tip "
+                     "rack is loaded." if unused else "Load a fresh tip rack and tell me it is loaded.")
+            several = len(again) > 1
+            return [f"{'Tips' if several else 'Tip'} {', '.join(again)} {'were' if several else 'was'} already used by "
+                    f"an earlier run of this session, so {'they are' if several else 'it is'} no longer "
+                    f"{'fresh tips' if several else 'a fresh tip'} in the rack. " + where]
+        drawn = recorded_liquid_errors(self._config, self.recorded_volumes())
+        if drawn:
+            return [f"Not enough liquid is recorded in the plate: {drawn[0]}."]
         return []
+
+    def recorded_volumes(self) -> dict[str, float]:
+        """{plate well: µL} that live runs of this session left in the wells they made or printed from, for the wells
+        whose record is newer than the last volume the scientist stated (dilution.prepared_volume_ul): a statement made
+        after the run describes the well better than the run's arithmetic."""
+        stated = max((record["revision"] for record in self.history
+                      if any(change["path"] == "dilution.prepared_volume_ul" and change["after"] not in (None, "")
+                             for change in record["changes"])), default=-1)
+        return {well: float(entry["volume_ul"]) for well, entry in (self.physical.get(WELL_VOLUMES) or {}).items()
+                if int(entry.get("revision", -1)) >= stated}
+
+    def _volumes_after_run(self, plan, run: int) -> dict[str, dict[str, Any]]:
+        """The liquid record after a live run of `plan` succeeded: wells it made hold the final volume, and every well
+        it printed from lost what the print step drew (starting from the recorded volume when there is one)."""
+        known = self.recorded_volumes()
+        volumes = deepcopy(self.physical.get(WELL_VOLUMES) or {})
+        stamp = {"revision": self.revision, "run": run}
+        if plan.do_dilution:
+            for well in plan.wells:
+                known[well.well] = plan.total_volume_ul
+                volumes[well.well] = {"volume_ul": plan.total_volume_ul, **stamp}
+        if plan.do_print:
+            for source in plan.print_sources:
+                left = known.get(source.well, source.start_ul) - source.draw_ul
+                volumes[source.well] = {"volume_ul": round(max(0.0, left), 3), **stamp}
+        return volumes
 
     def record_run(self, *, simulate: bool, exit_code: int, printed: Iterable[str],
                    tips_used: list[str], operator: str, prepared: dict[str, Any] | None = None,
@@ -1437,6 +1603,12 @@ class ExperimentState:
         if not simulate and exit_code == 0:
             self.printed_positions.update(printed)
             self.deck_changed_since_run = False
+            plan = build_plan(self._config)           # the plan this run carried out (the session runs the state)
+            self.physical[WELL_VOLUMES] = self._volumes_after_run(plan, record["run"])
             if prepared:
-                self.physical["dilutions_prepared"] = dict(prepared, source=f"made by run {record['run']}")
+                self.physical["dilutions_prepared"] = merged_prepared(
+                    self.physical.get("dilutions_prepared"), dict(prepared, source=f"made by run {record['run']}"))
+            if tips_used:
+                used = set(self.physical.get(TIPS_USED) or ()) | set(tips_used)
+                self.physical[TIPS_USED] = sorted(used, key=TIP_ORDER.index)
         return record

@@ -12,7 +12,7 @@ import re
 from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 import yaml
 
@@ -61,6 +61,22 @@ def fmt_num(value: float) -> str:
     if number and abs(number) < 0.1:
         return f"{number:.3g}"          # 0.005 mL must not be shown as 0.01 mL
     return f"{number:.2f}".rstrip("0").rstrip(".")
+
+
+def positions_text(positions: Iterable[str], *, limit: int = 8) -> str:
+    """'A1-A10' for a run along a row or down a column, else the positions (shortened past `limit`)."""
+    names = list(positions)
+    if not names:
+        return "none"
+    rows, columns = [name[0] for name in names], [int(name[1:]) for name in names]
+    if len(names) > 1 and len(set(rows)) == 1 and columns == list(range(columns[0], columns[0] + len(names))):
+        return f"{names[0]}-{names[-1]}"
+    if len(names) > 1 and len(set(columns)) == 1 and \
+            [ROWS.index(row) for row in rows] == list(range(ROWS.index(rows[0]), ROWS.index(rows[0]) + len(names))):
+        return f"{names[0]}-{names[-1]}"
+    if len(names) > limit:
+        return ", ".join(names[:limit - 2]) + f", … , {names[-1]}"
+    return ", ".join(names)
 
 
 def fmt_ul(value: float) -> str:

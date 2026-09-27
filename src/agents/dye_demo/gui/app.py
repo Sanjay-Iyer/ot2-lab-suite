@@ -12,7 +12,15 @@ from src.agents.dye_demo import render
 from src.agents.dye_demo.columns import format_columns, format_rows, paper_columns_printed
 from src.agents.dye_demo.render import print_map_text
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter, GuiSnapshot
-from src.agents.dye_demo.model import format_slot, material_label, material_spec, slot_of
+from src.agents.dye_demo.model import (
+    DECK_SLOTS,
+    OFF_DECK,
+    format_slot,
+    is_off_deck,
+    material_label,
+    material_spec,
+    slot_of,
+)
 from src.agents.dye_demo.plan import build_plan
 
 from src.agents.dye_demo.gui.labware_svg import (
@@ -417,7 +425,9 @@ def _controls(config: dict[str, Any]) -> dict[str, Any]:
         replicates = ui.number("Replicate columns", value=printing["replicates"], min=1, max=12, step=1)
         drops = ui.number("Drops per position", value=printing["droplets_per_spot"], min=1, step=1)
     with ui.row().classes("w-full gap-4"):
-        options = list(range(1, 12))
+        # every deck slot, and OFF DECK: labware the plan does not need may be off the robot (a list of slots alone
+        # refused the page with the vial rack off deck, and left the form unable to submit anything)
+        options = {**{slot: str(slot) for slot in DECK_SLOTS}, OFF_DECK: "OFF DECK"}
         plate = ui.select(options, value=deck["plate"]["slot"], label="96-well plate slot")
         paper = ui.select(options, value=deck["paper"]["slot"], label="Paper substrate / holder slot")
         tuberack = ui.select(options, value=deck["tuberack"]["slot"], label="20 mL vial rack slot")
@@ -438,11 +448,16 @@ def _control_values(controls: dict[str, Any]) -> dict[str, Any]:
         "print.paper_start_column": int(controls["first_column"].value),
         "print.replicates": int(controls["replicates"].value),
         "print.droplets_per_spot": int(controls["drops"].value),
-        "deck.plate.slot": int(controls["plate"].value),
-        "deck.paper.slot": int(controls["paper"].value),
-        "deck.tuberack.slot": int(controls["tuberack"].value),
-        "deck.tiprack.slot": int(controls["tiprack"].value),
+        "deck.plate.slot": _slot_value(controls["plate"].value),
+        "deck.paper.slot": _slot_value(controls["paper"].value),
+        "deck.tuberack.slot": _slot_value(controls["tuberack"].value),
+        "deck.tiprack.slot": _slot_value(controls["tiprack"].value),
     }
+
+
+def _slot_value(value: Any) -> Any:
+    """A slot select's value as the plan holds it: a slot number, or OFF_DECK."""
+    return OFF_DECK if is_off_deck(value) else int(value)
 
 
 def _sync_controls(controls: dict[str, Any], config: dict[str, Any]) -> None:

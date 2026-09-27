@@ -23,6 +23,7 @@ from src.agents.dye_demo.model import (
     is_off_deck,
     normalize_source_map,
     occupancy,
+    positions_text,
     required_roles,
     slot_of,
     well_geometry,
@@ -165,8 +166,9 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     elif plan.do_print and not plan.do_dilution and plan.wells:
         report.warn(
             "print.assumes_prepared",
-            f"this run does not make dilutions: it assumes plate wells {plan.wells[0].well}-"
-            f"{plan.wells[-1].well} already hold them ({fmt_ul(plan.source_volume_ul)} each)",
+            f"this run does not make dilutions: it assumes plate wells "
+            f"{positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)} already hold them "
+            f"({fmt_ul(plan.source_volume_ul)} each)",
         )
     if plan.do_dilution and (config["dilution"].get("prepared_volume_ul") not in (None, "")):
         report.warn("dilution.prepared_ignored",
@@ -446,7 +448,7 @@ def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
         _check_source_liquid(plan, area, mix_ul, mix_mm, aspirate_mm, report)
         return
     volume = plan.source_volume_ul
-    wells = f"{plan.wells[0].well}-{plan.wells[-1].well}" if len(plan.wells) > 1 else plan.wells[0].well
+    wells = positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)
     for spot in plan.spots:
         need = mix_ul + mix_mm * area
         if volume + 1e-6 < need:
@@ -471,11 +473,36 @@ def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
             volume -= float(spot["volume_ul"])
 
 
-def _check_source_liquid(plan, area: float, mix_ul: float, mix_mm: float, aspirate_mm: float, report: Report) -> None:
-    """Each mapped source well, in print order: enough liquid to mix and to keep the tip submerged for every drop."""
+def recorded_liquid_errors(config: dict[str, Any], recorded: dict[str, float]) -> list[str]:
+    """The print step checked against the liquid the session RECORDED in the plate wells it prints from (what earlier
+    live runs left there), instead of the volume the plan assumes. Wells this run makes and wells with no record are
+    not checked here: validate() checks them against the plan's own volumes."""
+    plan = build_plan(config)
+    if not plan.do_print or not recorded or not plan.print_sources:
+        return []
+    area = well_area_mm2(config, "plate")
+    if not area:
+        return []
+    mixing, printing = config["mixing"], config["print"]
+    report = Report()
+    _check_source_liquid(plan, area, float(mixing["volume_ul"]), float(mixing.get("height_mm", 2.0)),
+                         float(printing.get("aspirate_height_mm", 1.0)), report, recorded=recorded)
+    return report.error_messages()
+
+
+def _check_source_liquid(plan, area: float, mix_ul: float, mix_mm: float, aspirate_mm: float, report: Report, *,
+                         recorded: dict[str, float] | None = None) -> None:
+    """Each mapped source well, in print order: enough liquid to mix and to keep the tip submerged for every drop.
+    With `recorded`, only the wells this run does not make that have a recorded volume, starting from that volume."""
     for source in plan.print_sources:
         volume = source.start_ul
         assumed = "" if source.made_here else " (assumed; tell me the volume in the well if it differs)"
+        if recorded is not None:
+            if source.made_here or source.well not in recorded:
+                continue
+            volume = float(recorded[source.well])
+            assumed = (" (recorded: what earlier runs of this session left in it; if you refilled it, tell me the "
+                       "volume now in the well)")
         for operation in (op for op in plan.operations if op.kind == "print" and op.source == source.well):
             need = mix_ul + mix_mm * area
             if volume + 1e-6 < need:

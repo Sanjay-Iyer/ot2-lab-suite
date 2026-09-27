@@ -142,7 +142,7 @@ class Tracker:
     config_fp: str = ""
     physical: dict[str, Any] = field(default_factory=dict)
     soft_labels: bool = False
-    unreconciled: str | None = None          # a physical report that is not in the record yet
+    unreconciled: list[str] = field(default_factory=list)   # physical reports that are not in the record yet
 
     def start(self, session) -> None:
         self.config_fp = fingerprint(session.state.config)
@@ -288,13 +288,17 @@ def check_turn(tracker: Tracker, session, label: UserTurn, record: dict[str, Any
     # physical reports that could not be recorded stay outstanding (events in order) and block runs
     for event in events:
         if event.get("type") == "unreconciled_report":
-            tracker.unreconciled = event.get("report") or record["message"]
+            report = event.get("report") or record["message"]
+            if report not in tracker.unreconciled:
+                tracker.unreconciled.append(report)
         elif event.get("type") == "reconciled_report":
-            tracker.unreconciled = None
-        elif event.get("type") == "run" and tracker.unreconciled is not None:
+            # the report it names; an event without one (older sessions) reconciles every outstanding report
+            report = event.get("report")
+            tracker.unreconciled = [item for item in tracker.unreconciled if report is not None and item != report]
+        elif event.get("type") == "run" and tracker.unreconciled:
             tracker.fail("run_with_unreconciled_physical_report", number,
-                         f"run {event['run']} started although the scientist reported {tracker.unreconciled!r} and "
-                         "that was never recorded")
+                         f"run {event['run']} started although the scientist reported "
+                         f"{' and '.join(repr(item) for item in tracker.unreconciled)} and that was never recorded")
 
     # runs
     for event in run_events:
@@ -392,6 +396,17 @@ def protocol_mismatches(config: dict[str, Any]) -> list[str]:
     expected = [op.destination for op in plan.operations if op.kind == "print" for _ in range(op.droplets)]
     if drops != expected:
         problems.append(f"{len(drops)} paper drops differ from the {len(expected)} planned drops")
+    # where each drop was drawn from, not only where it landed: with plate rows and paper rows independent, the right
+    # paper positions printed from the wrong wells passed every other check here
+    drawn_from, printed = None, []
+    for entry in log:
+        if entry[0] == "aspirate" and entry[2][0] == plate:
+            drawn_from = entry[2][1]
+        elif entry[0] == "dispense" and entry[2][0] == paper:
+            printed.append((drawn_from, entry[2][1]))
+    if drops == expected and printed != [(op.source, op.destination) for op in plan.operations if op.kind == "print"
+                                         for _ in range(op.droplets)]:
+        problems.append("paper drops are printed from other plate wells than the plan shows")
     if not plan.do_dilution and any(entry[0] == "aspirate" and entry[2][0] == rack for entry in log):
         problems.append("the dilution step is off but the protocol still aspirated from the vial rack")
     return problems

@@ -118,6 +118,8 @@ from src.agents.dye_demo.state import (
     ASSUMED_FROM_PLAN,
     SELECTION_PATHS,
     SOURCES_PRESENT,
+    TIPS_USED,
+    WELL_VOLUMES,
     ExperimentState,
     Proposal,
     ProposalRejected,
@@ -586,8 +588,12 @@ class DemoSession:
         self._asked_made_not_printed: tuple[str, int] = ("", -1)
         self._asked_split: tuple[str, int] = ("", -1)      # the even-split question last asked, and its turn
         self._after_hypothetical = False
-        # A physical report ("I took the rack off") that is not in the record yet: no run until it is resolved.
-        self.unreconciled_report: str | None = None
+        # Physical reports ("I took the rack off") that are not in the record yet, oldest first: no run while any is
+        # outstanding.
+        self.unreconciled_reports: list[str] = []
+        # what each of them still says that no later report restated: {report: {(fact kind, labware role)}}, or None
+        # for a report that does not say which labware (only recording it resolves it)
+        self._report_left: dict[str, set[tuple[str, str | None]] | None] = {}
         # A live run that may have moved the robot but did not finish: the next live run asks that the robot was checked.
         self.unverified_run: dict[str, Any] | None = None
         self._last_discarded: tuple[int, str] | None = None
@@ -1131,8 +1137,8 @@ class DemoSession:
         elif self._clarify_streak:
             notes.append(f"You asked {self._clarify_streak} clarifying question(s) in a row and this message answers the "
                          "last one: propose now unless a required value is still missing.")
-        if self.unreconciled_report:
-            notes.append(f'The scientist reported "{self.unreconciled_report}" about the robot, and that is not in the '
+        for report in self.unreconciled_reports:
+            notes.append(f'The scientist reported "{report}" about the robot, and that is not in the '
                          "record yet.")
         negated = analysis.details.get("negated") or []
         if negated:
@@ -2063,6 +2069,11 @@ class DemoSession:
         if clarifying.payload.get("replaced") and self._replaced_id is None:
             self._replaced_id, self._replaced_summary = clarifying.payload["replaced"]
         analysis = analyze_turn(combined, self._turn_context())
+        if self._report_key(clarifying.original) in self.unreconciled_reports and analysis.kind == "physical_report" \
+                and any(fact.kind != "tips_replaced" for fact in analysis.facts):
+            # the answer completes that report ("I took the rack off" + "the vial rack"); the completed report is
+            # outstanding in its place (_reconcile marks it) until it is recorded
+            self._clear_unreconciled("restated", clarifying.original)
         self._event("clarification_answer", combined=combined, kind=analysis.kind)
         if analysis.kind in {"instruction", "mixed", "physical_report"} and not analysis.facts:
             analysis.informational = ""
@@ -2110,6 +2121,8 @@ class DemoSession:
                                    "why": "you said a fresh, full tip rack is loaded"}],
                                  original=clarifying.original, source="physical-report",
                                  title="PHYSICAL STATE RECONCILIATION",
+                                 # the tips earlier runs used are in the old rack, not this one
+                                 physical={TIPS_USED: []} if self.state.physical.get(TIPS_USED) else None,
                                  notes=["You told me a fresh tip rack is loaded; this updates the record only."])
             return
         if purpose == "claim":
@@ -2737,9 +2750,9 @@ class DemoSession:
         self._event("applied", id=proposal.id, revision=self.state.revision, paths=proposal.paths,
                     physical=sorted(proposal.physical))
         self.say(f"\nAPPLIED proposal #{proposal.id}. This is now the current plan (recorded for {self.operator}).")
-        if self.unreconciled_report and (proposal.source == "physical-report"
-                                         or self._report_matches_record(self.unreconciled_report)):
-            self._clear_unreconciled("recorded")
+        # a report is recorded when the record says all of it: a reconciliation may record part of a report ("I put in
+        # a fresh tip rack and moved the paper to slot 2" asks about the tips first; the paper is still to be recorded)
+        self._clear_matched_reports("recorded")
         notices = []
         if proposal.deck_changed:
             if render.reported_roles(proposal.changes):
@@ -2767,29 +2780,72 @@ class DemoSession:
 
     # ── physical state, undo, start over ────────────────────────────────────
 
-    def _mark_unreconciled(self, report: str) -> None:
-        if self.unreconciled_report is None:
-            self.log.write("physical_report_unreconciled", report=report)
-        self.unreconciled_report = report.strip()
-        self._event("unreconciled_report", report=self.unreconciled_report)
+    @property
+    def unreconciled_report(self) -> str | None:
+        """The latest physical report that is not in the record yet (None when every report is recorded)."""
+        return self.unreconciled_reports[-1] if self.unreconciled_reports else None
 
-    def _clear_unreconciled(self, reason: str) -> None:
-        if self.unreconciled_report is not None:
-            self.log.write("physical_report_reconciled", report=self.unreconciled_report, reason=reason)
-            self._event("reconciled_report", reason=reason)
-        self.unreconciled_report = None
+    @staticmethod
+    def _report_key(report: str) -> str:
+        return " ".join(str(report).split())
+
+    def _mark_unreconciled(self, report: str) -> None:
+        """Each report is kept until it is recorded: "I replaced the plate" and then "I removed the vial rack" are two
+        facts about the robot, and recording the first does not record the second (one report slot was overwritten by
+        the second and cleared by recording the first, so the run started with the rack still recorded in its slot)."""
+        report = self._report_key(report)
+        about = self._report_subjects(report)
+        for older in list(self.unreconciled_reports):
+            left = self._report_left.get(older)
+            if older == report or left is None or not about:
+                continue
+            # a later report about the same labware says how it is now ("I took the vial rack off the robot", then
+            # "the vial rack is back in slot 7"): only the later one still has to be in the record for that labware
+            left -= about
+            if not left:
+                self._clear_unreconciled("superseded", older)
+        if report not in self.unreconciled_reports:
+            self.log.write("physical_report_unreconciled", report=report)
+            self.unreconciled_reports.append(report)
+        self._report_left[report] = about
+        self._event("unreconciled_report", report=report)
+
+    def _report_subjects(self, report: str) -> set[tuple[str, str | None]] | None:
+        """What a physical report is about, from the facts intent.py reads in it: {(kind, labware role)}, e.g.
+        {("plate_replaced", None), ("location", "tuberack")}. None when a fact does not say which labware ("unclear")."""
+        facts = analyze_turn(report, self._turn_context()).facts
+        if not facts or any(fact.kind == "unclear" for fact in facts):
+            return None
+        return {(fact.kind, fact.role) for fact in facts}
+
+    def _clear_unreconciled(self, reason: str, report: str) -> None:
+        """`report` is in the record now."""
+        report = self._report_key(report)
+        if report in self.unreconciled_reports:
+            self.unreconciled_reports.remove(report)
+            self._report_left.pop(report, None)
+            self.log.write("physical_report_reconciled", report=report, reason=reason)
+            self._event("reconciled_report", reason=reason, report=report)
+
+    def _clear_matched_reports(self, reason: str) -> None:
+        """Every outstanding report the record now says in full (what a later report restated is checked there)."""
+        for report in list(self.unreconciled_reports):
+            if self._report_matches_record(report, self._report_left.get(report)):
+                self._clear_unreconciled(reason, report)
 
     @staticmethod
     def _span(wells: list[str]) -> str:
-        return f"{wells[0]}-{wells[-1]}" if len(wells) > 1 else (wells[0] if wells else "none")
+        """'A11-C11', but 'A11, C11, E11' for sparse rows: a range would name wells the plan does not use."""
+        return render.positions_text(wells, limit=len(wells) + 1)
 
     @staticmethod
     def _prepared_record(plan) -> dict[str, Any]:
         return {"wells": [well.well for well in plan.wells], "factors": [well.factor for well in plan.wells],
                 "total_volume_ul": plan.total_volume_ul, "source": "reported by the operator"}
 
-    def _report_matches_record(self, report: str) -> bool:
-        """True when everything a stored physical report says is already what the record says."""
+    def _report_matches_record(self, report: str, subjects: set[tuple[str, str | None]] | None = None) -> bool:
+        """True when everything a stored physical report says is already what the record says. With `subjects`, only
+        those facts of it are checked (the others were restated by a later report)."""
         analysis = analyze_turn(report, self._turn_context())
         if not analysis.facts:
             return False
@@ -2797,6 +2853,8 @@ class DemoSession:
         prepared = self.state.physical.get("dilutions_prepared")
         plan = build_plan(config)
         for fact in analysis.facts:
+            if subjects is not None and (fact.kind, fact.role) not in subjects:
+                continue
             if fact.kind == "location":
                 if fingerprint(get_path(config, f"deck.{fact.role}.slot")) != fingerprint(fact.slot):
                     return False
@@ -2804,7 +2862,9 @@ class DemoSession:
                 if not prepared or plan.do_dilution:
                     return False
             elif fact.kind == "plate_replaced":
-                if prepared or (plan.do_print and not plan.do_dilution):
+                physical = self.state.physical
+                if prepared or physical.get(SOURCES_PRESENT) or physical.get(WELL_VOLUMES) \
+                        or (plan.do_print and not plan.do_dilution):
                     return False
             elif fact.kind != "tips_replaced":      # fresh tips cannot collide with anything; they never block a run
                 return False
@@ -2857,6 +2917,8 @@ class DemoSession:
                     physical["dilutions_prepared"] = None
                 if self.state.physical.get(SOURCES_PRESENT):
                     physical[SOURCES_PRESENT] = {}          # the new plate holds none of the samples named before
+                if self.state.physical.get(WELL_VOLUMES):
+                    physical[WELL_VOLUMES] = {}             # nor the liquid earlier runs left in the old one
                 if plan.do_print and not plan.do_dilution:
                     # The plan prints from the plate; an empty plate means the dilutions must be made again.
                     changes.append({"path": "dilution.enabled", "value": True, "kind": "dependent",
@@ -2867,7 +2929,7 @@ class DemoSession:
             self.say("agent> " + (" ".join(notes) if notes else "That matches the record.")
                      + " Nothing needs to change.")
             self._event("noop", reason="report matches record")
-            self._clear_unreconciled("report matches record")
+            self._clear_unreconciled("report matches record", text)
             return
         self._note_referents([fact.role for fact in facts if fact.role])
         if analysis.actionable:
@@ -2955,14 +3017,14 @@ class DemoSession:
             self.log.write("run_refused", errors=["lab-owned settings changed"])
             self._event("refusal", reason="lab-owned changed")
             return
-        if self.unreconciled_report and self._report_matches_record(self.unreconciled_report):
-            self._clear_unreconciled("record matches the report")
-        if self.unreconciled_report:
+        self._clear_matched_reports("record matches the report")
+        if self.unreconciled_reports:
+            told = " and ".join(f'"{report}"' for report in self.unreconciled_reports)
             self.say(render.attention(
-                f'Not running: you told me "{self.unreconciled_report}", and that is not in the record yet.',
+                f"Not running: you told me {told}, and that is not in the record yet.",
                 'Tell me how the robot is set up now (for example "the vial rack is in slot 7"), or change the plan to '
                 "match, and then type run again."))
-            self.log.write("run_refused", errors=["unreconciled physical report"], report=self.unreconciled_report)
+            self.log.write("run_refused", errors=["unreconciled physical report"], reports=self.unreconciled_reports)
             self._event("refusal", reason="unreconciled physical report")
             return
         blockers = self.state.run_blockers()
@@ -3007,8 +3069,9 @@ class DemoSession:
                     self._event("refusal", reason="deck not confirmed")
                     return
             if plan.do_print and not plan.do_dilution and plan.wells:
-                if not self._yes_no(f"This run prints without making dilutions. Do plate wells "
-                                    f"{plan.wells[0].well}-{plan.wells[-1].well} already hold the dilutions? (yes/no)"):
+                wells = render.positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)
+                if not self._yes_no(f"This run prints without making dilutions. Do plate wells {wells} already hold "
+                                    "the dilutions? (yes/no)"):
                     self.say("Run cancelled. Nothing was executed.")
                     self.log.write("run_cancelled", reason="prepared dilutions not confirmed")
                     self._event("refusal", reason="dilutions not confirmed")
@@ -3094,8 +3157,14 @@ class DemoSession:
 
     def _after_live_run(self, plan, run_number: int, tips_used: list[str]) -> None:
         if plan.do_dilution and plan.wells:
-            self.say(f"Dilutions now exist in plate wells {plan.wells[0].well}-{plan.wells[-1].well}. To print "
-                     "from them again, say that the dilutions are already made.")
+            wells = render.positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)
+            self.say(f"Dilutions now exist in plate wells {wells}. To print from them again, say that the dilutions are "
+                     "already made.")
+        left = self.state.physical.get(WELL_VOLUMES) or {}
+        drawn = [(source.well, left[source.well]["volume_ul"]) for source in plan.print_sources if source.well in left]
+        if plan.do_print and drawn:
+            self.say("Liquid left in the wells printed from (recorded; checked before a run prints from them again): "
+                     + render.pipes(f"{well} ~{render.fmt_ul(volume)}" for well, volume in drawn) + ".")
         if not tips_used:
             return
         if plan.next_tip is None:
