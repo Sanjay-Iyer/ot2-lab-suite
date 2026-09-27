@@ -14,20 +14,22 @@ from src.agents.dye_demo.session import DemoSession
 
 LOOP_PROMPTS = {"you>", "confirm>", "clarify>"}      # the session's own prompts; any other prompt is a question to show
 STOP_WAIT_S = 180.0                                   # how long a server shutdown waits for a stopped robot run
-_RUN_STATUS = {
-    ("LIVE", "succeeded"): "RUN COMPLETE",
-    ("LIVE", "aborted"): "RUN STOPPED",
-    ("LIVE", "interrupted before start"): "RUN NOT STARTED",
-    ("LIVE", "failed"): "RUN FAILED",
-    ("SIMULATION", "succeeded"): "SIMULATION COMPLETE",
-}
+LOADING_MESSAGE = "Loading AI Agent NanoDrop..."
+# The page shows the same run statuses whichever execution backend (simulator or real OT-2) runs the plan.
+_RUN_STATUS = {"succeeded": "RUN COMPLETE", "aborted": "RUN STOPPED", "interrupted before start": "RUN NOT STARTED",
+               "failed": "RUN FAILED"}
 _WAITING_STATUS = {"busy": "WORKING", "operator": "ENTER YOUR NAME", "proposal": "PROPOSAL WAITING",
                    "clarify": "NEEDS CLARIFICATION", "question": "ANSWER YES OR NO"}
 
 
+def print_diagnostic(text: str) -> None:
+    """Default home for diagnostics: the terminal window the page was started from (flushed so a pipe shows it too)."""
+    print(text, flush=True)
+
+
 @dataclass(frozen=True)
 class ChatMessage:
-    role: str
+    role: str             # user, assistant, or status (a quiet progress line such as the loading message)
     text: str
 
 
@@ -48,12 +50,15 @@ class GuiSnapshot:
     running: bool         # the build or robot runner is running
     operator: str         # display the existing session identity
     validation_ok: bool   # the existing plan validation report, not a separate check
+    # physical reasons the session would refuse this run (ExperimentState.run_blockers: wells already full, ...)
+    blockers: tuple[str, ...] = ()
 
     @property
     def run_ready(self) -> bool:
         """UI readiness; the existing run path still performs all execution-time checks."""
         return (self.waiting == "idle" and not self.running and self.proposed is None
-                and bool(self.operator) and self.validation_ok and self.status != "SESSION ENDED")
+                and bool(self.operator) and self.validation_ok and not self.blockers
+                and self.status != "SESSION ENDED")
 
 
 class DemoGuiAdapter:
@@ -64,8 +69,9 @@ class DemoGuiAdapter:
     session thread before it reads the next line.
     """
 
-    def __init__(self, session: DemoSession):
+    def __init__(self, session: DemoSession, *, diagnostics: Callable[[str], None] = print_diagnostic):
         self.session = session
+        self._diagnostics_sink = diagnostics
         self._inputs: queue.Queue[str | Callable[[], None]] = queue.Queue()
         self._lock = threading.Lock()
         self._messages: list[ChatMessage] = []
@@ -75,8 +81,10 @@ class DemoGuiAdapter:
         self._last_said = ""
         self._ended = False
         self._thread: threading.Thread | None = None
+        self._diagnostics: list[str] = []
         session.input = self._read
         session.output = self._write
+        session.diagnostic = self._diagnostic
 
     @property
     def run_label(self) -> str:
@@ -85,6 +93,7 @@ class DemoGuiAdapter:
     def start(self) -> None:
         if self._thread is not None:
             return
+        self._add("status", LOADING_MESSAGE)
         self._thread = threading.Thread(target=self._run, name="dye-demo-session", daemon=True)
         self._thread.start()
 
@@ -132,6 +141,17 @@ class DemoGuiAdapter:
             self._last_said = text.strip()
             if display.strip():
                 self._messages.append(ChatMessage("assistant", display))
+
+    def _diagnostic(self, text: str = "") -> None:
+        """Startup banner, LLM setup and file paths: the terminal window and session log keep them; the chat does not."""
+        text = str(text).strip("\n")
+        with self._lock:
+            self._diagnostics.append(text)
+        self._diagnostics_sink(text)
+
+    def diagnostics(self, start: int = 0) -> list[str]:
+        with self._lock:
+            return self._diagnostics[start:]
 
     def _add(self, role: str, text: str) -> None:
         if role == "assistant":
@@ -239,9 +259,13 @@ class DemoGuiAdapter:
         prepared = session.state.physical.get("dilutions_prepared")
         proposed_prepared = pending.physical.get("dilutions_prepared", prepared) if pending else prepared
         report = session.state.validate()
+        blockers = tuple(session.state.run_blockers())
         with self._lock:
             waiting, question, ended = self._state(self._waiting), self._question, self._ended
         running = self.running
+        validation = render.render_report(report)
+        if blockers:
+            validation += "\n" + "\n".join(f"Run blocked: {reason}" for reason in blockers)
         return GuiSnapshot(
             revision=session.state.revision,
             current=current,
@@ -251,26 +275,27 @@ class DemoGuiAdapter:
             proposal_id=pending.id if pending else None,
             proposal_attention=render.proposal_attention_items(pending) if pending else [],
             status=self._status(waiting, running, ended),
-            validation=render.render_report(report),
+            validation=validation,
             live=not session.settings.simulate,
             waiting=waiting,
             question=question if waiting == "question" else "",
             running=running,
             operator=session.operator,
             validation_ok=report.ok,
+            blockers=blockers,
         )
 
     def _status(self, waiting: str, running: bool, ended: bool) -> str:
         if ended:
             return "SESSION ENDED"
         if running:
-            return "SIMULATING" if self.session.settings.simulate else "RUNNING ON OT-2"
+            return "RUNNING ON OT-2"
         if waiting in _WAITING_STATUS:
             return _WAITING_STATUS[waiting]
         runs = self.session.state.runs
         if runs and runs[-1]["revision"] == self.session.state.revision:     # a later change makes the result stale
-            last = runs[-1]
-            return _RUN_STATUS.get((last["mode"], last["status"]), f"{last['mode']} {last['status']}".upper())
+            status = runs[-1]["status"]
+            return _RUN_STATUS.get(status, f"RUN {status}".upper())
         return "READY"
 
 

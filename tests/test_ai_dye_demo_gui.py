@@ -25,11 +25,13 @@ from src.agents.dye_demo.gui.app import (
     DEFAULT_REFERENCE_IMAGES,
     _image_data_uri,
     build_page,
+    execution_target,
     experiment_flow,
 )
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter
 from src.agents.dye_demo.llm import LLMClient
 from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config
+from src.agents.dye_demo.plan import build_plan
 from src.agents.dye_demo.session import DemoSession, SessionSettings
 
 
@@ -75,7 +77,7 @@ def make_adapter(tmp_path, *, executor=None, llm=None, simulate=True, operator="
     settings = SessionSettings(simulate=simulate, config_source=DEFAULT_CONFIG,
                                working_config=tmp_path / "working.yaml", run_dir=tmp_path / "run",
                                session_label="GUI test", operator=operator, skip_llm_startup=True,
-                               raise_errors=True, run_button="Simulate" if simulate else "Run on OT-2")
+                               raise_errors=True, run_button="Run on OT-2")     # as the launcher: one page, both modes
     session = DemoSession(settings, load_config(DEFAULT_CONFIG), llm=llm,
                           executor=executor or (lambda path, simulate, log: 0), sleep=lambda _: None)
     adapter = DemoGuiAdapter(session)
@@ -190,13 +192,13 @@ def test_discard_leaves_authoritative_state_unchanged(tmp_path):
 def test_typed_run_is_refused_and_only_the_run_button_starts_a_run(tmp_path):
     calls = []
     adapter = started(make_adapter(tmp_path, executor=lambda path, simulate, log: calls.append(simulate) or 0))
-    assert "press Simulate to start it" in chat_text(adapter) and "type run to start it" not in chat_text(adapter)
+    assert "press Run on OT-2 to start it" in chat_text(adapter) and "type run to start it" not in chat_text(adapter)
     assert adapter.submit_text("run")
-    wait_for(lambda: "check the plan and press Simulate" in chat_text(adapter) and adapter.waiting == "idle")
+    wait_for(lambda: "check the plan and press Run on OT-2" in chat_text(adapter) and adapter.waiting == "idle")
     assert calls == []
     assert adapter.run()
     wait_for(lambda: calls == [True] and adapter.waiting == "idle")
-    assert adapter.snapshot().status == "SIMULATION COMPLETE"
+    assert adapter.snapshot().status == "RUN COMPLETE"                 # the same status wording as a real run
     apply_form(adapter, {"print.droplets_per_spot": 2})
     assert adapter.snapshot().status == "READY"                # a later change makes the result stale
     adapter.stop()
@@ -407,6 +409,21 @@ def test_run_readiness_follows_existing_session_and_validation(tmp_path, monkeyp
         adapter.stop()
 
 
+def test_run_is_not_ready_while_the_session_would_refuse_it(tmp_path):
+    # F09 in the 2026-09-23 validation: the page showed the run button ready for a plan the session then refused
+    # (dilutions recorded in wells the plan would fill again). The page now shows the same blocker the session uses.
+    adapter = started(make_adapter(tmp_path))
+    try:
+        assert adapter.snapshot().run_ready and adapter.snapshot().blockers == ()
+        plan_wells = [well.well for well in build_plan(adapter.session.state.config).wells]
+        adapter.session.state.physical["dilutions_prepared"] = {"wells": plan_wells, "source": "reported by the operator"}
+        snapshot = adapter.snapshot()
+        assert not snapshot.run_ready and snapshot.blockers
+        assert "Run blocked: Plate wells" in snapshot.validation and snapshot.validation_ok
+    finally:
+        adapter.stop()
+
+
 def test_page_identity_readiness_and_shared_live_confirmation(tmp_path, monkeypatch):
     asyncio.run(_check_page_identity(tmp_path, monkeypatch))
 
@@ -535,7 +552,10 @@ def test_informal_print_selection_preserves_source_wells_and_needs_approval(tmp_
         assert proposed["dilution"]["factors"] == before["dilution"]["factors"][:3]
         assert proposed["dilution"]["plate_column"] == before["dilution"]["plate_column"]
         assert proposed["print"]["droplet_volume_ul"] == before["print"]["droplet_volume_ul"]
-        assert "I interpreted rows A, B, C" in " ".join(adapter.session.pending.notes)
+        # 2026-09-27: the note says what the rows selection really is - PLATE rows (which samples print); it used to
+        # say "as paper destinations" while it set the plate rows, which hid that the dilution wells were moving
+        assert "I read rows A, B, C as the plate rows" in " ".join(adapter.session.pending.notes)
+        assert build_plan(proposed).paper_rows == ["A", "B", "C"]          # printed on their own paper rows
         assert adapter.snapshot().current == before
         assert adapter.submit_text("run")
         wait_for(lambda: adapter.waiting == "proposal")
@@ -672,4 +692,208 @@ async def _check_top_proposal_buttons(tmp_path, monkeypatch):
         adapter.stop()
 
 
+# ── one page for --simulate and the real OT-2; a clean startup chat ──────────────────────────────────────────────────
 
+class ReadyModel:
+    """Answers the startup handshake like a reachable model."""
+
+    def invoke(self, _messages):
+        return SimpleNamespace(content="READY")
+
+
+class DownModel:
+    def invoke(self, _messages):
+        raise ConnectionError("model unreachable")
+
+
+def startup_adapter(tmp_path, model, diagnostics):
+    settings = SessionSettings(simulate=True, config_source=DEFAULT_CONFIG, working_config=tmp_path / "working.yaml",
+                               run_dir=tmp_path / "run", session_label="GUI test",
+                               llm_description="LLM provider: api-key\nGemini model: test-model",
+                               raise_errors=True, run_button="Run on OT-2")
+    session = DemoSession(settings, load_config(DEFAULT_CONFIG), llm=LLMClient(lambda: model),
+                          executor=lambda path, simulate, log: 0, sleep=lambda _: None)
+    return DemoGuiAdapter(session, diagnostics=diagnostics.append)
+
+
+def test_startup_chat_shows_loading_then_the_operator_question_and_keeps_diagnostics_out(tmp_path):
+    diagnostics = []
+    adapter = startup_adapter(tmp_path, ReadyModel(), diagnostics)
+    try:
+        adapter.start()
+        wait_for(lambda: adapter.waiting == "operator")
+        assert [(m.role, m.text) for m in adapter.messages()] == [
+            ("status", "Loading AI Agent NanoDrop..."), ("assistant", "Who is running this experiment?")]
+        text = "\n".join(diagnostics)
+        for expected in ("OT-2 AI AGENT - DILUTIONS AND PRINTING - SIMULATION", "LLM provider: api-key",
+                         "Gemini model: test-model", "[startup] Initializing LLM client", '[startup] LLM replied "READY"'):
+            assert expected in text
+        assert adapter.submit_text("My name is Sni")
+        wait_for(lambda: adapter.waiting == "idle")
+        chat = chat_text(adapter)
+        assert "Hello Sni." in chat and "press Run on OT-2 to start it" in chat
+        for diagnostic in ("OT-2 AI AGENT", "[startup]", "LLM provider", "Gemini model", "MODE    :", "Working config",
+                           "Session log", "SIMULATION", "machine profile"):
+            assert diagnostic not in chat
+        assert "MODE    : SIMULATION - nothing contacts the robot" in "\n".join(diagnostics)
+        logged = [json.loads(line) for line in adapter.session.log.path.read_text(encoding="utf-8").splitlines()]
+        assert any(e["event"] == "diagnostic" and '[startup] LLM replied "READY"' in e["text"] for e in logged)
+        assert any(e["event"] == "diagnostic" and "Working config" in e["text"] for e in logged)
+    finally:
+        adapter.stop()
+
+
+def test_llm_startup_failure_is_told_in_the_chat_with_details_in_diagnostics(tmp_path):
+    diagnostics = []
+    adapter = startup_adapter(tmp_path, DownModel(), diagnostics)
+    try:
+        adapter.start()
+        wait_for(lambda: adapter.snapshot().status == "SESSION ENDED")
+        chat = chat_text(adapter)
+        assert "LLM STARTUP FAILED" in chat and "[startup]" not in chat
+        assert "model unreachable" in "\n".join(diagnostics)
+    finally:
+        adapter.stop()
+
+
+def page_signature(client):
+    """Everything the page shows, in order, apart from the one execution-target badge."""
+    rows = []
+    for element in client.elements.values():
+        if "execution-target" in element.classes:
+            continue
+        props = tuple(sorted((key, str(element.props[key])) for key in
+                             ("color", "icon", "name", "sent", "label", "bg-color", "text-color")
+                             if key in element.props))
+        text = getattr(element, "text", "") or str(getattr(element, "content", ""))   # chat bubbles render as Html
+        rows.append((type(element).__name__, text, tuple(element.classes), props,
+                     element.visible))
+    return rows
+
+
+def test_simulate_and_real_modes_build_the_same_page(tmp_path, monkeypatch):
+    asyncio.run(_check_same_page(tmp_path, monkeypatch))
+
+
+async def _check_same_page(tmp_path, monkeypatch):
+    monkeypatch.setattr(core, "loop", asyncio.get_running_loop())
+    monkeypatch.setattr(ui, "run_javascript", lambda *args, **kwargs: None)
+    pages = {}
+    for simulate in (True, False):
+        ticks = []
+        monkeypatch.setattr(ui, "timer", lambda interval, callback: ticks.append(callback))
+        adapter = started(make_adapter(tmp_path / f"simulate_{simulate}", executor=FakeRobotExecutor(),
+                                       simulate=simulate))
+        client = Client(ui.page(f"/same-page-{simulate}"))
+        try:
+            with client:
+                build_page(adapter)
+                ticks[0]()
+                target = execution_target(not simulate)
+                signature = page_signature(client)
+                assert any(row[1] == target.confirm_title for row in signature)
+                pages[simulate] = [row for row in signature if row[1] != target.confirm_title]
+                [badge] = [e for e in client.elements.values() if "execution-target" in e.classes]
+                assert badge.text == target.badge and badge.props["color"] == "negative"
+                buttons = [e for e in client.elements.values() if isinstance(e, ui.button) and e.text == "Run on OT-2"]
+                assert len(buttons) == 2 and all(b.props["icon"] == "precision_manufacturing" for b in buttons)
+        finally:
+            adapter.stop()
+            client.delete()
+    assert pages[True] == pages[False]
+    shown = str(pages[True])                     # labels, button texts and chat bubble texts
+    assert "Loading AI Agent NanoDrop..." in shown and "RUN ON OT-2" in shown and "ROBOT RUNNER OUTPUT" in shown
+    assert not any(word in shown for word in ("Simulate", "SIMULATE", "SIMULATION"))
+
+
+def test_simulate_launcher_serves_the_real_page_labels_and_only_ever_simulates(tmp_path, monkeypatch):
+    import src.lab.robot_connection as robot_connection
+
+    def no_robot(*args, **kwargs):
+        raise AssertionError("the OT-2 was contacted")
+
+    monkeypatch.setattr(robot_connection, "resolve_host", no_robot)
+    monkeypatch.setattr(robot_connection, "verify_host", no_robot)
+    created = {}
+    real_session, real_adapter = launcher.DemoSession, launcher.DemoGuiAdapter
+
+    def session(settings, config, **kwargs):
+        settings = replace(settings, working_config=tmp_path / "working.yaml", run_dir=tmp_path / "run")
+        created["session"] = real_session(settings, config, **kwargs)
+        return created["session"]
+
+    def adapter(session_):
+        created["adapter"] = real_adapter(session_, diagnostics=lambda text: None)
+        return created["adapter"]
+
+    monkeypatch.setattr(launcher, "DemoSession", session)
+    monkeypatch.setattr(launcher, "DemoGuiAdapter", adapter)
+    monkeypatch.setattr(launcher.app, "on_shutdown", lambda handler: None)
+    monkeypatch.setattr(launcher.ui, "run", lambda *args, **kwargs: created.update(served=kwargs))
+    assert launcher.main(["--simulate", "--offline", "--operator", "Tester", "--no-browser"]) == 0
+    assert created["served"]["title"] == "Agent NanoDrop"
+    settings = created["session"].settings
+    assert settings.simulate is True and settings.run_button == "Run on OT-2"
+
+    commands = []
+
+    class FinishedSimulation:
+        def __init__(self, command, **kwargs):
+            commands.append(command)
+            self.stdout = iter(["Generated: fake.py\n", "SIMULATION OK\n"])
+
+        def wait(self):
+            return 0
+
+        def terminate(self):
+            pass
+
+    executor = created["session"].executor
+    assert isinstance(executor, launcher.SubprocessExecutor)
+    executor.popen = FinishedSimulation
+    page = created["adapter"]
+    try:
+        page.start()
+        wait_for(lambda: page.waiting == "idle")
+        assert page.run()                                        # the page's "Run on OT-2" button path
+        wait_for(lambda: commands and page.waiting == "idle" and not page.running)
+        [command] = commands
+        assert "scripts/build_vial_dilution_print.py" in command and "--live" not in command
+        assert not any("run_vial_print_robot" in str(part) for part in command)
+        assert created["session"].state.runs[-1]["mode"] == "SIMULATION"
+        assert page.snapshot().status == "RUN COMPLETE"
+    finally:
+        page.stop()
+
+
+def test_stop_ends_a_running_simulation_without_touching_the_robot_path(tmp_path):
+    from src.agents.dye_demo.session import RUN_ABORTED_EXIT_CODE, SessionLog, SubprocessExecutor
+
+    released = threading.Event()
+
+    class SlowSimulation:
+        def __init__(self, command, **kwargs):
+            self.stdout = self._lines()
+
+        def _lines(self):
+            yield "Generated: fake.py\n"
+            released.wait(5)
+
+        def terminate(self):
+            released.set()
+
+        def wait(self):
+            return 1
+
+    lines, result = [], {}
+    executor = SubprocessExecutor(emit=lines.append, popen=SlowSimulation)
+    log = SessionLog(tmp_path / "run")
+    worker = threading.Thread(target=lambda: result.update(code=executor(tmp_path / "working.yaml", True, log)))
+    worker.start()
+    wait_for(lambda: executor._simulation is not None)
+    assert executor.request_stop()
+    worker.join(5)
+    assert result["code"] == RUN_ABORTED_EXIT_CODE and not executor.active
+    assert "[stop] Stop requested. The simulation was ended." in lines
+    assert not (tmp_path / "run" / "robot_stop_request").exists()
+    assert executor.request_stop() is False

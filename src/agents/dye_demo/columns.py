@@ -15,7 +15,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
-from src.agents.dye_demo.plan import droplet_volumes, paper_layout, steps_enabled
+from src.agents.dye_demo.plan import droplet_volumes, paper_layout, print_map, steps_enabled
 
 _NOT_A_COLUMN = r"(?!\s*(?:drops?|droplets?|µl|ul|ml|replicates?|dilutions?|tips?|times|x\b|×|%|\.\d))"
 _NUMBER = rf"\d{{1,2}}\b{_NOT_A_COLUMN}"
@@ -31,12 +31,14 @@ _COUNT_BEFORE = re.compile(r"\b(?:replicates?|repeats?|repeated|number\s+of|how\
                            r"last|final)\s+$", re.I)
 _AVOID_BEFORE = re.compile(
     r"\b(?:not|never|instead\s+of|rather\s+than|except(?:\s+for)?|other\s+than|besides|apart\s+from|avoid(?:ing)?|"
-    r"skip(?:ping)?|leave\s+out|leaving\s+out|without|away\s+from)\s+(?:(?:in|on|onto|into|at|from|using)\s+)?"
-    r"(?:the\s+)?(?:paper\s+)?$", re.I)
+    r"skip(?:ping)?|leave\s+out|leaving\s+out|without|away\s+from|(?:don'?t|do\s+not|dont|no\s+longer)\s+(?:want|need|"
+    r"use)(?:\s+to\s+use)?)\s+(?:(?:in|on|onto|into|at|from|using)\s+)?(?:the\s+)?(?:paper\s+)?$", re.I)
 _ONLY_BEFORE = re.compile(r"\b(?:only|just|a\s+single)\s+(?:(?:in|on|onto|into|at)\s+)?(?:the\s+)?(?:paper\s+)?$", re.I)
 _ONLY_AFTER = re.compile(r"^\s*only\b", re.I)
 # "paper columns 1 and 2 are already used": a statement about those columns, not where to print
 _STATEMENT_AFTER = re.compile(r"^\s*(?:(?:on|of)\s+the\s+paper\s+)?(?:are|were|is|was|have|has|had|already|got)\b", re.I)
+_ROW_AFTER = re.compile(r"^\s*,?\s*(?:and\s+)?row\s+(?:[a-h]|[1-8])\b", re.I)
+_ROW_BEFORE = re.compile(r"\brow\s+(?:[a-h]|[1-8])\s*,?\s*(?:and\s+)?$", re.I)
 _PAPER_SIDE = re.compile(r"\b(?:print\w*|paper|drops?|droplets?|deposit\w*|spots?)\b", re.I)
 _PLATE_SIDE = re.compile(r"\b(?:dilut\w*|plate|wells?|series)\b", re.I)
 
@@ -100,6 +102,8 @@ def paper_column_mentions(text: str) -> list[ColumnMention]:
         if not qualifier:
             if _OTHER_LABWARE_BEFORE.search(before):
                 continue
+            if len(columns) == 1 and (_ROW_AFTER.match(after) or _ROW_BEFORE.search(before)):
+                continue          # "column 11 row 1" / "row A column 11" is one well's address, not a paper column
             if len(columns) == 1 and not (paper_side and not plate_side):
                 continue          # a bare "column 3" in a sentence that also talks about the plate is not a paper column
         if _AVOID_BEFORE.search(before):
@@ -133,6 +137,9 @@ def paper_columns_printed(config: dict[str, Any]) -> list[int]:
         _, do_print = steps_enabled(config)
         if not do_print:
             return []
+        entries = print_map(config)
+        if entries is not None:
+            return sorted({int(position[1:]) for entry in entries for position in entry["positions"]})
         return sorted({int(spot["column"]) for spot in paper_layout(config, include_overflow=True)})
     except (TypeError, ValueError):
         return []
@@ -193,7 +200,9 @@ def column_conflict(text: str, after: dict[str, Any]) -> ColumnConflict | None:
     gap = gap_conflict(text)
     if gap is not None:
         return gap
-    target = request.exact[0] if request.exact else None
+    # "paper columns 1 and 2, then paper columns 4 and 5": every group named is printed (never only the first)
+    target = (tuple(sorted(set().union(*request.exact))) if len(request.exact) > 1
+              else request.exact[0] if request.exact else None)
     starts = request.starts
     if len(set(starts)) > 1 or (target is not None and any(start != target[0] for start in starts)):
         named = ", ".join(str(start) for start in dict.fromkeys(((target[0],) if target else ()) + starts))
@@ -215,18 +224,29 @@ def column_conflict(text: str, after: dict[str, Any]) -> ColumnConflict | None:
     elif target is None and wanted_start is not None and printed and printed[0] != wanted_start:
         problem = f"this change would print {columns_phrase(printed)}"
     elif request.avoided & set(printed):
+        question = GAP_QUESTION if len(droplet_volumes(after)) > 1 else "Which paper columns should this run print?"
         return ColumnConflict("paper_columns", f"{asked}, but this change would print {columns_phrase(printed)}.",
-                              printed=printed)
+                              question, printed=printed)
     else:
         return None
     message = f"{asked}, but {problem}."
     fix = _layout_fix(after, target, wanted_start, text, request)
+    if fix is None and target is not None and prints:
+        # Columns that are not side by side ("1 and 3") cannot come from a first column and a replicate count, but they
+        # can be printed exactly with a print map: the named columns themselves are the fix.
+        exact = _exact_columns_fix(after, target, request)
+        if exact is not None:
+            return ColumnConflict("paper_columns", message, f"Should this run print exactly {columns_phrase(target)}?",
+                                  exact, wanted=target, printed=printed)
     if fix is None:
         volumes = max(1, len(droplet_volumes(after)))
-        if target is not None and len(target) % volumes:
+        adjacent = target is not None and list(target) == list(range(target[0], target[0] + len(target)))
+        if target is not None and volumes > 1 and (len(target) % volumes or not adjacent):
             message += (f" With {volumes} drop volumes, each replicate prints {volumes} side-by-side paper columns, so "
                         f"{columns_phrase(target)} cannot be printed exactly in one run.")
-        return ColumnConflict("paper_columns", message, wanted=target or (), printed=printed)
+        # side by side matters only with several drop volumes (one replicate is that many adjacent columns)
+        question = GAP_QUESTION if volumes > 1 else "Which paper columns should this run print?"
+        return ColumnConflict("paper_columns", message, question, wanted=target or (), printed=printed)
     preview = _preview(after, fix)
     shown = columns_phrase(paper_columns_printed(preview))
     settings = [f"first paper column {wanted_start}"]
@@ -266,6 +286,28 @@ def _layout_fix(after: dict[str, Any], target: tuple[int, ...] | None, start: in
             or request.avoided & set(columns):
         return None
     return fix
+
+
+def _exact_columns_fix(after: dict[str, Any], target: tuple[int, ...],
+                       request: ColumnRequest) -> list[dict[str, Any]] | None:
+    """The paper-columns selection that prints exactly `target` (natural.expand_paper_columns decides whether it can)."""
+    from src.agents.dye_demo.model import resolve_path, set_path
+    from src.agents.dye_demo.natural import SelectionError, expand_paper_columns
+
+    if request.avoided & set(target):
+        return None
+    try:
+        expanded, _ = expand_paper_columns(list(target), after)
+        preview = deepcopy(after)
+        for item in expanded:
+            set_path(preview, resolve_path(preview, item["path"]), item["value"])
+    except (SelectionError, ValueError, KeyError, TypeError):
+        return None
+    if paper_columns_printed(preview) != list(target):
+        return None             # e.g. three columns with two drop volumes: not printable exactly in one run
+    evidence = next((mention.text for mention in request.mentions if mention.role != "avoid"), "")
+    return [{"path": "paper_columns", "value": list(target), "kind": "requested", "evidence": evidence,
+             "why": "the paper columns you named"}]
 
 
 def _preview(config: dict[str, Any], fix: list[dict[str, Any]]) -> dict[str, Any]:

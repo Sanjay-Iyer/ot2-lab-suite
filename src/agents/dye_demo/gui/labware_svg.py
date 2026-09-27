@@ -20,12 +20,11 @@ def render_plate_svg(config: dict[str, Any]) -> str:
     plan = build_plan(config)
     slot = format_slot(slot_of(config, "plate"))
 
-    used_wells = set()
-    if plan.plate_column:
+    used_wells = {well.well for well in plan.wells}
+    used_wells |= {source.well for source in plan.print_sources}      # the wells the print step draws from
+    if plan.plate_column and not plan.mapped:
         for r in plan.rows:
             used_wells.add(f"{r}{plan.plate_column}")
-    for well in plan.wells:
-        used_wells.add(well.well)
 
     width = 256
     height = 180
@@ -118,12 +117,9 @@ def render_paper_svg(config: dict[str, Any]) -> str:
     plan = build_plan(config)
     slot = format_slot(slot_of(config, "paper"))
 
-    printed_positions = set()
-    if plan.do_print and plan.spots:
-        for spot in plan.spots:
-            col = spot["column"]
-            for row in plan.rows:
-                printed_positions.add((row, col))
+    # exactly the positions the print operations reach (a print map, or each dilution row across its columns)
+    printed_positions = {(position[0], int(position[1:])) for position in plan.print_positions} if plan.do_print \
+        else set()
 
     width = 256
     height = 196

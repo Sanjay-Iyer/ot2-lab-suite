@@ -18,6 +18,7 @@ runs:
       dilution.factors: [4, 8, 16, 32]
       dilution.plate_column: "6"
       dilution.start_row: A
+      dilution.rows: null
       dilution.total_volume_ul: 200
       dilution.prepared_volume_ul: null
       mixing.reps: 2
@@ -27,6 +28,8 @@ runs:
       print.droplets_per_spot: 1
       print.replicates: 2
       print.paper_start_column: 1
+      print.paper_rows: null
+      print.source_map: null
       tips.start_tip: A1
       tips.return_tips: false
       tips.policy: per_liquid
@@ -58,6 +61,7 @@ runs:
       dilution.factors: [4, 8, 16, 32]
       dilution.plate_column: "6"
       dilution.start_row: A
+      dilution.rows: null
       dilution.total_volume_ul: 200
       mixing.reps: 2
       mixing.volume_ul: 15
@@ -66,6 +70,8 @@ runs:
       print.droplets_per_spot: 3
       print.replicates: 2
       print.paper_start_column: 4
+      print.paper_rows: null
+      print.source_map: null
       tips.return_tips: false
       tips.policy: per_liquid
     choices:

@@ -4,32 +4,41 @@ description: >-
   "Which side-by-side paper columns should this run print?", but the answer "Columns 3 and 4." was appended to the
   refused request ("Print in paper columns 3 and 5 Columns 3 and 4."), which was refused again until the session gave
   up. A short column answer now replaces the refused columns in the request.
+  (2026-09-26: paper columns that are not side by side are printed exactly with a print map, so "3 and 5" is no longer
+  refused: the model's reading as a first column and a replicate count (columns 3-4) is caught and the proposal prints
+  exactly columns 3 and 5. The follow-up "Columns 3 and 4." while that proposal waits is a revision read by the router
+  (it used to be taken for change numbers "3 and 4" and answered "I could not match that"); it replaces the waiting
+  proposal. The answer-replaces-columns path itself is covered by tests/test_ai_dye_demo_intent_to_plan.py.)
 found_by: {seed: 0, persona: code_review, goal: null, chaos: 0.0, live_logic: false}
 invariant: helpfulness_regression
-fixed_in: src/agents/dye_demo/session.py (_answer_columns), src/agents/dye_demo/columns.py (column_answer, rewrite_paper_columns)
+fixed_in: src/agents/dye_demo/columns.py (column_conflict, _exact_columns_fix), src/agents/dye_demo/intent.py (parse_selection)
 messages:
 - text: Print in paper columns 3 and 5.
-  label: {category: instruction, may_propose: false}
+  label:
+    category: instruction
+    may_propose: null
+    intended: [{path: print.source_map, value: null}]
   llm:
   - kind: interpret
     reply: '{"intent": "change", "changes": [{"path": "print.paper_start_column", "value": 3, "evidence": "paper columns 3"}, {"path": "print.replicates", "value": 2, "evidence": "paper columns 3 and 5"}], "explanation": "Proposes paper columns 3 and 5.", "clarification": ""}'
 - text: Columns 3 and 4.
   label:
-    category: clarification_answer
+    category: revision
     may_propose: null
     intended: [{path: print.paper_start_column, value: 3}, {path: print.replicates, value: 2}]
   llm:
   - kind: interpret
-    reply: '{"intent": "change", "changes": [{"path": "print.paper_start_column", "value": 3, "evidence": "paper columns 3"}, {"path": "print.replicates", "value": 2, "evidence": "paper columns 3 and 4"}], "explanation": "Proposes paper columns 3 and 4.", "clarification": ""}'
+    reply: '{"intent": "change", "changes": [{"path": "print.paper_start_column", "value": 3, "evidence": "Columns 3"}, {"path": "print.replicates", "value": 2, "evidence": "Columns 3 and 4"}], "explanation": "Proposes paper columns 3 and 4.", "clarification": ""}'
 - text: 'yes'
   label: {category: approve, may_mutate: true}
 expected:
   final: {revision: 1, pending: null, clarifying: false}
-  final_config: {print.paper_start_column: 3, print.replicates: 2}
+  final_config: {print.paper_start_column: 3, print.replicates: 2, print.source_map: null}
   turns:
   - turn: 1
-    no_proposal: true
-    output_contains: ["Paper columns 3, 5 are not side by side", "Which side-by-side paper columns should this run print?"]
+    proposal_paths: [print.source_map]
+    output_contains: ["A11 on 2 paper positions (A3, A5)"]
+    output_excludes: ["not side by side"]
   - turn: 2
     proposal_paths: [print.paper_start_column, print.replicates]
-    output_excludes: ["not side by side"]
+    output_excludes: ["could not match"]

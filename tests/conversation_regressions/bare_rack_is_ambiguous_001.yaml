@@ -1,21 +1,21 @@
 name: bare_rack_is_ambiguous_001
 description: >-
   A fragment "rack 10" was confirmed as a slot and then silently read as the vial rack, although the deck also has a
-  tip rack; the user meant the tip rack. A bare "rack" is now handled like a bare "plate": the agent asks which one.
+  tip rack; the user meant the tip rack. A bare "rack" names two labware here, so the agent asks which one - now after
+  the model has read the message (grounding, not a word check before the model): the question names both racks and the
+  slot, the answer "the tip rack" is merged into the request, and "rack 10" itself counts as the slot.
+  (2026-09-26: rewritten for the request-understanding redesign. The old path answered a pre-LLM
+  "Did you mean OT-2 deck SLOT 10?" and then a numbered "Which rack do you mean?"; both questions were removed with the
+  pre-LLM wording check. What the case protects is unchanged: a bare "rack" is never guessed.)
 found_by: {seed: 9206, persona: fast_user, goal: unrelated_parameter_change, chaos: 0.7, live_logic: false}
 invariant: unrelated_change_applied_unflagged
-fixed_in: src/agents/dye_demo/language.py (labware_word_ambiguities)
+fixed_in: src/agents/dye_demo/grounding.py (AMBIGUOUS_TERMS, referent), src/agents/dye_demo/session.py (_ask_about_change)
 messages:
 - text: rack 10
   label:
     category: move
     intended: [{path: deck.tiprack.slot, value: 10}]
-- text: 'yes'
-  label:
-    category: clarification_answer
-    may_propose: null
-    intended: [{path: deck.tiprack.slot, value: 10}]
-- text: '2'
+- text: the tip rack
   label:
     category: clarification_answer
     may_propose: null
@@ -23,14 +23,13 @@ messages:
 - text: 'yes'
   label: {category: approve, may_mutate: true}
 expected:
-  final: {revision: 1, pending: null}
+  final: {revision: 1, pending: null, clarifying: false}
   final_config: {deck.tiprack.slot: 10, deck.tuberack.slot: 7}
   turns:
   - turn: 1
     no_proposal: true
-    output_contains: ["deck SLOT 10"]
+    clarifying_after: true
+    output_contains: ["Which do you mean: the P20 tip rack or the vial rack?", "slot 10"]
   - turn: 2
-    no_proposal: true
-    output_contains: ["Which rack do you mean?"]
-  - turn: 3
     proposal_paths: [deck.tiprack.slot]
+    output_excludes: ["Which do you mean"]

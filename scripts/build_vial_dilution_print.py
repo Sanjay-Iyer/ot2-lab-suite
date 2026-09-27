@@ -844,7 +844,7 @@ def main() -> int:
                      if any(k in line for k in ("Pre-flight", "Series:", "Printing 8",
                                                 "Returned", "Completed ===", "WARNING",
                                                 "Clovers:", "Minimum int", "Usable paper",
-                                                "Print plan:",
+                                                "Print plan:", "Print map:", "Paper rows:",
                                                 "Paper print complete")))
     print("\n--- simulation key lines ---")
     print(tail)

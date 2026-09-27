@@ -2,8 +2,8 @@
 
 These pin the interaction model: READY before anything else, the operator's
 name on every record, /ask never changing state, nothing applied without an
-explicit yes, collisions explained instead of failing, ambiguous words confirmed
-before interpretation, and live runs gated on the physical deck.
+explicit yes, collisions explained instead of failing, informal wording read by the
+router (genuine ambiguity is asked about after it), and live runs gated on the physical deck.
 """
 from __future__ import annotations
 
@@ -154,21 +154,26 @@ def test_an_occupied_slot_is_explained_and_nothing_changes(tmp_path):
     assert harness.state.revision == 0 and harness.session.pending is None
 
 
-def test_spot_is_confirmed_as_a_slot_before_the_llm_interprets_anything(tmp_path):
-    harness = Harness(tmp_path, ["Stephen", "Move the dilution plate to spot 6.", "yes", "yes", "quit"],
-                      replies=[proposal(("deck.plate.slot", 6, "dilution plate to deck slot 6"))]).run()
-    assert 'You said "spot 6." Did you mean OT-2 deck SLOT 6?' in harness.text
-    # the router reads the confirmed wording as the message (the conversation it also sees still shows "spot 6")
+# 2026-09-26 (request-understanding redesign): these two tests pinned the pre-LLM wording check - 'You said "spot 6."
+# Did you mean OT-2 deck SLOT 6?' asked before the model saw the message, and the message then rewritten. That check
+# was removed on purpose (it asked about words that are ambiguous only in isolation). They now pin what replaced it: the
+# router reads exactly what was typed, grounding accepts "spot 6" as the slot it names, and the proposal - not a word
+# question - is where the scientist confirms or rejects the reading.
+def test_spot_is_read_by_the_router_without_a_wording_question_first(tmp_path):
+    harness = Harness(tmp_path, ["Stephen", "Move the dilution plate to spot 6.", "yes", "quit"],
+                      replies=[proposal(("deck.plate.slot", 6, "dilution plate to spot 6"))]).run()
+    assert "Did you mean OT-2 deck SLOT 6?" not in harness.text
     interpreted = harness.llm.calls[1][-1][1].split("SCIENTIST'S MESSAGE:\n")[-1]
-    assert "deck slot 6" in interpreted and "spot 6" not in interpreted
+    assert "Move the dilution plate to spot 6." in interpreted          # the router sees exactly what was typed
     assert harness.state.config["deck"]["plate"]["slot"] == 6
 
 
-def test_rejecting_the_meaning_of_an_ambiguous_word_changes_nothing(tmp_path):
-    harness = Harness(tmp_path, ["Stephen", "move the dilution plate to spot 6", "no", "quit"]).run()
-    assert "Nothing was changed. Please say it again using established terms" in harness.text
-    assert len(harness.llm.calls) == 1        # only the startup check
-    assert harness.state.revision == 0
+def test_rejecting_the_reading_of_an_informal_location_changes_nothing(tmp_path):
+    harness = Harness(tmp_path, ["Stephen", "move the dilution plate to spot 6", "no", "quit"],
+                      replies=[proposal(("deck.plate.slot", 6, "dilution plate to spot 6"))]).run()
+    assert "Discarded proposal #1. Nothing was changed." in harness.text
+    assert len(harness.llm.calls) == 2        # the startup check and one router call; "no" never reaches the model
+    assert harness.state.revision == 0 and harness.state.config["deck"]["plate"]["slot"] == 4
 
 
 def test_a_question_without_ask_is_answered_and_nothing_changes(tmp_path):

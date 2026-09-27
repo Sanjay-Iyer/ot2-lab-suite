@@ -19,8 +19,10 @@ from src.agents.dye_demo.columns import columns_phrase, format_columns, paper_co
 from src.agents.dye_demo.model import (
     CARRIED_OVER,
     DECK_SLOTS,
+    EARLIER_REVISION,
     LABWARE_NAMES,
     LABWARE_ROLES,
+    ROWS,
     TIP_POLICIES,
     circle_area_mm2,
     field_label,
@@ -33,7 +35,6 @@ from src.agents.dye_demo.model import (
     material_label,
     material_spec,
     occupancy,
-    off_deck_roles,
     slot_of,
     well_geometry,
 )
@@ -172,8 +173,46 @@ class PlanSection:
 LAB_OWNED_TITLE = "LAB-OWNED PARAMETERS"
 
 
+def factor_text(factor: float) -> str:
+    """'4×', or '—' when the factor is not known (a sample the scientist already has in the well)."""
+    return fmt_factor(factor) if float(factor or 0) > 0 else "—"
+
+
+def rows_text(rows: Sequence[str]) -> str:
+    """'row C', 'rows B-D' for consecutive rows, 'rows B, D, H' for rows that are not."""
+    rows = list(rows)
+    if len(rows) == 1:
+        return f"row {rows[0]}"
+    indexes = [ROWS.index(row) for row in rows if row in ROWS]
+    if len(indexes) == len(rows) and indexes == list(range(indexes[0], indexes[0] + len(rows))):
+        return f"rows {rows[0]}-{rows[-1]}"
+    return "rows " + ", ".join(rows)
+
+
+def positions_text(positions: Sequence[str], *, limit: int = 8) -> str:
+    """'A1-A10' for a run along a row or down a column, else the positions (shortened past `limit`)."""
+    names = list(positions)
+    if not names:
+        return "none"
+    rows, columns = [name[0] for name in names], [int(name[1:]) for name in names]
+    if len(names) > 1 and len(set(rows)) == 1 and columns == list(range(columns[0], columns[0] + len(names))):
+        return f"{names[0]}-{names[-1]}"
+    if len(names) > 1 and len(set(columns)) == 1 and \
+            [ROWS.index(row) for row in rows] == list(range(ROWS.index(rows[0]), ROWS.index(rows[0]) + len(names))):
+        return f"{names[0]}-{names[-1]}"
+    if len(names) > limit:
+        return ", ".join(names[:limit - 2]) + f", … , {names[-1]}"
+    return ", ".join(names)
+
+
+def print_map_text(plan: Plan) -> str:
+    """'A11 → A1-A10 (10) | B11 → B1-B5 (5)'."""
+    return pipes(f"{source.well} → {positions_text(source.positions)} ({len(source.positions)})"
+                 for source in plan.print_sources) or "none"
+
+
 def _well_grid(plan: Plan, *, volumes: bool) -> Grid:
-    rows = [("Well", [well.well for well in plan.wells]), ("Factor", [fmt_factor(well.factor) for well in plan.wells])]
+    rows = [("Well", [well.well for well in plan.wells]), ("Factor", [factor_text(well.factor) for well in plan.wells])]
     if volumes:
         rows += [("Dye µL", [fmt_num(well.sample_ul) for well in plan.wells]),
                  ("Water µL", [fmt_num(well.solvent_ul) for well in plan.wells])]
@@ -181,12 +220,17 @@ def _well_grid(plan: Plan, *, volumes: bool) -> Grid:
 
 
 def _dilutions(config: dict[str, Any], plan: Plan, prepared: dict[str, Any] | None, record: bool) -> PlanSection:
+    if not plan.do_dilution and plan.mapped and plan.do_print:
+        section = PlanSection("DILUTIONS", "SKIPPED - printing from wells that already hold the sample")
+        wells = [source.well for source in plan.print_sources]
+        section.add("Dilutions", "none made in this run")
+        section.add("Printed from", f"{pipes(wells)}   (already in the plate)" if wells else "none")
+        return section
     section = PlanSection("DILUTIONS", "made in this run" if plan.do_dilution else "SKIPPED - already in the plate")
     if not plan.wells:
         section.add("Dilutions", "none")
         return section
-    first, last = plan.wells[0], plan.wells[-1]
-    rows = f"rows {first.row}-{last.row}" if len(plan.wells) > 1 else f"row {first.row}"
+    rows = rows_text([well.row for well in plan.wells])
     section.add("Dilutions", f"{len(plan.wells)} in plate column {plan.plate_column} ({rows})")
     section.items.append(_well_grid(plan, volumes=plan.do_dilution))
     if plan.do_dilution:
@@ -216,6 +260,19 @@ def _printing(config: dict[str, Any], plan: Plan) -> PlanSection:
     if not plan.do_print:
         return PlanSection("PRINTING", "SKIPPED - this run does not print")
     printing = config["print"]
+    if plan.mapped:
+        droplets = int(printing.get("droplets_per_spot", 1))
+        section = PlanSection("PRINTING", "in this run")
+        section.add("Print map", print_map_text(plan))
+        section.add("Paper positions", f"{len(plan.print_positions)}   (from {_plural(len(plan.print_sources), 'plate well')})")
+        section.add("Drop volume", pipes(dict.fromkeys(fmt_ul(op.volume_ul) for op in plan.operations
+                                                        if op.kind == "print")) or "none")
+        section.add("Drops per position", f"{droplets}" + ("  (stacked)" if droplets > 1 else ""))
+        section.add("Total drops", plan.total_drops)
+        section.add("Printed volume", f"{fmt_ul(plan.printed_fluid_ul)}   (" + pipes(
+            f"{source.well}: {fmt_ul(source.draw_ul)} of {fmt_ul(source.start_ul)}" for source in plan.print_sources)
+                    + ")")
+        return section
     columns = paper_columns_printed(config)
     droplets = int(printing.get("droplets_per_spot", 1))
     replicates = int(printing.get("replicates", 1))
@@ -223,7 +280,7 @@ def _printing(config: dict[str, Any], plan: Plan) -> PlanSection:
     left = max(plan.source_volume_ul - plan.print_draw_per_well_ul, 0.0)
     section = PlanSection("PRINTING", "in this run")
     section.add("Paper columns", pipes(columns) if columns else "none")
-    section.add("Paper rows", f"{pipes(well.row for well in plan.wells)}   (one row per dilution)")
+    section.add("Paper rows", paper_rows_text(plan))
     section.add("Drop volume", _drop_volumes(config))
     section.add("Drops per position", f"{droplets}" + ("  (stacked)" if droplets > 1 else ""))
     section.add("Replicates", f"{_plural(replicates, 'side-by-side column')} per drop volume")
@@ -404,9 +461,18 @@ def render_run_banner(config: dict[str, Any], *, simulate: bool, operator: str, 
     lines += _row("Operator", f"{operator} | {session_label} | run {run_number}")
     lines += ["", "DECK"] + _deck_rows(config) + ["", "THIS RUN"]
     wells = _range([well.well for well in plan.wells])
-    lines += _row("Dilutions made", f"{len(plan.wells)}   (plate wells {wells})" if plan.do_dilution
-                  else f"none   (plate wells {wells} already hold them)")
-    if plan.do_print:
+    if plan.do_dilution:
+        lines += _row("Dilutions made", f"{len(plan.wells)}   (plate wells {wells})")
+    elif plan.mapped and plan.do_print:
+        lines += _row("Dilutions made", f"none   (printing from {pipes(source.well for source in plan.print_sources)}, "
+                                        "already in the plate)")
+    else:
+        lines += _row("Dilutions made", f"none   (plate wells {wells} already hold them)")
+    if plan.do_print and plan.mapped:
+        lines += _row("Print map", print_map_text(plan))
+        lines += _row("Print positions", len(plan.print_positions))
+        lines += _row("Total drops", plan.total_drops)
+    elif plan.do_print:
         lines += _row("Paper columns", pipes(columns))
         lines += _row("Print positions", sum(op.kind == "print" for op in plan.operations))
         lines += _row("Total drops", plan.total_drops)
@@ -429,7 +495,7 @@ _CHANGE_NAMES = {
     "mixing.reps": "mixes", "mixing.volume_ul": "mixing volume", "print.droplet_volume_ul": "drop volume",
     "print.droplets_per_spot": "drops per position", "print.replicates": "replicates",
     "print.paper_start_column": "first paper column", "tips.start_tip": "tip start", "tips.return_tips": "used tips",
-    "tips.policy": "tip use",
+    "tips.policy": "tip use", "print.source_map": "print map",
 }
 
 
@@ -450,6 +516,11 @@ def format_value(path: str, value: Any) -> str:
         return pipes(fmt_factor(item) for item in value)
     if path == "tips.policy":
         return "one tip per liquid" if value == "per_liquid" else "new tip every transfer"
+    if path == "print.source_map":
+        return pipes(f"{entry['source']} → {positions_text(entry['positions'])} ({len(entry['positions'])})"
+                     for entry in value) if isinstance(value, list) else str(value)
+    if path in {"dilution.rows", "print.paper_rows"} and isinstance(value, (list, tuple)):
+        return ", ".join(str(item) for item in value)                   # "A, C, F", not "['A', 'C', 'F']"
     if isinstance(value, bool):
         return "yes" if value else "no"
     if path.endswith("_ul"):
@@ -469,25 +540,45 @@ def interpretation_lines(proposal: Any) -> list[str]:
     after = proposal.after
     paths = [change.path for change in proposal.changes]
     plan = build_plan(after)
-    wells = _range([well.well for well in plan.wells])
+    wells = positions_text([well.well for well in plan.wells])      # "A11-C11", but "A11, C11, E11" for sparse rows
     lines: list[str] = []
     if "dilution.enabled" in paths:
-        lines.append("make the dilutions in this run" if plan.do_dilution else
-                     f"skip dilution preparation - print from the samples already in plate wells {wells}")
+        if plan.do_dilution:
+            lines.append("make the dilutions in this run")
+        elif plan.mapped and plan.do_print:
+            lines.append("skip dilution preparation - print from what is already in plate well"
+                         f"{'s' if len(plan.print_sources) > 1 else ''} "
+                         f"{', '.join(source.well for source in plan.print_sources)}")
+        else:
+            lines.append(f"skip dilution preparation - print from the samples already in plate wells {wells}")
+    if "print.source_map" in paths:
+        if plan.mapped and plan.do_print:
+            for source in plan.print_sources:
+                lines.append(f"print {source.well} on {_plural(len(source.positions), 'paper position')} "
+                             f"({positions_text(source.positions)})")
+        else:
+            lines.append("print each dilution on its paper row (no print map)")
+    if "print.paper_rows" in paths and "print.source_map" not in paths and plan.do_print and not plan.mapped:
+        # where the dilutions print, said with the wells they print from: the plate wells themselves do not move
+        lines.append("print " + ", ".join(f"{well} on paper row {row}" for well, row in paper_row_pairs(plan))
+                     + " (the dilution wells stay where they are)")
     if "print.enabled" in paths:
         lines.append("print in this run" if plan.do_print else "skip printing - make the dilutions only")
-    if {"dilution.start_row", "dilution.factors"} & set(paths) and plan.wells:
+    if {"dilution.start_row", "dilution.factors", "dilution.rows"} & set(paths) and plan.wells:
         rows = [well.row for well in plan.wells]
         factors = pipes(fmt_factor(well.factor) for well in plan.wells)
-        if "dilution.start_row" in paths:
-            lines.append((f"rows {rows[0]}-{rows[-1]}" if len(rows) > 1 else f"row {rows[0]}")
-                         + f" - plate wells {wells} ({factors})")
+        if {"dilution.start_row", "dilution.rows"} & set(paths):
+            lines.append(f"dilutions in plate {rows_text(rows)} - plate wells {wells} ({factors})")
         else:
             lines.append(f"{len(rows)} dilution{'s' if len(rows) != 1 else ''}: {factors} (plate wells {wells})")
     if {"print.paper_start_column", "print.replicates"} & set(paths) and plan.do_print:
         lines.append(f"print {columns_phrase(paper_columns_printed(after))}")
     shown = {"dilution.enabled", "print.enabled", "dilution.start_row", "dilution.factors", "print.paper_start_column",
-             "print.replicates"}
+             "print.replicates", "print.source_map", "dilution.rows"}
+    if plan.do_print:
+        # said above: by the paper-row line, or - when a print map names every position and the explicit paper rows
+        # were folded into it - by the print map lines ("paper rows: (not set)" would read as if they were lost)
+        shown.add("print.paper_rows")
     for change in proposal.changes:
         if change.path in shown:
             continue
@@ -511,14 +602,19 @@ def render_answer(answer: str) -> str:
 
 def _proposal_attention(proposal: Any) -> list[str]:
     items: list[str] = []
-    unverified = [change for change in proposal.changes if not change.verified and change.concern != CARRIED_OVER]
+    unverified = [change for change in proposal.changes if not change.verified
+                  and change.concern not in {CARRIED_OVER, EARLIER_REVISION}]
     carried = [change for change in proposal.changes if not change.verified and change.concern == CARRIED_OVER]
+    earlier = [change for change in proposal.changes if not change.verified and change.concern == EARLIER_REVISION]
     if unverified:
         items.append("CHECK THESE - I could not find them in what you typed:")
         items += [f"  - {field_label(change.path)}: {format_value(change.path, change.after)}" for change in unverified]
     if carried:
         items.append("CARRIED OVER FROM EARLIER IN THE CONVERSATION - check these still apply:")
         items += [f"  - {field_label(change.path)}: {format_value(change.path, change.after)}" for change in carried]
+    if earlier:
+        items.append("FROM AN EARLIER REVISION OF THIS SESSION - check these are the values you mean:")
+        items += [f"  - {field_label(change.path)}: {format_value(change.path, change.after)}" for change in earlier]
     warned = {issue.code for issue in proposal.report.warnings}
     for change in proposal.changes:
         if change.path == "dilution.enabled" and change.after is False and "print.assumes_prepared" not in warned:
@@ -692,6 +788,8 @@ def _conflict_example(conflict: DeckConflict, spare_slots: list[int], removable:
 
 def dilution_name(config: dict[str, Any], factor: float) -> str:
     sample, solvent = material_label(config, "sample"), material_label(config, "solvent")
+    if not float(factor or 0) > 0:
+        return f"{sample} as it is in the well"
     if float(factor) == 1.0:
         return f"neat {sample} (1×, undiluted)"
     return f"{fmt_factor(factor)} {sample} dilution in {solvent}"
@@ -710,6 +808,12 @@ def render_dilution_step(config: dict[str, Any], plan: Plan) -> str:
     total = plan.total_volume_ul
     header = (f"STEP 1 - DILUTIONS   {len(plan.wells)} well(s) in plate column {plan.plate_column}, "
               f"{fmt_ul(total)} each")
+    if not plan.do_dilution and plan.mapped and plan.do_print:
+        lines = ["STEP 1 - DILUTIONS   [SKIPPED: this run does not make dilutions]",
+                 "  The print map draws from plate wells that must ALREADY hold the sample:"]
+        lines += [f"    {source.well:<5} {dilution_name(config, source.factor)} "
+                  f"(~{fmt_ul(source.start_ul)} assumed)" for source in plan.print_sources]
+        return "\n".join(lines)
     if not plan.do_dilution:
         lines = [header + "   [SKIPPED: this run does not make dilutions]",
                  f"  These plate wells are assumed to ALREADY hold the dilutions "
@@ -752,14 +856,36 @@ def _tip_of_operation(plan: Plan, index: int) -> str:
     return "?"
 
 
+def paper_row_pairs(plan: Plan) -> list[tuple[str, str]]:
+    """(plate well, paper row) for each dilution a plan without a print map prints, in print order."""
+    return [(source.well, source.positions[0][0]) for source in plan.print_sources if source.positions]
+
+
+def paper_rows_text(plan: Plan) -> str:
+    """'A | B | C   (A11 → A, C11 → B, E11 → C)' - which paper row each printed dilution lands on."""
+    pairs = paper_row_pairs(plan)
+    rows = pipes(row for _, row in pairs) or "none"
+    if pairs and all(well[0] == row for well, row in pairs):
+        return f"{rows}   (one row per dilution)"               # the default: each on the row with its own letter
+    return f"{rows}   ({', '.join(f'{well} → {row}' for well, row in pairs)})" if pairs else rows
+
+
 def render_print_step(config: dict[str, Any], plan: Plan) -> str:
-    header = "STEP 2 - PRINTING   each dilution prints on its own paper row"
+    pairs = paper_row_pairs(plan)
+    header = ("STEP 2 - PRINTING   print map: each source well prints its own paper positions" if plan.mapped
+              else "STEP 2 - PRINTING   each dilution prints on its own paper row"
+              if all(well[0] == row for well, row in pairs)
+              else "STEP 2 - PRINTING   each dilution prints on its chosen paper row ("
+                   + ", ".join(f"{well} → {row}" for well, row in pairs) + ")")
     if not plan.do_print:
         return header + "   [SKIPPED: this run does not print]"
     steps = [(index, op) for index, op in enumerate(plan.operations) if op.kind == "print"]
     columns = paper_columns_printed(config)
-    lines = [header, f"  Paper columns printed: {format_columns(columns)}   (first paper column "
-                     f"{config['print'].get('paper_start_column', 1)}; one paper column per drop volume x replicate)"]
+    if plan.mapped:
+        lines = [header, f"  Print map: {print_map_text(plan)}"]
+    else:
+        lines = [header, f"  Paper columns printed: {format_columns(columns)}   (first paper column "
+                         f"{config['print'].get('paper_start_column', 1)}; one paper column per drop volume x replicate)"]
     if len(steps) <= DETAILED_PRINT_STEPS:
         for number, (index, op) in enumerate(steps, start=1):
             lines += [

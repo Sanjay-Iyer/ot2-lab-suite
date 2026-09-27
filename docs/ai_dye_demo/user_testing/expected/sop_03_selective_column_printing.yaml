@@ -18,6 +18,7 @@ runs:
       dilution.factors: [3, 6, 12]
       dilution.plate_column: "3"
       dilution.start_row: D
+      dilution.rows: null
       dilution.total_volume_ul: 150
       dilution.prepared_volume_ul: null
       mixing.reps: 2
@@ -27,6 +28,8 @@ runs:
       print.droplets_per_spot: 1
       print.replicates: 2
       print.paper_start_column: 3
+      print.paper_rows: null
+      print.source_map: null
       tips.start_tip: A1
       tips.return_tips: false
       tips.policy: per_liquid

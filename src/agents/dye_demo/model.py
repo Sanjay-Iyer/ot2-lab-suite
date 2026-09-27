@@ -49,6 +49,9 @@ class FieldError(ValueError):
 # A proposed value found only in the scientist's earlier messages ("same thing but columns 4-6" keeps the rows of the
 # request it revises): accepted, and shown for checking.
 CARRIED_OVER = "carried over from earlier in the conversation"
+# A proposed value the plan had after an earlier approved change of this session ("the factors I asked for at the very
+# beginning"): state, not an invented value - accepted, and shown for checking under its own heading.
+EARLIER_REVISION = "the value from an earlier revision of this session"
 
 
 # ── formatting shared by the plan, the checks and the renderers ─────────────────
@@ -294,6 +297,100 @@ def normalize_rows(value: Any) -> list[str]:
     raise FieldError(f"selected rows must be a list of row letters (A-H), got {value!r}")
 
 
+_PAPER_ROW = re.compile(r"(?:paper\s+)?(?:row\s*)?([A-Ha-h]|[1-8])")
+
+
+def normalize_paper_rows(value: Any) -> list[str] | None:
+    """print.paper_rows: the PAPER rows the dilution series prints on, top to bottom in series order (the first
+    dilution prints on the first of them). Independent of dilution.rows, the PLATE rows the dilutions are made in.
+
+    None (or "none"/"default") returns to the default: each dilution prints on the paper row with its own plate-row
+    letter. Rows are letters A-H or numbers 1-8; a row that does not exist on the paper is refused, never dropped."""
+    if value is None or (isinstance(value, str) and value.strip().lower() in {"", "none", "null", "default"}):
+        return None
+    if isinstance(value, (list, tuple)):
+        items = list(value)
+    else:
+        words = re.sub(r"(?i)\b(?:paper|rows?)\b", " ", str(value))
+        items = re.split(r"\s*(?:,|;|&|\band\b)\s*|\s+", words.strip())
+    rows: list[str] = []
+    for item in items:
+        text = str(item).strip()
+        if not text:
+            continue
+        match = _PAPER_ROW.fullmatch(text)
+        if not match:
+            raise FieldError(f"paper rows are A-H (or 1-8), got {item!r}")
+        token = match.group(1).upper()
+        rows.append(ROWS[int(token) - 1] if token.isdigit() else token)
+    if not rows:
+        raise FieldError("paper rows must name at least one row (A-H)")
+    return sorted(set(rows), key=ROWS.index)
+
+
+PLATE_COLUMNS = 12
+PAPER_COLUMNS = 12
+
+
+def plate_well(value: Any) -> str:
+    """A 96-well plate well (A1-H12), with the reason in plain words when it does not exist."""
+    try:
+        return parse_well_name(value, columns=PLATE_COLUMNS, what="a plate well")
+    except FieldError:
+        raise FieldError(f"I can't use {str(value).strip()!r}: the 96-well plate has rows A-H and columns 1-12, so its "
+                         "wells are A1-H12") from None
+
+
+def paper_position(value: Any) -> str:
+    """A paper position (A1-H12 on the 96-position paper), with the reason in plain words when it does not exist."""
+    try:
+        return parse_well_name(value, columns=PAPER_COLUMNS, what="a paper position")
+    except FieldError:
+        raise FieldError(f"I can't print on {str(value).strip()!r}: the paper has rows A-H and columns 1-12, so its "
+                         "positions are A1-H12") from None
+
+
+def _as_list(value: Any) -> list[Any]:
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [part for part in re.split(r"[\s,;]+", str(value).strip()) if part]
+
+
+def normalize_source_map(value: Any) -> list[dict[str, Any]]:
+    """print.source_map: which plate well prints on which paper positions, in print order.
+
+        [{"source": "A11", "positions": ["A1", "B1", ...]}, {"source": "B11", "positions": [...], "volume_ul": 3}]
+
+    One source may feed any number of positions, and any number of sources may be used; nothing here ties the sources
+    to the dilution factors. Every well and position must exist, and no paper position may be printed twice.
+    """
+    entries = value if isinstance(value, (list, tuple)) else [value]
+    result: list[dict[str, Any]] = []
+    used: dict[str, str] = {}
+    for item in entries:
+        if not isinstance(item, dict):
+            raise FieldError(f"each print-map entry names a source well and its paper positions, got {item!r}")
+        raw_source = next((item[key] for key in ("source", "well", "from", "source_well") if key in item), None)
+        raw_positions = next((item[key] for key in ("positions", "to", "destinations", "paper_positions")
+                              if key in item), None)
+        if raw_source in (None, "") or raw_positions in (None, "", []):
+            raise FieldError("each print-map entry needs a source well and at least one paper position")
+        source = plate_well(raw_source)
+        positions = [paper_position(position) for position in _as_list(raw_positions)]
+        for position in positions:
+            if position in used:
+                raise FieldError(f"paper position {position} is printed twice (from {used[position]} and {source}); "
+                                 "each paper position takes one sample")
+            used[position] = source
+        entry: dict[str, Any] = {"source": source, "positions": positions}
+        if item.get("volume_ul") not in (None, ""):
+            entry["volume_ul"] = normalize_volume(item["volume_ul"])
+        result.append(entry)
+    if not result:
+        raise FieldError("a print map needs at least one source well")
+    return result
+
+
 # ── the fields a conversation may change ────────────────────────────────────────
 # Canonical paths use the material ROLE (sample/solvent); resolve_path() maps them
 # to the configured material key. Everything absent from this table is lab-owned.
@@ -311,7 +408,7 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "dilution.factors": ("Dilution factors", normalize_factors),
     "dilution.plate_column": ("Dilution plate column", normalize_plate_column),
     "dilution.start_row": ("Dilution start row", normalize_row),
-    "dilution.rows": ("Selected rows", normalize_rows),
+    "dilution.rows": ("Dilution plate rows", normalize_rows),
     "dilution.total_volume_ul": ("Final volume per dilution", normalize_volume),
     "dilution.prepared_volume_ul": ("Volume now in each prepared well", normalize_optional_volume),
     "mixing.reps": ("Mixes before each print", normalize_count),
@@ -321,6 +418,8 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "print.droplets_per_spot": ("Drops per paper position", normalize_count),
     "print.replicates": ("Replicate paper columns", normalize_count),
     "print.paper_start_column": ("First paper column", normalize_paper_column),
+    "print.paper_rows": ("Paper rows (print destinations)", normalize_paper_rows),
+    "print.source_map": ("Print map (plate well → paper positions)", normalize_source_map),
     "tips.start_tip": ("Starting tip", normalize_tip),
     "tips.return_tips": ("Return used tips to the rack", normalize_bool),
     "tips.policy": ("Tip policy", normalize_policy),
@@ -363,6 +462,11 @@ _FIELD_ALIASES = {
     "print.volume_ul": "print.droplet_volume_ul",
     "print.drop_volume_ul": "print.droplet_volume_ul",
     "print.drops_per_spot": "print.droplets_per_spot",
+    "print.rows": "print.paper_rows",
+    "print.paper_row": "print.paper_rows",
+    "print.destination_rows": "print.paper_rows",
+    "print_rows": "paper_rows",
+    "dilution.plate_rows": "dilution.rows",
 }
 
 

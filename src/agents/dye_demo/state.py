@@ -36,10 +36,19 @@ from src.agents.dye_demo.columns import (  # noqa: F401 - listed_paper_columns i
     GAP_QUESTION,
     column_conflict,
     columns_phrase,
+    columns_words,
     gap_conflict,
     listed_paper_columns,
     paper_column_request,
     paper_columns_printed,
+)
+from src.agents.dye_demo.grounding import (
+    column_side_unclear,
+    labware_cues,
+    quoted_in,
+    referent,
+    slot_value_supported,
+    value_stated,
 )
 from src.agents.dye_demo.language import (
     TEMPORAL_FUTURE,
@@ -50,8 +59,10 @@ from src.agents.dye_demo.language import (
 )
 from src.agents.dye_demo.model import (
     CARRIED_OVER,
+    EARLIER_REVISION,
     EDITABLE_FIELDS,
     LABWARE_NAMES,
+    ROWS,
     FieldError,
     canonicalize_path,
     field_label,
@@ -60,21 +71,47 @@ from src.agents.dye_demo.model import (
     get_path,
     is_off_deck,
     lab_owned_reason,
+    material_label,
+    normalize_slot,
+    normalize_source_map,
     resolve_path,
     set_path,
+    slot_of,
     volume_in_microlitres,
 )
-from src.agents.dye_demo.natural import SelectionError, expand_paper_columns, expand_rows, selected_columns, selected_rows
-from src.agents.dye_demo.plan import build_plan, steps_enabled
+from src.agents.dye_demo.natural import (
+    SelectionError,
+    expand_paper_columns,
+    expand_paper_rows,
+    expand_print_map,
+    expand_rows,
+    selected_columns,
+    selected_paper_rows,
+    selected_rows,
+    unstated_split,
+)
+from src.agents.dye_demo.plan import (
+    build_plan,
+    explicit_paper_rows,
+    factors_of,
+    print_map,
+    row_factors,
+    steps_enabled,
+)
 from src.agents.dye_demo.validation import DeckConflict, Report, deck_conflicts, free_slots, validate
 
 _SLOT_PATHS = {"deck.plate.slot", "deck.paper.slot", "deck.tuberack.slot", "deck.tiprack.slot"}
 _WELL_PATHS = {"tips.start_tip", "materials.sample.vial", "materials.solvent.vial"}
+_NUMBERED_VIAL = re.compile(r"\bvial\s*(?:number\s+|no\.?\s*|#\s*)?\d{1,2}\b(?!\s*(?:µl|ul|ml|%))", re.I)
 _VOLUME_PATHS = {"print.droplet_volume_ul", "dilution.total_volume_ul", "dilution.prepared_volume_ul",
                  "mixing.volume_ul"}
 _COUNT_PATHS = {"print.droplets_per_spot", "print.replicates", "mixing.reps", "print.paper_start_column",
                 "dilution.plate_column"}
-_NULLABLE = {"dilution.prepared_volume_ul", "materials.sample.label", "materials.solvent.label"}
+_NULLABLE = {"dilution.prepared_volume_ul", "materials.sample.label", "materials.solvent.label", "dilution.rows",
+             "print.source_map", "print.paper_rows"}
+# Physical record of plate wells the scientist says already hold what they want to print (one confirmation: applying
+# the proposal that uses them records them, and later proposals do not ask again).
+SOURCES_PRESENT = "sources_present"
 # Physical record placeholder: "the dilutions of the plan this proposal produces are already in the plate".
 PREPARED_FROM_PLAN = "prepared dilutions of the resulting plan"
 ASSUMED_FROM_PLAN = "assumed existing samples of the resulting plan"
@@ -130,7 +167,15 @@ _STEP_WORDING = {
             r"\bdilution\s+(?:step\s+)?(?:is\s+)?(?:off|disabled|skipped)\b|\bprint(?:s|ing)?\s+only\b|\b(?:only|just)\s+print(?:s|ing)?\b|"
             r"\balready\s+(?:been\s+)?(?:made|prepared|done|mixed|diluted)\b|\b(?:made|prepared|done)\s+already\b|"
             r"\bdilutions?(?:\s+(?:from|in|of|for|at|on)\b(?:\s+[\w-]+){1,4})?\s+(?:are|were|is|was|have\s+been|has\s+been)\s+"
-            r"(?:already\s+|all\s+)?(?:made|prepared|done|mixed|filled|ready)\b", re.I)),
+            r"(?:already\s+|all\s+)?(?:made|prepared|done|mixed|filled|ready)\b|"
+            # samples that already exist: "my samples are in column 6", "I only have sample in A11", "take the samples in
+            # plate column 2", "what I've already got in the plate", "don't remake anything"
+            r"\b(?:my|our|the)\s+samples?\s+(?:are|is)\s+(?:already\s+)?(?:in|on|sitting)\b|"
+            r"\b(?:i|we)\s+(?:only\s+|already\s+)?(?:have|got)\s+(?:the\s+|my\s+|our\s+)?samples?\s+(?:already\s+)?in\b|"
+            r"\b(?:take|use|print|spot)\s+(?:the\s+|my\s+|our\s+)?samples?\s+(?:already\s+)?in\b|"
+            r"\bwhat\s+(?:i|we)(?:'ve|\s+have)\s+(?:already\s+)?got\b|\b(?:don'?t|do\s+not|dont|no\s+need\s+to)\s+remake\b|"
+            r"\b(?:i|we)\s+(?:don'?t|do\s+not|dont)\s+(?:want|need)\s+(?:any\s+|the\s+|new\s+)?dilut\w*",
+            re.I)),
 }
 _STEP_REFUSAL = {
     ("print.enabled", False): ('You did not ask to skip printing, so I did not turn printing off. To make the dilutions '
@@ -142,7 +187,27 @@ _STEP_REFUSAL = {
     ("dilution.enabled", True): ('You did not ask to make the dilutions in this run, so I did not turn the dilution step '
                                  'on. To make them, say "make the dilutions".'),
 }
-SELECTION_PATHS = frozenset({"rows", "paper_columns"})
+_STEP_CONCERNS = {
+    ("print.enabled", False): "you did not ask to skip printing",
+    ("print.enabled", True): "you did not ask to print in this run",
+    ("dilution.enabled", False): "you did not say the samples are already in the plate or ask to skip the dilutions",
+    ("dilution.enabled", True): "you did not ask to make the dilutions in this run",
+}
+# "plate columns 1, 3 and 5", "columns 1, 3 and 5 of the plate": several plate columns named at once
+_NOT_A_COLUMN_AFTER = r"(?!\s*(?:µl|ul|ml|x\b|×|%|drops?|droplets?|replicates?|times|dilutions?|columns?|rows?|wells?))"
+_PLATE_COLUMN_LIST = re.compile(
+    rf"\bplate\s+columns\s+(\d{{1,2}}(?:\s*(?:,|&|\band\b|\bor\b)\s*\d{{1,2}})+)\b{_NOT_A_COLUMN_AFTER}|"
+    rf"\bcolumns\s+(\d{{1,2}}(?:\s*(?:,|&|\band\b|\bor\b)\s*\d{{1,2}})+)\s+(?:of|in|on|from)\s+the\s+"
+    r"(?:96[-\s]?well\s+|dilution\s+)?plate\b", re.I)
+SELECTION_PATHS = frozenset({"rows", "paper_rows", "paper_columns", "print_map"})
+# The fields each selection sets: a selection whose fields the scientist asked to keep ("keep my dilution wells the
+# same") is left out like any kept change. "rows" is where the dilutions are (plate rows); "paper_rows" where they print.
+SELECTION_FIELDS = {
+    "rows": frozenset({"dilution.rows", "dilution.start_row"}),
+    "paper_rows": frozenset({"print.paper_rows"}),
+    "paper_columns": frozenset({"print.paper_start_column", "print.replicates"}),
+    "print_map": frozenset({"print.source_map"}),
+}
 # concerns that mean "this value is not in the current message": the scientist's earlier words may still hold it
 _GROUNDING_CONCERNS = {"those factors are not in your request", "not found in your request"}
 
@@ -185,6 +250,25 @@ _ROW_PHRASES = re.compile(
 )
 
 
+_ROW_ORDINAL_WORDS = ("first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth")
+
+
+def _start_row_stated(row: str, text: str) -> bool:
+    """A row named in words, the number or ordinal attached to "row" ("row 2", "the second row", "the 2nd row", "the
+    top row"): a count elsewhere in the message ("2 drops") never names a row."""
+    row = row.upper()
+    if row not in ROWS:
+        return False
+    number = ROWS.index(row) + 1
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(number, "th")
+    patterns = [rf"\brow\s*#?\s*{number}\b", rf"\b(?:{_ROW_ORDINAL_WORDS[number - 1]}|{number}{suffix})\s+row\b"]
+    if row == "A":
+        patterns.append(r"\btop\s+row\b")
+    if row == ROWS[-1]:
+        patterns.append(r"\b(?:bottom|last)\s+row\b")
+    return any(re.search(pattern, text, re.I) for pattern in patterns)
+
+
 def _rows_stated(rows: list[str], text: str) -> bool:
     """Check if the selected rows are supported by the scientist's words (letter, number, or natural phrase)."""
     if not rows:
@@ -196,8 +280,9 @@ def _rows_stated(rows: list[str], text: str) -> bool:
         return True
 
     from src.agents.dye_demo.model import ROWS
-    nums_in_text = set(re.findall(r"\b[1-8]\b", text))
-    if all(str(ROWS.index(r) + 1) in nums_in_text for r in rows):
+    # a row as a number ("rows 1 3 5") only in words about rows: "2 drops" never names row B
+    nums_in_text = set(re.findall(r"\b[1-8]\b", text)) if re.search(r"\brows?\b", text, re.I) else set()
+    if nums_in_text and all(str(ROWS.index(r) + 1) in nums_in_text for r in rows):
         return True
     if len(rows) == 1 and str(ROWS.index(rows[0]) + 1) in nums_in_text:
         return True
@@ -211,6 +296,55 @@ def _rows_stated(rows: list[str], text: str) -> bool:
 def _columns_stated(columns: list[int], text: str) -> bool:
     """The first and last selected paper column are numbers in a sentence about columns ("columns 1 2 and 3", "4-6")."""
     return bool(re.search(r"\bcol(?:umn)?s?\b", text, re.I)) and numbers_mentioned([columns[0], columns[-1]], text)
+
+
+_ROW_THEN_COLUMN = re.compile(r"\brow\s+([a-h]|[1-8])\b[^.;!?]{0,24}?\bcol(?:umn)?\s+(\d{1,2})\b", re.I)
+_COLUMN_THEN_ROW = re.compile(r"\bcol(?:umn)?\s+(\d{1,2})\b[^.;!?]{0,24}?\brow\s+([a-h]|[1-8])\b", re.I)
+
+
+def wells_named(text: str) -> set[str]:
+    """Plate wells a text names: "A11", or "row 1 column 11" / "column 11 row A" (rows as letters or 1-8)."""
+    named = {token.upper() for token in well_tokens(text)}
+
+    def row_letter(value: str) -> str:
+        return ROWS[int(value) - 1] if value.isdigit() else value.upper()
+
+    for match in _ROW_THEN_COLUMN.finditer(text):
+        named.add(f"{row_letter(match.group(1))}{int(match.group(2))}")
+    for match in _COLUMN_THEN_ROW.finditer(text):
+        named.add(f"{row_letter(match.group(2))}{int(match.group(1))}")
+    return named
+
+
+def made_not_printed(before: dict[str, Any], after: dict[str, Any]) -> tuple[list[str], list[str], str] | None:
+    """(made wells, printed wells, plate column) when a plan makes its dilution series and then prints only some of
+    those wells through a print map - "I only have sample in A11, use that everywhere" read with the dilution step
+    still on would dispense into the scientist's sample in A11 before printing it. Physical state only the scientist
+    knows (is the sample already there?), so it is asked, never assumed. None when the plan was already like this
+    before this proposal (asked, or accepted, then)."""
+    plan = build_plan(after)
+    if not (plan.do_dilution and plan.do_print and plan.mapped and plan.print_sources):
+        return None
+    made = [well.well for well in plan.wells]
+    printed = [source.well for source in plan.print_sources]
+    if not all(source.made_here for source in plan.print_sources) or set(made) <= set(printed):
+        return None
+    earlier = build_plan(before)
+    if earlier.do_dilution and earlier.mapped and [source.well for source in earlier.print_sources] == printed \
+            and [well.well for well in earlier.wells] == made:
+        return None
+    return made, printed, str(plan.plate_column)
+
+
+def _sources_stated(entries: list[dict[str, Any]], text: str) -> bool:
+    """Every source well of a print map is named in the words (where it prints is Python's arithmetic): as a well
+    ("A11", "column 11 row 1"), or as a well of a plate column the words name ("the samples in plate column 2")."""
+    named = wells_named(text)
+    columns = {int(number) for number in re.findall(
+        r"\bplate\s+columns?\s+(\d{1,2})\b|\bcolumns?\s+(\d{1,2})\s+(?:of|in|on)\s+the\s+(?:96[-\s]?well\s+|dilution\s+)?"
+        r"plate\b", text, re.I) for number in number if number}
+    return all(entry["source"] in named or (entry["source"][1:].isdigit() and int(entry["source"][1:]) in columns)
+               for entry in entries)
 
 
 _PAPER_LAYOUT_PATHS = {"print.replicates", "print.paper_start_column"}
@@ -242,6 +376,31 @@ def lab_owned_view(config: dict[str, Any]) -> dict[str, Any]:
 
 def _same(a: Any, b: Any) -> bool:
     return fingerprint(a) == fingerprint(b) or a == b
+
+
+def _map_prints_series(config: dict[str, Any]) -> bool:
+    """The print map prints exactly the dilutions this run makes (its source wells are the series wells)."""
+    entries = print_map(config) or []
+    plan = build_plan(config)
+    return bool(entries) and plan.do_dilution and \
+        {entry["source"] for entry in entries} == {well.well for well in plan.wells}
+
+
+def _follow_series(old: list[tuple[str, float]], new: list[tuple[str, float]]) -> dict[str, str] | None:
+    """{old well: new well} for each dilution of a series that moved: matched by dilution factor when every factor is
+    known and distinct and every new dilution finds its old one (a dilution left out has no new well), else by position
+    in the series when the counts agree (new factors in new rows: the i-th dilution keeps the i-th one's positions);
+    None when it cannot be told which dilution went where."""
+    old_factors, new_factors = [factor for _, factor in old], [factor for _, factor in new]
+    if all(factor > 0 for factor in old_factors + new_factors) and len(set(old_factors)) == len(old_factors) \
+            and len(set(new_factors)) == len(new_factors):
+        well_of = {factor: well for well, factor in new}
+        by_factor = {well: well_of[factor] for well, factor in old if factor in well_of}
+        if set(by_factor.values()) == {well for well, _ in new}:
+            return by_factor
+    if len(old) == len(new):
+        return {old_well: new_well for (old_well, _), (new_well, _) in zip(old, new)}
+    return None
 
 
 def _tidy(value: float) -> int | float:
@@ -328,7 +487,8 @@ class ProposalRejected(ValueError):
 
     def __init__(self, message: str, *, kind: str = "invalid", conflicts: Iterable[DeckConflict] = (),
                  before: dict[str, Any] | None = None, after: dict[str, Any] | None = None,
-                 question: str = "", yes_text: str = "", fix_changes: list[dict[str, Any]] | None = None):
+                 question: str = "", yes_text: str = "", fix_changes: list[dict[str, Any]] | None = None,
+                 path: str = ""):
         super().__init__(message)
         self.kind = kind
         self.conflicts = list(conflicts)
@@ -337,6 +497,9 @@ class ProposalRejected(ValueError):
         self.question = question
         self.yes_text = yes_text
         self.fix_changes = fix_changes
+        # The one proposed change this is about ("deck.plate.slot", or a selection such as "print_map"), when the
+        # rest of the request was fine: the session keeps the rest and asks only about this part.
+        self.path = path
 
 
 class StaleProposal(RuntimeError):
@@ -381,27 +544,68 @@ class ExperimentState:
                 notes: Iterable[str] = (), source: str = "conversation", superseded: str = "",
                 restrict_paths: Iterable[str] | None = None, physical: dict[str, Any] | None = None,
                 replaces: int | None = None, title: str = "PROPOSED PLAN", origin: str = "",
-                context: str = "", history: str = "", dry_run: bool = False) -> Proposal:
+                context: str = "", history: str = "", dry_run: bool = False, referents: Iterable[str] = (),
+                preserved: Iterable[str] = (), recent_paths: Iterable[str] = (), known_sources: Iterable[str] = (),
+                accepted: Iterable[str] = ()) -> Proposal:
         """`request` is the scientist's own words for this request; values must come from them. `history` is their own
         words earlier in this conversation: a value found only there is accepted as carried over and shown for checking
         ("same thing but columns 4-6" keeps the rows and drops of the request it revises). `context` (the question half
         of a mixed message, "why are we using 8 dilutions, and change it to 4") may only show which field is meant.
-        `dry_run` validates without numbering a proposal (an offer the scientist has not accepted yet)."""
+        `dry_run` validates without numbering a proposal (an offer the scientist has not accepted yet).
+
+        Grounding (grounding.py) is semantic: `referents` are the labware discussed most recently ("put that in slot 8"),
+        `preserved` the fields the scientist asked to keep (a change to one of them is dropped with a note), and
+        `recent_paths` the fields of the last request (they settle "column 7" as a paper or plate column). A change the
+        words do not support raises ProposalRejected with `path` set, so the session can ask about that change alone.
+        `known_sources` are the print-source wells of the proposal being revised and of the current plan: a print map
+        that uses them again ("sorry, I meant columns 2, 5 and 6") is not inventing wells. `accepted` names plan checks
+        the scientist already answered for this request ("made_not_printed")."""
         before = self.config
         after = deepcopy(before)
-        raw_changes = list(raw_changes)
+        raw_changes = self._rows_as_selection([self._as_print_map(raw, before) for raw in self._drops(raw_changes, before)],
+                                              before)
         restrict = tuple(restrict_paths or ())
         final_text = request.replace(superseded, " ") if superseded else request
         notes = list(notes)
         changes: dict[str, FieldChange] = {}
+        from_selections: set[str] = set()          # fields a selection (rows, paper columns, print map) produced
+        kept = set(preserved)
+        self._grounding = {"referents": tuple(referents), "recent_paths": tuple(recent_paths),
+                           "moves": self._planned_moves(raw_changes, before), "request": request, "kept": tuple(kept),
+                           "known_sources": tuple(known_sources), "accepted": tuple(accepted)}
 
         def add(raw: dict[str, Any], checked: tuple[bool, str] | None = None) -> None:
             canonical = canonicalize_path(before, raw.get("path", ""))
+            try:
+                _add(raw, canonical, checked)
+            except ProposalRejected as exc:
+                if not exc.path and canonical in EDITABLE_FIELDS and exc.kind not in {"deck_conflict", "invalid_plan"}:
+                    exc.path = canonical
+                raise
+
+        def _add(raw: dict[str, Any], canonical: str, checked: tuple[bool, str] | None) -> None:
             reason = lab_owned_reason(canonical)
             if reason:
                 raise ProposalRejected(f"{canonical} cannot be changed here: {reason}.", kind="lab_owned")
             label, normalize = EDITABLE_FIELDS[canonical]
             kind = "dependent" if raw.get("kind") == "dependent" else "requested"
+            if kind == "requested" and canonical in kept:
+                if canonical in _SLOT_PATHS:
+                    # "The plate can stay where it is but move the thing with the stock samples to 8" read as a plate
+                    # move: the words for this move name other labware, so it is asked about - never just dropped
+                    others = labware_cues(str(raw.get("evidence") or "")) - {canonical.split(".")[1]}
+                    others -= {path.split(".")[1] for path in kept if path.startswith("deck.")}
+                    if others:
+                        value = raw.get("value")
+                        where = "OFF DECK" if is_off_deck(value) else f"slot {value}"
+                        raise ProposalRejected(
+                            f"You asked to keep the {label.lower()} as it is, and the words for this move name other "
+                            "labware.", kind="ambiguous", path=canonical, question=f"Which labware should go to {where}?")
+                # CONTRADICTED: the scientist asked to keep this; the rest of the request goes ahead
+                note = f"You asked to keep the {label.lower()} as it is, so I left it unchanged."
+                if note not in notes:
+                    notes.append(note)
+                return
             if restrict and canonical not in restrict and kind == "requested":
                 allowed = ", ".join(field_label(path).lower() for path in restrict)
                 raise ProposalRejected(f"You asked me to change only the {allowed}, but this would also change the "
@@ -424,10 +628,17 @@ class ExperimentState:
                         f"{self._show(canonical, expected_value)}, so I did not change anything. Tell me the new value "
                         "you want.", kind="stale_information")
             if canonical in changes:
-                if not _same(changes[canonical].after, value):
+                if _same(changes[canonical].after, value):
+                    return
+                if not (checked is not None and canonical in from_selections):
                     raise ProposalRejected(f"two different values were proposed for the {label.lower()}",
                                            kind="invalid_value")
-                return
+                # a later selection lays out what an earlier one chose ("A11 for all prints" + "paper columns 2, 4
+                # and 6"): it was expanded from the plan WITH the earlier one, so its value is the combined one
+                if _same(current, value):
+                    set_path(after, actual, value)
+                    del changes[canonical]
+                    return
             if _same(current, value):
                 if kind == "requested" and checked is None:
                     # "Start tips at A10" answered with the current A1 is not "already set": the model contradicted
@@ -445,6 +656,8 @@ class ExperimentState:
             set_path(after, actual, value)
             changes[canonical] = FieldChange(canonical, current, value, kind, str(raw.get("evidence") or ""),
                                              str(raw.get("why") or ""), verified, concern)
+            if checked is not None:
+                from_selections.add(canonical)
 
         selections = [raw for raw in raw_changes if str(raw.get("path", "")).strip().lower() in SELECTION_PATHS]
         for raw in raw_changes:
@@ -452,21 +665,63 @@ class ExperimentState:
                 add(raw)
         for raw in selections:
             # expanded against the plan with this proposal's other changes (a new drop volume list, for example)
-            expanded, note, checked = self._expand_selection(raw, after, final_text, history)
+            selection = str(raw.get("path", "")).strip().lower()
+            held = sorted(SELECTION_FIELDS.get(selection, frozenset()) & kept)
+            if selection in kept or held:
+                # CONTRADICTED, as for a field: "keep my dilution wells the same" keeps the plate rows whatever
+                # selection would have moved them; the rest of the request goes ahead
+                for path in held:
+                    note = f"You asked to keep the {field_label(path).lower()} as it is, so I left it unchanged."
+                    if note not in notes:
+                        notes.append(note)
+                continue
+            try:
+                expanded, note, checked = self._expand_selection(raw, after, final_text, history,
+                                                                 factors_changed="dilution.factors" in changes)
+            except ProposalRejected as exc:
+                if not exc.path:
+                    exc.path = selection
+                raise
             if note not in notes:
                 notes.append(note)
             for item in expanded:
                 add({"evidence": str(raw.get("evidence") or ""), **item}, checked)
+        for item in self._destinations_kept(before, after, set(changes)):
+            add(item, (True, ""))
         physical = deepcopy(physical or {})
         if physical.get("dilutions_prepared") in (PREPARED_FROM_PLAN, ASSUMED_FROM_PLAN):
             # "The dilutions are already made ... their factors are 2x, 5x and 10x": record the wells and factors
             # of the plan after this proposal's own changes, not of the plan before them.
             resulting = build_plan(after)
+            series = resulting.wells
+            if not series and print_map(after) is not None:
+                # the reported dilutions printed through a print map: the record is the dilution series itself
+                unmapped = deepcopy(after)
+                unmapped["print"]["source_map"] = None
+                series = build_plan(unmapped).wells
             physical["dilutions_prepared"] = {
-                "wells": [well.well for well in resulting.wells], "factors": [well.factor for well in resulting.wells],
+                "wells": [well.well for well in series], "factors": [well.factor for well in series],
                 "total_volume_ul": resulting.total_volume_ul,
                 "source": "assumed for print-only proposal; confirmed on approval"
                           if physical["dilutions_prepared"] == ASSUMED_FROM_PLAN else "reported by the operator"}
+        if print_map(after) is not None and steps_enabled(after)[1] and source not in _NO_COLUMN_CHECK_SOURCES:
+            # A print map that prints from wells this run does not make: the scientist's statement that they hold the
+            # sample is recorded when this proposal is applied (that approval is the confirmation; nothing asks again).
+            recorded = set((self.physical.get(SOURCES_PRESENT) or {}))
+            prepared = self.physical.get("dilutions_prepared") or {}
+            recorded |= set(prepared.get("wells", []))
+            reported = physical.get("dilutions_prepared")              # recorded by this same proposal
+            if isinstance(reported, dict):
+                recorded |= set(reported.get("wells", []))
+            new = [item.well for item in build_plan(after).print_sources
+                   if not item.made_here and item.well not in recorded]
+            if new:
+                present = deepcopy(self.physical.get(SOURCES_PRESENT) or {})
+                present.update({well: {"source": "stated by the operator; recorded on approval"} for well in new})
+                physical[SOURCES_PRESENT] = present
+                if source == "conversation":
+                    # like a print-only run's assumed dilutions: a statement about the plate, recorded only on approval
+                    source = "print-only-assumption"
         proposal = Proposal(0 if dry_run else self._next_proposal_id, self.revision, request, tuple(changes.values()),
                             before, after, Report(), explanation, tuple(notes), source, physical, replaces, title, origin)
         # Checked before "already set": "print in paper columns 3 and 4" answered with values that are already set,
@@ -498,36 +753,245 @@ class ExperimentState:
         if report.errors:
             raise ProposalRejected("that would not be a valid run:\n- " + "\n- ".join(report.error_messages()),
                                    kind="invalid_plan", before=before, after=after)
+        if source in {"conversation", "print-only-assumption"} and "made_not_printed" not in set(accepted):
+            # a valid run that may still dispense into the scientist's own sample: asked before it is proposed
+            unprinted = made_not_printed(before, after)
+            if unprinted is not None:
+                made, printed, column = unprinted
+                names = ", ".join(printed[:-1]) + f" and {printed[-1]}" if len(printed) > 1 else printed[0]
+                plural = "s" if len(printed) > 1 else ""
+                raise ProposalRejected(
+                    f"This plan would make all {len(made)} dilutions in plate column {column} ({made[0]}-{made[-1]}), "
+                    f"which also fills plate well{plural} {names}, and then print only {names}.",
+                    kind="made_not_printed", before=before, after=after,
+                    question=f"Is your sample already in plate well{plural} {names}? Yes: skip making the dilutions "
+                             f"and print what is already there. No: make the {len(made)} dilutions first, then print "
+                             f"{names}.")
         proposal.report = report
         if not dry_run:
             self._next_proposal_id += 1
         return proposal
 
+    @staticmethod
+    def _as_print_map(raw: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+        """A print map the model wrote to the print.source_map field in the print_map selection's own terms
+        ({"source": "A11", "positions": "all"}, a count, columns, or sources and a total): the same request, so it is
+        expanded as that selection. A value the field itself holds (explicit positions, or null) is left as it is.
+        Likewise a list of paper columns written to the lab-owned paper width, print.paper_columns - a width is one
+        number, so a list can only be the paper-column selection (2026-09-27 X03.2: [2, 3] there refused the request).
+        Paper rows written to print.paper_rows are the paper-row selection: expanded against the plan like the paper
+        columns (a plan printing from a print map moves its sources to those rows; a dilution series gets them)."""
+        if canonicalize_path(config, raw.get("path", "")) == "print.paper_columns" \
+                and isinstance(raw.get("value"), (list, tuple)) and str(raw.get("op") or "set").lower() == "set":
+            return {**raw, "path": "paper_columns"}
+        if canonicalize_path(config, raw.get("path", "")) == "print.paper_rows" \
+                and raw.get("value") not in (None, "", []) and str(raw.get("op") or "set").lower() == "set":
+            return {**raw, "path": "paper_rows"}
+        if canonicalize_path(config, raw.get("path", "")) != "print.source_map" or raw.get("value") is None \
+                or str(raw.get("op") or "set").lower() != "set":
+            return raw
+        try:
+            normalize_source_map(raw["value"])
+        except (FieldError, TypeError, ValueError, AttributeError):
+            return {**raw, "path": "print_map"}
+        return raw
+
+    @staticmethod
+    def _destinations_kept(before: dict[str, Any], after: dict[str, Any], changed: set[str]) -> list[dict[str, Any]]:
+        """Dependent changes that keep WHERE the dilutions print independent of WHERE they are made.
+
+        Plate rows (dilution.rows) and paper destinations (print.paper_rows, or the print map) are separate settings;
+        a proposal that changes one must not silently change the other. When this proposal moves the dilution series
+        and leaves the print destinations alone:
+          * a print map that prints exactly this run's dilutions follows them to their new wells - each dilution keeps
+            its paper positions (a map left pointing at the old wells would print from wells nothing fills);
+          * explicit paper rows follow the dilutions they belong to when some dilutions are left out ("only the 5x and
+            10x": the 5x keeps its paper row).
+        A print map names every paper position, so explicit paper rows go when a map is in force.
+        """
+        items: list[dict[str, Any]] = []
+        old, new = build_plan(before), build_plan(after)
+        old_series = [(well.well, well.factor) for well in old.wells]
+        new_series = [(well.well, well.factor) for well in new.wells]
+        moved = old.do_dilution and new.do_dilution and old_series != new_series
+        entries = print_map(after) or []
+        if moved and "print.source_map" not in changed and entries \
+                and {entry["source"] for entry in entries} == {well for well, _ in old_series}:
+            follow = _follow_series(old_series, new_series)
+            if follow:
+                kept = [{**entry, "source": follow[entry["source"]]} for entry in entries if entry["source"] in follow]
+                if kept:
+                    items.append({"path": "print.source_map", "value": kept, "kind": "dependent",
+                                  "why": "the print map follows the dilutions it prints; their paper positions stay "
+                                         "the same"})
+        paper = explicit_paper_rows(after)
+        if paper is not None and "print.paper_rows" not in changed and not new.mapped \
+                and len(paper) == len(old.rows) and len(new.rows) != len(old.rows):
+            by_factor = {factor: row for (_, factor), row in zip(row_factors(old.rows, old.factors), paper)
+                         if factor > 0}
+            realigned = [by_factor.get(factor) for _, factor in row_factors(new.rows, new.factors)]
+            if realigned and None not in realigned and len(set(realigned)) == len(realigned) \
+                    and realigned == sorted(realigned, key=ROWS.index):
+                items.append({"path": "print.paper_rows", "value": realigned, "kind": "dependent",
+                              "why": "each dilution keeps the paper row it prints on"})
+        if paper is not None and (entries or any(item["path"] == "print.source_map" and item["value"]
+                                                 for item in items)):
+            items.append({"path": "print.paper_rows", "value": None, "kind": "dependent",
+                          "why": "the print map names every paper position"})
+        return items
+
+    @staticmethod
+    def _drops(raw_changes: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+        """"op": "drop" takes a change out of a request being merged (a clarification answer, a revision); both merges
+        consume it before a proposal is made. One that reaches a proposal names a setting of the plan: dropping the
+        print map returns printing to each dilution on its own paper row (the field's null); dropping anything else
+        changes nothing. 2026-09-27 GUI check: "use 2x and 4x dilutions, print in paper columns 2 and 3" on a print-only
+        plan came back with the print map dropped and was refused as an unknown change operation."""
+        kept = []
+        for raw in raw_changes:
+            if str(raw.get("op") or "").lower() != "drop":
+                kept.append(raw)
+            elif canonicalize_path(config, raw.get("path", "")) in {"print_map", "print.source_map"} \
+                    and print_map(config) is not None:
+                kept.append({"path": "print.source_map", "value": None, "evidence": str(raw.get("evidence") or ""),
+                             "kind": "dependent", "why": "the print map was dropped"})
+        return kept
+
+    @staticmethod
+    def _rows_as_selection(raw_changes: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+        """A dilution.rows list with no factor change, whose length does not match the current factors (3 rows for 8
+        factors), can only mean the rows selection - these rows of the current series, their factors kept (2026-09-27
+        85-test D05: rows C, E, G for "3x 6x and 12x" written to the field made the run invalid and was refused)."""
+        if any(canonicalize_path(config, raw.get("path", "")) == "dilution.factors" for raw in raw_changes):
+            return raw_changes
+        count = len(factors_of(config))
+        return [{**raw, "path": "rows"}
+                if canonicalize_path(config, raw.get("path", "")) == "dilution.rows"
+                and isinstance(raw.get("value"), (list, tuple)) and len(raw["value"]) != count
+                and str(raw.get("op") or "set").lower() == "set" else raw
+                for raw in raw_changes]
+
+    def _planned_moves(self, raw_changes: list[dict[str, Any]], before: dict[str, Any]) -> dict[str, tuple[Any, str]]:
+        """{role: (slot, evidence)} for every labware move in a request (for swaps and for telling moves apart)."""
+        moves: dict[str, tuple[Any, str]] = {}
+        for raw in raw_changes:
+            canonical = canonicalize_path(before, raw.get("path", ""))
+            if canonical in _SLOT_PATHS:
+                try:
+                    moves[canonical.split(".")[1]] = (normalize_slot(raw.get("value")), str(raw.get("evidence") or ""))
+                except (FieldError, TypeError, ValueError):
+                    continue
+        return moves
+
+    def _swap_supports(self, role: str, value: Any, before: dict[str, Any], text: str) -> bool:
+        """'Swap the plate and the vial rack': each goes where the other one is, with no slot number in the words."""
+        if not re.search(r"\b(?:swap|switch|exchange|trade|interchange|swop|flip)\b", text, re.I):
+            return False
+        moves = getattr(self, "_grounding", {}).get("moves", {})
+        for other, (other_value, _) in moves.items():
+            if other != role and slot_of(before, other) == value and other_value == slot_of(before, role):
+                return True
+        return False
+
+    @staticmethod
+    def _rows_follow_named_factors(rows: list[str], text: str, config: dict[str, Any]) -> bool:
+        """'Forget the 10x one' / 'print only the 5x and 10x': the rows are the current dilutions without (or with
+        only) the factors the words name."""
+        named = {float(match) for match in re.findall(r"(\d+(?:\.\d+)?)\s*[x×]", text, re.I)}
+        if not named:
+            return False
+        wells = build_plan(config).wells
+        without = [well.row for well in wells if not any(abs(well.factor - factor) < 1e-9 for factor in named)]
+        only = [well.row for well in wells if any(abs(well.factor - factor) < 1e-9 for factor in named)]
+        return rows in (without, only)
+
     def _expand_selection(self, raw: dict[str, Any], config: dict[str, Any], text: str,
-                          history: str) -> tuple[list[dict[str, Any]], str, tuple[bool, str]]:
-        """A row or paper-column selection as field changes, checked against the scientist's words."""
+                          history: str, *, factors_changed: bool = False) -> tuple[list[dict[str, Any]], str, tuple[bool, str]]:
+        """A row, paper-column or print-map selection as field changes, checked against the scientist's words."""
         path = str(raw.get("path", "")).strip().lower()
+        grounding = getattr(self, "_grounding", {})
         try:
             if path == "rows":
                 items: list[Any] = selected_rows(raw.get("value"))
+                if factors_changed:
+                    # The factors of this same request decide the series; the rows only say where it goes. The rows a
+                    # new factor list occupies anyway ("make 3x and 6x" + rows A, B) add nothing.
+                    factors = config["dilution"]["factors"]
+                    start = str(config["dilution"].get("start_row", "A")).upper()
+                    first = ROWS.index(start) if start in ROWS else 0
+                    if items == list(ROWS[first:first + len(factors)]):
+                        return [], "", (True, "")
+                    why = "the rows named for the new dilution factors"
+                    return ([{"path": "dilution.rows", "value": items, "kind": "dependent", "why": why},
+                             {"path": "dilution.start_row", "value": items[0], "kind": "dependent", "why": why}],
+                            f"The new dilutions go in rows {', '.join(items)}.", (True, ""))
                 stated = _rows_stated
                 changes, note = expand_rows(items, config)
+                if self._rows_follow_named_factors(items, text, config):
+                    stated = lambda rows, words: True  # noqa: E731 - "forget the 10x one" names the rows' factor
+                if print_map(config) is not None and not _map_prints_series(config):
+                    # a print map of OTHER wells: printing follows the selected dilutions again. (A map that prints
+                    # this run's dilutions follows them to their new rows instead: ExperimentState._destinations_kept.)
+                    changes.append({"path": "print.source_map", "value": None, "kind": "dependent",
+                                    "why": "the selected dilutions print again instead of the print map's wells"})
                 what = f"rows {', '.join(items)}" if len(items) > 1 else f"row {items[0]}"
+            elif path == "paper_rows":
+                # WHERE the samples print: the plate wells do not change (expand_paper_rows)
+                items = selected_paper_rows(raw.get("value"))
+                stated = _rows_stated
+                changes, note = expand_paper_rows(items, config)
+                what = f"paper rows {', '.join(items)}" if len(items) > 1 else f"paper row {items[0]}"
+            elif path == "print_map":
+                split = None if "unstated_split" in grounding.get("accepted", ()) else \
+                    unstated_split(raw.get("value"), f"{text}\n{history}")
+                if split is not None:
+                    raise split                 # asked like a total with no split (the even split offered as yes)
+                changes, note = expand_print_map(raw.get("value"), config)
+                items = next(change["value"] for change in changes if change["path"] == "print.source_map")
+                stated = _sources_stated
+                wells = [entry["source"] for entry in items]
+                what = f"plate well{'s' if len(wells) > 1 else ''} {', '.join(wells)}"
             else:
                 items = selected_columns(raw.get("value"))
-                stated = _columns_stated
+                if column_side_unclear(text, recent_paths=grounding.get("recent_paths", ()), config=self._config):
+                    words = columns_words(items).replace("paper ", "")
+                    raise ProposalRejected(
+                        "It is not clear whether that is a paper column or a plate column.", kind="ambiguous",
+                        path="paper_columns",
+                        question=f"Do you mean paper {words} (where the drops print) or plate {words} (where the "
+                                 "dilutions are)?")
+                # the column numbers in any written form ("columns 1 3 5", "one three and five", "first and third")
+                stated = lambda columns, words: (_columns_stated(columns, words)  # noqa: E731
+                                                 or value_stated([columns[0], columns[-1]], words))
                 changes, note = expand_paper_columns(items, config)
                 what = columns_phrase(items)
         except SelectionError as exc:
+            if path == "print_map" and exc.fix is not None:
+                # possible but not specified (two wells, ten prints): offer the even split as a yes/no question
+                raise ProposalRejected(f"{exc}", kind="print_split", question=exc.question,
+                                       fix_changes=[{"path": "print_map", "value": exc.fix,
+                                                     "evidence": str(raw.get("evidence") or "")}]) from exc
+            if path == "print_map":
+                raise ProposalRejected(f"{exc}", kind="print_map", question=exc.question) from exc
             raise ProposalRejected(f"{exc} Nothing was changed.", kind="paper_layout" if path == "paper_columns"
                                    else "selection", question=exc.question) from exc
         if stated(items, text):
             return changes, note, (True, "")
         if history and stated(items, history):
             return changes, note, (False, CARRIED_OVER)
+        if path == "paper_columns" and self._earlier_columns(items):
+            return changes, note, (False, EARLIER_REVISION)   # the columns an earlier revision printed
+        if path == "print_map":
+            known = set(grounding.get("known_sources", ()))
+            if known and all(entry["source"] in known for entry in items):
+                # the wells of the proposal being revised or of the current plan, used again: not new values
+                return changes, note, (False, CARRIED_OVER)
+            raise ProposalRejected(f"You did not name {what} as the well to print from, so I did not use "
+                                   f"{'them' if len(items) > 1 else 'it'}. Nothing was changed.", kind="needs_value",
+                                   question="Which plate well holds the sample to print?")
+        noun = {"rows": "plate rows", "paper_rows": "paper rows"}.get(path, "paper columns")
         raise ProposalRejected(f"You did not name {what}, so I did not choose them. Nothing was changed.",
-                               kind="needs_value", question=f"Which {'rows' if path == 'rows' else 'paper columns'} "
-                                                            "should this run use?")
+                               kind="needs_value", question=f"Which {noun} should this run use?")
 
     @staticmethod
     def _show(canonical: str, value: Any) -> str:
@@ -602,30 +1066,61 @@ class ExperimentState:
         """
         carried = False
         mentioned = f"{request}\n{context}" if context else request
+        if canonical in {"dilution.plate_column", "print.paper_start_column"} and column_side_unclear(
+                request, recent_paths=getattr(self, "_grounding", {}).get("recent_paths", ()), config=before):
+            # "Use column 3.": the words do not say plate or paper, and nothing earlier settles it
+            raise ProposalRejected(
+                "It is not clear whether that is a paper column or a plate column.", kind="ambiguous",
+                question=f"Do you mean paper column {value} (where the drops print) or plate column {value} (where "
+                         "the dilutions are)?")
         hint = _FIELD_HINTS.get(canonical)
-        if hint and not re.search(hint, mentioned, re.I) and not (history and re.search(hint, history, re.I)):
+        if hint and canonical not in _STEP_WORDING and not re.search(hint, mentioned, re.I) \
+                and not (history and re.search(hint, history, re.I)):
             return False, f"you did not mention the {label.lower()}"
+        # a step switched on or off is checked by what the words ask for that step (below), not by keywords
+        if canonical in _STEP_WORDING and not self._step_stated(canonical, value, mentioned) \
+                and not self._step_quoted(canonical, value, str(raw.get("evidence") or ""), request):
+            # A whole step switched on or off that the words do not ask for ("Print the first three rows onto paper
+            # columns 10 to 12" read as "skip the dilutions"): shown for checking, never silently accepted
+            if history and self._step_stated(canonical, value, history):
+                return False, CARRIED_OVER
+            return False, _STEP_CONCERNS[(canonical, bool(value))]
         if canonical in _SLOT_PATHS:
+            # Which labware: the model resolves the words; a reference with no referent (or two) is a question.
             role = canonical.split(".")[1]
-            named = named_labware(mentioned)
-            if role not in named and not (history and role in named_labware(history)):
-                if role == "tuberack" and not steps_enabled(before)[0]:
-                    return False, f"you did not mention moving the {LABWARE_NAMES[role]}"
-                if named:
-                    return False, f"you did not mention moving the {LABWARE_NAMES[role]}"
+            grounding = getattr(self, "_grounding", {})
+            moves = grounding.get("moves", {})
+            claimed = {other for other, (_, evidence) in moves.items()
+                       if other != role and other in labware_cues(evidence)}
+            # labware the scientist asked to keep is not what "the other sample holder" moves
+            claimed |= {path.split(".")[1] for path in grounding.get("kept", ()) if path.startswith("deck.")}
+            # The scientist's own words only: `context` may hold a replaced proposal's summary, which names labware the
+            # scientist did not name here. What was discussed recently counts through `referents` ("it" = that one).
+            status, question = referent(role, str(raw.get("evidence") or ""), request,
+                                        referents=grounding.get("referents", ()), claimed=claimed)
+            if status == "ambiguous" and self._swap_supports(role, value, before, mentioned):
+                # "swap them: plate to 7, rack to 4": the rack that goes where the plate was is the one in slot 7
+                status = "supported"
+            if status == "unverified":
+                return False, question
+            if status != "supported":
                 where = "OFF DECK" if is_off_deck(value) else f"slot {value}"
-                message = f"You did not name the {LABWARE_NAMES[role]}, so I did not move it to {where}."
-                if not is_off_deck(value) and re.search(r"\bdilut|\bprint|\bcolumns?\b|\brows?\b|\bwells?\b|\bdrops?\b",
-                                                        mentioned, re.I):
-                    message += (f' Deck slots hold labware. If you meant a column, say "plate column {value}" (where the '
-                                f'dilutions are made) or "paper column {value}" (where the drops print).')
+                hint = ""
+                # "Put the dilutions in slot 3" names no labware at all: perhaps a column was meant. (When the words name
+                # labware that is ambiguous - "the rack" - the question is only which one.)
+                if not is_off_deck(value) and question == "Which labware do you mean?" and re.search(
+                        r"\bdilut|\bprint|\bcolumns?\b|\brows?\b|\bwells?\b|\bdrops?\b", mentioned, re.I):
+                    hint = (f' Deck slots hold labware. If you meant a column, say "plate column {value}" (where the '
+                            f'dilutions are made) or "paper column {value}" (where the drops print).')
                 raise ProposalRejected(
-                    message,
-                    kind="labware_not_stated",
-                    question=f'Which labware should go to {where}? For example: "move the vial rack to {where}".')
+                    f"I am not sure which labware should go to {where}.{hint}", kind="ambiguous",
+                    question=(f"{question} (It would go to {where}.)" if question != "Which labware do you mean?"
+                              else f"Which labware should go to {where}?"))
         try:
             verified, concern = self._verify_value(canonical, label, value, raw, request, final_text, superseded, before)
         except ProposalRejected as exc:
+            if exc.kind == "needs_value" and self._earlier_value(canonical, value):
+                return False, EARLIER_REVISION
             if not history or exc.kind != "needs_value":
                 raise
             try:
@@ -633,12 +1128,27 @@ class ExperimentState:
             except ProposalRejected:
                 raise exc from None
             return False, CARRIED_OVER
+        if not verified and concern in _GROUNDING_CONCERNS and self._earlier_value(canonical, value):
+            return False, EARLIER_REVISION
         if not verified and history and concern in _GROUNDING_CONCERNS \
                 and self._verify_value(canonical, label, value, raw, history, history, "", before)[0]:
             return False, CARRIED_OVER
         if carried:
             return False, CARRIED_OVER
         return verified, concern
+
+    def _earlier_value(self, canonical: str, value: Any) -> bool:
+        """A value an earlier approved change of this session set for this field: restoring it ("the factors I asked
+        for at the very beginning") is state, not an invented value - shown under its own heading for checking. The
+        startup values do not count: an old plan the model brings back unasked stays "not in what you typed".
+        2026-09-27: turns that far back are outside the words grounding reads."""
+        return any(change["path"] == canonical and _same(change["after"], value)
+                   for record in self.history for change in record["changes"])
+
+    def _earlier_columns(self, columns: list[int]) -> bool:
+        """Paper columns printed after an earlier approved change of this session ("the paper columns we had before
+        I changed them"); not the startup layout and not the current one."""
+        return any(paper_columns_printed(snapshot["config"]) == list(columns) for snapshot in self.snapshots[1:-1])
 
     @staticmethod
     def _step_stated(canonical: str, value: Any, text: str) -> bool:
@@ -651,12 +1161,23 @@ class ExperimentState:
             return bool(turn_off.search(wording))
         return bool(turn_on.search(turn_off.sub(" ", wording)))
 
+    @staticmethod
+    def _step_quoted(canonical: str, value: Any, evidence: str, request: str) -> bool:
+        """Turning a step ON quoted from the scientist's own words, whatever the spelling ("do mkae dilutions agian"):
+        the quote names the step and does not negate it. Turning a step off always needs the words above."""
+        if value is not True or not quoted_in(evidence, request):
+            return False
+        word = r"\bdilut" if canonical == "dilution.enabled" else r"\bprint"
+        return bool(re.search(word, evidence, re.I)) and not _STEP_WORDING[canonical][1].search(evidence) \
+            and not re.search(r"\b(?:don'?t|do\s+not|dont|no|not|never|without|skip)\b", evidence, re.I)
+
     def _verify_value(self, canonical: str, label: str, value: Any, raw: dict[str, Any], request: str,
                       final_text: str, superseded: str, before: dict[str, Any]) -> tuple[bool, str]:
         op = str(raw.get("op") or "set").strip().lower()
         if op != "set":
             parameter = raw.get("factor", raw.get("amount", raw.get("count")))
-            if parameter is None or not numbers_mentioned(float(parameter), final_text):
+            if parameter is None or not (numbers_mentioned(float(parameter), final_text)
+                                         or value_stated(float(parameter), final_text)):
                 raise ProposalRejected(f"I could not find how much to change the {label.lower()} by in what you said, "
                                        "so nothing was changed.", kind="needs_value",
                                        question=f"By how much should the {label.lower()} change?")
@@ -666,7 +1187,16 @@ class ExperimentState:
             if is_off_deck(value):
                 stated = bool(re.search(r"\boff\b|\bremov\w*\b|\bout\s+of\b", final_text, re.I))
             else:
-                stated = int(value) in slot_numbers(final_text)
+                # the slot number in any written form ("slot 5", "at 5", "-> 5", "fifth position", "five"), or a
+                # swap that puts this labware where another one moving in the same request was. The model's quote is
+                # read without the words a self-correction replaced, as the request is ("Put the plate in 2, actually
+                # make that 6.": "make that 6." is the quote; the 2 is not evidence)
+                evidence = str(raw.get("evidence") or "")
+                if superseded:
+                    evidence = evidence.replace(superseded, " ")
+                stated = (int(value) in slot_numbers(final_text)
+                          or slot_value_supported(value, evidence, final_text)
+                          or self._swap_supports(role, value, before, final_text))
             if not stated:
                 if role == "tuberack" and not steps_enabled(before)[0] and "tuberack" not in named_labware(final_text):
                     return True, ""
@@ -685,6 +1215,14 @@ class ExperimentState:
                                            "Nothing was changed.", kind="well_mismatch",
                                            question=f"Should the {label.lower()} be {near}?", yes_text=near)
                 self._corrected(value, superseded, label)
+                numbered = _NUMBERED_VIAL.search(final_text)
+                if canonical != "tips.start_tip" and numbered:
+                    # "vial 5": no vial has that name, and "the fifth vial" depends on the order counted - never guessed
+                    material = material_label(before, "sample" if canonical == "materials.sample.vial" else "solvent")
+                    raise ProposalRejected(
+                        f'You said "{numbered.group(0)}". Vials are named A1-B4 (A1-A4 and B1-B4), so I did not pick one '
+                        f"for the {label.lower()}.", kind="needs_value",
+                        question=f"Which vial holds the {material} (A1-B4)?")
                 raise ProposalRejected(f"You did not name the {label.lower()}, so I did not pick one.",
                                        kind="needs_value", question=f"Which {label.lower()} exactly?")
             return True, ""
@@ -712,6 +1250,17 @@ class ExperimentState:
                 raise ProposalRejected(f"You did not state the {label.lower()}, so I did not choose one.",
                                        kind="needs_value", question=f"What {label.lower()} do you want, in µL?")
             return True, ""
+        if canonical == "dilution.plate_column":
+            listed = sorted({int(number) for match in _PLATE_COLUMN_LIST.finditer(final_text)
+                             for number in re.findall(r"\d{1,2}", match.group(1) or match.group(2))})
+            if len(listed) > 1:
+                # one run makes and prints its series from ONE plate column: the model picking one of several named
+                # columns would silently drop the others
+                raise ProposalRejected(
+                    f"You named plate columns {', '.join(map(str, listed))}, but a run uses its dilution series from one "
+                    "plate column, so I did not pick one of them.", kind="needs_value",
+                    question="Which plate column should this run use? (To print from wells in several plate columns, "
+                             "name the wells, for example \"print A1 and A3\".)")
         if canonical in _COUNT_PATHS:
             if canonical in _PAPER_LAYOUT_PATHS:
                 gap = gap_conflict(final_text)
@@ -722,20 +1271,21 @@ class ExperimentState:
                     # "Print in paper columns 3 and 4" states the first paper column and, with the drop volumes, the
                     # replicate count. propose() then requires the printed columns to be exactly those columns.
                     return True, ""
-            if not numbers_mentioned(value, final_text):
+            if not (numbers_mentioned(value, final_text) or value_stated(value, final_text)):
                 self._corrected(value, superseded, label)
                 raise ProposalRejected(f"You did not state the {label.lower()}, so I did not choose one.",
                                        kind="needs_value",
                                        question=_COUNT_QUESTIONS.get(canonical, f"What should the {label.lower()} be?"))
             return True, ""
         if canonical == "dilution.start_row":
-            if not re.search(rf"\brow\s+{value}\b|\b{value}\b", final_text.replace(f"row {str(value).lower()}",
-                                                                                  f"row {value}")):
+            # "row D", "D", or the row in other words ("the second row", "the 3rd row", "row 2", "the top row")
+            if not _start_row_stated(str(value), final_text) and not re.search(
+                    rf"\brow\s+{value}\b|\b{value}\b", final_text.replace(f"row {str(value).lower()}", f"row {value}")):
                 raise ProposalRejected("You did not state the starting row, so I did not choose one.",
                                        kind="needs_value", question="Which plate row (A-H) should the series start at?")
             return True, ""
         if canonical == "dilution.factors":
-            if not numbers_mentioned(value, final_text):
+            if not (numbers_mentioned(value, final_text) or value_stated(value, final_text)):
                 return False, "those factors are not in your request"
             return True, ""
         if not evidence_supported(str(raw.get("evidence") or ""), request):
@@ -758,18 +1308,25 @@ class ExperimentState:
         do_dilution_after, do_print_after = steps_enabled(after)
         if not do_print_after or do_dilution_after:
             return
+        if print_map(after) is not None:
+            return          # a print map names its own source wells; there is no dilution series to compare
         record = physical["dilutions_prepared"] if "dilutions_prepared" in physical else self.physical.get(
             "dilutions_prepared")
         if record is None:
             return
-        needed = {well.well: well.factor for well in build_plan(after).wells}
+        needed = {well.well: well.factor for well in build_plan(after).wells if well.factor > 0}
         recorded = dict(zip(record.get("wells", []), record.get("factors", [])))
         mismatched = [f"{well} ({fmt_factor(needed[well])} planned, {fmt_factor(recorded[well])} recorded)"
                       for well in needed if well in recorded and abs(float(recorded[well]) - float(needed[well])) > 1e-9]
         if mismatched:
+            # "Everything is already mixed, just print" after the plan changed: the scientist may be telling me the
+            # plate now holds this plan's dilutions. Asked, never assumed: a yes records them for these wells.
+            wells = ", ".join(needed)
+            factors = ", ".join(fmt_factor(factor) for factor in needed.values())
             raise ProposalRejected(
                 "This print-only plan does not match the dilutions recorded as prepared: different factors in "
-                + ", ".join(mismatched) + ". Nothing was changed.", kind="prerequisite")
+                + ", ".join(mismatched) + ". Nothing was changed.", kind="prerequisite",
+                question=f"Do plate wells {wells} now hold this plan's dilutions ({factors})?")
 
     def apply(self, proposal: Proposal, *, operator: str) -> dict[str, Any]:
         if proposal.base_revision != self.revision or proposal.before != self._config:
@@ -849,6 +1406,13 @@ class ExperimentState:
                 return [f"Plate wells {', '.join(overlap)} already hold dilutions ({prepared.get('source')}). Making "
                         "them again would add liquid to full wells. Skip the dilution step, use another plate column, "
                         "or tell me the plate was replaced."]
+        present = self.physical.get(SOURCES_PRESENT) or {}
+        if plan.do_dilution and present:
+            overlap = sorted(set(well.well for well in plan.wells) & set(present))
+            if overlap:
+                return [f"Plate well{'s' if len(overlap) > 1 else ''} {', '.join(overlap)} already hold"
+                        f"{'' if len(overlap) > 1 else 's'} sample you told me about. Making dilutions there would add "
+                        "liquid to it. Use another plate column or rows, or tell me the plate was replaced."]
         return []
 
     def record_run(self, *, simulate: bool, exit_code: int, printed: Iterable[str],

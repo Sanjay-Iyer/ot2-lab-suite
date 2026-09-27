@@ -236,25 +236,30 @@ def test_scripted_user_path_reaches_the_expected_final_state(replays, sop, name)
 @pytest.mark.parametrize("sop, name, turn, text", [
     (1, "confused", 1, "Factor 1× 2× 3× 4×"),                               # "4 dilutions" keeps the first four factors
     (1, "confused", 5, "You gave 200 without a unit"),
-    (1, "confused", 8, 'You said "vial 5". Vials are named A1-B4.'),
+    # 2026-09-26: said by grounding after the model's guess (B1) instead of by a word check before the model
+    (1, "confused", 8, 'You said "vial 5". Vials are named A1-B4'),
+    (1, "confused", 8, "Which vial holds the dye (A1-B4)?"),
     (1, "change_of_mind", 4, "replaces #2"),
     (2, "confused", 1, "The current plan has no 5×, 10×, 20× dilutions"),
     (2, "confused", 2, "I interpreted this as a print-only run using the existing prepared samples"),
-    (2, "confused", 8, "did not mention the replicate paper columns"),
+    # the replicate reading of "twice" is flagged for checking (the proposal groups flagged values under this heading)
+    (2, "confused", 8, "CHECK THESE - I could not find them in what you typed: - Replicate paper columns: 2"),
     (3, "confused", 1, 'If you meant a column, say "plate column 3"'),
     (3, "confused", 4, "8 dilutions starting at row D run past row H"),      # the series is still 8 long
     (3, "confused", 7, "Paper columns 3 | 4"),
-    (3, "confused", 9, 'You said "plate." Which plate do you mean?'),
-    (3, "confused", 10, "physically move the 96-well dilution plate from Slot 4 to Slot 3"),
+    # 2026-09-26: "the plate" is read as the dilution plate by the router (the pre-LLM "Which plate do you mean?"
+    # question was removed with the wording check); the proposed deck still shows the move before anything happens
+    (3, "confused", 9, "physically move the 96-well dilution plate from Slot 4 to Slot 3"),
     (4, "confused", 3, "different drop counts per column need two runs"),
     (4, "confused", 7, "DILUTIONS made in this run Dilutions 4 in plate column 6 (rows A-D)"),   # would remake them
     (4, "one_at_a_time", 10, "Saying yes records plate wells A6-D6 as already holding the dilutions"),
     (5, "clean", 1, "Slot 8 is currently occupied by the P20 tip rack."),
     (5, "clean", 1, '"move the tip rack to slot 1 and the dilution plate to slot 8"'),
     (5, "clean", 1, "Not OFF DECK: every step needs P20 tips."),
-    (5, "confused", 2, "Slot 8 is currently occupied by the P20 tip rack."),
-    (5, "confused", 3, "the P20 tip rack is OFF DECK, but every step needs P20 tips"),
-    (5, "confused", 8, "You gave 180 without a unit"),
+    # 2026-09-26: one turn earlier than before - the "which plate?" question and its answer "1" are gone (see above)
+    (5, "confused", 1, "Slot 8 is currently occupied by the P20 tip rack."),
+    (5, "confused", 2, "the P20 tip rack is OFF DECK, but every step needs P20 tips"),
+    (5, "confused", 7, "You gave 180 without a unit"),
 ])
 def test_the_safeguards_happen_where_each_path_expects(replays, sop, name, turn, text):
     row = replays[(sop, name)]["transcript"][turn - 1]
@@ -298,10 +303,20 @@ def test_listing_side_by_side_paper_columns_states_the_replicate_count(tmp_path)
     assert result["session"].state.config["print"]["paper_start_column"] == 3
 
 
-def test_columns_that_are_not_side_by_side_need_two_runs(tmp_path):
-    result = talk(tmp_path, said("Print in paper columns 1 and 3.", change("print.paper_start_column", 1, "columns 1"),
-                                 change("print.replicates", 2, "columns 1 and 3")))
-    assert "Paper columns 1, 3 are not side by side" in output(result, 1) and not events(result, 1, "proposal")
+def test_columns_that_are_not_side_by_side_print_exactly(tmp_path):
+    # 2026-09-26: replaces test_columns_that_are_not_side_by_side_need_two_runs. Paper columns that are not side by side
+    # are printed exactly with a print map now (the source-mapping work), so "need two runs" and the follow-up
+    # "Which side-by-side paper columns should this run print?" were obsolete. What is still protected: a model that
+    # reads "columns 1 and 3" as a first column and a replicate count (columns 1-2) is caught - the words name exactly
+    # which columns - and the proposal prints exactly the named columns, nothing else.
+    misread = said("Print in paper columns 1 and 3.", change("print.paper_start_column", 1, "columns 1"),
+                   change("print.replicates", 2, "columns 1 and 3"))
+    misread["label"]["intended"] = [{"path": "print.source_map", "value": None}]   # what the words mean
+    result = talk(tmp_path, misread, "yes")
+    assert not result["violations"], result["violations"]
+    assert [event["paths"] for event in events(result, 1, "proposal")] == [["print.source_map"]]
+    plan = build_plan(result["session"].state.config)
+    assert sorted({position[1:] for position in plan.print_positions}) == ["1", "3"]
 
 
 @pytest.mark.parametrize("text, groups", [("paper columns 3 and 4", [[3, 4]]), ("column 3 and 4", [[3, 4]]),
@@ -319,8 +334,10 @@ def test_printing_the_named_dilutions_depends_on_the_plan():
     planned = deepcopy(DEFAULT)
     planned["dilution"]["factors"] = [5, 10, 20]
     assert kind("Print the 5x, 10x and 20x dilutions onto paper column 2.", planned) == "instruction"
-    some = analyze_turn("Print the 5x and 10x dilutions onto paper column 2.", TurnContext(config=planned))
-    assert some.kind == "unsupported" and "cannot print only one or some of them" in some.details["unsupported"][0]
+    # 2026-09-26: printing SOME of the plan's dilutions is supported (a rows selection grounded by the named factors,
+    # or a print map), so it is an ordinary request for the router - no longer refused before the model reads it.
+    # tests/test_ai_dye_demo_request_understanding.py checks the resulting proposal.
+    assert kind("Print the 5x and 10x dilutions onto paper column 2.", planned) == "instruction"
     every = analyze_turn("Print the 5x, 10x and 20x dilutions.", TurnContext(config=planned))
     assert every.kind == "unsupported" and "already prints" in every.details["unsupported"][0]
 

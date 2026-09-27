@@ -3,7 +3,11 @@ description: >-
   The user was answering "where should the vial rack go?" with "slot 6", and the model proposed moving the dilution
   plate to slot 6 instead. The slot check only looked for the number, so the wrong labware was verified and could be
   approved without a warning. A slot change now needs its labware named as the object of the move; a change to other
-  labware than the one named is flagged, and a proposal made only of such changes is refused.
+  labware than the one named is flagged.
+  (2026-09-26, clarification state: the question "Where should the vial rack go?" is kept as pending intent with the
+  vial rack's slot as its open field. A bare answer ("slot 6") names no labware, so its value fills that field; the
+  model's reading of it as a dilution-plate move is never proposed. What the case protects is unchanged and stronger:
+  the wrong labware never reaches a proposal.)
 found_by: {seed: 1015, persona: new_student, goal: question_changes_state, chaos: 0.4, live_logic: false}
 invariant: unrelated_change_applied_unflagged
 fixed_in: src/agents/dye_demo/state.py (_verify, named_labware, slot_numbers)
@@ -22,11 +26,13 @@ messages:
     reply: '{"intent": "change", "changes": [{"path": "deck.plate.slot", "value": 6, "evidence": "slot 6"}], "explanation": "simulated interpretation", "clarification": ""}'
     chaos: wrong_labware
 expected:
-  final: {revision: 0, pending: null}
+  final: {revision: 0, pending: 1, clarifying: false}
   turns:
   - turn: 1
     classification: incomplete
     no_proposal: true
+    output_contains: ["Where should the Vial rack go?"]
   - turn: 2
-    no_proposal: true
-    output_contains: ["did not mention the 96-well dilution plate location"]
+    proposal_paths: [deck.tuberack.slot]
+    output_contains: ["Vial rack in Slot 6"]
+    output_excludes: ["96-well dilution plate in Slot 6"]

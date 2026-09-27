@@ -594,21 +594,56 @@ def test_wrong_order_requests_start_nothing(tmp_path):
 
 
 def test_moving_labware_somewhere_else_is_never_chosen_for_the_scientist(tmp_path):
+    # 2026-09-26 (request-understanding redesign): the router now reads "in 8" itself - the pre-LLM
+    # 'Did you mean OT-2 deck SLOT 8?' question and its "yes" turn were removed with the wording check. What this test
+    # protects is unchanged: a slot the model invents for "somewhere else" is never used; the scientist is asked, and the
+    # rest of the request (the plate move) is kept for the answer instead of being lost.
     c = talk(tmp_path, ("Move the vial rack to slot 8.", reply(item("deck.tuberack.slot", 8, "vial rack to slot 8"))),
-             "yes", "Put the dilution plate in 8 and move the vial rack somewhere else.",
-             ("yes", reply(item("deck.plate.slot", 8, "dilution plate in deck slot 8"),
-                           item("deck.tuberack.slot", 10, "move the vial rack somewhere else"))))
-    assert 'You said "in 8." Did you mean OT-2 deck SLOT 8?' in c.out(3)
-    assert not c.proposals(4)
-    assert "Where should the Vial rack go?" in c.out(4) and "OFF DECK" in c.out(4)
+             "yes",
+             ("Put the dilution plate in 8 and move the vial rack somewhere else.",
+              reply(item("deck.plate.slot", 8, "dilution plate in 8"),
+                    item("deck.tuberack.slot", 10, "move the vial rack somewhere else"))),
+             ("Slot 3.", reply(item("deck.plate.slot", 8, "dilution plate in 8"),
+                               item("deck.tuberack.slot", 3, "Slot 3"))))
+    assert not c.proposals(3)
+    assert "Where should the Vial rack go?" in c.out(3) and "OFF DECK" in c.out(3)
+    assert "I kept the rest of your request: 96-well dilution plate location: Slot 8" in c.out(3)
     assert c.config["deck"]["tuberack"]["slot"] == 8 and c.config["deck"]["plate"]["slot"] == 4
+    assert [sorted(event["paths"]) for event in c.proposals(4)] == [["deck.plate.slot", "deck.tuberack.slot"]]
+    assert c.session.pending.after["deck"]["tuberack"]["slot"] == 3 and c.session.pending.after["deck"]["plate"]["slot"] == 8
 
 
-@pytest.mark.parametrize("text", ["Use CV stock.", "10x CV", "CV 10×"])
-def test_reagent_aliases_are_confirmed_not_substituted(tmp_path, text):
-    c = talk(tmp_path, text)
+# 2026-09-26 (request-understanding redesign): the reagent check used to run before the model read the message (a
+# rewrite of "CV" followed by a re-read of the request). It now runs after the router: the model's reading of the whole
+# request is kept, the reagent is confirmed, and a yes proposes exactly that reading. What the test protects is
+# unchanged: a reagent named differently from the plan's dye is never silently taken to be that dye.
+@pytest.mark.parametrize("text, changes", [
+    ("Use CV stock from vial B1.", [item("materials.sample.vial", "B1", "CV stock from vial B1")]),
+    ("10x CV", [item("dilution.factors", [10], "10x CV")]),
+    ("CV 10×", [item("dilution.factors", [10], "CV 10×")]),
+    ("Make 2x and 5x CV dilutions and print 3 drops of each.",
+     [item("dilution.factors", [2, 5], "2x and 5x CV dilutions"), item("print.droplets_per_spot", 3, "3 drops")]),
+])
+def test_reagent_aliases_are_confirmed_not_substituted(tmp_path, text, changes):
+    c = talk(tmp_path, (text, reply(*changes)), "yes")
     assert c.unchanged(1) and not c.proposals(1)
     assert "Is that the dye" in c.out(1)
+    # the yes proposes the model's whole reading (every change), still waiting for its own approval
+    assert [sorted(event["paths"]) for event in c.proposals(2)] == [sorted(change["path"] for change in changes)]
+    assert c.state.revision == 0
+
+
+def test_a_reagent_that_is_not_the_dye_changes_nothing(tmp_path):
+    c = talk(tmp_path, ("10x CV", reply(item("dilution.factors", [10], "10x CV"))), "no")
+    assert not c.proposals(1) and not c.proposals(2) and c.state.revision == 0
+    assert "This plan's sample is the dye" in c.out(2) and c.session.clarifying is None
+
+
+def test_a_reagent_name_the_model_sets_is_shown_not_asked(tmp_path):
+    # renaming the dye is visible in the proposal itself, so nothing needs confirming first
+    c = talk(tmp_path, ("The dye is CV.", reply(item("materials.sample.label", "CV", "The dye is CV"))))
+    assert "Is that the dye" not in c.out(1)
+    assert [event["paths"] for event in c.proposals(1)] == [["materials.sample.label"]]
 
 
 def test_relative_drop_change_from_a_correct_current_value_is_computed(tmp_path):

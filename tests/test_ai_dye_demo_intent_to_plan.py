@@ -230,19 +230,33 @@ def test_paper_column_mentions(text, found):
     assert [(mention.columns, mention.role) for mention in paper_column_mentions(text)] == found
 
 
+def fixes(conflict):
+    return [(item["path"], item["value"]) for item in conflict.fix or []]
+
+
 def test_column_conflicts_between_words_and_plan():
     printing_3_4 = config_with(print={"paper_start_column": 3, "replicates": 2})
     assert column_conflict("Print in paper columns 3 and 4.", printing_3_4) is None
-    assert column_conflict("Print in paper columns 3 and 5.", DEFAULT).kind == "paper_layout"
-    assert "separate run" in column_conflict("Print in paper columns 1 and 2, then paper columns 4 and 5.", DEFAULT).message
+    # 2026-09-26: paper columns that are not side by side are printed exactly with a print map (the source-mapping
+    # work; gap_conflict already allowed them), so "3 and 5" is no longer a layout no run can print ("paper_layout",
+    # "separate run"): the fix is the named columns themselves, and every group named is kept.
+    gap = column_conflict("Print in paper columns 3 and 5.", DEFAULT)
+    assert gap.kind == "paper_columns" and fixes(gap) == [("paper_columns", [3, 5])]
+    groups = column_conflict("Print in paper columns 1 and 2, then paper columns 4 and 5.", DEFAULT)
+    assert fixes(groups) == [("paper_columns", [1, 2, 4, 5])]
     printing_off = config_with(print={"enabled": False})
     conflict = column_conflict("Print in paper columns 3 and 4.", printing_off)
     assert "this plan does not print in this run" in conflict.message
-    assert ("print.enabled", True) in [(item["path"], item["value"]) for item in conflict.fix]
-    odd = column_conflict("Print in paper columns 3, 4 and 5.", config_with(print={"droplet_volume_ul": [2.0, 5.0]}))
-    assert odd.fix is None and "cannot be printed exactly" in odd.message
+    assert ("print.enabled", True) in fixes(conflict)
+    # with two drop volumes a replicate is two side-by-side columns: 3, 4 and 5 (or 3 and 5) still cannot be printed
+    two_volumes = config_with(print={"droplet_volume_ul": [2.0, 5.0]})
+    for text in ("Print in paper columns 3, 4 and 5.", "Print in paper columns 3 and 5."):
+        odd = column_conflict(text, two_volumes)
+        assert odd.fix is None and "cannot be printed exactly" in odd.message
+        assert odd.question == "Which side-by-side paper columns should this run print?"
     avoided = column_conflict("Print three drops, not in paper column 1.", DEFAULT)
     assert avoided is not None and avoided.fix is None
+    assert avoided.question == "Which paper columns should this run print?"      # one drop volume: any columns
     assert paper_columns_printed(printing_off) == []
 
 
@@ -251,40 +265,49 @@ def test_column_conflicts_between_words_and_plan():
 LAYOUT = (change("print.paper_start_column", 3, "columns 3"), change("print.replicates", 2, "columns 3 and 4"))
 
 
+# 2026-09-26: the three tests below replace tests of the old "Paper columns 3, 5 are not side by side" refusal and its
+# follow-up question. Columns with a gap are printed exactly now (a print map), so that refusal was obsolete; each
+# test keeps what it protected: an answer to a column question REPLACES the refused columns, a report in the same
+# message stays in the proposal, and a layout no run can print is refused again without changing anything.
+TWO_VOLUMES = config_with(print={"droplet_volume_ul": [2.0, 5.0]})
+
+
 @pytest.mark.parametrize("answer", ["Columns 3 and 4.", "3 and 4", "paper columns 3-4"])
 def test_a_short_column_answer_replaces_the_refused_columns(tmp_path, answer):
-    result = talk(tmp_path, said("Print in paper columns 3 and 5.", *LAYOUT), run(), said(answer, *LAYOUT), YES)
-    assert "Paper columns 3, 5 are not side by side" in output(result, 1)
+    # two drop volumes: "3 and 5" cannot be printed exactly in one run, so it is asked about
+    result = talk(tmp_path, said("Print in paper columns 3 and 5.", change("print.paper_start_column", 3, "columns 3")),
+                  run(), said(answer, change("print.paper_start_column", 3, "columns 3")), YES, config=TWO_VOLUMES)
+    assert "cannot be printed exactly in one run" in output(result, 1)
     assert "Which side-by-side paper columns should this run print?" in output(result, 1)
     assert not events(result, 2, "run") and "Not running" in output(result, 2)
     [answered] = events(result, 3, "clarification_answer")
-    assert answered["combined"] == "Print in paper columns 3 and 4."
-    assert proposal_paths(result, 3) == [["print.paper_start_column", "print.replicates"]]
+    assert answered["combined"] == "Print in paper columns 3 and 4."          # replaced, not appended
+    assert proposal_paths(result, 3) == [["print.paper_start_column"]]
     assert_physical_plan(result["session"].state.config, [3, 4])
 
 
-def test_a_column_answer_after_a_report_keeps_the_report(tmp_path):
-    """"The dilutions are already made. Print three drops in paper columns 1 and 3." answered with "Columns 1 and 2.":
-    the whole message is read again, so the prepared-dilutions record is still part of the proposal."""
+def test_named_columns_after_a_report_keep_the_report(tmp_path):
+    """"The dilutions are already made. Print three drops in paper columns 1 and 3.", read by the model as a first column
+    and a replicate count (columns 1-2): the words say exactly which columns, so the proposal prints exactly columns 1
+    and 3 - and the prepared-dilutions record of the same message stays part of it."""
     drops = change("print.droplets_per_spot", 3, "three drops")
     result = talk(tmp_path, said("The dilutions are already made. Print three drops in paper columns 1 and 3.", drops,
-                                 change("print.replicates", 2, "paper columns 1 and 3")),
-                  said("Columns 1 and 2.", drops, change("print.replicates", 2, "paper columns 1 and 2")), YES, run())
-    assert "Paper columns 1, 3 are not side by side" in output(result, 1) and not events(result, 1, "proposal")
-    [proposal] = events(result, 2, "proposal")
+                                 change("print.replicates", 2, "paper columns 1 and 3")), YES, run())
+    [proposal] = events(result, 1, "proposal")
     assert proposal["source"] == "physical-report" and proposal["physical"] == ["dilutions_prepared"]
-    assert sorted(proposal["paths"]) == ["dilution.enabled", "print.droplets_per_spot", "print.replicates"]
+    assert sorted(proposal["paths"]) == ["dilution.enabled", "print.droplets_per_spot", "print.source_map"]
     session = result["session"]
-    assert session.unreconciled_report is None and events(result, 4, "run")
+    assert session.unreconciled_report is None and events(result, 3, "run")
     assert session.state.physical["dilutions_prepared"]["wells"] == [f"{row}11" for row in "ABCDEFGH"]
     [executed] = session_run_configs(session)
     assert not build_plan(executed).do_dilution
-    assert_physical_plan(executed, [1, 2])
+    assert_physical_plan(executed, [1, 3])
 
 
-def test_a_second_gap_is_refused_again_and_nothing_changes(tmp_path):
-    result = talk(tmp_path, said("Print in paper columns 3 and 5.", *LAYOUT), said("3 and 5", *LAYOUT))
-    assert not events(result, 2, "proposal") and "Paper columns 3, 5 are not side by side" in output(result, 2)
+def test_a_layout_no_run_can_print_is_refused_again_and_nothing_changes(tmp_path):
+    result = talk(tmp_path, said("Print in paper columns 3 and 5.", change("print.paper_start_column", 3, "columns 3")),
+                  said("3 and 5", change("print.paper_start_column", 3, "columns 3")), config=TWO_VOLUMES)
+    assert not events(result, 2, "proposal") and "cannot be printed exactly in one run" in output(result, 2)
     assert result["session"].state.revision == 0 and result["session"].clarifying is not None
 
 

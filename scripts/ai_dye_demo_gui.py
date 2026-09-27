@@ -4,7 +4,8 @@
     python scripts/ai_dye_demo_gui.py              # work laptop: Run on OT-2 runs the real robot
     python scripts/ai_dye_demo_gui.py --simulate   # any laptop: the run button only builds and simulates
 
-Launching never contacts the robot. The OT-2 is found and checked only when Run on OT-2 is pressed. The run then takes
+Both commands serve the same page (same buttons, labels, chat and plan views); --simulate only swaps the execution
+backend underneath for the local build + Opentrons simulator. Launching never contacts the robot. The OT-2 is found and checked only when Run on OT-2 is pressed. The run then takes
 the terminal demo's robot path (scripts/run_vial_print_robot.py: build + simulate, upload over the HTTP API, start,
 monitor), and the page's Stop button stops it the way Ctrl-C does in the terminal.
 """
@@ -81,8 +82,11 @@ def main(argv: list[str] | None = None) -> int:
         session_label=f"{datetime.now():%Y-%m-%d} {args.session_label}",
         operator=args.operator,
         llm_description="" if args.offline else Config.describe_llm_auth(),
-        run_button="Simulate" if args.simulate else RUN_ON_OT2,
+        run_button=RUN_ON_OT2,              # the same page in both modes; only the executor below differs
     )
+    if args.simulate:
+        print(f"SIMULATION: '{RUN_ON_OT2}' builds and simulates the protocol on this laptop; the OT-2 is never "
+              "contacted.", flush=True)
     llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=0))
     executor = SubprocessExecutor(robot_host=args.robot_host)
     session = DemoSession(settings, load_config(source), llm=llm, executor=executor)

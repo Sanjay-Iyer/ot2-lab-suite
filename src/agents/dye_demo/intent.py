@@ -212,13 +212,28 @@ _VALUE_TOKEN = re.compile(r"\b(?:\d+(?:\.\d+)?|\d+(?:\.\d+)?\s*[x×]|[A-H]\d{1,2
 
 # ── whole-message patterns ──────────────────────────────────────────────────────
 
-_CANCEL = re.compile(
-    r"^\s*(?:(?:no|nope|oh|ok|okay|actually|wait|hmm|sorry|um|uh)[,.!\s]+)*"
-    r"(?:never\s*mind|nevermind|nvm|cancel(?:\s+(?:that|it|this|the\s+(?:change|proposal|request)))?|"
-    r"forget\s+(?:it|that|about\s+(?:it|that))|scratch\s+that|disregard(?:\s+(?:that|it))?|ignore\s+that|"
+_CANCEL_PHRASE = (
+    r"(?:never\s*mind|nevermind|nvm|cancel(?:\s+(?:that|it|this|everything|the\s+(?:change|proposal|request)))?|"
+    r"forget\s+(?:it|that|about\s+(?:it|that)|the\s+(?:change|proposal|request))|scratch\s+(?:that|it)|"
+    r"scrap\s+(?:that|it|the\s+(?:change|proposal|request))|disregard(?:\s+(?:that|it|the\s+(?:change|proposal)))?|"
+    r"discard(?:\s+(?:that|it|this|the))?(?:\s+(?:change|proposal|request))?|ignore\s+that|"
     r"don'?t\s+do\s+(?:that|it)|leave\s+it(?:\s+as\s+(?:it\s+)?(?:is|was))?|drop\s+(?:it|that)|no\s+changes?|"
-    r"keep\s+(?:it|everything)\s+as\s+(?:it\s+)?(?:is|was)|stop\s+that|abort(?:\s+that)?)"
+    r"keep\s+(?:it|everything)\s+as\s+(?:it\s+)?(?:is|was)|stop\s+that|abort(?:\s+that)?)")
+# "Never mind, cancel that." / "No, scratch that - never mind": one or more cancel phrases and nothing else.
+_CANCEL = re.compile(
+    rf"^\s*(?:(?:no|nope|oh|ok|okay|actually|wait|hmm|sorry|um|uh)[,.!\s]+)*{_CANCEL_PHRASE}"
+    rf"(?:[,.!;\s-]+(?:(?:no|ok|okay|actually|just)[,.!\s]+)*{_CANCEL_PHRASE})*"
     r"(?:[,.!\s]+(?:please|thanks|thank\s+you))?[.!\s]*$", re.I)
+# "Leave everything as it is." / "Don't change anything.": nothing about the plan should change (a waiting proposal or
+# question is dropped); different from a negated setting ("don't move the plate"), which may come with a change.
+_NO_CHANGE = re.compile(
+    r"^\s*(?:(?:no|ok|okay|actually|wait|hmm|sorry|um|uh|please)[,.!\s]+)*(?:please\s+)?(?:just\s+)?"
+    r"(?:(?:leave|keep)\s+(?:everything|it\s+all|all\s+of\s+it|the\s+(?:whole\s+)?(?:plan|experiment|setup|protocol|"
+    r"settings))\s+(?:exactly\s+|just\s+)?(?:as\s+(?:it\s+)?(?:is|was)|the\s+same|unchanged|alone|as\s+is)|"
+    r"(?:don'?t|do\s+not|dont)\s+(?:change|touch)\s+(?:anything|a\s+thing)|change\s+nothing|"
+    r"nothing\s+(?:needs\s+to\s+|should\s+)?change|no\s+changes?\s+(?:needed|please|for\s+now|today)|"
+    r"(?:i|we)\s+(?:don'?t|do\s+not|dont)\s+(?:want|need)\s+(?:to\s+change\s+anything|any\s+changes?))"
+    r"(?:[,.!\s]+(?:please|thanks|thank\s+you|for\s+now))?[.!\s]*$", re.I)
 _UNCERTAIN = re.compile(
     r"^\s*(?:ok|okay|k|kk|sure|sure\?|looks\s+good|look\s+good|probably|i\s+guess|i\s+think\s+so|maybe|fine|"
     r"that'?s\s+fine|thats\s+fine|sounds\s+good|alright|all\s+right|yeah|yep|yup|ya|right|cool|great|perfect|"
@@ -296,8 +311,9 @@ _UNSUPPORTED = (
      "series of concentrations, give the fold factors instead (for example \"make dilutions of 2×, 5× and 10×\")."),
     (re.compile(r"\bprint\s+(?:only\s+)?(?:the\s+)?(?:\d+(?:\.\d+)?\s*[x×]|[x×]\s*\d+)(?:\s+(?:dilution|well|one))?\b|"
                 r"\bprint\s+only\s+(?:the\s+|one\s+)", re.I),
-     "This demo prints every dilution in the plan, one paper row each; it cannot print only one or some of them. "
-     "You could change the plan to just those dilutions instead."),
+     # only a marker: _named_dilutions_reason decides (a dilution the plan does not make is explained; printing some of
+     # the plan's dilutions is an ordinary request - rows or a print map)
+     "print named dilutions"),
     (re.compile(r"\b(?:second|another|two|2|more\s+than\s+one|multiple|different)\s+(?:dyes?|samples?|reagents?|"
                 r"stocks?)\b", re.I),
      "This demo uses one dye (the sample) and one diluent (water); a second dye is not supported."),
@@ -412,6 +428,10 @@ _REPORT_PLATE_REPLACED = re.compile(
     r"\b(?:new|fresh|clean|empty)\s+(?:dilution\s+|96[-\s]?well\s+|well\s+)?plate\b(?!\s+(?:column|row|well))|"
     r"\b(?:replaced|swapped|changed|emptied|cleaned|washed)\s+(?:out\s+)?(?:the\s+)?(?:dilution\s+|96[-\s]?well\s+|"
     r"well\s+)?(?:plate|wells)\b|\bwells?\s+(?:are|were)\s+(?:now\s+)?(?:empty|emptied|clean)\b", re.I)
+# "paper columns 2 and 3", "plate column 6", "the plate wells": positions on the paper or the plate - part of the plan,
+# not the labware. "Use the same paper columns we had before I changed them" reports a plan change; read as a report
+# that the paper was moved, it asked "Which labware is where?" and blocked the run 13 turns later (2026-09-27 T01).
+_COORDINATE = re.compile(r"\b(?:paper|plate|print)\s+(?:columns?|rows?|positions?|spots?|wells?)\b", re.I)
 _REPORT_IDIOM = re.compile(
     r"\b(?:changed\s+(?:my|our|his|her|their)\s+minds?|made\s+(?:a|an)\s+(?:mistake|error|typo)|mixed\s+(?:it|them|"
     r"things)?\s*up|took\s+(?:a\s+)?(?:look|note|break)|put\s+(?:it|that)\s+wrong|set\s+up\s+the\s+(?:meeting|call))\b",
@@ -471,14 +491,15 @@ _RUN_LIKE = re.compile(
     rf"(?:\s+(?:now|please|immediately|right\s+away))?\s*[.!]*\s*$", re.I)
 _DANGLING_NOUNS = {"well", "slot", "tip", "vial", "column", "row", "position"}
 _SPLIT = re.compile(
-    rf"\s*;\s*|\s*,\s*(?:and\s+|but\s+|so\s+|then\s+)?(?:actually\s+|also\s+|then\s+|please\s+|now\s+|just\s+)*"
+    rf"\s*;\s*|\s*,\s*(?:and\s+|but\s+|so\s+|then\s+)?(?:actually\s+|also\s+|then\s+|please\s+|now\s+|just\s+|only\s+)*"
     rf"(?=(?:{_VERB_ALT})\b)|\s+(?:and|but|so)\s+(?:then\s+|also\s+|actually\s+|please\s+|now\s+)*"
     rf"(?=(?:{_VERB_ALT})\b)", re.I)
 _SENTENCES = re.compile(r"(?<=[.!?])\s+(?=[A-Za-z0-9\"'(])|\n+")
 
 FIELD_TERMS = (
     ("deck.tiprack.slot", re.compile(r"\btip\s*racks?\b|\btiprack\b", re.I)),
-    ("deck.paper.slot", re.compile(r"\bpaper(?:\s+print)?\s+plate\b|\bpaper\b(?!\s+(?:column|position|row))", re.I)),
+    ("deck.paper.slot", re.compile(r"\bpaper(?:\s+print)?\s+plate\b|\bpaper\b(?!\s+(?:columns?|positions?|rows?))",
+                                   re.I)),
     ("deck.tuberack.slot", re.compile(r"\b(?:vial|tube)\s*racks?\b|\bracks?\b", re.I)),
     ("deck.plate.slot", re.compile(r"\b(?:dilution|well|96[-\s]?well)\s+plate\b|\bplates?\b(?!\s+(?:column|row|well))",
                                    re.I)),
@@ -486,11 +507,16 @@ FIELD_TERMS = (
     ("materials.solvent.vial", re.compile(r"\b(?:water|solvent|diluent)\s+vial\b", re.I)),
     ("dilution.enabled", re.compile(r"\bdilution\s+step\b|\bmak(?:e|ing)\s+(?:the\s+)?dilutions\b", re.I)),
     ("dilution.total_volume_ul", re.compile(r"\b(?:total|final)\s+volume\b|\bvolume\s+per\s+(?:well|dilution)\b", re.I)),
-    ("dilution.plate_column", re.compile(r"\bplate\s+column\b", re.I)),
+    ("dilution.plate_column", re.compile(r"\bplate\s+columns?\b", re.I)),
+    # where the dilutions print (paper rows) and where they are made (plate rows) are different settings
+    ("print.paper_rows", re.compile(r"\bpaper\s+rows?\b|\bprint(?:ing|ed)?\s+rows?\b|\brows?\s+(?:on|of)\s+(?:the\s+)?"
+                                    r"paper\b", re.I)),
+    ("dilution.rows", re.compile(r"\b(?:dilution|plate)\s+(?:rows?|wells)\b|\brows?\s+of\s+(?:the\s+)?(?:dilutions?|"
+                                 r"plate)\b", re.I)),
     ("dilution.start_row", re.compile(r"\b(?:start(?:ing)?\s+)?row\b", re.I)),
     ("dilution.factors", re.compile(r"\bdilutions?\b(?!\s+step)|\bfactors?\b|\bfold\b|\bseries\b", re.I)),
     ("print.droplet_volume_ul", re.compile(r"\bdrop(?:let)?\s+volume\b|\bµL\s+drops?\b|\bdrop\s+size\b", re.I)),
-    ("print.paper_start_column", re.compile(r"\bpaper\s+column\b|\bcolumn\b", re.I)),
+    ("print.paper_start_column", re.compile(r"\bpaper\s+columns?\b|\bcolumns?\b", re.I)),
     ("print.replicates", re.compile(r"\breplicates?\b", re.I)),
     ("print.droplets_per_spot", re.compile(r"\bdrops?\b|\bdroplets?\b", re.I)),
     ("print.enabled", re.compile(r"\bprint(?:ing)?\s+step\b", re.I)),
@@ -504,7 +530,7 @@ FIELD_TERMS = (
 PATH_GROUPS = {
     "deck.plate.slot": ("deck.plate.slot",), "deck.paper.slot": ("deck.paper.slot",),
     "deck.tuberack.slot": ("deck.tuberack.slot",), "deck.tiprack.slot": ("deck.tiprack.slot",),
-    "dilution.factors": ("dilution.factors", "dilution.total_volume_ul", "dilution.start_row",
+    "dilution.factors": ("dilution.factors", "dilution.total_volume_ul", "dilution.start_row", "dilution.rows",
                          "dilution.plate_column", "dilution.enabled", "dilution.prepared_volume_ul"),
 }
 
@@ -625,17 +651,18 @@ def _plan_prints(config: dict[str, Any]) -> bool:
 def _named_dilutions_reason(clause: str, config: dict[str, Any]) -> str | None:
     """'Print the 5x, 10x and 20x dilutions onto paper column 2', checked against the dilutions the plan makes.
 
-    Naming every dilution of the plan together with how to print them is an ordinary print instruction (None), and so
-    is naming every dilution while printing is off in this plan (a request to print them). A dilution the plan does not
-    make, or only some of the plan's dilutions, gets an explanation instead.
+    Only facts about the plan are said here: a dilution the plan does not make ("the plan has no 5x dilution"), and
+    naming every dilution with nothing else to change ("every dilution already prints"). Anything else - some of the
+    dilutions ("print only the 5x and 10x": a rows selection), "print only the first one", every dilution with how to
+    print them - is an ordinary print instruction (None) that the router reads.
     """
     try:
         planned = [float(factor) for factor in (config.get("dilution") or {}).get("factors") or []]
         named = sorted({float(first or second) for first, second in _FACTOR_WORD.findall(clause)})
     except (TypeError, ValueError):
-        return _PRINT_ONE_REASON
+        return None
     if not planned or not named:
-        return _PRINT_ONE_REASON
+        return None
     in_plan = ", ".join(fmt_factor(factor) for factor in planned)
     missing = [factor for factor in named if all(abs(factor - item) > 1e-9 for item in planned)]
     if missing:
@@ -644,7 +671,7 @@ def _named_dilutions_reason(clause: str, config: dict[str, Any]) -> str | None:
                 "one paper row each, so set the dilution factors first (for example \"make dilutions of "
                 f"{', '.join(fmt_factor(factor) for factor in named)}\"), then say how to print them.")
     if len(named) < len({round(factor, 6) for factor in planned}):
-        return _PRINT_ONE_REASON
+        return None             # some of the plan's dilutions: the rows that hold them (grounded by the named factors)
     if _VALUE_TOKEN.search(_FACTOR_WORD.sub(" ", clause)) or not _plan_prints(config):
         return None
     return f"Every dilution in the plan ({in_plan}) already prints, one paper row each."
@@ -905,7 +932,8 @@ def _extract_facts(clause: str, ctx: TurnContext) -> list[PhysicalFact]:
         facts.append(PhysicalFact("dilutions_prepared", text=clause))
     if _REPORT_TIPS.search(clause):
         facts.append(PhysicalFact("tips_replaced", text=clause))
-    if _REPORT_PLATE_REPLACED.search(clause) and (_REPORT_ACTION.search(clause) or _REPORT_STATE.search(clause)
+    objects = _COORDINATE.sub(lambda match: " " * len(match.group(0)), clause)
+    if _REPORT_PLATE_REPLACED.search(objects) and (_REPORT_ACTION.search(clause) or _REPORT_STATE.search(clause)
                                                   or re.search(r"\b(?:is|are|was|were|now)\b", clause, re.I)):
         facts.append(PhysicalFact("plate_replaced", text=clause))
     if facts:
@@ -914,7 +942,8 @@ def _extract_facts(clause: str, ctx: TurnContext) -> list[PhysicalFact]:
         return facts
     parts = re.split(r"\s+and\s+(?=(?:the\s+)?(?:vial|tube|tip|paper|dilution|well|96|plate|rack))", clause, flags=re.I)
     for part in parts:
-        mentions = labware_mentions(part)
+        # a position on the paper or the plate is part of the plan, not labware on the deck
+        mentions = labware_mentions(_COORDINATE.sub(lambda match: " " * len(match.group(0)), part))
         roles = list(dict.fromkeys(role for role, _, _ in mentions))
         bare_plate = any(role == "plate" and re.fullmatch(r"(?i)plates?", part[start:end].strip())
                          for role, start, end in mentions)
@@ -970,6 +999,9 @@ def analyze_turn(text: str, context: TurnContext | None = None) -> TurnAnalysis:
         return analysis
     if _CANCEL.match(value):
         analysis.kind = "cancel"
+        return analysis
+    if _NO_CHANGE.match(value):
+        analysis.kind = "no_change"
         return analysis
     if analysis.confirmation == "uncertain":
         analysis.kind = "uncertain"
@@ -1093,10 +1125,10 @@ def analyze_turn(text: str, context: TurnContext | None = None) -> TurnAnalysis:
                 actionable.append(tail.group(1))     # "..., each well has about 190 µL left" is a value, not a report
             continue
         unsupported = next((reason for pattern, reason in _UNSUPPORTED if pattern.search(clause)), None)
-        if unsupported == _PRINT_ONE_REASON and ctx.config:
-            unsupported = _named_dilutions_reason(clause, ctx.config)
-            if unsupported is None:          # every dilution of the plan is named: an ordinary print instruction
-                if not _plan_prints(ctx.config):
+        if unsupported == _PRINT_ONE_REASON:
+            unsupported = _named_dilutions_reason(clause, ctx.config) if ctx.config else None
+            if unsupported is None:          # dilutions of the plan are named: an ordinary print instruction
+                if ctx.config and not _plan_prints(ctx.config):
                     # printing is off, so this asks for it to be turned on (the session proposes that change itself)
                     analysis.details["enable_print"] = clause
                     analysis.details["enable_print_values"] = bool(_VALUE_TOKEN.search(_FACTOR_WORD.sub(" ", clause)))
@@ -1375,7 +1407,8 @@ def parse_selection(text: str, pending_paths: list[str]) -> Selection | None:
         if all(1 <= n <= len(pending_paths) for n in picked):
             approved = [pending_paths[n - 1] for n in picked]
             return Selection(approved, [p for p in pending_paths if p not in approved], [])
-        return Selection([], [], [numbers.group(1)])
+        # not change numbers of this proposal ("3 and 4" answering which paper columns): a request, for the router
+        return None
     partial = _PARTIAL.match(value)
     reverse = _REJECT_THEN_APPROVE.match(value)
     only = _ONLY.match(value)
@@ -1385,9 +1418,13 @@ def parse_selection(text: str, pending_paths: list[str]) -> Selection | None:
         reject_phrase, approve_phrase = reverse.group(1), reverse.group(2)
     elif only:
         approve_phrase, reject_phrase = only.group(1), ""
+        if _VALUE_TOKEN.search(approve_phrase) or _ACTION.match(approve_phrase):
+            return None         # "only change drops to 4": a revision with a new value, not a pick from the proposal
     else:
         return None
     approved = _match_paths(approve_phrase, pending_paths)
+    if only and not partial and not reverse and not approved:
+        return None             # "only paper columns 6 and 7" names none of the waiting changes: a request
     rejected = _match_paths(reject_phrase, pending_paths) if reject_phrase else []
     unmatched = []
     if not approved:

@@ -16,10 +16,12 @@ from src.agents.dye_demo.model import (
     TIP_ORDER,
     TIP_POLICIES,
     VIAL_NAMES,
+    FieldError,
     fmt_factor,
     fmt_num,
     fmt_ul,
     is_off_deck,
+    normalize_source_map,
     occupancy,
     required_roles,
     slot_of,
@@ -27,9 +29,12 @@ from src.agents.dye_demo.model import (
 )
 from src.agents.dye_demo.plan import (
     build_plan,
+    dilution_rows,
     droplet_volumes,
+    explicit_paper_rows,
     factors_of,
     paper_layout,
+    print_map,
     steps_enabled,
     well_area_mm2,
 )
@@ -149,7 +154,15 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     if plan.do_dilution and not plan.do_print:
         report.warn("dilution.not_mixed", "a dilute-only run does not mix the wells; they are mixed "
                                           "only right before each print step")
-    if plan.do_print and not plan.do_dilution and plan.wells:
+    if plan.do_print and plan.mapped:
+        existing = [source.well for source in plan.print_sources if not source.made_here]
+        if existing:
+            report.warn(
+                "print.assumes_sources",
+                f"plate well{'s' if len(existing) > 1 else ''} {', '.join(existing)} must already hold the liquid "
+                f"to print (this run does not make {'them' if len(existing) > 1 else 'it'})",
+            )
+    elif plan.do_print and not plan.do_dilution and plan.wells:
         report.warn(
             "print.assumes_prepared",
             f"this run does not make dilutions: it assumes plate wells {plan.wells[0].well}-"
@@ -214,6 +227,15 @@ def _check_materials(config: dict[str, Any], report: Report) -> None:
 
 def _check_dilution(config: dict[str, Any], report: Report, p20_min: float, max_fill: float) -> None:
     dilution = config["dilution"]
+    try:
+        do_dilution, do_print = steps_enabled(config)
+    except (TypeError, ValueError):
+        do_dilution, do_print = True, True
+    # The dilution series (factors, rows, plate column) matters when this run makes it, or when printing follows
+    # the series rows. A print map names its own source wells, so a print-only map run needs no series at all.
+    if not (do_dilution or (do_print and print_map(config) is None)):
+        _check_volumes(config, report, max_fill)
+        return
     raw = dilution.get("factors")
     factors = factors_of(config)
     if not isinstance(raw, list) or len(factors) != len(raw):
@@ -228,8 +250,13 @@ def _check_dilution(config: dict[str, Any], report: Report, p20_min: float, max_
         rows = [str(r).strip().upper() for r in explicit_rows]
         if any(r not in ROWS for r in rows):
             report.error("dilution.rows", f"all dilution rows must be A-H, got {explicit_rows!r}")
-        elif len(rows) != len(factors):
-            report.error("dilution.rows_count", f"number of selected rows ({len(rows)}) must match dilution factors count ({len(factors)})")
+        elif do_dilution and len(set(rows)) != len(factors):
+            # Making dilutions puts one factor in each selected row; printing from rows that already hold liquid
+            # does not need a factor for every row.
+            report.error("dilution.rows_count",
+                         f"making dilutions puts one factor in each selected row, but {len(set(rows))} row"
+                         f"{'s are' if len(set(rows)) != 1 else ' is'} selected for {len(factors)} factor"
+                         f"{'s' if len(factors) != 1 else ''}")
     else:
         start_row = str(dilution.get("start_row", "A")).upper()
         if start_row not in ROWS:
@@ -240,6 +267,12 @@ def _check_dilution(config: dict[str, Any], report: Report, p20_min: float, max_
     column = str(dilution.get("plate_column", ""))
     if not column.isdigit() or not 1 <= int(column) <= 12:
         report.error("dilution.column", f"the dilution plate column must be 1-12, got {column!r}")
+    _check_volumes(config, report, max_fill, factors=factors, p20_min=p20_min)
+
+
+def _check_volumes(config: dict[str, Any], report: Report, max_fill: float, *, factors: list[float] | None = None,
+                   p20_min: float = 1.0) -> None:
+    dilution = config["dilution"]
     try:
         total = float(dilution.get("total_volume_ul", 0) or 0)
     except (TypeError, ValueError):
@@ -257,7 +290,7 @@ def _check_dilution(config: dict[str, Any], report: Report, p20_min: float, max_
         if not 0 < prepared_ul <= max_fill:
             report.error("dilution.prepared_volume",
                          f"the volume now in each prepared well must be in (0, {fmt_num(max_fill)}] µL")
-    if not dilution.get("enabled", True):
+    if not dilution.get("enabled", True) or not factors:
         return
     for factor in factors:
         if factor < 1:
@@ -313,6 +346,19 @@ def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max
     except (TypeError, ValueError):
         report.error("print.paper_column", "the first paper column must be a whole number")
         return
+    paper_rows = explicit_paper_rows(config)
+    try:
+        prints = steps_enabled(config)[1]
+    except (TypeError, ValueError):
+        prints = True
+    if printing.get("source_map") not in (None, "", []):
+        if paper_rows is not None and prints:
+            report.error("print.paper_rows_with_map", "paper rows cannot be combined with a print map: the print map "
+                                                      "already names every paper position")
+        _check_print_map(printing["source_map"], volumes, width, air_gap, p20_min, p20_max, report)
+        return              # the map names every position; the column layout settings are not used
+    if paper_rows is not None and prints:
+        _check_paper_rows(config, paper_rows, report)
     if start < 1:
         report.error("print.paper_column", "the first paper column must be 1-12")
         return
@@ -326,6 +372,56 @@ def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max
                      f"columns; start further left or use fewer volumes/replicates")
 
 
+def _check_paper_rows(config: dict[str, Any], paper_rows: list[str], report: Report) -> None:
+    """print.paper_rows: where the dilutions print is independent of where they are made, but each printed dilution
+    needs exactly one real paper row of its own (the i-th dilution prints on the i-th paper row)."""
+    invalid = [row for row in paper_rows if row not in ROWS]
+    if invalid:
+        report.error("print.paper_rows", f"the paper has rows A-H, so it has no row {', '.join(invalid)}")
+        return
+    repeated = sorted({row for row in paper_rows if paper_rows.count(row) > 1}, key=ROWS.index)
+    if repeated:
+        report.error("print.paper_rows", f"paper row {', '.join(repeated)} is listed twice; each dilution prints on a "
+                                         "paper row of its own")
+        return
+    series = dilution_rows(config)
+    if len(paper_rows) != len(series):
+        report.error("print.paper_rows_count",
+                     f"{len(series)} dilution{'s' if len(series) != 1 else ''} would print on {len(paper_rows)} paper "
+                     f"row{'s' if len(paper_rows) != 1 else ''} ({', '.join(paper_rows)}); each dilution needs one paper "
+                     "row")
+
+
+def _check_print_map(raw: Any, volumes: list[float], width: int, air_gap: float, p20_min: float, p20_max: float,
+                     report: Report) -> None:
+    """An explicit print map: every source a real plate well, every position a real paper position, printed once."""
+    try:
+        entries = normalize_source_map(raw)
+    except FieldError as exc:
+        report.error("print.source_map", str(exc))
+        return
+    for entry in entries:
+        outside = [position for position in entry["positions"] if int(position[1:]) > width]
+        if outside:
+            report.error("print.past_paper", f"paper position{'s' if len(outside) > 1 else ''} "
+                                             f"{', '.join(outside)} {'are' if len(outside) > 1 else 'is'} past the "
+                                             f"paper's {width} columns")
+        if "volume_ul" in entry:
+            volume = float(entry["volume_ul"])
+            if volume < p20_min:
+                report.error("print.volume_below_min",
+                             f"a {fmt_ul(volume)} drop from {entry['source']} is under the P20's {fmt_num(p20_min)} µL "
+                             "minimum")
+            elif volume + air_gap > p20_max:
+                report.error("print.volume_over_max",
+                             f"a {fmt_ul(volume)} drop from {entry['source']} plus the {fmt_ul(air_gap)} air gap is "
+                             f"over the P20's {fmt_num(p20_max)} µL")
+        elif len(volumes) > 1:
+            report.error("print.map_volume",
+                         f"the plan has several drop volumes ({', '.join(fmt_ul(volume) for volume in volumes)}), so "
+                         f"say which one {entry['source']} prints")
+
+
 def _check_tip_fields(config: dict[str, Any], report: Report) -> None:
     tips = config["tips"]
     start = str(tips.get("start_tip", "A1")).upper()
@@ -337,7 +433,7 @@ def _check_tip_fields(config: dict[str, Any], report: Report) -> None:
 
 def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
     """Keep the tip submerged while mixing and aspirating inside each dilution well."""
-    if not plan.do_print or not plan.spots:
+    if not plan.do_print or not (plan.spots or plan.print_sources):
         return
     area = well_area_mm2(config, "plate")
     if not area:
@@ -346,6 +442,9 @@ def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
     mixing, printing = config["mixing"], config["print"]
     mix_ul, mix_mm = float(mixing["volume_ul"]), float(mixing.get("height_mm", 2.0))
     aspirate_mm = float(printing.get("aspirate_height_mm", 1.0))
+    if plan.mapped:
+        _check_source_liquid(plan, area, mix_ul, mix_mm, aspirate_mm, report)
+        return
     volume = plan.source_volume_ul
     wells = f"{plan.wells[0].well}-{plan.wells[-1].well}" if len(plan.wells) > 1 else plan.wells[0].well
     for spot in plan.spots:
@@ -370,6 +469,35 @@ def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
                 )
                 return
             volume -= float(spot["volume_ul"])
+
+
+def _check_source_liquid(plan, area: float, mix_ul: float, mix_mm: float, aspirate_mm: float, report: Report) -> None:
+    """Each mapped source well, in print order: enough liquid to mix and to keep the tip submerged for every drop."""
+    for source in plan.print_sources:
+        volume = source.start_ul
+        assumed = "" if source.made_here else " (assumed; tell me the volume in the well if it differs)"
+        for operation in (op for op in plan.operations if op.kind == "print" and op.source == source.well):
+            need = mix_ul + mix_mm * area
+            if volume + 1e-6 < need:
+                report.error(
+                    "print.mix_draws_air",
+                    f"mixing {fmt_ul(mix_ul)} at {fmt_num(mix_mm)} mm needs at least {need:.0f} µL in {source.well}, "
+                    f"but it would hold {volume:.0f} µL{assumed} before printing {operation.destination}; the tip "
+                    f"would draw air. Print fewer positions from {source.well} or use more liquid",
+                )
+                return
+            for _ in range(operation.droplets):
+                need = operation.volume_ul + aspirate_mm * area
+                if volume + 1e-6 < need:
+                    report.error(
+                        "print.aspirate_draws_air",
+                        f"printing a {fmt_ul(operation.volume_ul)} drop needs at least {need:.0f} µL in "
+                        f"{source.well} to keep the tip ({fmt_num(aspirate_mm)} mm) submerged, but it would hold "
+                        f"{volume:.0f} µL{assumed} at {operation.destination}. Print fewer positions from "
+                        f"{source.well} or use more liquid",
+                    )
+                    return
+                volume -= operation.volume_ul
 
 
 def _check_dispense_clearance(config: dict[str, Any], plan, report: Report) -> None:

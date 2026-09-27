@@ -211,6 +211,10 @@ CHANGED = configured(
 )
 PREPARED = configured(dilution={"enabled": False, "prepared_volume_ul": 140.0})
 NOT_PRINTING = configured(print={"enabled": False})
+SPARSE_ROWS = configured(dilution={"factors": [2, 5, 10], "rows": ["B", "D", "H"]})
+# made in plate rows B, D, H; printed on paper rows A, B, C: where a dilution prints is independent of where it is made
+PAPER_ROWS = configured(dilution={"factors": [2, 5, 10], "rows": ["B", "D", "H"]}, print={"paper_rows": ["A", "B", "C"]})
+MAPPED = configured(dilution={"enabled": False}, print={"source_map": [{"source": "A11", "positions": ["A1", "B1", "C1"]}]})
 
 # every conversation-editable setting, the screen that shows it changed, and how it reads there
 EDITABLE_ROWS = {
@@ -226,6 +230,9 @@ EDITABLE_ROWS = {
     "dilution.factors": (CHANGED, lambda s: squash("Factor 2× 5× 10×") in squash(s)),
     "dilution.plate_column": (CHANGED, lambda s: value_of(s, "Dilutions") == "3 in plate column 3 (rows C-E)"),
     "dilution.start_row": (CHANGED, lambda s: squash("Well C3 D3 E3") in squash(s)),
+    # rows that are not consecutive are listed, never shown as a range ("rows B-H" would read as seven rows)
+    "dilution.rows": (SPARSE_ROWS, lambda s: value_of(s, "Dilutions") == "3 in plate column 11 (rows B, D, H)"
+                      and squash("Well B11 D11 H11") in squash(s)),
     "dilution.total_volume_ul": (CHANGED, lambda s: value_of(s, "Final volume") == "120 µL in each well"),
     "dilution.prepared_volume_ul": (PREPARED, lambda s: value_of(s, "Volume in each well") == "140 µL"),
     "mixing.reps": (CHANGED, lambda s: value_of(s, "Mixing") == "3 × 10 µL before each print step"),
@@ -235,6 +242,10 @@ EDITABLE_ROWS = {
     "print.droplets_per_spot": (CHANGED, lambda s: value_of(s, "Drops per position") == "2  (stacked)"),
     "print.replicates": (CHANGED, lambda s: value_of(s, "Replicates") == "2 side-by-side columns per drop volume"),
     "print.paper_start_column": (CHANGED, lambda s: value_of(s, "Paper columns") == "6 | 7"),
+    "print.paper_rows": (PAPER_ROWS, lambda s: value_of(s, "Paper rows") == "A | B | C   (B11 → A, D11 → B, H11 → C)"
+                         and squash("Well B11 D11 H11") in squash(s)),
+    "print.source_map": (MAPPED, lambda s: value_of(s, "Print map") == "A11 → A1-C1 (3)"
+                         and value_of(s, "Printed from") == "A11   (already in the plate)"),
     "tips.start_tip": (CHANGED, lambda s: value_of(s, "Tip start") == "C1"),
     "tips.return_tips": (CHANGED, lambda s: value_of(s, "Used tips") == "returned to the rack (do not reuse them)"),
     "tips.policy": (CHANGED, lambda s: value_of(s, "Tip use") == "new tip every transfer"),

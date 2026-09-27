@@ -81,11 +81,26 @@ _APPROVES_PROPOSAL = re.compile(r"^(?:(?:yes|ok|okay|sure)\s+)?(?:(?:i|we)\s+)?(
                                 r"proposal\s*#?\s*(\d+)$")
 
 
+# An approval verb whose object is the waiting proposal, with courtesy words: "apply that", "okay, apply it", "yes,
+# please apply the proposal". Nothing else may be in the message (2026-09-27 novice validation: "apply that" and
+# "Okay, apply it." were explicit approvals the specification did not list).
+_VERB_APPROVAL = {"verbs": {"apply", "approve", "confirm", "accept"},
+                  "other": {"it", "that", "this", "the", "proposal", "change", "changes", "ok", "okay", "yes", "yeah",
+                            "yep", "sure", "please", "thanks", "thank", "you", "great", "perfect", "cool", "nice",
+                            "cheers"}}
+
+
 def explicit_yes(text: str, pending_id: int | None = None) -> bool:
-    """The specification of approval: an explicit yes word, or an approval naming the waiting proposal by number,
-    optionally with courtesy words ("Yes, I approve proposal #1. Thanks.")."""
+    """The specification of approval: an explicit yes word, an approval verb naming the waiting proposal ("apply
+    that", "okay, apply it"), or an approval naming the waiting proposal by number, optionally with courtesy words
+    ("Yes, I approve proposal #1. Thanks.")."""
     visible = re.sub("[﻿​‌‍⁠]", "", text)          # judged on what the scientist sees
     if " ".join(re.sub(r"[,.!]", " ", visible.lower()).split()) in EXPLICIT_YES:
+        return True
+    words = re.findall(r"[a-z']+", visible.lower())
+    if "?" not in visible and not re.search(r"\d", visible) and 0 < len(words) <= 8 \
+            and any(word in _VERB_APPROVAL["verbs"] for word in words) \
+            and all(word in _VERB_APPROVAL["verbs"] or word in _VERB_APPROVAL["other"] for word in words):
         return True
     if pending_id is None:
         return False

@@ -10,8 +10,9 @@ from nicegui import app, events, ui
 
 from src.agents.dye_demo import render
 from src.agents.dye_demo.columns import format_columns, format_rows, paper_columns_printed
+from src.agents.dye_demo.render import print_map_text
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter, GuiSnapshot
-from src.agents.dye_demo.model import fmt_factor, format_slot, material_label, material_spec, slot_of
+from src.agents.dye_demo.model import format_slot, material_label, material_spec, slot_of
 from src.agents.dye_demo.plan import build_plan
 
 from src.agents.dye_demo.gui.labware_svg import (
@@ -43,6 +44,20 @@ class FlowStep:
     destination: str
 
 
+@dataclass(frozen=True)
+class ExecutionTarget:
+    """The only part of the page that names the execution backend. Every other label, button, card, status and dialog
+    is identical for --simulate and the real OT-2, so work on the page carries over to both."""
+    badge: str              # header badge (same component, colour and place in both modes)
+    confirm_title: str      # title of the run confirmation dialog
+
+
+def execution_target(live: bool) -> ExecutionTarget:
+    if live:
+        return ExecutionTarget("LIVE · REAL OT-2", "Start the real OT-2 run?")
+    return ExecutionTarget("SIMULATED OT-2", "Start the simulated OT-2 run?")
+
+
 def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION") -> None:
     plate_svg = render_plate_svg(config)
     tuberack_svg = render_tuberack_svg(config)
@@ -65,7 +80,7 @@ def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
     """High-level material path derived from the same config and Plan as the detailed sections."""
     plan = build_plan(config)
     wells = " | ".join(well.well for well in plan.wells) or "none"
-    factors = " | ".join(fmt_factor(well.factor) for well in plan.wells) or "none"
+    factors = " | ".join(render.factor_text(well.factor) for well in plan.wells) or "none"
     steps: list[FlowStep] = []
     if plan.do_dilution:
         dye, water = material_spec(config, "sample"), material_spec(config, "solvent")
@@ -77,10 +92,23 @@ def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
             f"96-well plate, {format_slot(slot_of(config, 'plate'))} · wells {wells} · dilutions {factors}",
         ))
     if plan.do_print:
-        columns = format_columns(paper_columns_printed(config))
-        rows = format_rows([well.row for well in plan.wells])
         drops = int(config["print"].get("droplets_per_spot", 1))
         number = "drop" if drops == 1 else "drops"
+        if plan.mapped:
+            sources = " | ".join(source.well for source in plan.print_sources) or "none"
+            steps.append(FlowStep(
+                f"STEP {len(steps) + 1} — PRINT",
+                f"96-well plate, {format_slot(slot_of(config, 'plate'))} · source wells {sources}",
+                f"Paper substrate / holder, {format_slot(slot_of(config, 'paper'))} · {print_map_text(plan)} · "
+                f"{drops} {number} per position",
+            ))
+            return steps
+        columns = format_columns(paper_columns_printed(config))
+        # the paper rows the dilutions print on (print.paper_rows), not the plate rows they are made in
+        pairs = render.paper_row_pairs(plan)
+        rows = format_rows([row for _, row in pairs])
+        if any(well[0] != row for well, row in pairs):
+            rows += " (" + ", ".join(f"{well}→{row}" for well, row in pairs) + ")"
         steps.append(FlowStep(
             f"STEP {len(steps) + 1} — PRINT",
             f"96-well plate, {format_slot(slot_of(config, 'plate'))} · dilution wells {wells}",
@@ -94,7 +122,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     """Build one browser page. Business logic remains in ``DemoSession``."""
     app.add_static_files("/visualization", REPO / "visualization")
     adapter.start()
-    live = not adapter.session.settings.simulate
+    target = execution_target(not adapter.session.settings.simulate)
     ui.colors(primary="#315c4d", secondary="#64748b", accent="#b56a35")
     ui.add_css("""
         body { background: #f5f7f6; color: #1f2937; }
@@ -104,6 +132,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .chat-scroll { min-height: 0; }
         .chat-scroll .q-message-text-content div { white-space: pre-wrap; font-size: 14.5px; line-height: 1.5; }
         .chat-scroll .mono .q-message-text-content div { font-family: Consolas, ui-monospace, monospace; font-size: 13.5px; }
+        .chat-scroll .status-message .q-message-text-content div { font-style: italic; font-size: 13.5px; }
         .chat-scroll strong, .chat-scroll b { font-weight: 700; color: #166534; }
         @media (min-width: 640px) and (min-height: 500px) {
             .page-header { position: sticky; top: 0; z-index: 100; background: #f5f7f6; padding: 6px 0; }
@@ -123,8 +152,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         with ui.row().classes("page-header w-full items-center justify-between"):
             ui.label("Agent NanoDrop").classes("text-2xl font-semibold")
             with ui.row().classes("items-center gap-3 flex-wrap justify-end"):
-                ui.badge("LIVE · REAL OT-2" if live else "SIMULATION ONLY",
-                         color="negative" if live else "secondary").classes("text-sm px-3 py-2")
+                ui.badge(target.badge, color="negative").classes("execution-target text-sm px-3 py-2")
                 user_badge = ui.badge("Current User = waiting for chat input", color=None).classes(
                     "current-user text-sm px-3 py-2")
                 with ui.column().classes("items-center gap-1"):
@@ -137,8 +165,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                                                        on_click=lambda: adapter.submit_text("no"),
                                                        color="negative").props("outline dense size=sm")
                 top_proposal_actions.set_visibility(False)
-                top_run_button = ui.button(adapter.run_label,
-                                           icon="precision_manufacturing" if live else "play_arrow",
+                top_run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
                                            color="warning").classes("run-action text-lg")
                 top_run_button.set_enabled(False)
                 stop_button = ui.button("Stop robot", icon="stop", color="negative").classes("text-lg")
@@ -164,16 +191,13 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         with ui.card().classes("section-run w-full p-5"):
             with ui.row().classes("w-full items-center justify-between"):
                 with ui.column().classes("gap-0"):
-                    ui.label("RUN ON OT-2" if live else "SIMULATE").classes("text-lg font-semibold")
-                    ui.label("Check the Experiment Procedure above and the deck, then start the real run. The robot is "
-                             "contacted only now." if live else
-                             "Builds and simulates the Experiment Procedure on this laptop; no robot is contacted.").classes(
-                        "text-sm text-slate-500")
-                run_button = ui.button(adapter.run_label, icon="precision_manufacturing" if live else "play_arrow",
+                    ui.label("RUN ON OT-2").classes("text-lg font-semibold")
+                    ui.label("Check the Experiment Procedure above and the deck, then start the run. The OT-2 is "
+                             "contacted only now.").classes("text-sm text-slate-500")
+                run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
                                        color="warning").classes("run-action text-lg")
                 run_button.set_enabled(False)
-            ui.label("ROBOT RUNNER OUTPUT" if live else "BUILD AND SIMULATION OUTPUT").classes(
-                "text-sm font-semibold text-slate-500 mt-2")
+            ui.label("ROBOT RUNNER OUTPUT").classes("text-sm font-semibold text-slate-500 mt-2")
             output_log = ui.log(max_lines=OUTPUT_LINES).classes("w-full h-72 text-xs")
 
         with ui.card().classes("section-tool w-full p-5"):
@@ -190,7 +214,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                     _reference_card(title, image_path)
 
     with ui.dialog() as confirm_run, ui.card().classes("p-6 max-w-lg"):
-        ui.label("Start the real OT-2 run?").classes("text-xl font-semibold")
+        ui.label(target.confirm_title).classes("text-xl font-semibold")
         ui.label("The software now connects to the OT-2, builds and simulates the protocol for the Experiment Procedure, "
                  "uploads it and starts it. The robot moves as soon as the run starts. Check the deck, tips, liquids "
                  "and paper against the Experiment Procedure first.").classes("text-slate-600")
@@ -254,10 +278,8 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     def press_run() -> None:
         if not adapter.snapshot().run_ready:
             ui.notify("Not yet: " + busy_note, type="warning")
-        elif live:
-            confirm_run.open()
         else:
-            start_run()
+            confirm_run.open()
 
     def start_run() -> None:
         confirm_run.close()
@@ -298,7 +320,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             with chat_box:
                 bubble = ui.chat_message(message.text, name="You" if message.role == "user" else "Agent NanoDrop",
                                          sent=message.role == "user")
-            if "\n" in message.text:
+            if message.role == "status":            # quiet progress line, e.g. while the agent loads
+                bubble.classes("status-message").props("bg-color=grey-2 text-color=grey-7")
+            elif "\n" in message.text:
                 bubble.classes("mono")
         if messages:
             last["messages"] += len(messages)
@@ -317,7 +341,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             status_badge.text = snapshot.status
             status_badge.props(f"color={_status_color(snapshot)}")
             top_proposal_actions.set_visibility(snapshot.proposed is not None)
-            stop_button.set_visibility(snapshot.live and snapshot.running)
+            stop_button.set_visibility(snapshot.running)
             idle = snapshot.waiting == "idle" and not snapshot.running
             for button in (top_run_button, run_button):
                 button.props(f"color={'positive' if snapshot.run_ready else 'warning'}")
@@ -343,7 +367,7 @@ def _status_color(snapshot: GuiSnapshot) -> str:
         return "negative"
     if snapshot.waiting in {"operator", "question", "proposal", "clarify"}:
         return "warning"
-    return "positive" if snapshot.status in {"RUN COMPLETE", "SIMULATION COMPLETE"} else "primary"
+    return "positive" if snapshot.status == "RUN COMPLETE" else "primary"
 
 
 def _plan(sections: list[render.PlanSection]) -> None:

@@ -71,11 +71,30 @@ def wants_to_run(text: str) -> bool:
     return all(word in _RUN_WORDS or word in _RUN_FILLER for word in words)
 
 
+# An explicit approval may carry an object naming the waiting proposal and courtesy words around it ("apply that",
+# "okay, apply it", "yes, please apply the proposal") - the same allowance the approval specification already makes
+# for "Yes, I approve proposal #1. Thanks.". A closed vocabulary: any other word ("apply that to column 3", "don't apply
+# that", "apply it later", "just apply it" - an attempt to skip the review in the red-team specification), a number or
+# a question mark makes it something else, read by the router. Courtesy words alone ("okay", "sounds good") never are.
+_APPROVAL_VERBS = {"apply", "approve", "confirm", "accept"}
+_APPROVAL_OBJECTS = {"it", "that", "this", "the", "proposal", "change", "changes"}
+_APPROVAL_COURTESY = {"ok", "okay", "yes", "yeah", "yep", "sure", "please", "thanks", "thank", "you", "great", "perfect",
+                      "cool", "nice", "cheers"}
+
+
+def explicit_approval(text: str) -> bool:
+    if "?" in text or re.search(r"\d", text):
+        return False
+    words = re.findall(r"[a-z']+", text.lower())
+    return 0 < len(words) <= 8 and any(word in _APPROVAL_VERBS for word in words) \
+        and all(word in _APPROVAL_VERBS or word in _APPROVAL_OBJECTS or word in _APPROVAL_COURTESY for word in words)
+
+
 def parse_confirmation(text: str) -> str | None:
     """'yes', 'no', or None. Only explicit words count: 'sure?', 'I think so' are None."""
     normalized = re.sub(r"[,.!]", " ", text.lower())
     normalized = " ".join(normalized.split())
-    if normalized in _YES:
+    if normalized in _YES or explicit_approval(text):
         return "yes"
     if normalized in _NO:
         return "no"
@@ -215,6 +234,20 @@ def _previous_word(text: str, index: int) -> str:
 def _numbered(*options: tuple[str, str]) -> tuple[Option, ...]:
     return tuple(Option(str(number), label, replacement)
                  for number, (label, replacement) in enumerate(options, start=1))
+
+
+def reagent_alias_question(text: str, config: dict[str, Any]) -> str | None:
+    """'10x CV' while the plan's dye has another name: the question that confirms CV is the plan's dye, asked after the
+    router has read the request (None when the names match, or the words define a name: "call the dye crystal violet").
+    The plan's liquids are never silently taken to be a reagent the scientist names differently."""
+    match = _REAGENT_ALIAS.search(text)
+    if not match or _NAMING.search(text):
+        return None
+    labels = " ".join(material_label(config, role).lower() for role in ("sample", "solvent")) if config else ""
+    if "violet" in labels or re.search(r"\bcv\b", labels):
+        return None
+    sample = material_label(config, "sample") if config else "dye"
+    return f'You said "{match.group(0)}". Is that the {sample} (the sample in this experiment)?'
 
 
 def find_ambiguities(text: str, config: dict[str, Any]) -> list[Ambiguity]:

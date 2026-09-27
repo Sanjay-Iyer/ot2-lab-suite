@@ -8,15 +8,17 @@ scientist cannot drift from what the robot will do.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from src.agents.dye_demo.model import (
     EPSILON_UL,
     ROWS,
     TIP_ORDER,
+    FieldError,
     circle_area_mm2,
     is_off_deck,
+    normalize_source_map,
     slot_of,
     well_geometry,
 )
@@ -64,6 +66,18 @@ class TipAssignment:
     operation_count: int
 
 
+@dataclass(frozen=True)
+class PrintSource:
+    """A plate well the print step draws from, and the paper positions it prints, in print order."""
+
+    well: str
+    positions: tuple[str, ...]
+    factor: float            # the dilution factor when it is known; 0.0 when it is not (a sample the scientist has)
+    made_here: bool          # this run makes the dilution in this well
+    start_ul: float          # liquid in the well when printing starts (assumed when the scientist did not say)
+    draw_ul: float           # liquid the print step takes from it
+
+
 @dataclass
 class Plan:
     do_dilution: bool
@@ -86,6 +100,14 @@ class Plan:
     total_drops: int
     printed_fluid_ul: float
     vial_use_ul: dict[str, float]
+    mapped: bool = False                                   # printing follows print.source_map
+    print_sources: list[PrintSource] = field(default_factory=list)
+    # the paper row each series row prints on when there is no print map (print.paper_rows, or the same letters)
+    paper_rows: list[str] = field(default_factory=list)
+
+    @property
+    def print_positions(self) -> list[str]:
+        return [op.destination for op in self.operations if op.kind == "print"]
 
     @property
     def tips_needed(self) -> int:
@@ -121,6 +143,46 @@ def dilution_rows(config: dict[str, Any]) -> list[str]:
         return []
     first = ROWS.index(start)
     return list(ROWS[first:first + len(factors_of(config))])
+
+
+def explicit_paper_rows(config: dict[str, Any]) -> list[str] | None:
+    """print.paper_rows as given (upper-cased, in the given order), or None when the plan uses the default: each
+    dilution prints on the paper row with its own plate-row letter. validate() refuses a list that does not fit."""
+    raw = (config.get("print") or {}).get("paper_rows")
+    if raw in (None, "", []):
+        return None
+    items = raw if isinstance(raw, (list, tuple)) else [raw]
+    return [str(item).strip().upper() for item in items]
+
+
+def paper_rows_of(config: dict[str, Any], rows: list[str]) -> list[str]:
+    """The PAPER row each series row prints on, in series order.
+
+    Where the dilutions are made (dilution.rows, plate rows) and where they print (print.paper_rows, paper rows) are
+    independent settings: with print.paper_rows the i-th dilution of the series prints on its i-th paper row; without
+    it, each dilution prints on the paper row with the same letter as its plate row (the original demo layout).
+    Mirrors the protocol's _paper_rows."""
+    explicit = explicit_paper_rows(config)
+    return list(rows) if explicit is None else explicit
+
+
+def print_map(config: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """The explicit print map (print.source_map), or None when printing follows the dilution rows.
+
+    A malformed map gives [] (nothing printed from it): validate() names the problem.
+    """
+    raw = (config.get("print") or {}).get("source_map")
+    if raw in (None, "", []):
+        return None
+    try:
+        return normalize_source_map(raw)
+    except FieldError:
+        return []
+
+
+def row_factors(rows: list[str], factors: list[float]) -> list[tuple[str, float]]:
+    """Each series row with its dilution factor; 0.0 for a row the factor list does not cover (print only)."""
+    return [(row, factors[index] if index < len(factors) else 0.0) for index, row in enumerate(rows)]
 
 
 def droplet_volumes(config: dict[str, Any]) -> list[float]:
@@ -218,16 +280,36 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
                         from_top_mm=float(dilution.get(height_key, -2.0)),
                     ))
     if do_print:
-        for row, factor in zip(rows, factors):
-            source = f"{row}{column}"
-            for spot in spots:
-                position = f"{row}{spot['column']}"
-                group = f"print:{row}" if policy == "per_liquid" else f"print:{position}"
-                operations.append(Operation(
-                    kind="print", group=group, source=source, destination=position,
-                    volume_ul=float(spot["volume_ul"]), factor=factor,
-                    droplets=int(spot["droplets"]), column=int(spot["column"]),
-                ))
+        entries = print_map(config)
+        if entries is not None:
+            # An explicit map: each source well prints exactly its positions, in order. A source may feed any
+            # number of positions; its factor is known only when this run makes that well.
+            volumes = droplet_volumes(config)
+            default_volume = volumes[0] if volumes else 0.0
+            droplets = int((config.get("print") or {}).get("droplets_per_spot", 1))
+            made = {f"{row}{column}": factor for row, factor in zip(rows, factors)} if do_dilution else {}
+            for entry in entries:
+                source = entry["source"]
+                volume = float(entry.get("volume_ul", default_volume))
+                for position in entry["positions"]:
+                    group = f"print:{source}" if policy == "per_liquid" else f"print:{position}"
+                    operations.append(Operation(
+                        kind="print", group=group, source=source, destination=position, volume_ul=volume,
+                        factor=float(made.get(source, 0.0)), droplets=droplets, column=int(position[1:]),
+                    ))
+        else:
+            # Each series row prints on its paper row (print.paper_rows, or the row with the same letter), one paper
+            # column per spot.
+            for (row, factor), paper_row in zip(row_factors(rows, factors), paper_rows_of(config, rows)):
+                source = f"{row}{column}"
+                for spot in spots:
+                    position = f"{paper_row}{spot['column']}"
+                    group = f"print:{row}" if policy == "per_liquid" else f"print:{position}"
+                    operations.append(Operation(
+                        kind="print", group=group, source=source, destination=position,
+                        volume_ul=float(spot["volume_ul"]), factor=factor,
+                        droplets=int(spot["droplets"]), column=int(spot["column"]),
+                    ))
     return operations
 
 
@@ -247,11 +329,23 @@ def build_plan(config: dict[str, Any]) -> Plan:
     rows = dilution_rows(config)
     column = str(dilution.get("plate_column", ""))
     total = float(dilution.get("total_volume_ul", 0.0) or 0.0)
-    wells = [
-        DilutionWell(row, f"{row}{column}", factor, total / factor, total - total / factor)
-        for row, factor in zip(rows, factors) if factor > 0
-    ]
-    spots = paper_layout(config)
+    mapped = print_map(config) is not None
+    if do_dilution:
+        # Making dilutions: one factor per series row (validate() requires the counts to agree).
+        wells = [
+            DilutionWell(row, f"{row}{column}", factor, total / factor, total - total / factor)
+            for row, factor in zip(rows, factors) if factor > 0
+        ]
+    elif mapped and do_print:
+        wells = []           # printing from the wells the map names; no dilution series is involved
+    else:
+        # Printing the series rows that already hold liquid: a row the factor list does not cover prints too.
+        wells = [
+            DilutionWell(row, f"{row}{column}", factor, total / factor if factor > 0 else 0.0,
+                         total - total / factor if factor > 0 else 0.0)
+            for row, factor in row_factors(rows, factors)
+        ]
+    spots = [] if mapped else paper_layout(config)
     operations = build_operations(config, rows, factors, spots, do_dilution, do_print)
     groups = tip_groups(operations)
 
@@ -272,7 +366,30 @@ def build_plan(config: dict[str, Any]) -> Plan:
 
     prepared = dilution.get("prepared_volume_ul")
     source_volume = total if do_dilution or prepared in (None, "") else float(prepared)
-    draw = sum(spot["volume_ul"] * spot["droplets"] for spot in spots) if do_print else 0.0
+    made = {well.well for well in wells} if do_dilution else set()
+    order: list[str] = []
+    positions: dict[str, list[str]] = {}
+    draws: dict[str, float] = {}
+    factor_of: dict[str, float] = {}
+    for operation in operations:
+        if operation.kind != "print":
+            continue
+        if operation.source not in positions:
+            order.append(operation.source)
+            positions[operation.source], draws[operation.source] = [], 0.0
+            factor_of[operation.source] = operation.factor
+        positions[operation.source].append(operation.destination)
+        draws[operation.source] += operation.volume_ul * operation.droplets
+    print_sources = [
+        PrintSource(well, tuple(positions[well]), factor_of[well], well in made,
+                    total if well in made or prepared in (None, "") else float(prepared), round(draws[well], 6))
+        for well in order
+    ]
+    if mapped:
+        draw = max((source.draw_ul for source in print_sources), default=0.0) if do_print else 0.0
+    else:
+        draw = sum(spot["volume_ul"] * spot["droplets"] for spot in spots) if do_print else 0.0
+    prints = [operation for operation in operations if operation.kind == "print"]
     vial_use = {"solvent": 0.0, "sample": 0.0}
     for operation in operations:
         if operation.kind == "transfer":
@@ -285,9 +402,11 @@ def build_plan(config: dict[str, Any]) -> Plan:
         start_tip=start if start_index is not None else None,
         tips_available=available, next_tip=next_tip,
         source_volume_ul=source_volume, print_draw_per_well_ul=draw,
-        total_drops=len(rows) * sum(spot["droplets"] for spot in spots) if do_print else 0,
-        printed_fluid_ul=len(rows) * draw if do_print else 0.0,
+        total_drops=sum(operation.droplets for operation in prints),
+        printed_fluid_ul=round(sum(operation.volume_ul * operation.droplets for operation in prints), 6),
         vial_use_ul={role: round(volume, 2) for role, volume in vial_use.items()},
+        mapped=mapped, print_sources=print_sources,
+        paper_rows=[] if mapped else paper_rows_of(config, rows),
     )
 
 

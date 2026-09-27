@@ -87,8 +87,9 @@ PATHS: dict[int, dict[str, list[dict[str, Any]]]] = {
             said("Wait, those factors are wrong. I need 2x, 4x, 8x and 16x.", FACTORS_1), YES,
             said("Make each one 200.", change("dilution.total_volume_ul", 200, "200")),      # no unit: asked
             said("yes", change("dilution.total_volume_ul", "200 uL", "200 µL")), YES,
-            said("Use vial 5 for the dye."),                            # vial 5: the rack in slot 5, or vial B1?
-            said("2", VIAL_1), YES,
+            # vial 5: no vial has that name. The model guesses B1; grounding never uses the guess and asks which vial.
+            said("Use vial 5 for the dye.", change("materials.sample.vial", "B1", "vial 5")),
+            said("B1", VIAL_1), YES,
             run(),
         ],
         "change_of_mind": [
@@ -165,9 +166,9 @@ PATHS: dict[int, dict[str, list[dict[str, Any]]]] = {
                  change("dilution.start_row", "D", "row D")), YES,
             said("Print in column 3 and 4.", change("print.paper_start_column", 3, "column 3"),
                  change("print.replicates", 2, "column 3 and 4")), YES,
-            said("Move the plate to slot 3."),                          # which plate?
-            said("1", change("deck.plate.slot", 3, "dilution plate to slot 3")),
-            NO,                                                          # the proposed deck shows the mistake
+            # "the plate" is the dilution plate (the paper is "the paper"); the proposed deck shows the mistake
+            said("Move the plate to slot 3.", change("deck.plate.slot", 3, "plate to slot 3")),
+            NO,
             run(),
         ],
         "change_of_mind": [
@@ -277,8 +278,7 @@ PATHS: dict[int, dict[str, list[dict[str, Any]]]] = {
             command("deck"), command("tips"), run(),
         ],
         "confused": [
-            said("Move the plate to slot 8."),                                         # which plate?
-            said("1", change("deck.plate.slot", 8, "dilution plate to slot 8")),        # slot 8 holds the tip rack
+            said("Move the plate to slot 8.", change("deck.plate.slot", 8, "plate to slot 8")),   # slot 8: the tip rack
             said("Take the tip rack off the deck.", change("deck.tiprack.slot", "OFF_DECK", "tip rack off the deck")),
             said("Move the tip rack to slot 4 and the dilution plate to slot 8.",
                  change("deck.tiprack.slot", 4, "tip rack to slot 4"), change("deck.plate.slot", 8, "plate to slot 8")),
