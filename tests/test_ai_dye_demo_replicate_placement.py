@@ -85,6 +85,28 @@ def test_the_side_by_side_layout_is_kept_when_it_fits():
     assert sorted({position[1:] for position in build_plan(proposal.after).print_positions}) == ["1", "2"]
 
 
+
+def test_start_at_column_12_preserves_three_total_replicates():
+    current = load_config(DEFAULT_CONFIG)
+    current["dilution"]["factors"] = [1, 2, 3]
+    first = propose(current, [change("print.replicates", 3, "3 replicates")], "3 replicates").after
+    moved = propose(first, [change("print.paper_start_column", 12, "start at paper column 12")],
+                    "start at paper column 12").after
+    assert moved["print"]["replicates"] == 3
+    assert printed_by(moved) == [(f"{row}11", [f"{row}12", f"{row}11", f"{row}10"]) for row in "ABC"]
+    assert validate(moved).ok
+
+
+def test_start_at_column_12_moves_an_existing_map_without_losing_the_count():
+    current = single_at_a12()
+    first = propose(current, [change("print.replicates", 3, "3 replicates")], "3 replicates").after
+    moved = propose(first, [change("print.paper_start_column", 10, "start at paper column 10")],
+                    "start at paper column 10").after
+    assert moved["print"]["replicates"] == 3
+    assert printed_by(moved) == [("A11", ["A10", "A11", "A9"])]
+
+
+
 def test_a_count_on_a_print_map_is_no_longer_ignored():
     config = load_config(DEFAULT_CONFIG)
     config["dilution"]["enabled"] = False
@@ -95,6 +117,24 @@ def test_a_count_on_a_print_map_is_no_longer_ignored():
     fewer["print"]["replicates"] = 2
     back = propose(fewer, [change("print.replicates", 1, "just one print")], "just one print")
     assert printed_by(back.after) == [("A11", ["A12"])]                      # a lower count keeps the first prints
+
+
+
+def test_zero_no_and_removing_one_replicate_keep_one_print_per_condition():
+    current = single_at_a12()
+    three = propose(current, [change("print.replicates", 3, "3 replicates")], "3 replicates").after
+    zero = propose(three, [change("print.replicates", 0, "0 replicates")], "0 replicates").after
+    assert zero["print"]["replicates"] == 1
+    assert printed_by(zero) == [("A11", ["A12"])]
+    none = propose(three, [change("print.replicates", evidence="no replicates", op="none")],
+                   "no replicates").after
+    assert none["print"]["replicates"] == 1
+    assert printed_by(none) == [("A11", ["A12"])]
+    two = propose(three, [change("print.replicates", evidence="remove one replicate", op="add", amount=-1)],
+                  "remove one replicate").after
+    assert two["print"]["replicates"] == 2
+    assert printed_by(two) == [("A11", ["A12", "A11"])]
+
 
 
 def test_a_count_that_does_not_fit_a_print_map_asks_instead_of_guessing():
@@ -175,11 +215,14 @@ def test_a_35_ul_drop_on_the_p20_is_still_refused():
                 "I want to print a 35 µL droplet")
 
 
-def test_a_first_paper_column_the_scientist_names_is_their_constraint_not_a_default():
-    with pytest.raises(ProposalRejected, match="past the paper's 12 columns; start further left"):
-        propose(load_config(DEFAULT_CONFIG), [change("print.droplet_volume_ul", [5, 10, 15]),
-                                              change("print.paper_start_column", 11)],
-                "print 5, 10 and 15 µL drops starting at paper column 11")
+def test_a_first_paper_column_is_an_anchor_with_flexible_remaining_placement():
+    proposal = propose(load_config(DEFAULT_CONFIG), [change("print.droplet_volume_ul", [5, 10, 15]),
+                                                       change("print.paper_start_column", 11)],
+                       "print 5, 10 and 15 µL drops starting at paper column 11")
+    plan = build_plan(proposal.after)
+    assert plan.print_positions[0] == "A11"
+    assert {int(position[1:]) for position in plan.print_positions} == {10, 11, 12}
+    assert proposal.report.ok
 
 
 # ── a conversation: proposal, approval, and the invariants after every turn (the protocol matches the plan) ─────────
@@ -276,7 +319,8 @@ def test_the_paper_drawing_shows_the_allocated_positions_and_marks_the_new_ones(
     current = single_at_a12()
     proposed = propose(current, REPLICATES_2, "do 2 replicates").after
     svg = render_paper_svg(proposed, current)
-    assert "Position A12 (1 drop / position)" in svg                          # kept: plain green
-    assert re.search(r'stroke="#d97706"[^>]*><title>Position A11 \([^)]*new in this proposal\)', svg)
+    assert "Position A12 (1 drop / position, original)" in svg         # kept: plain green
+    assert re.search(r'fill="#3b82f6" stroke="#d97706"[^>]*><title>Position A11 \([^)]*repeat, new in this proposal\)', svg)
     assert "Position A13" not in svg and "1 new" in svg
+    assert "1 unique · 2 replicates · 2 spots" in svg
     assert "new in this proposal" not in render_paper_svg(proposed)          # the applied plan: nothing marked

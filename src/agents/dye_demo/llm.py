@@ -110,6 +110,7 @@ def startup_check(client: LLMClient, emit: Callable[[str], None], *, attempts: i
 ROUTE_GENERAL = "general_question"
 ROUTE_EXPERIMENT = "experiment_question"
 ROUTE_CHANGE = "experiment_change"
+ROUTE_REQUEST_RUN = "request_run"
 ROUTE_CLARIFY = "clarify"
 # The scientist's decision about the proposal waiting for approval, read in any wording ("apply that", "looks good, go
 # ahead", "never mind, scrap it"). Python acts on it only while that proposal is waiting (see DemoSession._decide).
@@ -117,7 +118,7 @@ ROUTE_APPROVE = "approve_proposal"
 ROUTE_DISCARD = "discard_proposal"
 ANSWER_ROUTES = frozenset({ROUTE_GENERAL, ROUTE_EXPERIMENT})
 DECISION_ROUTES = frozenset({ROUTE_APPROVE, ROUTE_DISCARD})
-ROUTES = frozenset({ROUTE_GENERAL, ROUTE_EXPERIMENT, ROUTE_CHANGE, ROUTE_CLARIFY, ROUTE_APPROVE, ROUTE_DISCARD})
+ROUTES = frozenset({ROUTE_GENERAL, ROUTE_EXPERIMENT, ROUTE_CHANGE, ROUTE_REQUEST_RUN, ROUTE_CLARIFY, ROUTE_APPROVE, ROUTE_DISCARD})
 
 ROUTER_PROMPT = """You are Agent NanoDrop, the AI assistant in a laboratory chat. You can talk about anything, and you
 also build the experiment plan for an OT-2 robot that makes dye dilutions and prints them onto paper.
@@ -140,7 +141,11 @@ EVERY MESSAGE IS ONE OF THESE. Decide from the whole conversation, not only the 
    "how many drops are we using?", "what does dilution factor mean?", "why column 11?"), or an informal answer to the opening onboarding prompt ("printing", "dilutions", "both", "we already made the samples"). Answer from CURRENT PLAN, STATE and the conversation. For an onboarding response, acknowledge their focus conversationally (e.g. "Got it. What would you like to print?") and invite their plan parameters. Stating focus or asking a question is not a request to change a value.
 3. experiment_change: the scientist wants the plan to be different. Turn the request into structured changes. If the
    message also asks a question, answer it in "answer".
-4. clarify: only as the clarification policy below allows.
+4. request_run: the scientist asks to execute the CURRENT plan now ("run this", "start the experiment",
+   "go ahead and run it"). No changes. This only requests the existing Run confirmation; it never starts
+   execution. If a proposal is waiting, it must be applied or discarded first. A question about running
+   is experiment_question.
+5. clarify: only as the clarification policy below allows.
 5. approve_proposal: only while a PROPOSAL WAITING FOR APPROVAL is shown, when the message accepts that proposal as a
    whole, exactly as shown, in any wording ("apply that", "okay, apply it", "looks good, go ahead", "yes do that").
    No changes. A message that also asks for any change is experiment_change (a revision), and a question about the
@@ -236,7 +241,9 @@ wrote it - Python refuses it and says what exists. Volumes are µL; convert mL t
 a drop, dilution or mixing volume means µL. Relative requests use an operation and Python does the arithmetic:
 "twice as dilute" -> dilution.factors op scale_each factor 2; "half the final volume" -> dilution.total_volume_ul op
 scale factor 0.5; "one more drop" -> print.droplets_per_spot op add amount 1; "add 2 more replicates" ->
-print.replicates op add amount 2 ("do 2 replicates" is op set value 2: two prints in total); "use four dilutions" with no factors
+print.replicates op add amount 2 ("do 2 replicates" is op set value 2: two prints in total);
+"no replicates", "remove the replicates", "don't repeat them" -> print.replicates op none (one print per
+condition); "0 replicates" -> op set value 0 (Python normalizes to one print); "use four dilutions" with no factors
 -> dilution.factors op set_count count 4; "from 2 drops to 3" -> op set value 3 with expected_before 2.
 
 SELECTIONS: use these instead of working out layouts or factors yourself.
@@ -300,10 +307,10 @@ WHAT YOU NEVER DO
 
 OUTPUT: only one JSON object, without a markdown fence:
 {"route": "general_question" | "experiment_question" | "experiment_change" | "clarify" | "approve_proposal" |
-          "discard_proposal",
+          "discard_proposal" | "request_run",
  "answer": "<your reply to a question: plain conversational text, usually under 150 words; for an experiment_change,
             only the answer to a question the message also asked, otherwise empty>",
- "changes": [{"path": "<field or selection>", "op": "set" | "scale" | "add" | "scale_each" | "set_count" | "drop",
+ "changes": [{"path": "<field or selection>", "op": "set" | "scale" | "add" | "none" | "scale_each" | "set_count" | "drop",
               "value": <for set>, "factor": <for scale and scale_each>, "amount": <for add>, "count": <for set_count>,
               "expected_before": <only when the scientist states the current value>,
               "evidence": "<the scientist's own words that ask for this>"}],

@@ -221,13 +221,20 @@ def column_conflict(text: str, after: dict[str, Any]) -> ColumnConflict | None:
         problem = "this plan does not print in this run"
     elif target is not None and printed != list(target):
         problem = f"this change would print {columns_phrase(printed)}"
-    elif target is None and wanted_start is not None and printed and printed[0] != wanted_start:
-        problem = f"this change would print {columns_phrase(printed)}"
+    elif target is None and wanted_start is not None and printed:
+        # A start column anchors the first copy. The allocator may place later
+        # copies to its left at the paper edge, so sorted columns are misleading.
+        from src.agents.dye_demo.plan import build_plan
+        first = build_plan(after).print_positions[0] if build_plan(after).print_positions else ""
+        problem = (f"this change would print {columns_phrase(printed)}"
+                   if not first or int(first[1:]) != wanted_start else "")
     elif request.avoided & set(printed):
         question = GAP_QUESTION if len(droplet_volumes(after)) > 1 else "Which paper columns should this run print?"
         return ColumnConflict("paper_columns", f"{asked}, but this change would print {columns_phrase(printed)}.",
                               question, printed=printed)
     else:
+        return None
+    if not problem:
         return None
     message = f"{asked}, but {problem}."
     fix = _layout_fix(after, target, wanted_start, text, request)

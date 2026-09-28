@@ -279,6 +279,25 @@ def map_with_count(before: dict, after: dict, occupied: Iterable[str] = (), *,
     return result, _new_positions(result, (position for entry in entries for position in entry["positions"]))
 
 
+
+def map_at_anchor(after: dict, occupied: Iterable[str] = (), *,
+                  width: int = PAPER_COLUMNS) -> tuple[list[dict], list[str]]:
+    """Move a mapped plan to a requested first column while keeping its total replicate count.
+
+    The first copy is anchored at the requested column. Remaining copies use the
+    same allocator as count changes, including when the anchor is at the edge.
+    """
+    entries = print_map(after) or []
+    count = int((after.get("print") or {}).get("replicates", 1))
+    anchor = int((after.get("print") or {}).get("paper_start_column", 1))
+    needs = [Need(entry["source"], count, home_row=entry["positions"][0][0],
+                  anchor_column=anchor) for entry in entries]
+    placed = allocate_side_by_side(needs, occupied, width=width) or allocate(needs, occupied, width=width,
+                                                                               reserved_rows={need.row for need in needs})
+    result = [{**entry, "positions": positions} for entry, positions in zip(entries, placed)]
+    return result, _new_positions(result, (position for entry in entries for position in entry["positions"]))
+
+
 def describe_new(positions: list[str]) -> str:
     """'A11', 'A11-H11' or 'A10, A11, B12' for a note."""
     return positions_text(positions, limit=10) if positions else "none"

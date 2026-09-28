@@ -8,9 +8,15 @@ machine profile.
 
 What it does, in order:
   1. dilute one SAMPLE (dye stock) in one SOLVENT (water) across a fold series,
-     one dilution per plate row, all in a single plate column;
-  2. print every one of those dilutions onto paper, one paper row per dilution,
-     one paper column per print volume x replicate.
+     one dilution per plate row (dilution.rows, or consecutive rows from
+     dilution.start_row), all in a single plate column;
+  2. print: with print.source_map, each named plate well prints exactly the paper
+     positions listed for it (one well may feed any number of positions, and the
+     wells need not come from this run's series); without it, every dilution
+     prints onto its paper row, one paper column per print volume x replicate.
+     Its paper row is print.paper_rows[i] for the i-th dilution of the series when
+     that list is given (where the dilutions are made and where they print are
+     independent), else the paper row with the dilution's own plate-row letter.
 
 Everything a demo audience changes by talking — deck slots (or OFF_DECK), how
 many dilutions, which plate column, which paper column, drop volume, replicates,
@@ -33,10 +39,15 @@ LIQUID HANDLING (docs/ai_dye_demo/liquid_handling_parameters.md):
                      explains blow-out inside a loop at API 2.15.
 
 TIPS are taken in rack order from tips.start_tip, one pick-up per tip group:
-  per_liquid (default)     all water transfers share a tip, all dye transfers
+  single_tip               ONE tip for the entire run: picked up once, kept on
+                           for every water, dye, mixing and print step, and
+                           released once at the end (liquids can carry over).
+  per_liquid               all water transfers share a tip, all dye transfers
                            share a tip, and each dilution gets its own print tip.
   new_tip_every_transfer   a fresh tip for every transfer and paper position.
-A step that does not run takes no tips.
+A step that does not run takes no tips. Each tip is released (returned to its
+rack position when tips.return_tips is true, else dropped in the trash) when the
+next group starts and after the last operation.
 
 Labware whose slot is OFF_DECK is not loaded; the pre-flight refuses a run that
 needs it. Release geometry and air handling are laboratory-owned and come from
@@ -85,41 +96,42 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
   'pipette': {'name': 'p20_single_gen2', 'mount': 'left'},
   'materials': { 'water': {'role': 'solvent', 'vial': 'A1', 'aspirate_height_mm': 4.0},
                  'dye': {'role': 'sample', 'vial': 'A2', 'aspirate_height_mm': 4.0}},
-  'dilution': { 'enabled': False,
-                'plate_column': '9',
+  'dilution': { 'enabled': True,
+                'plate_column': '11',
                 'start_row': 'A',
-                'factors': [1, 2, 3],
+                'factors': [1, 2, 3, 4, 6, 8, 12, 16],
                 'total_volume_ul': 150.0,
-                'max_transfer_ul': 20.0,
-                'solvent_dispense_from_top_mm': -2.0,
-                'sample_dispense_from_top_mm': -1.0,
-                'blow_out_after_dispense': True},
-  'mixing': {'reps': 2, 'volume_ul': 15.0, 'height_mm': 2.0},
+                'max_transfer_ul': 20.0},
+  'liquid_handling': { 'plate_aspirate_height_mm': 0.3,
+                       'plate_dispense_height_mm': 0.3,
+                       'air_gap_ul': 1.0,
+                       'blow_out': True,
+                       'touch_tip': True},
+  'mixing': {'reps': 2, 'volume_ul': 15.0},
   'print': { 'enabled': True,
              'droplet_volume_ul': 5.0,
              'droplets_per_spot': 1,
-             'replicates': 3,
-             'paper_start_column': 5,
+             'replicates': 1,
+             'paper_start_column': 1,
              'paper_columns': 12,
              'z_mm': 1.1,
-             'aspirate_height_mm': 1.0,
              'air_gap_ul': 1.5,
              'air_gap_height_mm': 5.0,
              'push_out_ul': 3.0,
              'blow_out': True,
              'post_dispense_delay_s': 2.0},
-  'tips': {'start_tip': 'A1', 'return_tips': False, 'policy': 'per_liquid'},
+  'tips': {'start_tip': 'A1', 'return_tips': True, 'policy': 'single_tip'},
   'flow_rates': {'aspirate': 3.0, 'dispense': 3.0},
   'safety': { 'expected_tuberack_load_name': 'tuberack_3dprint_20ml_8vials_v2',
               'expected_well_count': 8,
               'p20_max_volume_ul': 20.0,
               'p20_min_volume_ul': 1.0,
               'max_well_fill_ul': 340.0},
-  'session': { 'operator': 'si',
-               'operator_id': 'si',
-               'session_label': '2026-09-15 NiceGUI',
-               'session_id': '20260915_210624',
-               'revision': 6},
+  'session': { 'operator': 'Tester',
+               'operator_id': 'tester',
+               'session_label': '2026-09-28 NiceGUI',
+               'session_id': '20260928_161045',
+               'revision': 0},
   'protocol_version': 19}
 # <<< CONFIG END <<<
 
@@ -128,7 +140,7 @@ ROWS = tuple("ABCDEFGH")
 EPSILON_UL = 0.01
 OFF_DECK = "OFF_DECK"
 LABWARE_ROLES = ("tuberack", "plate", "paper", "tiprack")
-TIP_POLICIES = ("per_liquid", "new_tip_every_transfer")
+TIP_POLICIES = ("single_tip", "per_liquid", "new_tip_every_transfer")
 TIP_ORDER = tuple(f"{row}{column}" for column in range(1, 13) for row in ROWS)
 
 
@@ -161,6 +173,64 @@ def _steps():
     do_dilution = bool(DEFAULT_DO_DILUTION and CONFIG["dilution"].get("enabled", True))
     do_print = bool(DEFAULT_DO_PRINT and CONFIG["print"].get("enabled", True))
     return do_dilution, do_print
+
+
+def _series_rows(factors):
+    """Plate rows of the dilution series: dilution.rows when given, else consecutive rows from start_row.
+
+    Mirrors src/agents/dye_demo/plan.py::dilution_rows.
+    """
+    dilution = CONFIG["dilution"]
+    explicit = dilution.get("rows")
+    if isinstance(explicit, (list, tuple)) and explicit:
+        valid = [str(row).strip().upper() for row in explicit if str(row).strip().upper() in ROWS]
+        if valid:
+            return sorted(set(valid), key=ROWS.index)
+    start_row = str(dilution.get("start_row", "A")).upper()
+    if start_row not in ROWS:
+        return []
+    first = ROWS.index(start_row)
+    return list(ROWS[first:first + len(factors)])
+
+
+def _explicit_paper_rows():
+    """print.paper_rows as given, upper-cased, or None (the default: same letters as the plate rows).
+
+    Mirrors src/agents/dye_demo/plan.py::explicit_paper_rows; the pre-flight checks every row.
+    """
+    raw = CONFIG["print"].get("paper_rows")
+    if raw in (None, "", []):
+        return None
+    items = raw if isinstance(raw, (list, tuple)) else [raw]
+    return [str(item).strip().upper() for item in items]
+
+
+def _paper_rows(rows):
+    """The paper row each series row prints on, in series order: print.paper_rows[i] for the i-th dilution when
+    given, else the paper row with the dilution's own plate-row letter.
+
+    Mirrors src/agents/dye_demo/plan.py::paper_rows_of.
+    """
+    explicit = _explicit_paper_rows()
+    return list(rows) if explicit is None else explicit
+
+
+def _source_map():
+    """print.source_map as [{"source": "A11", "positions": [...], "volume_ul"?: x}], or None when printing follows
+    the series rows. Entries are the canonical form the agent writes; the pre-flight checks every name."""
+    raw = CONFIG["print"].get("source_map")
+    if raw in (None, "", []):
+        return None
+    entries = []
+    for item in raw:
+        entry = {
+            "source": str(item["source"]).strip().upper(),
+            "positions": [str(position).strip().upper() for position in item["positions"]],
+        }
+        if item.get("volume_ul") not in (None, ""):
+            entry["volume_ul"] = float(item["volume_ul"])
+        entries.append(entry)
+    return entries
 
 
 def _required_roles(do_dilution, do_print):
@@ -247,7 +317,15 @@ def _plan_paper_layout(paper_columns_available):
     return placed, skipped
 
 
-def _build_operations(rows, factors, placed, do_dilution, do_print):
+def _tip_group(policy, liquid_group, own_group):
+    """One tip for the whole run (single_tip), one per liquid or printed sample (per_liquid), or one per operation.
+    Mirrors src/agents/dye_demo/plan.py::tip_group."""
+    if policy == "single_tip":
+        return "run"
+    return liquid_group if policy == "per_liquid" else own_group
+
+
+def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=None):
     """Every tip-bearing operation in execution order, each with its tip group.
 
     Mirrors src/agents/dye_demo/plan.py::build_operations, which the operator's
@@ -273,18 +351,38 @@ def _build_operations(rows, factors, placed, do_dilution, do_print):
                 for index, chunk in enumerate(chunks, start=1):
                     operations.append({
                         "kind": "transfer",
-                        "group": role if policy == "per_liquid" else f"{role}:{well}:{index}",
+                        "group": _tip_group(policy, role, f"{role}:{well}:{index}"),
                         "role": role, "well": well, "factor": factor, "total_ul": volume,
                         "volume_ul": chunk, "chunk": index, "chunks": len(chunks),
                         "from_top_mm": float(dilution[height_key]),
                     })
-    if do_print:
-        for row, factor in zip(rows, factors):
-            for spot in placed:
-                paper_well = f"{row}{spot['column']}"
+    if do_print and source_map is not None:
+        # Explicit map: each source well prints exactly its positions, in order.
+        volumes = _droplet_volumes()
+        default_volume = volumes[0] if volumes else 0.0
+        droplets = int(CONFIG["print"].get("droplets_per_spot", 1))
+        made = {f"{row}{column}": factor for row, factor in zip(rows, factors)} if do_dilution else {}
+        for entry in source_map:
+            source = entry["source"]
+            volume = float(entry.get("volume_ul", default_volume))
+            for paper_well in entry["positions"]:
                 operations.append({
                     "kind": "print",
-                    "group": f"print:{row}" if policy == "per_liquid" else f"print:{paper_well}",
+                    "group": _tip_group(policy, f"print:{source}", f"print:{paper_well}"),
+                    "row": source[0], "source": source, "paper_well": paper_well,
+                    "factor": float(made.get(source, 0.0)), "column": int(paper_well[1:]),
+                    "volume_ul": volume, "droplets": droplets,
+                })
+    elif do_print:
+        # Each series row prints on its paper row (print.paper_rows, or the row with the same letter); a row the
+        # factor list does not cover (printing rows that already hold liquid) prints too.
+        for index, (row, paper_row) in enumerate(zip(rows, _paper_rows(rows))):
+            factor = factors[index] if index < len(factors) else 0.0
+            for spot in placed:
+                paper_well = f"{paper_row}{spot['column']}"
+                operations.append({
+                    "kind": "print",
+                    "group": _tip_group(policy, f"print:{row}", f"print:{paper_well}"),
                     "row": row, "source": f"{row}{column}", "paper_well": paper_well,
                     "factor": factor, "column": spot["column"],
                     "volume_ul": spot["volume_ul"], "droplets": spot["droplets"],
@@ -345,18 +443,34 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
                 errors.append(f"{name} vial {spec['vial']} is absent from the rack")
 
     factors = _factors()
-    if not 1 <= len(factors) <= len(ROWS):
-        errors.append(f"1 to {len(ROWS)} dilutions are possible, got {len(factors)}")
-    if any(factor < 1 for factor in factors):
-        errors.append("dilution factors must be 1x or greater")
-    start_row = str(dilution.get("start_row", "A")).upper()
+    try:
+        source_map = _source_map() if do_print else None
+    except (KeyError, TypeError, ValueError) as exc:
+        errors.append(f"print.source_map is malformed: {exc!r}")
+        source_map = None
+    series_used = do_dilution or (do_print and source_map is None)
     rows = []
-    if start_row not in ROWS:
-        errors.append(f"dilution.start_row must be one of {''.join(ROWS)}, got {start_row!r}")
-    elif ROWS.index(start_row) + len(factors) > len(ROWS):
-        errors.append(f"{len(factors)} dilutions starting at row {start_row} run past row H")
-    else:
-        rows = list(ROWS[ROWS.index(start_row):ROWS.index(start_row) + len(factors)])
+    if series_used:
+        if not 1 <= len(factors) <= len(ROWS):
+            errors.append(f"1 to {len(ROWS)} dilutions are possible, got {len(factors)}")
+        if any(factor < 1 for factor in factors):
+            errors.append("dilution factors must be 1x or greater")
+        explicit = dilution.get("rows")
+        start_row = str(dilution.get("start_row", "A")).upper()
+        if isinstance(explicit, (list, tuple)) and explicit:
+            invalid = [row for row in explicit if str(row).strip().upper() not in ROWS]
+            if invalid:
+                errors.append(f"dilution.rows must be A-H, got {invalid!r}")
+            rows = _series_rows(factors)
+            if do_dilution and len(rows) != len(factors):
+                errors.append(f"making dilutions needs one factor per selected row: {len(rows)} row(s) for "
+                              f"{len(factors)} factor(s)")
+        elif start_row not in ROWS:
+            errors.append(f"dilution.start_row must be one of {''.join(ROWS)}, got {start_row!r}")
+        elif ROWS.index(start_row) + len(factors) > len(ROWS):
+            errors.append(f"{len(factors)} dilutions starting at row {start_row} run past row H")
+        else:
+            rows = _series_rows(factors)
 
     total = float(dilution["total_volume_ul"])
     if total > float(safety["max_well_fill_ul"]):
@@ -395,9 +509,40 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
             errors.append("print.droplets_per_spot must be >= 1")
         if int(pr.get("paper_start_column", 1)) < 1:
             errors.append("print.paper_start_column must be >= 1")
-        placed, skipped = _plan_paper_layout(len(labware["paper"].columns()))
+        explicit_paper_rows = _explicit_paper_rows()
+        if source_map is None:
+            placed, skipped = _plan_paper_layout(len(labware["paper"].columns()))
+            if explicit_paper_rows is not None:
+                invalid = [row for row in explicit_paper_rows if row not in ROWS]
+                if invalid:
+                    errors.append(f"print.paper_rows must be paper rows A-H, got {invalid!r}")
+                if len(set(explicit_paper_rows)) != len(explicit_paper_rows):
+                    errors.append(f"print.paper_rows names a paper row twice: {explicit_paper_rows!r}")
+                if len(explicit_paper_rows) != len(rows):
+                    errors.append(f"print.paper_rows gives {len(explicit_paper_rows)} paper row(s) for "
+                                  f"{len(rows)} dilution row(s): one paper row per dilution")
+        else:
+            if explicit_paper_rows is not None:
+                errors.append("print.paper_rows cannot be combined with print.source_map: the map names every "
+                              "paper position")
+            seen = {}
+            for entry in source_map:
+                if "volume_ul" in entry:
+                    volume = entry["volume_ul"]
+                    if volume < p20_min or volume + air_gap > p20_max:
+                        errors.append(f"droplet {volume:g} uL from {entry['source']} is outside the P20's range")
+                elif len(_droplet_volumes()) > 1:
+                    errors.append(f"print.source_map entry {entry['source']} needs its own volume_ul: "
+                                  "several drop volumes are configured")
+                if not entry["positions"]:
+                    errors.append(f"print.source_map entry {entry['source']} names no paper positions")
+                for position in entry["positions"]:
+                    if position in seen:
+                        errors.append(f"paper position {position} is printed from both {seen[position]} and "
+                                      f"{entry['source']}")
+                    seen[position] = entry["source"]
 
-    operations = _build_operations(rows, factors, placed, do_dilution, do_print)
+    operations = _build_operations(rows, factors, placed, do_dilution, do_print, source_map)
     groups = _tip_groups(operations)
     start_tip = str(CONFIG["tips"].get("start_tip", "A1")).upper()
     tip_names = []
@@ -419,12 +564,20 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
     column = str(dilution["plate_column"])
     plate_names = labware["plate"].wells_by_name()
     paper_names = labware["paper"].wells_by_name() if "paper" in labware else {}
-    for row in rows:
+    destinations = _paper_rows(rows)
+    for index, row in enumerate(rows):
         if f"{row}{column}" not in plate_names:
             errors.append(f"plate well {row}{column} does not exist")
-        for spot in placed:
-            if f"{row}{spot['column']}" not in paper_names:
-                errors.append(f"paper well {row}{spot['column']} does not exist")
+        if source_map is None and index < len(destinations):
+            for spot in placed:
+                if f"{destinations[index]}{spot['column']}" not in paper_names:
+                    errors.append(f"paper well {destinations[index]}{spot['column']} does not exist")
+    for entry in source_map or []:
+        if entry["source"] not in plate_names:
+            errors.append(f"plate well {entry['source']} does not exist")
+        for position in entry["positions"]:
+            if position not in paper_names:
+                errors.append(f"paper position {position} does not exist")
 
     if errors:
         protocol.comment("PRE-FLIGHT VALIDATION FAILED")
@@ -437,21 +590,44 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
             f"WARNING: the print plan needs {len(placed) + len(skipped)} paper columns "
             f"but only {len(placed)} fit; {len(skipped)} will be skipped."
         )
-    _liquid_warnings(protocol, labware, placed, do_dilution, do_print)
-    return rows, factors, placed, skipped, operations, tip_names
+    _liquid_warnings(protocol, labware, placed, do_dilution, do_print, operations, rows)
+    return rows, factors, placed, skipped, operations, tip_names, source_map
 
 
-def _liquid_warnings(protocol, labware, placed, do_dilution, do_print):
+def _liquid_warnings(protocol, labware, placed, do_dilution, do_print, operations=(), rows=()):
     """Comment when a dilution well would get too shallow for the mix or aspirate height."""
-    if not do_print or not placed or "plate" not in labware:
+    prints = [op for op in operations if op["kind"] == "print"]
+    if not do_print or not (placed or prints) or "plate" not in labware:
         return
     diameter = getattr(labware["plate"].wells()[0], "diameter", None)
     if not diameter:
         return
     area = math.pi * (float(diameter) / 2.0) ** 2
     prepared = CONFIG["dilution"].get("prepared_volume_ul")
-    volume = (float(CONFIG["dilution"]["total_volume_ul"]) if do_dilution or prepared in (None, "")
-              else float(prepared))
+    total = float(CONFIG["dilution"]["total_volume_ul"])
+    if not placed:
+        # An explicit print map: each source well, in print order.
+        made = {f"{row}{CONFIG['dilution']['plate_column']}" for row in rows} if do_dilution else set()
+        mix_ul = float(CONFIG["mixing"]["volume_ul"])
+        mix_mm = float(CONFIG["mixing"].get("height_mm", 2.0))
+        aspirate_mm = float(CONFIG["print"]["aspirate_height_mm"])
+        left = {}
+        for op in prints:
+            source = op["source"]
+            if source not in left:
+                left[source] = total if source in made or prepared in (None, "") else float(prepared)
+            if left[source] < mix_ul + mix_mm * area:
+                protocol.comment(f"WARNING: mixing at {mix_mm:g} mm may draw air in {source} before paper "
+                                 f"{op['paper_well']} (~{left[source]:.0f} uL left).")
+                return
+            for _ in range(int(op["droplets"])):
+                if left[source] < float(op["volume_ul"]) + aspirate_mm * area:
+                    protocol.comment(f"WARNING: aspirating at {aspirate_mm:g} mm may draw air in {source} at paper "
+                                     f"{op['paper_well']} (~{left[source]:.0f} uL left).")
+                    return
+                left[source] -= float(op["volume_ul"])
+        return
+    volume = total if do_dilution or prepared in (None, "") else float(prepared)
     if sum(spot["volume_ul"] * spot["droplets"] for spot in placed) > volume:
         protocol.comment("WARNING: printing draws more than each dilution well holds; later spots may run dry.")
     mix_ul = float(CONFIG["mixing"]["volume_ul"])
@@ -534,7 +710,7 @@ def _execute(protocol, labware, p20, operations, tip_names):
         source = labware["plate"][op["source"]]
         paper_well = labware["paper"][op["paper_well"]]
         protocol.comment(
-            f"Row {op['row']} -> paper {op['paper_well']}: mix {mix_reps}x, then "
+            f"{op['source']} -> paper {op['paper_well']}: mix {mix_reps}x, then "
             f"{op['droplets']} x {op['volume_ul']:g} uL drop(s)."
         )
         p20.mix(mix_reps, mix_vol, source.bottom(mix_h))
@@ -577,7 +753,7 @@ def run(protocol: protocol_api.ProtocolContext):
         pip_cfg["name"], pip_cfg["mount"], tip_racks=[labware["tiprack"]]
     )
 
-    rows, factors, placed, skipped, operations, tip_names = _preflight(
+    rows, factors, placed, skipped, operations, tip_names, source_map = _preflight(
         protocol, labware, p20, do_dilution, do_print
     )
     solvent_name, solvent = _material_by_role("solvent")
@@ -600,13 +776,27 @@ def run(protocol: protocol_api.ProtocolContext):
         f"Materials: solvent={solvent_name} (vial {solvent['vial']}), "
         f"sample={sample_name} (vial {sample['vial']})."
     )
-    protocol.comment(
-        "Series: "
-        + ", ".join(f"{row}={factor:g}x" for row, factor in zip(rows, factors))
-        + f" in plate column {CONFIG['dilution']['plate_column']}"
-        + ("." if do_dilution else " (already prepared; not diluted in this run).")
-    )
-    if do_print:
+    if rows:
+        protocol.comment(
+            "Series: "
+            + ", ".join(f"{row}={factor:g}x" for row, factor in zip(rows, factors))
+            + f" in plate column {CONFIG['dilution']['plate_column']}"
+            + ("." if do_dilution else " (already prepared; not diluted in this run).")
+        )
+    if do_print and source_map is not None:
+        droplets = int(CONFIG["print"].get("droplets_per_spot", 1))
+        volumes = _droplet_volumes()
+        protocol.comment(
+            "Print map: "
+            + "; ".join(
+                f"{entry['source']} -> {', '.join(entry['positions'])} "
+                f"({len(entry['positions'])} position(s), {entry.get('volume_ul', volumes[0] if volumes else 0):g} uL"
+                + (f" x{droplets} drops" if droplets > 1 else "") + ")"
+                for entry in source_map
+            )
+            + f"; mix {CONFIG['mixing']['reps']}x before each."
+        )
+    elif do_print:
         protocol.comment(
             "Print plan: "
             + ", ".join(
@@ -616,6 +806,13 @@ def run(protocol: protocol_api.ProtocolContext):
             )
             + f"; mix {CONFIG['mixing']['reps']}x before each."
         )
+        if _explicit_paper_rows() is not None:
+            column = CONFIG["dilution"]["plate_column"]
+            protocol.comment(
+                "Paper rows: "
+                + ", ".join(f"{row}{column} -> row {paper_row}" for row, paper_row in zip(rows, _paper_rows(rows)))
+                + "."
+            )
     policy = CONFIG["tips"].get("policy", "per_liquid")
     protocol.comment(
         f"Tips: {len(tip_names)} ({policy})"
@@ -631,7 +828,13 @@ def run(protocol: protocol_api.ProtocolContext):
 
     _set_flow_rates(p20)
     printed = _execute(protocol, labware, p20, operations, tip_names)
-    if do_print:
+    if do_print and source_map is not None:
+        positions = sum(len(entry["positions"]) for entry in source_map)
+        protocol.comment(
+            f"Paper print complete: {printed} drop(s) on {positions} paper position(s) from "
+            f"{len(source_map)} plate well(s)."
+        )
+    elif do_print:
         tail = f" ({len(skipped)} column(s) skipped - paper full)" if skipped else ""
         protocol.comment(
             f"Paper print complete: {printed} drop(s) across {len(placed)} column(s) and "

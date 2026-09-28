@@ -104,7 +104,7 @@ def test_print_cycle_is_the_physically_validated_one(protocol_module, config):
     for index in paper:
         aspirate, air_gap, dispense, blow_out, delay = log[index - 2], log[index - 1], log[index], log[index + 1], log[index + 2]
         assert aspirate[0] == "aspirate" and aspirate[1] == 5.0 and aspirate[2][0] == PLATE
-        assert aspirate[2][2:] == ("bottom", 1.0)
+        assert aspirate[2][2:] == ("bottom", config["liquid_handling"]["plate_aspirate_height_mm"])
         assert air_gap == ("air_gap", 1.5, 5.0)
         assert dispense[1] == 6.5 and dispense[2][2:] == ("bottom", 1.1) and dispense[3] == 3.0
         assert blow_out == ("blow_out", dispense[2])
@@ -116,7 +116,9 @@ def test_no_transfer_is_below_the_p20_minimum(protocol_module, config):
     volumes = [entry[1] for entry in log if entry[0] == "aspirate"]
     assert min(volumes) >= 1.0
     water_into_h11 = [entry[1] for entry in log if entry[0] == "dispense" and entry[2][:2] == (PLATE, "H11")]
-    assert round(sum(water_into_h11), 1) == 150.0            # 140.63 water + 9.38 dye
+    sample_chunks = sum(op.kind == "transfer" and op.role == "sample" and op.destination == "H11"
+                        for op in build_plan(config).operations)
+    assert round(sum(water_into_h11) - sample_chunks * config["liquid_handling"]["air_gap_ul"], 1) == 150.0
 
 
 def test_off_deck_vial_rack_is_not_loaded_for_a_print_only_run(protocol_module, config):
@@ -146,6 +148,17 @@ def test_new_tip_policy_never_puts_a_used_tip_into_another_liquid(protocol_modul
         if entry[0] == "aspirate":
             per_tip.setdefault(entry[3], set()).add(entry[2][:2])
     assert all(len(sources) == 1 for sources in per_tip.values())
+
+
+@pytest.mark.parametrize("return_tips", [True, False])
+def test_single_tip_uses_one_physical_tip_through_the_whole_run(protocol_module, config, return_tips):
+    config["tips"].update(policy="single_tip", start_tip="H12", return_tips=return_tips)
+    from src.agents.dye_demo.validation import validate
+    assert validate(config).ok
+    log = run_protocol(protocol_module, config).log
+    assert [entry[1] for entry in log if entry[0] == "pick_up_tip"] == ["H12"]
+    assert [entry[1] for entry in log if entry[0] == "return_tip"] == (["H12"] if return_tips else [])
+    assert [entry[1] for entry in log if entry[0] == "drop_tip"] == ([] if return_tips else ["H12"])
 
 
 def test_operator_and_revision_are_written_into_the_robot_run_log(protocol_module, config):

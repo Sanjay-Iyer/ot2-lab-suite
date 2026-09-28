@@ -277,6 +277,15 @@ def normalize_count(value: Any) -> int:
     return count
 
 
+
+def normalize_replicates(value: Any) -> int:
+    """Zero repeats still prints each condition once; a negative count is invalid."""
+    count = _integer(value, "total replicates")
+    if count < 0:
+        raise FieldError(f"total replicates cannot be negative, got {value!r}")
+    return max(1, count)
+
+
 def normalize_bool(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -438,7 +447,7 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "print.enabled": ("Print in this run", normalize_bool),
     "print.droplet_volume_ul": ("Drop volume", normalize_drop_volumes),
     "print.droplets_per_spot": ("Drops per paper position", normalize_count),
-    "print.replicates": ("Replicates (prints of each sample)", normalize_count),
+    "print.replicates": ("Total replicates (prints of each condition)", normalize_replicates),
     "print.paper_start_column": ("First paper column", normalize_paper_column),
     "print.paper_rows": ("Paper rows (print destinations)", normalize_paper_rows),
     "print.source_map": ("Print map (plate well → paper positions)", normalize_source_map),

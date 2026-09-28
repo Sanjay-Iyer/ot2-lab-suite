@@ -92,7 +92,7 @@ from src.agents.dye_demo.natural import (
     selected_rows,
     unstated_split,
 )
-from src.agents.dye_demo.placement import PlacementError, describe_new, map_with_count, series_as_map
+from src.agents.dye_demo.placement import PlacementError, describe_new, map_at_anchor, map_with_count, series_as_map
 from src.agents.dye_demo.plan import (
     build_plan,
     explicit_paper_rows,
@@ -366,7 +366,7 @@ def _sources_stated(entries: list[dict[str, Any]], text: str) -> bool:
 
 _PAPER_LAYOUT_PATHS = {"print.replicates", "print.paper_start_column"}
 _COUNT_QUESTIONS = {
-    "print.replicates": "How many side-by-side replicate paper columns should each drop volume print?",
+    "print.replicates": "How many total copies of each print condition should be printed?",
     "print.droplets_per_spot": "How many drops should be stacked on each paper position?",
 }
 # Proposals that restore stored values or book-keep a finished run are not read against the words of a request.
@@ -901,15 +901,18 @@ class ExperimentState:
         fit ("start further left")."""
         changed = set(changes)
         requested = {path for path, change in changes.items() if change.kind == "requested"}
-        if "print.source_map" in changed or "print.paper_start_column" in requested or not steps_enabled(after)[1]:
+        if "print.source_map" in changed or not steps_enabled(after)[1]:
             return []
         occupied = set(self.printed_positions)
         width = int((after.get("print") or {}).get("paper_columns", 12) or 12)
         try:
             if print_map(after) is not None:
-                if "print.replicates" not in changed:
+                if "print.paper_start_column" in requested:
+                    entries, new = map_at_anchor(after, occupied, width=width)
+                elif "print.replicates" in changed:
+                    entries, new = map_with_count(before, after, occupied, width=width)
+                else:
                     return []
-                entries, new = map_with_count(before, after, occupied, width=width)
                 count = int(after["print"].get("replicates", 1))
                 why = (f"each sample now prints {count} time{'s' if count != 1 else ''}: its prints stay where they are"
                        + (f" and the new ones go on the nearest free paper positions ({describe_new(new)})" if new
@@ -1175,6 +1178,8 @@ class ExperimentState:
 
     def _value_for(self, canonical: str, raw: dict[str, Any], current: Any, normalize) -> Any:
         op = str(raw.get("op") or "set").strip().lower()
+        if op == "none" and canonical == "print.replicates":
+            return 1
         if op == "set":
             if "value" not in raw:
                 raise FieldError("no value was given")
@@ -1348,10 +1353,13 @@ class ExperimentState:
     def _verify_value(self, canonical: str, label: str, value: Any, raw: dict[str, Any], request: str,
                       final_text: str, superseded: str, before: dict[str, Any]) -> tuple[bool, str]:
         op = str(raw.get("op") or "set").strip().lower()
+        if op == "none" and canonical == "print.replicates":
+            return True, ""
         if op != "set":
             parameter = raw.get("factor", raw.get("amount", raw.get("count")))
-            if parameter is None or not (numbers_mentioned(float(parameter), final_text)
-                                         or value_stated(float(parameter), final_text)):
+            magnitude = abs(float(parameter)) if parameter is not None else None
+            if magnitude is None or not (numbers_mentioned(magnitude, final_text)
+                                         or value_stated(magnitude, final_text)):
                 raise ProposalRejected(f"I could not find how much to change the {label.lower()} by in what you said, "
                                        "so nothing was changed.", kind="needs_value",
                                        question=f"By how much should the {label.lower()} change?")
@@ -1436,6 +1444,10 @@ class ExperimentState:
                     question="Which plate column should this run use? (To print from wells in several plate columns, "
                              "name the wells, for example \"print A1 and A3\".)")
         if canonical in _COUNT_PATHS:
+            if canonical == "print.replicates" and (
+                    str(raw.get("op") or "").lower() == "none"
+                    or raw.get("value") == 0 and numbers_mentioned(0, final_text)):
+                return True, ""
             if canonical in _PAPER_LAYOUT_PATHS:
                 gap = gap_conflict(final_text)
                 if gap is not None:

@@ -66,14 +66,14 @@ Dilutions the tester *reports* as made are recorded, and block a run that would 
 |---|---|---|---|---|
 | Dilution plate location | Slot 4 | | Drop volume | 5 µL |
 | Paper print plate location | Slot 5 | | Drops per paper position | 1 |
-| Vial rack location | Slot 7 | | Replicate paper columns | 1 |
+| Vial rack location | Slot 7 | | Total replicates | 1 |
 | P20 tip rack location | Slot 9 | | First paper column | 1 |
 | **Dye (sample) vial** | **B1** | | Mixes before each print | 2 |
 | Water (solvent) vial | A1 | | Mixing volume | 15 µL |
 | Make dilutions in this run | yes | | Print in this run | yes |
 | **Dilution factors** | **2×, 4×, 8×, 16×** | | Starting tip | A1 |
-| Dilution plate column | 11 | | Tip policy | one tip per liquid |
-| Dilution start row | A | | Return used tips to the rack | no |
+| Dilution plate column | 11 | | Tip policy | one tip for entire run |
+| Dilution start row | A | | Return used tips to the rack | yes |
 | **Final volume per dilution** | **200 µL** | | Volume now in each prepared well | (not set) |
 
 Changes from the start: dye vial, dilution factors, final volume.
@@ -88,24 +88,24 @@ Changes from the start: dye vial, dilution factors, final volume.
 | D11 | 16× | 12.5 µL | 187.5 µL |
 
 - Water: FROM vial rack (slot 7) vial A1 TO dilution plate (slot 4) wells A11–D11. 612.5 µL in 32 transfers, tip A1.
-- Dye: FROM vial rack (slot 7) vial B1 TO wells A11–D11. 187.5 µL in 11 transfers, tip B1.
+- Dye: FROM vial rack (slot 7) vial B1 TO wells A11–D11. 187.5 µL in 12 transfers, using the same tip A1.
 - Load at least 2.65 mL of dye in B1 and 3.08 mL of water in A1 (plan → LIQUIDS).
 
 ### Printing plan
 
 | Step | FROM plate well | TO paper position | Drops | Tip |
 |---|---|---|---|---|
-| 1 | A11 (2×) | A1 | 1 × 5 µL | C1 |
-| 2 | B11 (4×) | B1 | 1 × 5 µL | D1 |
-| 3 | C11 (8×) | C1 | 1 × 5 µL | E1 |
-| 4 | D11 (16×) | D1 | 1 × 5 µL | F1 |
+| 1 | A11 (2×) | A1 | 1 × 5 µL | A1 |
+| 2 | B11 (4×) | B1 | 1 × 5 µL | A1 |
+| 3 | C11 (8×) | C1 | 1 × 5 µL | A1 |
+| 4 | D11 (16×) | D1 | 1 × 5 µL | A1 |
 
 4 drops, 20 µL printed. Each well holds 200 µL before printing and 195 µL after.
 
 ### Tips and operations
 
-- 6 tips, A1–F1; next unused tip G1; 90 remaining.
-- 43 dilution transfers (each followed by a blow-out), 4 print steps (mix, then drop), 4 drops, 6 tip pick-ups.
+- 1 tip, A1; next unused tip B1; 95 remaining.
+- 44 dilution transfers, 4 print steps (mix, then drop), 4 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -142,8 +142,7 @@ you>     run
 ### Final state
 
 As the starting plan, except: **Dilution factors 5×, 10×, 20×**; **Drops per paper position 2**; **First paper column 2**.
-The dye vial stays A2, the final volume 150 µL, plate column 11 from row A, drop volume 5 µL, one replicate, tips A1 with
-one tip per liquid.
+The dye vial stays A2, the final volume 150 µL, plate column 11 from row A, drop volume 5 µL, one total replicate, with tip A1 for the entire run.
 
 ### Dilution plan
 
@@ -154,23 +153,23 @@ one tip per liquid.
 | C11 | 20× | 7.5 µL | 142.5 µL |
 
 - Water: FROM vial A1 TO wells A11–C11. 397.5 µL in 21 transfers, tip A1.
-- Dye: FROM vial A2 TO wells A11–C11. 52.5 µL in 4 transfers, tip B1.
+- Dye: FROM vial A2 TO wells A11–C11. 52.5 µL in 4 transfers, using tip A1.
 - Load at least 2.52 mL of dye and 2.86 mL of water.
 
 ### Printing plan
 
 | Step | FROM plate well | TO paper position | Drops | Tip |
 |---|---|---|---|---|
-| 1 | A11 (5×) | A2 | 2 × 5 µL | C1 |
-| 2 | B11 (10×) | B2 | 2 × 5 µL | D1 |
-| 3 | C11 (20×) | C2 | 2 × 5 µL | E1 |
+| 1 | A11 (5×) | A2 | 2 × 5 µL | A1 |
+| 2 | B11 (10×) | B2 | 2 × 5 µL | A1 |
+| 3 | C11 (20×) | C2 | 2 × 5 µL | A1 |
 
 6 drops, 30 µL printed. Wells hold 150 µL before printing and 140 µL after. Paper column 1 is untouched.
 
 ### Tips and operations
 
-- 5 tips, A1–E1; next unused tip F1.
-- 25 transfers, 3 print steps, 6 drops, 5 tip pick-ups.
+- 1 tip, A1; next unused tip B1.
+- 25 transfers, 3 print steps, 6 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -184,11 +183,11 @@ one tip per liquid.
 | Asking to print the 5×, 10× and 20× dilutions before setting the factors | "The current plan has no 5×, 10×, 20× dilutions (it makes 1×, 2×, 3×, 4×, 6×, 8×, 12×, 16×). Printing always uses the dilutions in the plan ... set the dilution factors first" | Set the factors, then the printing |
 | "Skip the dilutions and just print" | Refused: "nothing in this session records that those wells already hold the dilutions"; asks "Do plate wells A11-H11 already hold the dilutions in the current plan?" | `no` keeps the dilution step |
 | Saying the dilutions are already made (untrue) | A reconciliation proposal turns the dilution step off. If applied, the run only prints (FAIL). `Undo my last change.` restores the setting but not the record, and `run` is then refused ("Not running: Plate wells ... already hold dilutions ...") | "I replaced the dilution plate with a new empty one." then `yes` |
-| "Print each dilution twice" | A model reading of *replicates* is refused ("your message did not mention the replicate paper columns") or flagged under CHECK THESE. Two replicate columns would print columns 2 and 3 (FAIL) | "two drops stacked on the same spot" |
+| "Print each dilution twice" | A model reading of *replicates* is refused ("your message did not specify stacked drops") or flagged under CHECK THESE. Two total replicates would print columns 2 and 3 (FAIL) | "two drops stacked on the same spot" |
 | "Print 10 µL" meaning two 5 µL drops | Proposes a 10 µL drop volume (FAIL) | Drops per position instead |
 | "column 2" in a sentence about both dilutions and printing | Asks: PAPER column 2 or PLATE column 2. PLATE moves the dilutions (FAIL) | PAPER |
 
-**Typical fails:** printing from column 1 or 3; one drop per position; two replicate columns; dilution step skipped.
+**Typical fails:** printing from column 1 or 3; one drop per position; two total replicates; dilution step skipped.
 
 ### Validated reference conversation
 
@@ -205,7 +204,7 @@ you>     run
 ### Final state
 
 As the starting plan, except: **Dilution factors 3×, 6×, 12×**; **Dilution plate column 3**; **Dilution start row D**;
-**Replicate paper columns 2**; **First paper column 3**. Deck unchanged: slot 3 stays empty.
+**Total replicates 2**; **First paper column 3**. Deck unchanged: slot 3 stays empty.
 
 ### Dilution plan
 
@@ -216,27 +215,27 @@ As the starting plan, except: **Dilution factors 3×, 6×, 12×**; **Dilution pl
 | F3 | 12× | 12.5 µL | 137.5 µL |
 
 - Water: FROM vial A1 TO wells D3–F3. 362.5 µL in 19 transfers, tip A1.
-- Dye: FROM vial A2 TO wells D3–F3. 87.5 µL in 6 transfers, tip B1.
+- Dye: FROM vial A2 TO wells D3–F3. 87.5 µL in 6 transfers, using tip A1.
 - Load at least 2.55 mL of dye and 2.83 mL of water.
 
 ### Printing plan
 
 | Step | FROM plate well | TO paper position | Drops | Tip |
 |---|---|---|---|---|
-| 1 | D3 (3×) | D3 | 1 × 5 µL | C1 |
-| 2 | D3 (3×) | D4 | 1 × 5 µL | C1 |
-| 3 | E3 (6×) | E3 | 1 × 5 µL | D1 |
-| 4 | E3 (6×) | E4 | 1 × 5 µL | D1 |
-| 5 | F3 (12×) | F3 | 1 × 5 µL | E1 |
-| 6 | F3 (12×) | F4 | 1 × 5 µL | E1 |
+| 1 | D3 (3×) | D3 | 1 × 5 µL | A1 |
+| 2 | D3 (3×) | D4 | 1 × 5 µL | A1 |
+| 3 | E3 (6×) | E3 | 1 × 5 µL | A1 |
+| 4 | E3 (6×) | E4 | 1 × 5 µL | A1 |
+| 5 | F3 (12×) | F3 | 1 × 5 µL | A1 |
+| 6 | F3 (12×) | F4 | 1 × 5 µL | A1 |
 
 6 drops, 30 µL printed. Plate well D3 prints onto paper position D3: the same name on different labware. Wells hold
 150 µL before printing and 140 µL after.
 
 ### Tips and operations
 
-- 5 tips, A1–E1 (one per dilution row when printing); next unused tip F1.
-- 25 transfers, 6 print steps, 6 drops, 5 tip pick-ups.
+- 1 tip, A1, reused for all dilution and print steps; next unused tip B1.
+- 25 transfers, 6 print steps, 6 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -254,7 +253,7 @@ As the starting plan, except: **Dilution factors 3×, 6×, 12×**; **Dilution pl
 | "column 3" in a sentence about both plate and paper | Asks: PAPER column 3 or PLATE column 3 | Answer the question |
 | "Print in paper columns 3 and 5" | "Paper columns 3, 5 are not side by side ... leaving a gap takes two runs" | Adjacent columns |
 | "Print in 3 and 4" without *column* | Asks "How many side-by-side replicate paper columns should each drop volume print?" | `2` |
-| Three replicate columns, or "columns 3 to 5" | Accepted as valid; prints column 5 as well (FAIL) | Two replicate columns |
+| Three total replicates, or "columns 3 to 5" | Accepted as valid; prints column 5 as well (FAIL) | Two replicate columns |
 | Different dilutions into different paper columns | Explained as unsupported: every dilution prints into every printed column | Not needed for this SOP |
 
 **Typical fails:** dilutions in rows A–C; plate column 11; deck plate moved to slot 3; wrong replicate count.
@@ -274,14 +273,14 @@ you>     run
 ### Final state: first run
 
 As the starting plan, except: **Dilution factors 4×, 8×, 16×, 32×**; **Final volume per dilution 200 µL**;
-**Dilution plate column 6**; **Replicate paper columns 2**. First paper column 1, one drop, first tip A1.
+**Dilution plate column 6**; **Total replicates 2**. First paper column 1, one drop, first tip A1.
 
 ### Final state: second run
 
 As the first run, except: **Make dilutions in this run: no** (with the prepared-dilution record for wells A6–D6);
 **Volume now in each prepared well 190 µL** (the scorer accepts 180–190 µL); **Drops per paper position 3**;
-**First paper column 4**; **Starting tip G1** (the scorer accepts G1 or any later tip, provided none of A1–F1 is used).
-Replicates stay 2; tip policy stays one tip per liquid.
+**First paper column 4**; **Starting tip B1** (the scorer accepts B1 or any later tip; A1 was used in run 1).
+Total replicates stay 2; tip policy stays one tip for the entire run.
 
 ### Dilution plan (first run only)
 
@@ -293,21 +292,21 @@ Replicates stay 2; tip policy stays one tip per liquid.
 | D6 | 32× | 6.25 µL | 193.75 µL |
 
 - Water: FROM vial A1 TO wells A6–D6. 706.25 µL in 37 transfers, tip A1.
-- Dye: FROM vial A2 TO wells A6–D6. 93.75 µL in 7 transfers, tip B1.
+- Dye: FROM vial A2 TO wells A6–D6. 93.75 µL in 7 transfers, using tip A1.
 - Load at least 2.56 mL of dye and 3.17 mL of water.
 
 ### Printing plan
 
 | Run | FROM plate well | TO paper positions | Drops per position | Tip |
 |---|---|---|---|---|
-| 1 | A6 (4×) | A1, A2 | 1 × 5 µL | C1 |
-| 1 | B6 (8×) | B1, B2 | 1 × 5 µL | D1 |
-| 1 | C6 (16×) | C1, C2 | 1 × 5 µL | E1 |
-| 1 | D6 (32×) | D1, D2 | 1 × 5 µL | F1 |
-| 2 | A6 (4×) | A4, A5 | 3 × 5 µL | G1 |
-| 2 | B6 (8×) | B4, B5 | 3 × 5 µL | H1 |
-| 2 | C6 (16×) | C4, C5 | 3 × 5 µL | A2 |
-| 2 | D6 (32×) | D4, D5 | 3 × 5 µL | B2 |
+| 1 | A6 (4×) | A1, A2 | 1 × 5 µL | A1 |
+| 1 | B6 (8×) | B1, B2 | 1 × 5 µL | A1 |
+| 1 | C6 (16×) | C1, C2 | 1 × 5 µL | A1 |
+| 1 | D6 (32×) | D1, D2 | 1 × 5 µL | A1 |
+| 2 | A6 (4×) | A4, A5 | 3 × 5 µL | B1 |
+| 2 | B6 (8×) | B4, B5 | 3 × 5 µL | B1 |
+| 2 | C6 (16×) | C4, C5 | 3 × 5 µL | B1 |
+| 2 | D6 (32×) | D4, D5 | 3 × 5 µL | B1 |
 
 - Run 1: 8 drops, 40 µL printed; each well 200 µL → 190 µL.
 - Run 2: 24 drops, 120 µL printed; each well 190 µL → 160 µL.
@@ -317,8 +316,8 @@ Replicates stay 2; tip policy stays one tip per liquid.
 
 | | Transfers | Print steps | Drops | Tips | Next unused tip |
 |---|---|---|---|---|---|
-| Run 1 | 44 | 8 | 8 | 6 (A1–F1) | G1 |
-| Run 2 | 0 (dilution step SKIPPED, no vial aspirations) | 8 | 24 | 4 (G1, H1, A2, B2) | C2 |
+| Run 1 | 44 | 8 | 8 | 1 (A1) | B1 |
+| Run 2 | 0 (dilution step SKIPPED, no vial aspirations) | 8 | 24 | 1 (B1) | C1 |
 
 ### Expected agent events
 
@@ -328,7 +327,7 @@ Replicates stay 2; tip policy stays one tip per liquid.
   under ATTENTION **Saying yes records plate wells A6-D6 as already holding the dilutions (4× | 8× | 16× | 32×; made at
   200 µL each; reported by the operator).** with the warning "this run does not make dilutions: it assumes plate
   wells A6-D6 already hold them (190 µL each)".
-- In simulation nothing prompts for the starting tip; `tips` shows "Next unused tip after: G1" before run 1.
+- In simulation nothing prompts for the starting tip; `tips` shows "Next unused tip after: B1" before run 1.
 
 ### Likely mistakes
 
@@ -336,11 +335,11 @@ Replicates stay 2; tip policy stays one tip per liquid.
 |---|---|---|
 | Both drop counts in one message | Explains that two runs are needed | Plan the runs separately |
 | Planning the second printing with the dilution step still on | In simulation nothing stops it. The proposal's DILUTIONS section says "made in this run" with 4 dilutions; running it fails the SOP (the dilutions would be made again). A live run would be refused | Report the dilutions as made before the second run |
-| Not setting a starting tip | The second run uses A1–D1 again (PIPETTING shows it). FAIL | Start from G1 |
+| Not setting a starting tip | The second run reuses A1. FAIL | Start from B1 |
 | Not recording the volume left in each well | The plan assumes the full 200 µL; the scorer fails "volume now in each prepared well" | Say how much is left |
-| "Three drops" set as three replicate columns, or "columns 4 to 6" | Valid but wrong (FAIL) | Drops per position 3, replicate columns 2 |
+| "Three drops" set as three replicate columns, or "columns 4 to 6" | Valid but wrong (FAIL) | Drops per position 3, total replicates 2 |
 | Changing replicates to 1, or the first paper column to 3 | Valid but wrong (FAIL) | |
-| "Use new tips" read as the tip policy | 8 print tips instead of 4 (FAIL: the policy must stay one tip per liquid) | Starting tip instead |
+| "Use new tips" read as the tip policy | Changes the requested single-tip policy (FAIL) | Set the starting tip instead |
 | Reporting different dilutions than were made | Records wrong wells or factors, or refuses: "This print-only plan does not match the dilutions recorded as prepared" | Report them as made |
 
 ### Validated reference conversation (several changes at once)
@@ -349,7 +348,7 @@ Replicates stay 2; tip policy stays one tip per liquid.
 you>     Make four dilutions, 4x, 8x, 16x and 32x, 200 uL each, in plate column 6, and print one 5 uL drop of each in paper columns 1 and 2.
 confirm> yes
 you>     run
-you>     The dilutions from run 1 are already made and each well now holds about 190 uL. Print three stacked drops in paper columns 4 and 5, starting from tip G1.
+you>     The dilutions from run 1 are already made and each well now holds about 190 uL. Print three stacked drops in paper columns 4 and 5, starting from tip B1.
 confirm> yes
 you>     run
 ```
@@ -369,11 +368,11 @@ you>     run
 | **Dilution factors** | **3×, 9×, 27×** |
 | **Final volume per dilution** | **180 µL** |
 | **Drops per paper position** | **2** |
-| **Replicate paper columns** | **2** |
+| **Total replicates** | **2** |
 | **First paper column** | **6** |
 | **Starting tip** | **A2** |
 | **Tip policy** | **new tip every transfer** |
-| Everything else | as at the start (vials A1/A2, plate column 11 from row A, 5 µL drops, mixing 2× 15 µL, tips not returned) |
+| Everything else | as at the start (vials A1/A2, plate column 11 from row A, 5 µL drops, mixing 2× 15 µL, tips returned) |
 
 Final deck (with the tip rack in slot 11, for example): slot 4 empty, dilution plate 8, paper print plate 5, vial
 rack 7, tip rack 11. After the deck proposal is approved the agent says: "Now physically move the 96-well dilution
@@ -403,9 +402,8 @@ plate from Slot 4 to Slot 8; move the P20 tip rack from Slot 8 to Slot 11."
 
 ### Tips and operations
 
-- 34 tips (28 transfers + 6 printed positions): A2–H2, A3–H3, A4–H4, A5–H5, A6, B6. Next unused tip C6; 54 remain of
-  the 88 from A2.
-- 28 transfers, 6 print steps, 12 drops, 34 tip pick-ups.
+- 36 tips (30 transfers + 6 printed positions): A2–H2, A3–H3, A4–H4, A5–H5, A6–D6. Next unused tip E6; 52 remain of the 88 from A2.
+- 30 transfers, 6 print steps, 12 drops, 36 tip pick-ups.
 
 ### Expected agent events
 

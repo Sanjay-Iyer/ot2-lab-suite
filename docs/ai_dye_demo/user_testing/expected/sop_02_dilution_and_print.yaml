@@ -30,8 +30,8 @@ runs:
       print.paper_rows: null
       print.source_map: null
       tips.start_tip: A1
-      tips.return_tips: false
-      tips.policy: per_liquid
+      tips.return_tips: true
+      tips.policy: single_tip
     plan:
       makes_dilutions: true
       prints: true
@@ -42,4 +42,4 @@ runs:
         - [C11, C2, 2, 5]
       transfers: 25
       total_drops: 6
-      tips: [A1, B1, C1, D1, E1]
+      tips: [A1]

@@ -1,13 +1,23 @@
-# User-test SOP 5 (deck reconfiguration) starting configuration for scripts/ai_dye_demo.py.
+# SOP 5 starts from the current demo default with the tip rack in slot 8.
+# AI agent demo: 8-point dye dilution series, then print every dilution on paper.
 #
-#   python scripts\ai_dye_demo.py --simulate --config configs\workflows\user_test_sops\ai_dye_demo_sop05_start.yaml
+# This is the "I don't know what I want" starting point for scripts/ai_dye_demo.py.
+# It is a complete, physically sane plan on its own: an 8-point dilution series
+# down one plate column, then one 5 uL drop of each onto paper column 1.
 #
-# Identical to configs/workflows/defaults/ai_agent_dilution_print_demo.yaml except that the P20 tip rack
-# starts in deck slot 8 (the default is slot 9), so "move the dilution plate to slot 8" meets an occupied
-# slot. tests/test_ai_dye_demo_user_test_sops.py fails if this file drifts from the default in any other way:
-# after a lab-owned value changes in the default, copy the default here again and set the tip rack to slot 8.
+#   configs/workflows/defaults/ai_agent_dilution_print_demo.yaml   <- this file
+#        |  the agent copies it; every change is proposed, validated and
+#        |  applied only after the operator types yes (src/agents/dye_demo/)
+#        v
+#   configs/workflows/user/ai_dye_demo_<timestamp>.yaml
+#        |  scripts/build_vial_dilution_print.py (embeds YAML, simulates)
+#        v
+#   src/protocols/generated/ai_agent_dilution_print_demo_latest.py  <- uploaded
 #
-# See docs/ai_dye_demo/user_testing/SOP_05_deck_reconfiguration.md.
+# Conversation may change: deck slots (or OFF_DECK), vials and material names,
+# the dilution series, mixing counts, the print plan, and the tip settings. The
+# pipette, every height, the air handling, blow-out, dwell, transfer size and the
+# safety limits are laboratory-owned and stay fixed (src/agents/dye_demo/model.py).
 
 protocol_version: 19
 
@@ -15,6 +25,8 @@ protocol_version: 19
 run_modes: {dry_run: false, do_dilution: true, do_print: true}
 
 # --- where things sit on the deck ----------------------------------------------
+# slot: 1-11, or OFF_DECK for labware physically removed from the robot. The run
+# refuses to start if a step needs labware that is OFF_DECK.
 deck:
   tuberack:
     slot: 7
@@ -32,33 +44,55 @@ deck:
     namespace: custom_beta
     version: 1
   tiprack:
-    slot: 8                     # SOP 5: occupies the slot the dilution plate must move to
+    slot: 8  # SOP 5: occupies the plate's requested destination
     load_name: opentrons_96_tiprack_20ul
 
 # Laboratory-owned. The whole workflow is single-channel P20.
 pipette: {name: p20_single_gen2, mount: left}
 
 # --- what is in the vial rack ---------------------------------------------------
+# role "solvent" = the diluent, role "sample" = the thing being diluted. An
+# optional `label` (e.g. "crystal violet") is the name shown in summaries.
+# aspirate_height_mm is lab-owned: 4.0 mm needs ~2.46 mL in a 28 mm vial to stay
+# submerged, so the summary tells the operator the minimum to load.
 materials:
   water: {role: solvent, vial: A1, aspirate_height_mm: 4.0}
   dye:   {role: sample,  vial: A2, aspirate_height_mm: 4.0}
 
 # --- the dilution series --------------------------------------------------------
+# One dilution per plate row, all in `plate_column`, starting at `start_row`.
+# factor N means "1 part dye in N parts total": 150 uL at 4x is 37.5 uL dye
+# + 112.5 uL water. 1 to 8 factors; the P20 needs at least 1 uL of dye per well,
+# so 150 uL total allows fold factors up to 150x — but this default stops at 16x,
+# where every dye transfer is still 9 uL or more and therefore accurate.
+# `enabled: false` means the dilutions already exist; `prepared_volume_ul` (optional)
+# is then the volume now in each well, used for the liquid-depth checks.
 dilution:
   enabled: true
   plate_column: '11'
   start_row: A
   factors: [1, 2, 3, 4, 6, 8, 12, 16]
   total_volume_ul: 150.0
-  max_transfer_ul: 20.0        # lab-owned: P20 ceiling per transfer
-  solvent_dispense_from_top_mm: -2.0   # lab-owned: dispense above the liquid
-  sample_dispense_from_top_mm: -1.0    # lab-owned: dispense above the liquid
-  blow_out_after_dispense: true        # lab-owned
+  max_transfer_ul: 20.0        # liquid ceiling; sample chunks also reserve the air gap
+
+# Plate-only test settings. Edit this block on the offline work laptop, then rebuild.
+# Vial aspiration heights and paper release geometry are configured separately.
+# The mixing position and plate-to-paper aspiration both use plate_aspirate_height_mm.
+liquid_handling:
+  plate_aspirate_height_mm: 0.3
+  plate_dispense_height_mm: 0.3
+  air_gap_ul: 1.0              # sample/dye transfers only; counts toward P20 capacity
+  blow_out: true
+  touch_tip: true
 
 # Mix the source well immediately before each print aspiration (height lab-owned).
-mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
+mixing: {reps: 2, volume_ul: 15.0}
 
 # --- printing the dilutions onto paper ------------------------------------------
+# Each dilution prints on its own paper ROW; each droplet volume x replicate gets
+# its own paper COLUMN, starting at paper_start_column.
+#   droplet_volume_ul: 5.0        -> one 5 uL drop per dilution, paper column 1
+#   droplet_volume_ul: [5.0, 10] -> 5 uL in column 1, 10 uL in column 2
 print:
   enabled: true
   droplet_volume_ul: 5.0
@@ -68,15 +102,29 @@ print:
   paper_columns: 12
 
   # --- laboratory-owned release geometry; do not tune these for a demo ---------
+  # From configs/machines/ot2_standard_printing_p20_v1.yaml: paper dispense 1.1 mm
+  # off the bottom, 1.5 uL trailing air gap released 5 mm up, 3.0 uL push-out,
+  # blow-out on, and a 2 s dwell so the drop separates from the tip.
+  # 0.5 mm is the last physically confirmed release height; 1.1 mm was requested
+  # on 2026-08-31 and its physical revalidation is pending.
   z_mm: 1.1
-  aspirate_height_mm: 1.0
   air_gap_ul: 1.5
   air_gap_height_mm: 5.0
   push_out_ul: 3.0
   blow_out: true
   post_dispense_delay_s: 2.0
 
-tips: {start_tip: A1, return_tips: false, policy: per_liquid}
+# Tips are taken in rack order from start_tip, one pick-up per tip group:
+#   single_tip              ONE tip for the entire run (water, dye, mixing and
+#                           printing), returned or dropped once at the end
+#   per_liquid              one tip for all water transfers, one for all dye
+#                           transfers, one per dilution for printing
+#   new_tip_every_transfer  a fresh tip for every transfer and paper position
+# A step that does not run takes no tips. This demo defaults to single_tip with
+# the tip returned to the rack, to keep the demo fast; liquids can carry over,
+# so ask for "one tip per liquid" or "a fresh tip every transfer" (and "don't
+# return the tips") for a contamination-sensitive run.
+tips: {start_tip: A1, return_tips: true, policy: single_tip}
 
 flow_rates: {aspirate: 3.0, dispense: 3.0}
 

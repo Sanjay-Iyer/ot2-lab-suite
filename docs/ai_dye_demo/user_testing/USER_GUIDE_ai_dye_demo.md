@@ -96,8 +96,9 @@ The paper print plate is addressed like a 96-well plate, positions A1 to H12.
 
 - **Each dilution prints on the paper row with the same letter as its plate row.** A dilution made in plate row B
   prints on paper row B.
-- **Each drop volume and each replicate gets its own paper column**, starting at the first paper column and moving
-  to the right.
+- **Total replicates** is the number of printed copies of each condition. One means one original and no repeats;
+  three means one original and two repeats. Placement is separate: named paper positions stay exact, and a starting
+  column is an anchor. When copies do not fit to its right, the allocator can use other free positions.
 
 ### Tips
 
@@ -177,10 +178,10 @@ Names in **bold** are the labels used in proposals.
 | **Print in this run** | Whether this run prints | `Skip printing.` | yes / no | |
 | **Drop volume** | Volume of one drop | `Print 8 µL drops.` | µL, 1–18.5 | A list of volumes (`4 and 8 µL`) prints each volume in its own paper column. |
 | **Drops per paper position** | Drops stacked on one position | `Stack two drops on each position.` | whole number ≥ 1 | The same for every printed column in one run. |
-| **Replicate paper columns** | Side-by-side repeats of each drop volume | `Use three replicate columns.` | whole number ≥ 1 | Columns used = drop volumes × replicates. |
-| **First paper column** | Leftmost printed paper column | `Start printing at paper column 7.` | 1–12 | Printing moves to the right; it must fit within 12 columns. |
+| **Total replicates** | Total printed copies of each condition | `Print each condition three times.` | whole number ≥ 1 | `No replicates` means one print per condition. |
+| **First paper column** | Anchor for automatic paper placement | `Start printing at paper column 12.` | 1–12 | The allocator uses other free positions if more copies are needed. |
 | **Starting tip** | First tip this run picks up | `Start from tip C4.` | A1–H12 | Tips are used in column order. |
-| **Tip policy** | When a fresh tip is used | `Use a new tip for every transfer.` | one tip per liquid / new tip every transfer | "one tip per liquid" reuses a tip only for the same liquid, and uses one tip per dilution when printing. |
+| **Tip policy** | When a fresh tip is used | `Use a new tip for every transfer.` | one tip for entire run / one tip per liquid / new tip every transfer | The demo defaults to one tip for the entire run; choose another policy when needed. |
 | **Return used tips to the rack** | Put used tips back instead of the trash | `Return the tips to the rack.` | yes / no | Returned tips are contaminated; a later run must start after them. |
 
 Changing dilutions, drops or columns changes liquid use and tip use. The proposal shows the resulting dilutions, paper
@@ -257,7 +258,7 @@ A session may start from a different arrangement; `deck` always shows the curren
 |---|---|---|
 | Question | `Why is the release height 1.1 mm?`, `What does replicate mean?` | Answered. Nothing changes. |
 | Hypothetical | `What if we moved the plate to slot 6?`, `Could we use 8 µL drops?` | Answered. Nothing changes. |
-| Change | `Move the tip rack to slot 10.`, `Can you use 8 µL drops?`, `Use three replicate columns.` | A numbered proposal, waiting for yes or no. |
+| Change | `Move the tip rack to slot 10.`, `Can you use 8 µL drops?`, `Print each condition three times.` | A numbered proposal, waiting for yes or no. |
 | Report of what you did | `I moved the vial rack to slot 6 myself.`, `The dilutions are already made.` | A reconciliation proposal that only updates the record, waiting for yes or no. |
 | Negation | `Don't move the tip rack.`, `Don't print anything.` | Nothing changes; the agent says what the plan still does. |
 | Confirmation | `yes` | Applies the proposal on screen, exactly as shown. |
@@ -365,7 +366,7 @@ run: ATTENTION says "This plan cannot run. Execution is blocked until these are 
 | `Nothing was changed: this plan still prints in this run ...` | A "don't" or "no printing" message changes nothing. Say `skip printing` to turn printing off. |
 | `The current plan has no ... dilution ...` | Printing uses the dilutions in the plan. Set the dilution factors first. |
 | `One run uses the same number of drops in every paper column; ...` | Different drop counts in different columns need two runs. |
-| `Paper columns ... are not side by side.` | One run prints neighbouring columns only; a gap needs two runs. Answer with the columns to print (`columns 3 and 4`). |
+| `Paper columns ... are not side by side.` | If adjacency was requested, name neighbouring positions or remove that constraint. Explicit nonadjacent destinations can be used when adjacency was not requested. |
 | `You asked for paper columns ..., but this change would print ...` | The interpretation would have printed other paper columns, so nothing was proposed. Answer `yes` to print exactly the columns you named (shown as a proposal first), or `no` to say it differently. |
 | `Not running: the paper columns you asked for are not settled ...` | Answer the paper-column question first, or say `cancel` to keep the current plan. |
 | `Run N was interrupted, and a stop was requested from the OT-2.` | Ctrl-C during a live run asks the OT-2 to stop that run. If the agent says the stop was not confirmed, stop the run in the Opentrons App. |

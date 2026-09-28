@@ -15,7 +15,7 @@ import pytest
 from nicegui import Client, core, ui
 
 from src.agents.dye_demo.gui.app import build_page
-from src.agents.dye_demo.gui.labware_svg import render_tiprack_svg, tip_settings
+from src.agents.dye_demo.gui.labware_svg import render_deck_svg, render_tiprack_svg, tip_settings
 from src.agents.dye_demo.model import OFF_DECK, TIP_ORDER, FieldError, normalize_tip
 from src.agents.dye_demo.plan import build_plan
 from tests.test_ai_dye_demo_gui import make_adapter, router, started, wait_for
@@ -64,12 +64,13 @@ def test_tip_rack_card_shows_the_rack_slot_in_green_and_the_tips_this_run_uses()
     assert "start tip" in tip_circle(svg, "A1")
     assert GREEN not in tip_circle(svg, "C2")                               # the next tips stay in the rack
     assert "10 tips this run: A1-B2" in svg
-    # the deck map: the tip rack's slot is the only green square; the other labware is labelled in grey
-    assert GREEN in deck_slot(svg, 9) and "P20 tip rack" in deck_slot(svg, 9)
-    for slot, what in ((4, "plate"), (5, "paper"), (7, "vials")):
-        assert GREEN not in deck_slot(svg, slot) and what in deck_slot(svg, slot)
-    assert "fixed trash" in deck_slot(svg, 12)
-    assert svg.count(GREEN) == len(used) + 1
+    deck = render_deck_svg(config)
+    assert "OT-2 Deck Layout" not in svg and "OT-2 Deck Layout" in deck
+    assert 'stroke="#111827"' in deck_slot(deck, 9) and "Tips" in deck_slot(deck, 9)
+    for slot, what in ((4, "Plate"), (5, "Paper"), (7, "Vials")):
+        assert 'stroke="#15803d"' in deck_slot(deck, slot) and what in deck_slot(deck, slot)
+    assert "Trash" in deck_slot(deck, 12)
+    assert svg.count(GREEN) == len(used)
 
 
 def test_tip_rack_card_follows_the_start_tip_and_the_rack_slot():
@@ -77,7 +78,7 @@ def test_tip_rack_card_follows_the_start_tip_and_the_rack_slot():
     config["deck"]["tiprack"]["slot"] = 6
     svg = render_tiprack_svg(config)
     assert "P20 Tip Rack — Slot 6" in svg
-    assert GREEN in deck_slot(svg, 6) and GREEN not in deck_slot(svg, 9)
+    assert "Tips" in deck_slot(render_deck_svg(config), 6) and "Empty" in deck_slot(render_deck_svg(config), 9)
     assert GREEN in tip_circle(svg, "G1") and "start tip" in tip_circle(svg, "G1")
     for tip in ("A1", "F1"):                            # before the start tip: not used by this run
         assert "stroke-dasharray" in tip_circle(svg, tip) and "before the start tip" in tip_circle(svg, tip)
@@ -90,7 +91,7 @@ def test_a_new_tip_every_transfer_takes_more_tips_from_the_rack():
     plan = build_plan(config)
     svg = render_tiprack_svg(config)
     assert plan.tips_needed > build_plan(DEFAULT).tips_needed
-    assert svg.count(GREEN) == plan.tips_needed + 1                          # every tip taken, and the rack's slot
+    assert svg.count(GREEN) == plan.tips_needed                              # every tip taken
     assert f"{plan.tips_needed} tips this run: A1-" in svg
 
 
@@ -100,7 +101,7 @@ def test_tip_rack_card_warns_when_the_rack_runs_short_or_is_off_the_deck():
     config["deck"]["tiprack"]["slot"] = OFF_DECK
     svg = render_tiprack_svg(config)
     assert "P20 Tip Rack — OFF DECK" in svg and "The tip rack is OFF DECK" in svg
-    assert not any(GREEN in deck_slot(svg, slot) for slot in range(1, 13))
+    assert not any("Tips" in deck_slot(render_deck_svg(config), slot) for slot in range(1, 12))
 
 
 @pytest.mark.parametrize("tips,shown", [
@@ -223,6 +224,8 @@ def tip_cards(client) -> dict[str, dict[str, object]]:
         content = str(getattr(element, "content", ""))
         if content.startswith("<svg") and "P20 Tip Rack" in content:
             cards.setdefault(_panel(element), {})["svg"] = content
+        if content.startswith("<svg") and "OT-2 Deck Layout" in content:
+            cards.setdefault(_panel(element), {})["deck"] = content
     return cards
 
 
@@ -263,7 +266,7 @@ async def _check_tip_cards(tmp_path, monkeypatch):
             assert cards["proposed"]["settings"] == {"Start tip": ("G1", True), "Return tips": ("No", True),
                                                      "Tip policy": ("One tip for entire run", False)}
             assert "P20 Tip Rack — Slot 6" in cards["proposed"]["svg"]
-            assert GREEN in deck_slot(cards["proposed"]["svg"], 6) and GREEN in deck_slot(cards["current"]["svg"], 9)
+            assert "Tips" in deck_slot(cards["proposed"]["deck"], 6) and "Tips" in deck_slot(cards["current"]["deck"], 9)
 
             assert adapter.submit_text("yes")
             wait_for(lambda: adapter.waiting == "idle" and adapter.snapshot().revision == 1)
@@ -273,7 +276,7 @@ async def _check_tip_cards(tmp_path, monkeypatch):
             assert cards["current"]["settings"] == {"Start tip": ("G1", False), "Return tips": ("No", False),
                                                     "Tip policy": ("One tip for entire run", False)}
             assert "P20 Tip Rack — Slot 6" in cards["current"]["svg"]
-            assert GREEN in deck_slot(cards["current"]["svg"], 6) and GREEN not in deck_slot(cards["current"]["svg"], 9)
+            assert "Tips" in deck_slot(cards["current"]["deck"], 6) and "Empty" in deck_slot(cards["current"]["deck"], 9)
     finally:
         adapter.stop()
         client.delete()

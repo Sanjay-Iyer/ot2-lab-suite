@@ -189,19 +189,41 @@ def test_discard_leaves_authoritative_state_unchanged(tmp_path):
     adapter.stop()
 
 
-def test_typed_run_is_refused_and_only_the_run_button_starts_a_run(tmp_path):
+def test_typed_run_requests_confirmation_and_three_simulations_stay_runnable(tmp_path):
     calls = []
     adapter = started(make_adapter(tmp_path, executor=lambda path, simulate, log: calls.append(simulate) or 0))
-    assert "press Run on OT-2 to start it" in chat_text(adapter) and "type run to start it" not in chat_text(adapter)
-    assert adapter.submit_text("run")
-    wait_for(lambda: "check the plan and press Run on OT-2" in chat_text(adapter) and adapter.waiting == "idle")
-    assert calls == []
-    assert adapter.run()
-    wait_for(lambda: calls == [True] and adapter.waiting == "idle")
-    assert adapter.snapshot().status == "RUN COMPLETE"                 # the same status wording as a real run
-    apply_form(adapter, {"print.droplets_per_spot": 2})
-    assert adapter.snapshot().status == "READY"                # a later change makes the result stale
-    adapter.stop()
+    try:
+        assert adapter.submit_text("run")
+        wait_for(lambda: adapter.waiting == "idle" and adapter.take_run_confirmation_request())
+        assert calls == []                              # chat has requested the normal dialog, never execution
+        for number in range(1, 4):
+            assert adapter.snapshot().run_ready, adapter.snapshot().run_block_reason
+            assert adapter.run()                        # stands in for confirming the normal dialog
+            wait_for(lambda: len(calls) == number and adapter.waiting == "idle")
+            assert adapter.snapshot().status == "RUN COMPLETE"
+        assert calls == [True, True, True]
+        apply_form(adapter, {"print.droplets_per_spot": 2})
+        assert adapter.snapshot().status == "READY"
+    finally:
+        adapter.stop()
+
+
+def test_llm_request_run_requires_confirmation_and_pending_plan_blocks_it(tmp_path):
+    calls = []
+    model = router(lambda message: {"route": "request_run", "changes": []})
+    adapter = started(make_adapter(tmp_path, llm=model,
+                                   executor=lambda path, simulate, log: calls.append(simulate) or 0))
+    try:
+        assert adapter.submit_text("run the robot now")
+        wait_for(lambda: adapter.waiting == "idle" and adapter.take_run_confirmation_request())
+        assert calls == []
+        assert adapter.propose_form({"print.droplets_per_spot": 2})
+        wait_for(lambda: adapter.waiting == "proposal")
+        assert adapter.submit_text("run this")
+        wait_for(lambda: "Proposal #1 is still waiting" in chat_text(adapter))
+        assert not adapter.take_run_confirmation_request() and calls == []
+    finally:
+        adapter.stop()
 
 
 def test_live_run_checks_the_robot_first_and_an_unreachable_robot_changes_nothing(tmp_path):
@@ -466,9 +488,12 @@ async def _check_page_identity(tmp_path, monkeypatch):
             assert user_badge.text == "Current User = Sni"
             assert all(b.enabled and b.props["color"] == "positive" for b in buttons)
             assert adapter.submit_text("run")
-            wait_for(lambda: adapter.waiting == "idle" and "check the plan and press Run on OT-2" in chat_text(adapter))
+            wait_for(lambda: adapter.waiting == "idle" and "Run confirmation requested" in chat_text(adapter))
             assert executor.calls == [] and executor.checks == 0
             dialog = next(e for e in elements if isinstance(e, ui.dialog))
+            ticks[0]()
+            assert dialog.value is True and executor.calls == []
+            dialog.close()
             for callback in callbacks:
                 callback()
                 assert dialog.value is True

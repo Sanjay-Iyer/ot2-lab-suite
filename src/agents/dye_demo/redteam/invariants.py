@@ -390,7 +390,13 @@ def protocol_mismatches(config: dict[str, Any]) -> list[str]:
     if transfers != planned:
         problems.append(f"{len(transfers)} vial aspirations differ from the {len(planned)} planned transfers")
     into_plate = [(key[1], volume) for _, volume, key, _ in (e for e in log if e[0] == "dispense") if key[0] == plate]
-    if into_plate != [(op.destination, op.volume_ul) for op in plan.operations if op.kind == "transfer"]:
+    sample_gap = float((config.get("liquid_handling") or {}).get("air_gap_ul", 0.0) or 0.0)
+    expected_plate = [(op.destination, op.volume_ul + (sample_gap if op.role == "sample" else 0.0))
+                      for op in plan.operations if op.kind == "transfer"]
+    if len(into_plate) != len(expected_plate) or any(
+        well != expected_well or abs(volume - expected_volume) > 1e-6
+        for (well, volume), (expected_well, expected_volume) in zip(into_plate, expected_plate)
+    ):
         problems.append("plate dispenses differ from the planned dilution transfers")
     drops = [key[1] for _, _, key, _ in (e for e in log if e[0] == "dispense") if key[0] == paper]
     expected = [op.destination for op in plan.operations if op.kind == "print" for _ in range(op.droplets)]

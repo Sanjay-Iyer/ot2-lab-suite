@@ -125,6 +125,21 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
     # exactly the positions the print operations reach (a print map, or each dilution row across its columns)
     printed_positions = {(position[0], int(position[1:])) for position in plan.print_positions} if plan.do_print \
         else set()
+    # A unique condition is a source well at one drop volume. Its first paper
+    # position is the original; every later position is a repeat, wherever the
+    # canonical allocator put it.
+    copy_index: dict[tuple[str, float], int] = {}
+    repeats: set[tuple[str, int]] = set()
+    for operation in plan.operations:
+        if operation.kind != "print":
+            continue
+        key = (operation.source, operation.volume_ul)
+        copy_index[key] = copy_index.get(key, 0) + 1
+        if copy_index[key] > 1:
+            repeats.add((operation.destination[0], int(operation.destination[1:])))
+    unique_drops = len(copy_index)
+    total_spots = len(plan.print_positions)
+    total_replicates = int((config.get("print") or {}).get("replicates", 1))
     applied = set()
     if baseline is not None:
         applied_plan = build_plan(baseline)
@@ -133,7 +148,7 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
     added = printed_positions - applied if baseline is not None else set()
 
     width = 256
-    height = 196
+    height = 200
 
     drops = int((config.get("print") or {}).get("droplets_per_spot", 1))
     drop_unit = "drop" if drops == 1 else "drops"
@@ -157,14 +172,22 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
         for c_idx, c in enumerate(WELL_COLS):
             cx = 32 + c_idx * 18
             pos = (r, c)
-            if pos in added:
-                svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="5" fill="#22c55e" stroke="#d97706" stroke-width="2"><title>Position {r}{c} ({summary_label}, new in this proposal)</title></circle>')
-            elif pos in printed_positions:
-                svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="4.5" fill="#22c55e" stroke="#15803d" stroke-width="1"><title>Position {r}{c} ({summary_label})</title></circle>')
+            if pos in printed_positions:
+                repeat = pos in repeats
+                fill = "#3b82f6" if repeat else "#22c55e"
+                stroke = "#d97706" if pos in added else "#1d4ed8" if repeat else "#15803d"
+                sw = "2.5" if pos in added else "1"
+                label = "repeat" if repeat else "original"
+                pending = ", new in this proposal" if pos in added else ""
+                svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="5" fill="{fill}" stroke="{stroke}" '
+                                 f'stroke-width="{sw}"><title>Position {r}{c} ({summary_label}, {label}{pending})'
+                                 '</title></circle>')
 
     if added:
         summary_label += f" · {len(added)} new"
-    svg_parts.append(f'<text x="135" y="186" font-size="10" font-weight="bold" fill="#1e293b" text-anchor="middle">{summary_label}</text>')
+    svg_parts.append(f'<text x="135" y="181" font-size="9" font-weight="bold" fill="#1e293b" text-anchor="middle">'
+                     f'{unique_drops} unique · {total_replicates} replicates · {total_spots} spots</text>')
+    svg_parts.append(f'<text x="135" y="192" font-size="9" fill="#475569" text-anchor="middle">{summary_label}</text>')
     svg_parts.append('</svg>')
     return "".join(svg_parts)
 
@@ -191,7 +214,7 @@ def render_tiprack_svg(config: dict[str, Any]) -> str:
     first = TIP_ORDER.index(plan.start_tip) if plan.start_tip in TIP_ORDER else 0
     before_start = set(TIP_ORDER[:first])                             # skipped: the run starts after them
 
-    width = 384
+    width = 256
     height = 196
 
     svg_parts = [
@@ -234,32 +257,37 @@ def render_tiprack_svg(config: dict[str, Any]) -> str:
         summary, colour = f"{len(picked)} tip{'' if len(picked) == 1 else 's'} this run: {tips_range}", "#1e293b"
     svg_parts.append(f'<text x="135" y="188" font-size="10" font-weight="bold" fill="{colour}" text-anchor="middle">{summary}</text>')
 
-    # Where the rack is: the deck map, the tip rack's slot in green
-    svg_parts.append('<!-- Deck map -->')
-    svg_parts.append('<text x="319" y="36" font-size="9" font-weight="bold" fill="#64748b" text-anchor="middle">Deck</text>')
-    roles_in = occupancy(config)
-    for row_idx, slots in enumerate(DECK_LAYOUT):
-        y = 44 + row_idx * 32
-        for col_idx, deck_slot in enumerate(slots):
-            x = 264 + col_idx * 38
-            roles = roles_in.get(deck_slot, [])
-            if "tiprack" in roles:
-                fill, stroke, sw, text_fill = "#22c55e", "#15803d", "2", "#ffffff"
-                title_text = f"Slot {deck_slot}: P20 tip rack"
-            elif deck_slot == 12:
-                fill, stroke, sw, text_fill = "#f1f5f9", "#cbd5e1", "1", "#94a3b8"
-                title_text = "Slot 12: fixed trash"
-            elif roles:
-                fill, stroke, sw, text_fill = "#e2e8f0", "#94a3b8", "1", "#475569"
-                title_text = f"Slot {deck_slot}: " + ", ".join(_DECK_LABELS[role].lower() for role in roles)
-            else:
-                fill, stroke, sw, text_fill = "#ffffff", "#cbd5e1", "1", "#94a3b8"
-                title_text = f"Slot {deck_slot}: empty"
-            label = "Trash" if deck_slot == 12 else "+".join(_DECK_LABELS[role] for role in roles)
-            svg_parts.append(f'<rect x="{x}" y="{y}" width="34" height="28" rx="3" ry="3" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"><title>{title_text}</title></rect>')
-            svg_parts.append(f'<text x="{x + 3}" y="{y + 9}" font-size="7.5" fill="{text_fill}">{deck_slot}</text>')
-            if label:
-                svg_parts.append(f'<text x="{x + 17}" y="{y + 21}" font-size="8" font-weight="bold" fill="{text_fill}" text-anchor="middle">{label}</text>')
-
     svg_parts.append('</svg>')
     return "".join(svg_parts)
+
+
+def paper_summary(config: dict[str, Any]) -> tuple[int, int, int]:
+    """Unique source/volume conditions, total copies requested, actual paper spots."""
+    plan = build_plan(config)
+    prints = [operation for operation in plan.operations if operation.kind == "print"]
+    return (len({(operation.source, operation.volume_ul) for operation in prints}),
+            int((config.get("print") or {}).get("replicates", 1)), len(prints))
+
+
+def render_deck_svg(config: dict[str, Any]) -> str:
+    """A standalone, readable OT-2 deck map; position comes only from config."""
+    roles_in = occupancy(config)
+    parts = ['<svg viewBox="0 0 390 310" xmlns="http://www.w3.org/2000/svg" '
+             'style="width:100%; max-width:650px; height:auto; background:white; font-family:system-ui,sans-serif;">',
+             '<text x="195" y="19" font-size="14" font-weight="bold" fill="#1e293b" '
+             'text-anchor="middle">OT-2 Deck Layout</text>']
+    for row_index, slots in enumerate(DECK_LAYOUT):
+        for column_index, deck_slot in enumerate(slots):
+            x, y = 22 + column_index * 124, 33 + row_index * 67
+            roles = roles_in.get(deck_slot, [])
+            label = "Trash" if deck_slot == 12 else " + ".join(_DECK_LABELS[role] for role in roles) or "Empty"
+            fill = "#f1f5f9" if deck_slot == 12 else "#ecfdf5" if roles else "#ffffff"
+            stroke = "#15803d" if roles and "tiprack" not in roles else "#111827" if roles else "#94a3b8"
+            parts.append(f'<rect x="{x}" y="{y}" width="110" height="55" rx="6" fill="{fill}" '
+                         f'stroke="{stroke}" stroke-width="2"><title>Slot {deck_slot}: {label}</title></rect>')
+            parts.append(f'<text x="{x + 9}" y="{y + 17}" font-size="11" font-weight="bold" fill="#475569">'
+                         f'{deck_slot}</text>')
+            parts.append(f'<text x="{x + 55}" y="{y + 38}" font-size="12" font-weight="bold" '
+                         f'fill="#1e293b" text-anchor="middle">{label}</text>')
+    parts.append('</svg>')
+    return "".join(parts)

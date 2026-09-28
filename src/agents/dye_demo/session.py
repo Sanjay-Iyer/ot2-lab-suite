@@ -91,6 +91,7 @@ from src.agents.dye_demo.llm import (
     ROUTE_APPROVE,
     ROUTE_CHANGE,
     ROUTE_CLARIFY,
+    ROUTE_REQUEST_RUN,
     Interpretation,
     LLMClient,
     LLMError,
@@ -598,6 +599,7 @@ class DemoSession:
         self.unverified_run: dict[str, Any] | None = None
         self._last_discarded: tuple[int, str] | None = None
         self._from_button = False
+        self.request_run_confirmation: Callable[[], None] | None = None
         self._clarify_streak = 0              # router questions in a row
         self._settling = False                # proposing what is settled after the last allowed question
         self._turn_out: list[str] = []        # what this turn printed, for the conversation the router sees
@@ -1043,9 +1045,7 @@ class DemoSession:
             return
         if kind == "run":
             if self.settings.run_button and not self._from_button:
-                self.say(f"agent> Nothing has started. To start the run, check the plan and press "
-                         f"{self.settings.run_button}.")
-                self._event("refusal", reason="typed run in the GUI")
+                self._request_gui_run()
                 return
             if self._after_hypothetical and " ".join(analysis.text.lower().split()).strip(" .!") != TRIGGER:
                 self.say("agent> Nothing has started. Your last message was a hypothetical or quoted text, so it did not "
@@ -1063,6 +1063,9 @@ class DemoSession:
                              text, analysis, purpose="claim", original=text, payload={"instruction": instruction})
             return
         if kind == "run_like":
+            if self.settings.run_button and self.llm is not None:
+                self._converse(text, analysis)
+                return
             how = f"press {self.settings.run_button}" if self.settings.run_button else f"type {TRIGGER} by itself"
             self.say(f"agent> Nothing has started. To start the run, check the plan and then {how}.")
             self._event("hint", reason="run-like wording")
@@ -1192,6 +1195,14 @@ class DemoSession:
             return
         if result.route in DECISION_ROUTES:
             self._decide(result, text, pending)
+            return
+        if result.route == ROUTE_REQUEST_RUN:
+            if self._asks_only(analysis):
+                self.say("agent> Nothing has started. Ask me to run the current plan when you are ready.")
+            elif self.settings.run_button:
+                self._request_gui_run()
+            else:
+                self.say(f"agent> Nothing has started. Type {TRIGGER} by itself to request a run.")
             return
         if (result.route in ANSWER_ROUTES and result.answer.strip().endswith("?") and not result.clarification.strip()
                 and analysis.kind in {"instruction", "mixed", "reference"} and analysis.actionable.strip()):
@@ -2483,6 +2494,29 @@ class DemoSession:
         self.log.write("gui_form_input", request=request, revision=self.state.revision, changes=changes)
         self._propose_direct(changes, original=request, source="gui-form", title="PROPOSED PLAN", notes=[],
                              evidence=request)
+
+    def _request_gui_run(self) -> None:
+        """A chat run intent requests the page's normal confirmation, never execution."""
+        if self.pending is not None:
+            self.say(f"agent> Apply or discard proposal #{self.pending.id} before requesting a run.")
+            return
+        if self.clarifying is not None:
+            self.say("agent> Answer or cancel the pending question before requesting a run.")
+            return
+        report = self.state.validate()
+        blockers = list(report.error_messages())
+        if not self.state.lab_owned_intact():
+            blockers.append("lab-owned settings changed during this session")
+        blockers.extend(self.unreconciled_reports)
+        blockers.extend(self.state.run_blockers())
+        if blockers:
+            self.say("agent> Run blocked: " + " ".join(blockers))
+            return
+        if self.request_run_confirmation is None:
+            self.say(f"agent> Check the plan and press {self.settings.run_button}. Nothing has started.")
+            return
+        self.request_run_confirmation()
+        self.say("agent> Run confirmation requested. Nothing has started yet.")
 
     def run_from_button(self) -> None:
         """The GUI's run button: the typed run command, through the same turn record, checks and robot path. The GUI

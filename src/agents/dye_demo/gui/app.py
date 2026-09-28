@@ -24,6 +24,8 @@ from src.agents.dye_demo.model import (
 from src.agents.dye_demo.plan import build_plan
 
 from src.agents.dye_demo.gui.labware_svg import (
+    paper_summary,
+    render_deck_svg,
     render_paper_svg,
     render_plate_svg,
     render_tiprack_svg,
@@ -56,16 +58,28 @@ class FlowStep:
 
 @dataclass(frozen=True)
 class ExecutionTarget:
-    """The only part of the page that names the execution backend. Every other label, button, card, status and dialog
-    is identical for --simulate and the real OT-2, so work on the page carries over to both."""
-    badge: str              # header badge (same component, colour and place in both modes)
-    confirm_title: str      # title of the run confirmation dialog
+    """Mode-specific run copy shown by the shared page and confirmation flow."""
+    badge: str
+    confirm_title: str
+    run_heading: str
+    run_note: str
+    confirm_note: str
 
 
 def execution_target(live: bool) -> ExecutionTarget:
     if live:
-        return ExecutionTarget("LIVE · REAL OT-2", "Start the real OT-2 run?")
-    return ExecutionTarget("SIMULATED OT-2", "Start the simulated OT-2 run?")
+        return ExecutionTarget(
+            "LIVE · REAL OT-2", "Start the real OT-2 run?", "RUN ON OT-2",
+            "Check the Experiment Procedure and physical deck before starting the run.",
+            "The software connects to the OT-2, uploads the protocol and starts it. The robot moves as soon as "
+            "the run starts. Check the deck, tips, liquids and paper against the Experiment Procedure first.",
+        )
+    return ExecutionTarget(
+        "SIMULATED OT-2", "Start the simulated OT-2 run?", "SIMULATED RUN",
+        "Build and simulate the Experiment Procedure on this laptop. No robot is contacted.",
+        "The protocol will be built and simulated on this laptop. No robot is contacted and no liquid or tips "
+        "are used.",
+    )
 
 
 def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION",
@@ -78,20 +92,32 @@ def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUAL
     tiprack_svg = render_tiprack_svg(config)
 
     ui.label(title).classes("font-semibold text-slate-700 mt-4 mb-1 text-base")
-    with ui.row().classes("w-full gap-4 items-start flex-wrap"):
+    with ui.element("div").classes("labware-grid w-full"):
         if plate_svg:
-            with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+            with ui.column().classes("labware-card experiment-card"):
+                ui.label("96-Well Plate").classes("labware-card-title")
                 ui.html(plate_svg).classes("w-full")
         if tuberack_svg:
-            with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+            with ui.column().classes("labware-card experiment-card"):
+                ui.label("Vial Rack").classes("labware-card-title")
                 ui.html(tuberack_svg).classes("w-full")
         if paper_svg:
-            with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+            with ui.column().classes("labware-card experiment-card"):
+                ui.label("Paper Substrate").classes("labware-card-title")
                 ui.html(paper_svg).classes("w-full")
+                unique, total_replicates, total_spots = paper_summary(config)
+                with ui.column().classes("paper-summary"):
+                    ui.label(f"Unique drops: {unique}")
+                    ui.label(f"Total replicates: {total_replicates}")
+                    ui.label(f"Total printed spots: {total_spots}")
         if tiprack_svg:
-            with ui.column().classes("tip-rack-card items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+            with ui.column().classes("labware-card tip-rack-card"):
+                ui.label("Pipette Tip Rack").classes("labware-card-title")
                 _tip_settings(config, baseline)
                 ui.html(tiprack_svg).classes("w-full")
+        with ui.column().classes("labware-card deck-card"):
+            ui.label("OT-2 Deck Layout").classes("labware-card-title")
+            ui.html(render_deck_svg(config)).classes("w-full")
 
 
 def _tip_settings(config: dict[str, Any], baseline: dict[str, Any] | None) -> None:
@@ -175,6 +201,16 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .flow-step-title { font-size: 15px; font-weight: 700; color: #334e62;
                            border-bottom: 1px solid #c5d2dc; padding-bottom: 10px; margin-bottom: 4px; width: 100%; }
         .current-user { background: #e5e7eb; color: #374151; white-space: normal; }
+        .labware-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; align-items:start; }
+        .labware-card { display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px;
+                        background:white; border-radius:10px; min-width:0; box-sizing:border-box; }
+        .experiment-card { border:3px solid #15803d; }
+        .tip-rack-card { border:3px solid #111827; }
+        .deck-card { border:2px solid #475569; grid-column:1 / -1; }
+        .labware-card-title { width:100%; font-size:20px; font-weight:750; color:#1e293b; text-align:center; }
+        .paper-summary { align-self:stretch; gap:2px; font-size:14px; font-weight:650; color:#1e293b; }
+        @media (max-width:1200px) { .labware-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @media (max-width:700px) { .labware-grid { grid-template-columns:minmax(0,1fr); } }
         .tip-settings { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:14px; background:#ffffff;
                         border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; }
         .tip-setting-changed { background:#fef3c7; color:#92400e; border-radius:4px; padding:0 4px; }
@@ -224,12 +260,13 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         with ui.card().classes("section-run w-full p-5"):
             with ui.row().classes("w-full items-center justify-between"):
                 with ui.column().classes("gap-0"):
-                    ui.label("RUN ON OT-2").classes("text-lg font-semibold")
-                    ui.label("Check the Experiment Procedure above and the deck, then start the run. The OT-2 is "
-                             "contacted only now.").classes("text-sm text-slate-500")
+                    ui.label(target.run_heading).classes("text-lg font-semibold")
+                    ui.label(target.run_note).classes("text-sm text-slate-500")
                 run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
                                        color="warning").classes("run-action text-lg")
                 run_button.set_enabled(False)
+            run_block_label = ui.label().classes("w-full text-sm font-semibold text-amber-800")
+            run_block_label.set_visibility(False)
             ui.label("ROBOT RUNNER OUTPUT").classes("text-sm font-semibold text-slate-500 mt-2")
             output_log = ui.log(max_lines=OUTPUT_LINES).classes("w-full h-72 text-xs")
 
@@ -248,9 +285,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
 
     with ui.dialog() as confirm_run, ui.card().classes("p-6 max-w-lg"):
         ui.label(target.confirm_title).classes("text-xl font-semibold")
-        ui.label("The software now connects to the OT-2, builds and simulates the protocol for the Experiment Procedure, "
-                 "uploads it and starts it. The robot moves as soon as the run starts. Check the deck, tips, liquids "
-                 "and paper against the Experiment Procedure first.").classes("text-slate-600")
+        ui.label(target.confirm_note).classes("text-slate-600")
         with ui.row().classes("w-full justify-end gap-3 mt-4"):
             ui.button("Cancel", on_click=confirm_run.close).props("flat")
             start_button = ui.button("Start run", icon="precision_manufacturing", color="negative")
@@ -308,11 +343,15 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         if not adapter.submit_text(text):
             ui.notify("Nothing is waiting for an answer.", type="info")
 
+    def request_run_confirmation() -> None:
+        snapshot = adapter.snapshot()
+        if not snapshot.run_ready:
+            ui.notify("Run blocked: " + snapshot.run_block_reason, type="warning")
+            return
+        confirm_run.open()
+
     def press_run() -> None:
-        if not adapter.snapshot().run_ready:
-            ui.notify("Not yet: " + busy_note, type="warning")
-        else:
-            confirm_run.open()
+        request_run_confirmation()
 
     def start_run() -> None:
         confirm_run.close()
@@ -365,8 +404,10 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             output_log.push(line)
         last["output"] += len(lines)
         snapshot = adapter.snapshot()
+        if snapshot.waiting == "idle" and adapter.take_run_confirmation_request():
+            request_run_confirmation()
         state = (snapshot.status, snapshot.waiting, snapshot.running, snapshot.question,
-                 snapshot.operator, snapshot.run_ready, snapshot.proposed is not None)
+                 snapshot.operator, snapshot.run_ready, snapshot.run_block_reason, snapshot.proposed is not None)
         if state != last["state"]:
             last["state"] = state
             user_badge.text = f"Current User = {snapshot.operator or 'waiting for chat input'}"
@@ -379,6 +420,8 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             for button in (top_run_button, run_button):
                 button.props(f"color={'positive' if snapshot.run_ready else 'warning'}")
                 button.set_enabled(snapshot.run_ready)
+            run_block_label.text = "Run blocked: " + snapshot.run_block_reason if snapshot.run_block_reason else ""
+            run_block_label.set_visibility(bool(snapshot.run_block_reason))
             submit_controls.set_enabled(idle)
             send_button.set_enabled(snapshot.waiting != "busy")
             answer_row.set_visibility(snapshot.waiting == "question")
@@ -447,7 +490,7 @@ def _controls(config: dict[str, Any]) -> dict[str, Any]:
         dilution_enabled = ui.switch("Dilution enabled", value=dilution["enabled"])
         printing_enabled = ui.switch("Printing enabled", value=printing["enabled"])
         first_column = ui.number("First paper column", value=printing["paper_start_column"], min=1, max=12, step=1)
-        replicates = ui.number("Replicate columns", value=printing["replicates"], min=1, max=12, step=1)
+        replicates = ui.number("Total replicates", value=printing["replicates"], min=1, max=12, step=1)
         drops = ui.number("Drops per position", value=printing["droplets_per_spot"], min=1, step=1)
     with ui.row().classes("w-full gap-4"):
         # every deck slot, and OFF DECK: labware the plan does not need may be off the robot (a list of slots alone

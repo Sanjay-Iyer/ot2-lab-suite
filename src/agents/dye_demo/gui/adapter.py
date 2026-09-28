@@ -52,6 +52,25 @@ class GuiSnapshot:
     validation_ok: bool   # the existing plan validation report, not a separate check
     # physical reasons the session would refuse this run (ExperimentState.run_blockers: wells already full, ...)
     blockers: tuple[str, ...] = ()
+    validation_errors: tuple[str, ...] = ()
+
+    @property
+    def run_block_reason(self) -> str:
+        if self.proposed is not None:
+            return "Apply or discard the proposal first."
+        if self.waiting in {"proposal", "clarify", "question"}:
+            return "Answer or cancel the pending question first."
+        if self.waiting == "operator":
+            return "Enter the operator name first."
+        if self.waiting == "busy" or self.running:
+            return "The agent or run is still working."
+        if self.status == "SESSION ENDED":
+            return "The session has ended."
+        if self.validation_errors:
+            return self.validation_errors[0]
+        if self.blockers:
+            return self.blockers[0]
+        return ""
 
     @property
     def run_ready(self) -> bool:
@@ -82,6 +101,8 @@ class DemoGuiAdapter:
         self._ended = False
         self._thread: threading.Thread | None = None
         self._diagnostics: list[str] = []
+        self._run_confirmation_requested = False
+        session.request_run_confirmation = self._request_run_confirmation
         session.input = self._read
         session.output = self._write
         session.diagnostic = self._diagnostic
@@ -191,6 +212,17 @@ class DemoGuiAdapter:
         text = text.strip()
         return bool(text) and self._offer(text, shown=text)
 
+    def _request_run_confirmation(self) -> None:
+        with self._lock:
+            self._run_confirmation_requested = True
+
+    def take_run_confirmation_request(self) -> bool:
+        with self._lock:
+            if not self._run_confirmation_requested:
+                return False
+            self._run_confirmation_requested = False
+            return True
+
     def run(self) -> bool:
         """The run button: the session's own run command, only while the session is idle at its main prompt."""
         return self._offer(self.session.run_from_button, shown=self.run_label, idle=True)
@@ -259,7 +291,12 @@ class DemoGuiAdapter:
         prepared = session.state.physical.get("dilutions_prepared")
         proposed_prepared = pending.physical.get("dilutions_prepared", prepared) if pending else prepared
         report = session.state.validate()
-        blockers = tuple(session.state.run_blockers())
+        blockers = list(session.state.run_blockers())
+        if not session.state.lab_owned_intact():
+            blockers.append("Lab-owned settings changed during this session.")
+        if session.unreconciled_reports:
+            blockers.append("A physical report has not been reconciled: " + session.unreconciled_reports[0])
+        blockers = tuple(blockers)
         with self._lock:
             waiting, question, ended = self._state(self._waiting), self._question, self._ended
         running = self.running
@@ -283,6 +320,7 @@ class DemoGuiAdapter:
             operator=session.operator,
             validation_ok=report.ok,
             blockers=blockers,
+            validation_errors=tuple(report.error_messages()),
         )
 
     def _status(self, waiting: str, running: bool, ended: bool) -> str:

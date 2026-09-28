@@ -82,7 +82,7 @@ def test_the_sops_start_from_the_default_plan_they_describe():
     assert (config["print"]["droplet_volume_ul"], config["print"]["droplets_per_spot"], config["print"]["replicates"],
             config["print"]["paper_start_column"]) == (5.0, 1, 1, 1)
     assert config["mixing"]["reps"] == 2 and config["mixing"]["volume_ul"] == 15.0
-    assert config["tips"] == {"start_tip": "A1", "return_tips": False, "policy": "per_liquid"}
+    assert config["tips"] == {"start_tip": "A1", "return_tips": True, "policy": "single_tip"}
 
 
 def test_sop5_start_config_is_the_default_with_the_tip_rack_in_slot_8():
@@ -121,8 +121,8 @@ def _through_the_engine(sop: int) -> list[dict]:
                        ("dilution.plate_column", "6"), ("print.replicates", 2)],
                       "dilutions 4x, 8x, 16x and 32x, 200 uL total, plate column 6, 2 replicate columns")
         second = apply([("dilution.enabled", False), ("dilution.prepared_volume_ul", "190 uL"),
-                        ("print.droplets_per_spot", 3), ("print.paper_start_column", 4), ("tips.start_tip", "G1")],
-                       "the dilutions are already made, 190 uL left, 3 drops, paper column 4, tip G1",
+                        ("print.droplets_per_spot", 3), ("print.paper_start_column", 4), ("tips.start_tip", "B1")],
+                       "the dilutions are already made, 190 uL left, 3 drops, paper column 4, tip B1",
                        physical={"dilutions_prepared": PREPARED_FROM_PLAN})
         return [first, second]
     apply([("deck.tiprack.slot", 11), ("deck.plate.slot", 8)], "move the tip rack to slot 11 and the plate to slot 8")
@@ -153,7 +153,7 @@ def test_the_checker_fails_what_the_sops_forbid():
     reused = deepcopy(second)
     reused["tips"]["start_tip"] = "A1"                     # the second printing would reuse run 1's tips
     unmet = [finding.requirement for finding in check_runs([first, reused], load_expected(4)) if not finding.ok]
-    assert "tips.start_tip is G1 or a later tip in rack order" in unmet
+    assert "tips.start_tip is B1 or a later tip in rack order" in unmet
     assert any(requirement.startswith("plan tips_exclude") for requirement in unmet)
     lab_owned = deepcopy(_through_the_engine(1)[0])
     lab_owned["print"]["z_mm"] = 0.5
@@ -243,7 +243,7 @@ def test_scripted_user_path_reaches_the_expected_final_state(replays, sop, name)
     (2, "confused", 1, "The current plan has no 5×, 10×, 20× dilutions"),
     (2, "confused", 2, "I interpreted this as a print-only run using the existing prepared samples"),
     # the replicate reading of "twice" is flagged for checking (the proposal groups flagged values under this heading)
-    (2, "confused", 8, "CHECK THESE - I could not find them in what you typed: - Replicates (prints of each sample): 2"),
+    (2, "confused", 8, "CHECK THESE - I could not find them in what you typed: - Total replicates (prints of each condition): 2"),
     (3, "confused", 1, 'If you meant a column, say "plate column 3"'),
     (3, "confused", 4, "8 dilutions starting at row D run past row H"),      # the series is still 8 long
     (3, "confused", 7, "Paper columns 3 | 4"),
@@ -439,6 +439,6 @@ def test_the_sop_paths_carry_model_replies_only_as_recorded_json():
 def test_sop_end_states_print_what_the_sop_documents_say():
     plans = {sop: [build_plan(config) for config in _through_the_engine(sop)] for sop in (1, 2, 3, 4, 5)}
     assert [op.destination for op in plans[3][0].operations if op.kind == "print"] == ["D3", "D4", "E3", "E4", "F3", "F4"]
-    assert plans[4][1].total_drops == 24 and [tip.tip for tip in plans[4][1].tips] == ["G1", "H1", "A2", "B2"]
-    assert plans[5][0].tips_needed == 34 and plans[5][0].next_tip == "C6"
+    assert plans[4][1].total_drops == 24 and [tip.tip for tip in plans[4][1].tips] == ["B1"]
+    assert plans[5][0].tips_needed == 36 and plans[5][0].next_tip == "E6"
     assert plans[1][0].vial_use_ul == {"solvent": 612.5, "sample": 187.5}

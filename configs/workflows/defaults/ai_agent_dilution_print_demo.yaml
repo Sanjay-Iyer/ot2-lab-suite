@@ -92,7 +92,7 @@ print:
   enabled: true
   droplet_volume_ul: 5.0
   droplets_per_spot: 1          # stacked drops on the same spot
-  replicates: 1                 # side-by-side paper columns per volume
+  replicates: 1                 # total printed copies of each condition, including the first
   paper_start_column: 1
   paper_columns: 12
 

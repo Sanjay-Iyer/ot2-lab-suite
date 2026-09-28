@@ -99,6 +99,10 @@ class FakePipette:
     def air_gap(self, volume, height=None):
         self.log.append(("air_gap", float(volume), height))
 
+    def touch_tip(self, location=None, **kwargs):
+        assert self.has_tip
+        self.log.append(("touch_tip", location.top().key() if hasattr(location, "top") else None))
+
     def mix(self, reps, volume, location):
         assert self.has_tip
         self.log.append(("mix", reps, float(volume), location.key()))
