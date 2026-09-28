@@ -179,7 +179,9 @@ def normalize_tip(value: Any) -> str:
     try:
         return parse_well_name(value, rows="ABCDEFGH", columns=12, what="a tip")
     except FieldError as exc:
-        raise FieldError(f"tips are A1-H12 on the 96-tip rack, got {value!r} ({exc})") from exc
+        # keep the hint for a reversed name ("1G"); "Z99" needs only the range, not the same sentence twice
+        hint = f" ({exc})" if "row letter first" in str(exc) else ""
+        raise FieldError(f"tips are A1-H12 on the 96-tip rack, got {value!r}{hint}") from exc
 
 
 def normalize_row(value: Any) -> str:
@@ -432,7 +434,7 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "print.enabled": ("Print in this run", normalize_bool),
     "print.droplet_volume_ul": ("Drop volume", normalize_drop_volumes),
     "print.droplets_per_spot": ("Drops per paper position", normalize_count),
-    "print.replicates": ("Replicate paper columns", normalize_count),
+    "print.replicates": ("Replicates (prints of each sample)", normalize_count),
     "print.paper_start_column": ("First paper column", normalize_paper_column),
     "print.paper_rows": ("Paper rows (print destinations)", normalize_paper_rows),
     "print.source_map": ("Print map (plate well → paper positions)", normalize_source_map),

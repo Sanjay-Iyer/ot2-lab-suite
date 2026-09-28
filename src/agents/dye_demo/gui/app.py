@@ -26,7 +26,9 @@ from src.agents.dye_demo.plan import build_plan
 from src.agents.dye_demo.gui.labware_svg import (
     render_paper_svg,
     render_plate_svg,
+    render_tiprack_svg,
     render_tuberack_svg,
+    tip_settings,
 )
 
 REPO = Path(__file__).resolve().parents[4]
@@ -66,10 +68,14 @@ def execution_target(live: bool) -> ExecutionTarget:
     return ExecutionTarget("SIMULATED OT-2", "Start the simulated OT-2 run?")
 
 
-def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION") -> None:
+def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION",
+                            baseline: dict[str, Any] | None = None) -> None:
+    """`baseline` is the applied plan when `config` is a proposal: the tip settings it changes and the paper positions it
+    adds are highlighted (amber)."""
     plate_svg = render_plate_svg(config)
     tuberack_svg = render_tuberack_svg(config)
-    paper_svg = render_paper_svg(config)
+    paper_svg = render_paper_svg(config, baseline)
+    tiprack_svg = render_tiprack_svg(config)
 
     ui.label(title).classes("font-semibold text-slate-700 mt-4 mb-1 text-base")
     with ui.row().classes("w-full gap-4 items-start flex-wrap"):
@@ -82,6 +88,22 @@ def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUAL
         if paper_svg:
             with ui.column().classes("items-center p-2 bg-slate-50 border border-slate-200 rounded"):
                 ui.html(paper_svg).classes("w-full")
+        if tiprack_svg:
+            with ui.column().classes("tip-rack-card items-center p-2 bg-slate-50 border border-slate-200 rounded"):
+                _tip_settings(config, baseline)
+                ui.html(tiprack_svg).classes("w-full")
+
+
+def _tip_settings(config: dict[str, Any], baseline: dict[str, Any] | None) -> None:
+    """Start tip, return tips and tip policy above the tip rack; in a proposal, the values it changes stand out."""
+    applied = dict(tip_settings(baseline)) if baseline is not None else {}
+    with ui.element("div").classes("tip-settings w-full"):
+        for label, value in tip_settings(config):
+            ui.label(f"{label}:").classes("plan-label")
+            changed = bool(applied) and applied.get(label) != value
+            shown = ui.label(value).classes("font-semibold" + (" tip-setting-changed" if changed else ""))
+            if changed:
+                shown.props('title="Changed by this proposal"')     # a plain hover title: no extra grid element
 
 
 def experiment_flow(config: dict[str, Any]) -> list[FlowStep]:
@@ -153,6 +175,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .flow-step-title { font-size: 15px; font-weight: 700; color: #334e62;
                            border-bottom: 1px solid #c5d2dc; padding-bottom: 10px; margin-bottom: 4px; width: 100%; }
         .current-user { background: #e5e7eb; color: #374151; white-space: normal; }
+        .tip-settings { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:14px; background:#ffffff;
+                        border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; }
+        .tip-setting-changed { background:#fef3c7; color:#92400e; border-radius:4px; padding:0 4px; }
         .run-action.disabled { opacity: 1 !important; }
     """)
 
@@ -256,7 +281,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                 with ui.row().classes("w-full items-center justify-between"):
                     ui.label(f"PROPOSED PLAN #{snapshot.proposal_id}").classes("text-lg font-semibold")
                     ui.badge("WAITING FOR APPROVAL", color="warning")
-                _labware_visualizations(snapshot.proposed, "PROPOSED LABWARE VISUALIZATION")
+                _labware_visualizations(snapshot.proposed, "PROPOSED LABWARE VISUALIZATION", baseline=snapshot.current)
                 _plan(snapshot.proposed_sections)
                 if snapshot.proposal_attention:
                     with ui.card().classes("w-full bg-amber-50 text-amber-900"):

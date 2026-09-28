@@ -264,7 +264,7 @@ def test_history_records_who_changed_what_and_when(state):
                          operator="Stephen")
     assert record["operator"] == "Stephen" and record["revision"] == 1
     assert record["changes"] == [{
-        "path": "print.replicates", "label": "Replicate paper columns", "before": 1, "after": 2,
+        "path": "print.replicates", "label": "Replicates (prints of each sample)", "before": 1, "after": 2,
         "kind": "requested", "why": "", "verified": True, "concern": "",
     }]
     assert "by Stephen" in render.render_history(state.history)

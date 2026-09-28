@@ -136,10 +136,13 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     if not plan.do_dilution and not plan.do_print:
         report.error("steps.none", "nothing to run: both the dilution step and the print step are off")
     if plan.tips_short:
+        # the last start tip with enough fresh tips after it ("start from tip H12" on a 10-tip plan: G11)
+        latest = f" ({TIP_ORDER[-plan.tips_needed]} is the latest that fits)" if plan.tips_needed <= len(TIP_ORDER) \
+            else ""
         report.error(
             "tips.insufficient",
             f"this plan needs {plan.tips_needed} tips but only {plan.tips_available} remain from "
-            f"{plan.start_tip}; start from an earlier tip or load a fresh rack",
+            f"{plan.start_tip}; start from an earlier tip{latest} or load a fresh rack",
         )
     elif plan.next_tip is not None and 0 < len(TIP_ORDER) - TIP_ORDER.index(plan.next_tip) < 8:
         remaining = len(TIP_ORDER) - TIP_ORDER.index(plan.next_tip)

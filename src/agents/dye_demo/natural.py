@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
-from typing import Any
+from typing import Any, Iterable
 
 from src.agents.dye_demo.columns import GAP_QUESTION
 from src.agents.dye_demo.grounding import value_stated
@@ -25,6 +25,7 @@ from src.agents.dye_demo.model import (
     paper_position,
     plate_well,
 )
+from src.agents.dye_demo.placement import Need, PlacementError, allocate, placement_of
 from src.agents.dye_demo.plan import build_plan, droplet_volumes, explicit_paper_rows, steps_enabled
 
 
@@ -403,39 +404,42 @@ def _home_rows(plan) -> dict[str, str]:
     return {f"{row}{plan.plate_column}": paper_row for row, paper_row in zip(plan.rows, plan.paper_rows)}
 
 
-def _allocate(source: str, count: int, taken: set[str], reserved_rows: set[str], start: int, width: int,
-              own: str | None = None) -> list[str]:
-    """`count` free paper positions for one source: along its own paper row (the paper row it prints on now, else the
-    row letter of the well) from the first paper column, then on the next free rows. Deterministic, so the same words
-    give the same map."""
-    own = own or source[0]
-    order = [own] + [row for row in ROWS if row != own and row not in reserved_rows] + \
-            [row for row in ROWS if row != own and row in reserved_rows]
-    positions: list[str] = []
-    for row in order:
-        for column in range(start, width + 1):
-            position = f"{row}{column}"
-            if position in taken:
-                continue
-            positions.append(position)
-            if len(positions) == count:
-                return positions
-    raise SelectionError(f"there are not {count} free paper positions left for {source}",
-                         "Which paper positions should it print on?")
+def _allocate(source: str, count: int, taken: set[str], reserved_rows: set[str], anchor: int, width: int,
+              own: str, entry: dict[str, Any]) -> list[str]:
+    """`count` free paper positions for one source (placement.allocate): its own paper row nearest the column it prints
+    on now (else the first paper column), then the nearest free rows; within the entry's paper rows / columns and its
+    placement wish ("adjacent", "same_row", "same_column") when it gives them. Deterministic, so the same words give
+    the same map."""
+    try:
+        rows = tuple(normalize_paper_rows(entry["rows"])) if entry.get("rows") not in (None, "", []) else ()
+        columns = tuple(normalize_paper_column(item) for item in _as_items(entry.get("columns")))
+        need = Need(source, count, home_row=own, rows=rows, columns=columns,
+                    placement=placement_of(entry.get("placement")), anchor_column=columns[0] if columns else anchor)
+        return allocate([need], taken, width=width, reserved_rows=reserved_rows)[0]
+    except FieldError as exc:
+        raise SelectionError(str(exc)) from exc
+    except PlacementError as exc:
+        raise SelectionError(str(exc), "Which paper positions should it print on?") from exc
 
 
-def expand_print_map(value: Any, config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+def expand_print_map(value: Any, config: dict[str, Any], *,
+                     occupied: Iterable[str] = ()) -> tuple[list[dict[str, Any]], str]:
     """A print-map selection as field changes.
 
     Entry forms the router uses (all resolved here, never by the model):
-      {"source": "A11", "positions": ["A1", "B1"]}       exactly these paper positions
+      {"source": "A11", "positions": ["A1", "B1"]}       exactly these paper positions, in this order
       {"source": "A11", "positions": "all"}              every position the plan prints now ("use this for all prints")
-      {"source": "A11", "count": 10}                     10 prints: along the source's own paper row, from the first
-                                                         paper column, then the next free rows
+      {"source": "A11", "count": 10}                     10 prints on free positions: along the source's own paper row
+                                                         nearest the column it prints on now (else the first paper
+                                                         column), then the nearest free rows (placement.py)
+      {"source": "A11", "count": 3, "columns": [5]}      3 prints within those paper columns (Python picks the rows)
+      {"source": "A11", "count": 3, "rows": ["B"]}       3 prints within those paper rows (Python picks the columns)
+      {"source": "A11", "count": 3, "placement": "adjacent"}  3 side-by-side prints (also "same_row", "same_column")
       {"source": "A11", "columns": [1, 2, 3]}            its own paper row in those columns (with "rows": those rows)
       {"source": "A11", "rows": ["A", "B"], "columns": [3]}  those paper rows in those columns (A3, B3)
       {"sources": ["A11", "B11"], "total": 10}           a total without a split: a question, never a guess
     A source's "own paper row" is the paper row it prints on in the current plan (print.paper_rows), else its letter.
+    `occupied` are paper positions no counted print may use (printed on by an earlier live run of the session).
     """
     entries, group = _map_entries(value)
     printing = config.get("print") or {}
@@ -472,7 +476,7 @@ def expand_print_map(value: Any, config: dict[str, Any]) -> tuple[list[dict[str,
     if kinds.count("all") > 1 or ("all" in kinds and len(entries) > 1) or \
             (len(entries) > 1 and "none" in kinds):
         raise _split_question(sources, len(current))
-    taken: set[str] = set()
+    taken: set[str] = set(occupied)             # counted prints never go where an earlier live run printed
     resolved: dict[int, list[str]] = {}
     for index, (entry, kind, source) in enumerate(zip(entries, kinds, sources)):
         try:
@@ -491,7 +495,9 @@ def expand_print_map(value: Any, config: dict[str, Any]) -> tuple[list[dict[str,
         except FieldError as exc:
             raise SelectionError(str(exc)) from exc
         taken.update(resolved.get(index, []))
-    reserved = {home.get(source, source[0]) for source in sources}
+    # where each source prints now: its new prints start on that row, next to that column
+    now = {item.well: item.positions[0] for item in plan.print_sources if item.positions} if plan.do_print else {}
+    reserved = {now[source][0] if source in now else home.get(source, source[0]) for source in sources}
     for index, (entry, kind, source) in enumerate(zip(entries, kinds, sources)):
         if kind != "count":
             continue
@@ -501,8 +507,9 @@ def expand_print_map(value: Any, config: dict[str, Any]) -> tuple[list[dict[str,
             raise SelectionError(f"{entry['count']!r} is not a number of prints") from exc
         if count < 1:
             raise SelectionError(f"{source} would print {count} times; the number of prints must be at least 1")
-        own = home.get(source, source[0])
-        resolved[index] = _allocate(source, count, taken, reserved - {own}, start, width, own)
+        own = now[source][0] if source in now else home.get(source, source[0])
+        anchor = int(now[source][1:]) if source in now else start
+        resolved[index] = _allocate(source, count, taken, reserved - {own}, anchor, width, own, entry)
         taken.update(resolved[index])
     try:
         mapped = normalize_source_map([

@@ -92,10 +92,12 @@ from src.agents.dye_demo.natural import (
     selected_rows,
     unstated_split,
 )
+from src.agents.dye_demo.placement import PlacementError, describe_new, map_with_count, series_as_map
 from src.agents.dye_demo.plan import (
     build_plan,
     explicit_paper_rows,
     factors_of,
+    paper_layout,
     print_map,
     row_factors,
     steps_enabled,
@@ -729,6 +731,8 @@ class ExperimentState:
                 add({"evidence": str(raw.get("evidence") or ""), **item}, checked)
         for item in self._destinations_kept(before, after, set(changes)):
             add(item, (True, ""))
+        for item in self._placed_prints(before, after, changes):
+            add(item, (True, ""))
         physical = deepcopy(physical or {})
         if physical.get("dilutions_prepared") in (PREPARED_FROM_PLAN, ASSUMED_FROM_PLAN):
             # "The dilutions are already made ... their factors are 2x, 5x and 10x": record the wells and factors
@@ -879,6 +883,52 @@ class ExperimentState:
                               "why": "each dilution keeps the paper row it prints on"})
         if paper is not None and (entries or any(item["path"] == "print.source_map" and item["value"]
                                                  for item in items)):
+            items.append({"path": "print.paper_rows", "value": None, "kind": "dependent",
+                          "why": "the print map names every paper position"})
+        return items
+
+    def _placed_prints(self, before: dict[str, Any], after: dict[str, Any],
+                       changes: dict[str, FieldChange]) -> list[dict[str, Any]]:
+        """Prints the side-by-side paper layout cannot place, placed on free paper positions (placement.py).
+
+        A replicate count (print.replicates) says how many times each sample prints, never where. The default layout
+        puts the replicates side by side from the first paper column and is kept whenever it fits. When it would need
+        a paper column past the paper's edge, or when a print map is in force (its positions do not follow a count),
+        the plan becomes an explicit print map instead: every print the layout does place stays where it is and the
+        others go on the nearest free positions, never on one an earlier live run printed. Only a paper with no room
+        left is refused - a real limit, unlike the old "column 13" refusal of a default layout. A first paper column
+        the scientist names in the same request is their constraint, not a default: validation then says it does not
+        fit ("start further left")."""
+        changed = set(changes)
+        requested = {path for path, change in changes.items() if change.kind == "requested"}
+        if "print.source_map" in changed or "print.paper_start_column" in requested or not steps_enabled(after)[1]:
+            return []
+        occupied = set(self.printed_positions)
+        width = int((after.get("print") or {}).get("paper_columns", 12) or 12)
+        try:
+            if print_map(after) is not None:
+                if "print.replicates" not in changed:
+                    return []
+                entries, new = map_with_count(before, after, occupied, width=width)
+                count = int(after["print"].get("replicates", 1))
+                why = (f"each sample now prints {count} time{'s' if count != 1 else ''}: its prints stay where they are"
+                       + (f" and the new ones go on the nearest free paper positions ({describe_new(new)})" if new
+                          else ", keeping the first ones"))
+            else:
+                placed = series_as_map(before, after, occupied, width=width)
+                if placed is None:
+                    return []
+                entries, new = placed
+                past = max(int(spot["column"]) for spot in paper_layout(after, include_overflow=True))
+                why = (f"side by side from paper column {after['print'].get('paper_start_column', 1)} would need paper "
+                       f"column {past}, past the paper's {width} columns, so the prints stay where they are and the "
+                       f"new ones go on the nearest free paper positions ({describe_new(new)})")
+        except PlacementError as exc:
+            raise ProposalRejected(f"{exc}. Nothing was changed.", kind="paper_layout",
+                                   question=getattr(exc, "question", "") or "Which paper positions should they print "
+                                                                             "on?") from exc
+        items = [{"path": "print.source_map", "value": entries, "kind": "dependent", "why": why}]
+        if explicit_paper_rows(after) is not None:
             items.append({"path": "print.paper_rows", "value": None, "kind": "dependent",
                           "why": "the print map names every paper position"})
         return items
@@ -1070,7 +1120,7 @@ class ExperimentState:
                     unstated_split(raw.get("value"), f"{text}\n{history}")
                 if split is not None:
                     raise split                 # asked like a total with no split (the even split offered as yes)
-                changes, note = expand_print_map(raw.get("value"), config)
+                changes, note = expand_print_map(raw.get("value"), config, occupied=self.printed_positions)
                 items = next(change["value"] for change in changes if change["path"] == "print.source_map")
                 stated = _sources_stated
                 wells = [entry["source"] for entry in items]

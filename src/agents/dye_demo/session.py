@@ -756,6 +756,11 @@ class DemoSession:
         wells: list[str] = list(self._replaced_sources)
         for config in ((self.pending.after,) if self.pending else ()) + (self.state.config,):
             wells += [str(entry.get("source", "")).upper() for entry in (print_map(config) or [])]
+            # the wells a dilution series prints from are in play too: "put 3 replicates in column 5" of a plan that
+            # prints A11 uses A11 without the scientist naming it (2026-09-28); a map listed only its own sources
+            plan = build_plan(config)
+            if plan.do_print:
+                wells += [source.well for source in plan.print_sources]
         return tuple(dict.fromkeys(well for well in wells if well))
 
     @staticmethod
