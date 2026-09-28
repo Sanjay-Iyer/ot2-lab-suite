@@ -897,8 +897,8 @@ class ExperimentState:
         the plan becomes an explicit print map instead: every print the layout does place stays where it is and the
         others go on the nearest free positions, never on one an earlier live run printed. Only a paper with no room
         left is refused - a real limit, unlike the old "column 13" refusal of a default layout. A first paper column
-        the scientist names in the same request is their constraint, not a default: validation then says it does not
-        fit ("start further left")."""
+        the scientist names anchors the first print of each sample; the other copies go on the nearest free positions
+        (3 replicates from column 12 print in columns 12, 11 and 10)."""
         changed = set(changes)
         requested = {path for path, change in changes.items() if change.kind == "requested"}
         if "print.source_map" in changed or not steps_enabled(after)[1]:
@@ -1140,7 +1140,10 @@ class ExperimentState:
                 # the column numbers in any written form ("columns 1 3 5", "one three and five", "first and third")
                 stated = lambda columns, words: (_columns_stated(columns, words)  # noqa: E731
                                                  or value_stated([columns[0], columns[-1]], words))
-                changes, note = expand_paper_columns(items, config)
+                # one column without "only" says where the prints start, not how many (as the text's own column
+                # request reads it: columns.paper_column_mentions), so the replicate count stays
+                anchor = len(items) == 1 and (items[0],) not in paper_column_request(text).exact
+                changes, note = expand_paper_columns(items, config, anchor=anchor)
                 what = columns_phrase(items)
         except SelectionError as exc:
             if path == "print_map" and exc.fix is not None:

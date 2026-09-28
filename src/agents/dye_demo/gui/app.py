@@ -21,7 +21,7 @@ from src.agents.dye_demo.model import (
     material_spec,
     slot_of,
 )
-from src.agents.dye_demo.plan import build_plan
+from src.agents.dye_demo.plan import build_plan, steps_enabled
 
 from src.agents.dye_demo.gui.labware_svg import (
     paper_summary,
@@ -58,66 +58,83 @@ class FlowStep:
 
 @dataclass(frozen=True)
 class ExecutionTarget:
-    """Mode-specific run copy shown by the shared page and confirmation flow."""
-    badge: str
-    confirm_title: str
-    run_heading: str
-    run_note: str
-    confirm_note: str
+    """The only part of the page that names the execution backend. Every other label, button, card, status and dialog
+    is identical for --simulate and the real OT-2, so work on the page carries over to both."""
+    badge: str              # header badge (same component, colour and place in both modes)
+    confirm_title: str      # title of the run confirmation dialog
 
 
 def execution_target(live: bool) -> ExecutionTarget:
     if live:
-        return ExecutionTarget(
-            "LIVE · REAL OT-2", "Start the real OT-2 run?", "RUN ON OT-2",
-            "Check the Experiment Procedure and physical deck before starting the run.",
-            "The software connects to the OT-2, uploads the protocol and starts it. The robot moves as soon as "
-            "the run starts. Check the deck, tips, liquids and paper against the Experiment Procedure first.",
-        )
-    return ExecutionTarget(
-        "SIMULATED OT-2", "Start the simulated OT-2 run?", "SIMULATED RUN",
-        "Build and simulate the Experiment Procedure on this laptop. No robot is contacted.",
-        "The protocol will be built and simulated on this laptop. No robot is contacted and no liquid or tips "
-        "are used.",
-    )
+        return ExecutionTarget("LIVE · REAL OT-2", "Start the real OT-2 run?")
+    return ExecutionTarget("SIMULATED OT-2", "Start the simulated OT-2 run?")
 
 
 def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION",
                             baseline: dict[str, Any] | None = None) -> None:
-    """`baseline` is the applied plan when `config` is a proposal: the tip settings it changes and the paper positions it
-    adds are highlighted (amber)."""
-    plate_svg = render_plate_svg(config)
-    tuberack_svg = render_tuberack_svg(config)
-    paper_svg = render_paper_svg(config, baseline)
-    tiprack_svg = render_tiprack_svg(config)
+    """The labware as the workflow it serves: STEP 1 DILUTIONS (vial rack -> 96-well plate) and STEP 2 PRINTING
+    (96-well plate -> paper), each in its own box with FROM and TO, then the tip rack and the deck, which support both
+    steps. The 96-well plate is in both boxes: the dilutions' destination and the prints' source. `baseline` is the
+    applied plan when `config` is a proposal: the tip settings it changes and the paper positions it adds are
+    highlighted (amber)."""
+    do_dilution, do_print = steps_enabled(config)
 
     ui.label(title).classes("font-semibold text-slate-700 mt-4 mb-1 text-base")
-    with ui.element("div").classes("labware-grid w-full"):
-        if plate_svg:
-            with ui.column().classes("labware-card experiment-card"):
-                ui.label("96-Well Plate").classes("labware-card-title")
-                ui.html(plate_svg).classes("w-full")
-        if tuberack_svg:
-            with ui.column().classes("labware-card experiment-card"):
-                ui.label("Vial Rack").classes("labware-card-title")
-                ui.html(tuberack_svg).classes("w-full")
-        if paper_svg:
-            with ui.column().classes("labware-card experiment-card"):
-                ui.label("Paper Substrate").classes("labware-card-title")
-                ui.html(paper_svg).classes("w-full")
+    with ui.element("div").classes("workflow-steps w-full"):
+        with _workflow_step("dilutions", 1, "DILUTIONS", "Vial rack → 96-well plate", do_dilution):
+            _flow_card("FROM", "Vial Rack", render_tuberack_svg(config))
+            _flow_arrow()
+            _flow_card("TO", "96-Well Plate", render_plate_svg(config, role="dilution"))
+        with _workflow_step("printing", 2, "PRINTING", "96-well plate → paper substrate", do_print):
+            _flow_card("FROM", "96-Well Plate", render_plate_svg(config, role="print"))
+            _flow_arrow()
+            with _flow_card("TO", "Paper Substrate", render_paper_svg(config, baseline)):
                 unique, total_replicates, total_spots = paper_summary(config)
                 with ui.column().classes("paper-summary"):
                     ui.label(f"Unique drops: {unique}")
                     ui.label(f"Total replicates: {total_replicates}")
                     ui.label(f"Total printed spots: {total_spots}")
-        if tiprack_svg:
-            with ui.column().classes("labware-card tip-rack-card"):
-                ui.label("Pipette Tip Rack").classes("labware-card-title")
-                _tip_settings(config, baseline)
-                ui.html(tiprack_svg).classes("w-full")
+    # outside both steps: the tips serve every step that runs, and the deck holds all the labware
+    serves = {(True, True): "Supports both steps", (True, False): "Supports the dilutions",
+              (False, True): "Supports the printing"}.get((do_dilution, do_print), "No step uses tips")
+    with ui.element("div").classes("support-row w-full"):
+        with ui.column().classes("labware-card tip-rack-card"):
+            ui.label("Pipette Tip Rack").classes("labware-card-title")
+            ui.label(serves).classes("support-note")
+            _tip_settings(config, baseline)
+            ui.html(render_tiprack_svg(config)).classes("labware-drawing w-full")
         with ui.column().classes("labware-card deck-card"):
-            ui.label("OT-2 Deck Layout").classes("labware-card-title")
-            ui.html(render_deck_svg(config)).classes("w-full")
+            ui.html(render_deck_svg(config)).classes("labware-drawing w-full")      # the drawing carries its "OT-2 Deck Layout" title
+
+
+def _workflow_step(kind: str, number: int, name: str, flow: str, active: bool):
+    """One workflow step's box (blue for dilutions, green for printing); returns its body for the FROM/TO cards. A
+    step this run does not perform stays in place, dimmed and marked, so the workflow always reads the same way."""
+    step = ui.element("div").classes(f"workflow-step step-{kind}" + ("" if active else " step-skipped"))
+    with step:
+        with ui.element("div").classes("workflow-step-header"):
+            with ui.column().classes("gap-0"):
+                ui.label(f"STEP {number}").classes("workflow-step-number")
+                ui.label(name).classes("workflow-step-title")
+            ui.label(flow if active else "Skipped in this run").classes("workflow-step-flow")
+        body = ui.element("div").classes("workflow-step-body")
+    return body
+
+
+def _flow_card(direction: str, title: str, svg: str):
+    """A labware card in a step under its FROM or TO label; returns the card so more can go under the drawing."""
+    with ui.element("div").classes("flow-slot"):
+        ui.label(direction).classes("flow-direction")
+        card = ui.column().classes("labware-card flow-card")
+        with card:
+            ui.label(title).classes("labware-card-title")
+            ui.html(svg).classes("labware-drawing w-full")
+    return card
+
+
+def _flow_arrow() -> None:
+    with ui.element("div").classes("flow-arrow"):
+        ui.icon("east").classes("flow-arrow-icon")
 
 
 def _tip_settings(config: dict[str, Any], baseline: dict[str, Any] | None) -> None:
@@ -201,16 +218,52 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .flow-step-title { font-size: 15px; font-weight: 700; color: #334e62;
                            border-bottom: 1px solid #c5d2dc; padding-bottom: 10px; margin-bottom: 4px; width: 100%; }
         .current-user { background: #e5e7eb; color: #374151; white-space: normal; }
-        .labware-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; align-items:start; }
+        .workflow-steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(640px,100%),1fr));
+                          gap:20px; align-items:stretch; }
+        .workflow-step { display:flex; flex-direction:column; gap:12px; padding:14px 18px 18px; border-radius:14px;
+                         min-width:0; box-sizing:border-box; }
+        .step-dilutions { border:3px solid #2563eb; background:#eff6ff; }
+        .step-printing { border:3px solid #16a34a; background:#f0fdf4; }
+        .step-skipped { opacity:.5; border-style:dashed; }
+        .workflow-step-header { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+                                gap:4px 16px; padding-bottom:10px; border-bottom:1px solid #cbd5e1; }
+        .step-dilutions .workflow-step-header { border-color:#bfdbfe; }
+        .step-printing .workflow-step-header { border-color:#bbf7d0; }
+        .workflow-step-number { font-size:12px; font-weight:800; letter-spacing:.14em; }
+        .workflow-step-title { font-size:28px; font-weight:800; letter-spacing:.08em; line-height:1.1; }
+        .step-dilutions .workflow-step-number, .step-dilutions .workflow-step-title { color:#1d4ed8; }
+        .step-printing .workflow-step-number, .step-printing .workflow-step-title { color:#15803d; }
+        .workflow-step-flow { font-size:15px; font-weight:600; color:#475569; }
+        .workflow-step-body { flex:1; display:grid; grid-template-columns:minmax(0,380px) auto minmax(0,380px);
+                              justify-content:center; align-items:stretch; gap:10px; }
+        .flow-slot { display:flex; flex-direction:column; gap:6px; min-width:0; }
+        .flow-slot > .flow-card { flex:1; }
+        .flow-direction { align-self:flex-start; font-size:12px; font-weight:800; letter-spacing:.14em;
+                          padding:2px 12px; border-radius:999px; }
+        .step-dilutions .flow-direction { background:#dbeafe; color:#1d4ed8; }
+        .step-printing .flow-direction { background:#dcfce7; color:#15803d; }
+        .step-dilutions .flow-card { border:2px solid #93c5fd; }
+        .step-printing .flow-card { border:2px solid #86efac; }
+        .flow-arrow { display:flex; align-items:center; justify-content:center; padding-top:26px; }
+        .flow-arrow-icon { font-size:34px; }
+        .step-dilutions .flow-arrow-icon { color:#3b82f6; }
+        .step-printing .flow-arrow-icon { color:#22c55e; }
+        .support-row { display:grid; grid-template-columns:minmax(280px,360px) minmax(0,1fr); gap:20px;
+                       align-items:start; margin-top:20px; }
+        .support-note { width:100%; margin-top:-6px; font-size:13px; font-weight:600; color:#64748b; text-align:center; }
         .labware-card { display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px;
                         background:white; border-radius:10px; min-width:0; box-sizing:border-box; }
-        .experiment-card { border:3px solid #15803d; }
         .tip-rack-card { border:3px solid #111827; }
-        .deck-card { border:2px solid #475569; grid-column:1 / -1; }
+        .deck-card { border:2px solid #475569; }
+        .labware-drawing svg { display:block; margin:0 auto; }
         .labware-card-title { width:100%; font-size:20px; font-weight:750; color:#1e293b; text-align:center; }
         .paper-summary { align-self:stretch; gap:2px; font-size:14px; font-weight:650; color:#1e293b; }
-        @media (max-width:1200px) { .labware-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-        @media (max-width:700px) { .labware-grid { grid-template-columns:minmax(0,1fr); } }
+        @media (max-width:760px) {
+            .workflow-step-body { grid-template-columns:minmax(0,1fr); }
+            .flow-arrow { padding-top:0; }
+            .flow-arrow-icon { transform:rotate(90deg); }
+            .support-row { grid-template-columns:minmax(0,1fr); }
+        }
         .tip-settings { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:14px; background:#ffffff;
                         border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; }
         .tip-setting-changed { background:#fef3c7; color:#92400e; border-radius:4px; padding:0 4px; }
@@ -260,8 +313,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         with ui.card().classes("section-run w-full p-5"):
             with ui.row().classes("w-full items-center justify-between"):
                 with ui.column().classes("gap-0"):
-                    ui.label(target.run_heading).classes("text-lg font-semibold")
-                    ui.label(target.run_note).classes("text-sm text-slate-500")
+                    ui.label("RUN ON OT-2").classes("text-lg font-semibold")
+                    ui.label("Check the Experiment Procedure above and the deck, then start the run. The OT-2 is "
+                             "contacted only now.").classes("text-sm text-slate-500")
                 run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
                                        color="warning").classes("run-action text-lg")
                 run_button.set_enabled(False)
@@ -285,7 +339,9 @@ def build_page(adapter: DemoGuiAdapter) -> None:
 
     with ui.dialog() as confirm_run, ui.card().classes("p-6 max-w-lg"):
         ui.label(target.confirm_title).classes("text-xl font-semibold")
-        ui.label(target.confirm_note).classes("text-slate-600")
+        ui.label("The software now connects to the OT-2, builds and simulates the protocol for the Experiment Procedure, "
+                 "uploads it and starts it. The robot moves as soon as the run starts. Check the deck, tips, liquids "
+                 "and paper against the Experiment Procedure first.").classes("text-slate-600")
         with ui.row().classes("w-full justify-end gap-3 mt-4"):
             ui.button("Cancel", on_click=confirm_run.close).props("flat")
             start_button = ui.button("Start run", icon="precision_manufacturing", color="negative")

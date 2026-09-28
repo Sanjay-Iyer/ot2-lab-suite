@@ -104,7 +104,7 @@ def test_print_cycle_is_the_physically_validated_one(protocol_module, config):
     for index in paper:
         aspirate, air_gap, dispense, blow_out, delay = log[index - 2], log[index - 1], log[index], log[index + 1], log[index + 2]
         assert aspirate[0] == "aspirate" and aspirate[1] == 5.0 and aspirate[2][0] == PLATE
-        assert aspirate[2][2:] == ("bottom", config["liquid_handling"]["plate_aspirate_height_mm"])
+        assert aspirate[2][2:] == ("bottom", config["print"]["aspirate_height_mm"])
         assert air_gap == ("air_gap", 1.5, 5.0)
         assert dispense[1] == 6.5 and dispense[2][2:] == ("bottom", 1.1) and dispense[3] == 3.0
         assert blow_out == ("blow_out", dispense[2])
@@ -115,10 +115,8 @@ def test_no_transfer_is_below_the_p20_minimum(protocol_module, config):
     log = run_protocol(protocol_module, config).log          # 16x leaves a 0.63 uL remainder
     volumes = [entry[1] for entry in log if entry[0] == "aspirate"]
     assert min(volumes) >= 1.0
-    water_into_h11 = [entry[1] for entry in log if entry[0] == "dispense" and entry[2][:2] == (PLATE, "H11")]
-    sample_chunks = sum(op.kind == "transfer" and op.role == "sample" and op.destination == "H11"
-                        for op in build_plan(config).operations)
-    assert round(sum(water_into_h11) - sample_chunks * config["liquid_handling"]["air_gap_ul"], 1) == 150.0
+    into_h11 = [entry[1] for entry in log if entry[0] == "dispense" and entry[2][:2] == (PLATE, "H11")]
+    assert round(sum(into_h11), 1) == 150.0                  # water and dye together, no liquid lost to the merge
 
 
 def test_off_deck_vial_rack_is_not_loaded_for_a_print_only_run(protocol_module, config):

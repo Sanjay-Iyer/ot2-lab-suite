@@ -151,13 +151,19 @@ def test_physically_impossible_requests_are_refused(state, path, value, said, me
         state.propose([change(path, value, said)], request=said)
 
 
-def test_series_past_row_h_and_printing_off_the_paper_are_refused(state):
+def test_series_past_row_h_and_a_paper_with_no_room_left_are_refused(state):
     with pytest.raises(ProposalRejected, match="past row H"):
         state.propose([change("dilution.start_row", "F"), change("dilution.factors", [1, 2, 4, 8, 16, 32])],
                       request="start at row F with factors 1, 2, 4, 8, 16 and 32")
-    with pytest.raises(ProposalRejected, match="past the paper"):
-        state.propose([change("print.droplet_volume_ul", [5, 10, 15]), change("print.paper_start_column", 11)],
-                      request="print 5, 10 and 15 µL drops starting at paper column 11")
+    # a named first paper column anchors the prints: those that would pass column 12 go on the nearest free
+    # columns instead of being refused (5, 10 and 15 uL from column 11 print in columns 10-12)
+    anchored = state.propose([change("print.droplet_volume_ul", [5, 10, 15]), change("print.paper_start_column", 11)],
+                             request="print 5, 10 and 15 µL drops starting at paper column 11")
+    columns = {int(op.destination[1:]) for op in build_plan(anchored.after).operations if op.kind == "print"}
+    assert columns == {10, 11, 12}
+    with pytest.raises(ProposalRejected, match="not enough free paper positions") as caught:
+        state.propose([change("print.replicates", 13)], request="print each dilution 13 times")    # 104 > 96
+    assert caught.value.kind == "paper_layout"
 
 
 def test_rejected_edits_leave_the_state_untouched(state):
@@ -272,7 +278,7 @@ def test_history_records_who_changed_what_and_when(state):
                          operator="Stephen")
     assert record["operator"] == "Stephen" and record["revision"] == 1
     assert record["changes"] == [{
-        "path": "print.replicates", "label": "Replicates (prints of each sample)", "before": 1, "after": 2,
+        "path": "print.replicates", "label": "Total replicates (prints of each condition)", "before": 1, "after": 2,
         "kind": "requested", "why": "", "verified": True, "concern": "",
     }]
     assert "by Stephen" in render.render_history(state.history)

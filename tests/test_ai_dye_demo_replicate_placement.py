@@ -107,6 +107,23 @@ def test_start_at_column_12_moves_an_existing_map_without_losing_the_count():
 
 
 
+def test_one_named_paper_column_is_where_the_prints_start_and_keeps_the_count():
+    # the router may send "print on column 12" as paper_columns [12] or as the first paper column: either way it
+    # says where the prints go, not how many (it used to reset 3 replicates to 1). "Only column 12" is exact.
+    current = load_config(DEFAULT_CONFIG)
+    current["dilution"]["factors"] = [1, 2, 3]
+    three = propose(current, [change("print.replicates", 3, "3 replicates")], "3 replicates").after
+    for named in (change("paper_columns", [12], "print on column 12"),
+                  change("print.paper_start_column", 12, "print on column 12")):
+        moved = propose(three, [named], "instead let's print on column 12").after
+        assert moved["print"]["replicates"] == 3 and validate(moved).ok
+        assert printed_by(moved) == [(f"{row}11", [f"{row}12", f"{row}11", f"{row}10"]) for row in "ABC"]
+    only = propose(three, [change("paper_columns", [12], "only paper column 12")],
+                   "print only in paper column 12").after
+    assert only["print"]["replicates"] == 1
+    assert printed_by(only) == [(f"{row}11", [f"{row}12"]) for row in "ABC"]
+
+
 def test_a_count_on_a_print_map_is_no_longer_ignored():
     config = load_config(DEFAULT_CONFIG)
     config["dilution"]["enabled"] = False

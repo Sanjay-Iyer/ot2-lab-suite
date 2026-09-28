@@ -73,20 +73,16 @@ dilution:
   start_row: A
   factors: [1, 2, 3, 4, 6, 8, 12, 16]
   total_volume_ul: 150.0
-  max_transfer_ul: 20.0        # liquid ceiling; sample chunks also reserve the air gap
-
-# Plate-only test settings. Edit this block on the offline work laptop, then rebuild.
-# Vial aspiration heights and paper release geometry are configured separately.
-# The mixing position and plate-to-paper aspiration both use plate_aspirate_height_mm.
-liquid_handling:
-  plate_aspirate_height_mm: 0.3
-  plate_dispense_height_mm: 0.3
-  air_gap_ul: 1.0              # sample/dye transfers only; counts toward P20 capacity
-  blow_out: true
-  touch_tip: true
+  max_transfer_ul: 20.0        # lab-owned: P20 ceiling per transfer
+  solvent_dispense_from_top_mm: -2.0   # lab-owned: dispense above the liquid
+  sample_dispense_from_top_mm: -1.0    # lab-owned: dispense above the liquid
+  # Lab-owned. Blow out after every dilution dispense, in air at the dispense
+  # position. The P20 GEN2's default push-out is 0 uL, so without this the end of
+  # each transfer can stay in the tip. See docs/ai_dye_demo/liquid_handling_parameters.md.
+  blow_out_after_dispense: true
 
 # Mix the source well immediately before each print aspiration (height lab-owned).
-mixing: {reps: 2, volume_ul: 15.0}
+mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
 
 # --- printing the dilutions onto paper ------------------------------------------
 # Each dilution prints on its own paper ROW; each droplet volume x replicate gets
@@ -97,7 +93,7 @@ print:
   enabled: true
   droplet_volume_ul: 5.0
   droplets_per_spot: 1          # stacked drops on the same spot
-  replicates: 1                 # side-by-side paper columns per volume
+  replicates: 1                 # total printed copies of each condition, including the first
   paper_start_column: 1
   paper_columns: 12
 
@@ -108,6 +104,7 @@ print:
   # 0.5 mm is the last physically confirmed release height; 1.1 mm was requested
   # on 2026-08-31 and its physical revalidation is pending.
   z_mm: 1.1
+  aspirate_height_mm: 1.0       # inside the dilution well (inherited from v6)
   air_gap_ul: 1.5
   air_gap_height_mm: 5.0
   push_out_ul: 3.0

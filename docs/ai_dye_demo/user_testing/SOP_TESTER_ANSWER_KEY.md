@@ -105,7 +105,7 @@ Changes from the start: dye vial, dilution factors, final volume.
 ### Tips and operations
 
 - 1 tip, A1; next unused tip B1; 95 remaining.
-- 44 dilution transfers, 4 print steps (mix, then drop), 4 drops, 1 tip pick-up.
+- 43 dilution transfers, 4 print steps (mix, then drop), 4 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -402,8 +402,8 @@ plate from Slot 4 to Slot 8; move the P20 tip rack from Slot 8 to Slot 11."
 
 ### Tips and operations
 
-- 36 tips (30 transfers + 6 printed positions): A2–H2, A3–H3, A4–H4, A5–H5, A6–D6. Next unused tip E6; 52 remain of the 88 from A2.
-- 30 transfers, 6 print steps, 12 drops, 36 tip pick-ups.
+- 34 tips (28 transfers + 6 printed positions): A2–H2, A3–H3, A4–H4, A5–H5, A6–B6. Next unused tip C6; 54 remain of the 88 from A2.
+- 28 transfers, 6 print steps, 12 drops, 34 tip pick-ups.
 
 ### Expected agent events
 

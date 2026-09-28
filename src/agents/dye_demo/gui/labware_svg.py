@@ -19,16 +19,18 @@ DECK_LAYOUT = ((10, 11, 12), (7, 8, 9), (4, 5, 6), (1, 2, 3))
 _DECK_LABELS = {"plate": "Plate", "paper": "Paper", "tuberack": "Vials", "tiprack": "Tips"}
 
 
-def render_plate_svg(config: dict[str, Any]) -> str:
-    """Generate SVG for the 96-well dilution plate."""
+def render_plate_svg(config: dict[str, Any], role: str = "all") -> str:
+    """Generate SVG for the 96-well dilution plate. `role` picks the wells shown in use: "dilution" the wells the
+    dilution step fills, "print" the wells the print step draws from, "all" both."""
     plan = build_plan(config)
     slot = format_slot(slot_of(config, "plate"))
 
-    used_wells = {well.well for well in plan.wells}
-    used_wells |= {source.well for source in plan.print_sources}      # the wells the print step draws from
-    if plan.plate_column and not plan.mapped:
-        for r in plan.rows:
-            used_wells.add(f"{r}{plan.plate_column}")
+    filled = {well.well for well in plan.wells} if plan.do_dilution or role == "all" else set()
+    printed_from = {source.well for source in plan.print_sources}      # the wells the print step draws from
+    if plan.plate_column and not plan.mapped and (plan.do_print or role == "all"):
+        printed_from |= {f"{r}{plan.plate_column}" for r in plan.rows}
+    used_wells = filled if role == "dilution" else printed_from if role == "print" else filled | printed_from
+    in_use = {"dilution": "filled in this step", "print": "printed from"}.get(role, "Used")
 
     width = 256
     height = 180
@@ -55,7 +57,7 @@ def render_plate_svg(config: dict[str, Any]) -> str:
             fill = "#22c55e" if is_used else "#e2e8f0"
             stroke = "#15803d" if is_used else "#94a3b8"
             sw = "1.5" if is_used else "1"
-            title_text = f"Well {well_name} ({'Used' if is_used else 'Unused'})"
+            title_text = f"Well {well_name} ({in_use if is_used else 'Unused'})"
             svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="6.5" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"><title>{title_text}</title></circle>')
 
     svg_parts.append('</svg>')
@@ -186,7 +188,8 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
     if added:
         summary_label += f" · {len(added)} new"
     svg_parts.append(f'<text x="135" y="181" font-size="9" font-weight="bold" fill="#1e293b" text-anchor="middle">'
-                     f'{unique_drops} unique · {total_replicates} replicates · {total_spots} spots</text>')
+                     f'{unique_drops} unique · {total_replicates} replicate{"" if total_replicates == 1 else "s"} · '
+                     f'{total_spots} spot{"" if total_spots == 1 else "s"}</text>')
     svg_parts.append(f'<text x="135" y="192" font-size="9" fill="#475569" text-anchor="middle">{summary_label}</text>')
     svg_parts.append('</svg>')
     return "".join(svg_parts)

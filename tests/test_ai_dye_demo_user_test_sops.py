@@ -440,5 +440,5 @@ def test_sop_end_states_print_what_the_sop_documents_say():
     plans = {sop: [build_plan(config) for config in _through_the_engine(sop)] for sop in (1, 2, 3, 4, 5)}
     assert [op.destination for op in plans[3][0].operations if op.kind == "print"] == ["D3", "D4", "E3", "E4", "F3", "F4"]
     assert plans[4][1].total_drops == 24 and [tip.tip for tip in plans[4][1].tips] == ["B1"]
-    assert plans[5][0].tips_needed == 36 and plans[5][0].next_tip == "E6"
+    assert plans[5][0].tips_needed == 34 and plans[5][0].next_tip == "C6"
     assert plans[1][0].vial_use_ul == {"solvent": 612.5, "sample": 187.5}

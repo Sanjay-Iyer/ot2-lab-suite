@@ -49,6 +49,6 @@ runs:
         - [B11, B1, 1, 5]
         - [C11, C1, 1, 5]
         - [D11, D1, 1, 5]
-      transfers: 44
+      transfers: 43
       total_drops: 4
       tips: [A1]

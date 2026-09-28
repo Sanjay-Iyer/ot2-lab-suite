@@ -208,6 +208,48 @@ def test_typed_run_requests_confirmation_and_three_simulations_stay_runnable(tmp
         adapter.stop()
 
 
+def test_the_page_opens_its_run_dialog_for_a_chat_run_and_stays_runnable_after_each_run(tmp_path, monkeypatch):
+    asyncio.run(_check_run_dialog(tmp_path, monkeypatch))
+
+
+async def _check_run_dialog(tmp_path, monkeypatch):
+    monkeypatch.setattr(core, "loop", asyncio.get_running_loop())
+    monkeypatch.setattr(ui, "run_javascript", lambda *args, **kwargs: None)
+    ticks = []
+    monkeypatch.setattr(ui, "timer", lambda interval, callback: ticks.append(callback))
+    calls = []
+    adapter = started(make_adapter(tmp_path, executor=lambda path, simulate, log: calls.append(simulate) or 0))
+    client = Client(ui.page("/run-dialog-test"))
+
+    async def tick():
+        ticks[0]()
+        await asyncio.sleep(0.05)          # a panel refresh runs on the event loop's next turn
+
+    try:
+        with client:
+            build_page(adapter)
+            [dialog] = [element for element in client.elements.values() if isinstance(element, ui.dialog)]
+            run_buttons = [element for element in client.elements.values()
+                           if isinstance(element, ui.button) and element.text == "Run on OT-2"]
+            await tick()
+            assert len(run_buttons) == 2 and all(button.enabled for button in run_buttons) and not dialog.value
+            assert adapter.submit_text("run")
+            wait_for(lambda: "Run confirmation requested" in chat_text(adapter))
+            await tick()
+            assert dialog.value and calls == []                    # the normal dialog; nothing has started
+            dialog.close()
+            for number in range(1, 4):                            # a finished run leaves the page runnable
+                assert adapter.run()                               # what the dialog's Start run does
+                wait_for(lambda: len(calls) == number and adapter.waiting == "idle")
+                await tick()
+                assert all(button.enabled for button in run_buttons), adapter.snapshot().run_block_reason
+                assert not dialog.value
+            assert calls == [True, True, True]
+    finally:
+        adapter.stop()
+        client.delete()
+
+
 def test_llm_request_run_requires_confirmation_and_pending_plan_blocks_it(tmp_path):
     calls = []
     model = router(lambda message: {"route": "request_run", "changes": []})

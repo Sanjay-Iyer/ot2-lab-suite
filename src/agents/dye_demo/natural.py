@@ -279,16 +279,21 @@ def expand_paper_rows(rows: list[str], config: dict[str, Any]) -> tuple[list[dic
     return changes, note
 
 
-def expand_paper_columns(columns: list[int], config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+def expand_paper_columns(columns: list[int], config: dict[str, Any], *,
+                         anchor: bool = False) -> tuple[list[dict[str, Any]], str]:
     """The paper columns as settings: side-by-side columns as the first paper column and a replicate count; columns
     with gaps, or a plan that already prints from a print map, as an explicit print map (each source keeps its paper
-    rows and prints in exactly these columns)."""
+    rows and prints in exactly these columns). With `anchor`, one column is only where the prints start ("print on
+    column 12"): the replicate count stays, and ExperimentState places the prints from there (placement.py)."""
     volumes = max(1, len(droplet_volumes(config)))
     changes: list[dict[str, Any]] = []
     if not steps_enabled(config)[1]:
         changes.append({"path": "print.enabled", "value": True})
     col_phrase = f"columns {', '.join(map(str, columns))}" if len(columns) > 1 else f"column {columns[0]}"
     note = f"I interpreted the named paper columns as destinations for this procedure: {col_phrase}."
+    if anchor and len(columns) == 1:
+        changes.append({"path": "print.paper_start_column", "value": columns[0]})
+        return changes, note
     side_by_side = columns == list(range(columns[0], columns[0] + len(columns)))
     plan = build_plan(config)
     if plan.mapped or (not side_by_side and volumes == 1):
