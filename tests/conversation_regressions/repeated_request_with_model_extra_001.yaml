@@ -19,11 +19,11 @@ messages:
     intended: [{path: deck.paper.slot, value: 11}]
   llm:
   - kind: interpret
-    reply: '{"intent": "change", "changes": [{"path": "deck.paper.slot", "value": 11, "evidence": "Could you move the paper print plate to slot 11 for me?"}, {"path": "tips.return_tips", "value": true, "evidence": "Could you move the paper print plate to slot 11 for me?"}], "explanation": "simulated interpretation", "clarification": ""}'
+    reply: '{"intent": "change", "changes": [{"path": "deck.paper.slot", "value": 11, "evidence": "Could you move the paper print plate to slot 11 for me?"}, {"path": "tips.return_tips", "value": false, "evidence": "Could you move the paper print plate to slot 11 for me?"}], "explanation": "simulated interpretation", "clarification": ""}'
     chaos: unrelated_extra
 expected:
   final: {revision: 1, pending: null}
-  final_config: {deck.paper.slot: 11, tips.return_tips: false}
+  final_config: {deck.paper.slot: 11, tips.return_tips: true}
   turns:
   - turn: 1
     proposal_paths: [deck.paper.slot]

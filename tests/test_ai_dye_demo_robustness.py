@@ -80,7 +80,7 @@ class Conversation:
         return any(event["type"] == "run" for event in self.rows[turn - 1]["events"])
 
 
-def talk(tmp_path, *messages: Any, live: bool = False) -> Conversation:
+def talk(tmp_path, *messages: Any, live: bool = False, config: dict[str, Any] | None = None) -> Conversation:
     """str, (text, model reply) or a full message dict. Labels are optional."""
     items = []
     for message in messages:
@@ -92,7 +92,8 @@ def talk(tmp_path, *messages: Any, live: bool = False) -> Conversation:
             items.append({"text": text, "llm": [{"kind": "interpret", "reply": content}]})
         else:
             items.append({"text": message})
-    result = replay(items, workdir=tmp_path, live_logic=live, keep_transcript=True, return_session=True)
+    result = replay(items, workdir=tmp_path, live_logic=live, keep_transcript=True, return_session=True,
+                    config=config)
     conversation = Conversation(result)
     assert conversation.violations == [], conversation.violations
     return conversation
@@ -357,7 +358,7 @@ def test_19_20_multiple_changes_are_atomic_and_nothing_else_changes(tmp_path):
 
 def test_20_an_unrelated_change_added_by_the_model_is_flagged(tmp_path):
     c = talk(tmp_path, ("Print 2 drops per spot.", reply(item("print.droplets_per_spot", 2, "2 drops per spot"),
-                                                       item("tips.return_tips", True, "Print 2 drops per spot."))))
+                                                       item("tips.return_tips", False, "Print 2 drops per spot."))))
     [proposal] = c.proposals(1)
     assert proposal["unverified"] == ["tips.return_tips"] and "CHECK THESE" in c.out(1)
 
@@ -572,8 +573,10 @@ def test_changing_a_parent_parameter_to_an_impossible_value_explains_why(tmp_pat
 
 
 def test_changing_the_count_regenerates_wells_tips_and_operations(tmp_path):
+    per_liquid = load_config(DEFAULT_CONFIG)
+    per_liquid["tips"].update(policy="per_liquid", return_tips=False)
     c = talk(tmp_path, ("Use four dilutions.", reply(item("dilution.factors", None, "four dilutions", op="set_count",
-                                                          count=4))), "yes")
+                                                          count=4))), "yes", config=per_liquid)
     plan = build_plan(c.config)
     assert [well.well for well in plan.wells] == ["A11", "B11", "C11", "D11"]
     assert plan.total_drops == 4 and plan.tips_needed == 6

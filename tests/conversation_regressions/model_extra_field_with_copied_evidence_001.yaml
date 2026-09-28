@@ -1,6 +1,6 @@
 name: model_extra_field_with_copied_evidence_001
 description: >-
-  The model added "return used tips to the rack = yes" to a request about drops and copied the whole request as its
+  The model added "return used tips to the rack = no" (the demo default returns them) to a request about drops and copied the whole request as its
   evidence, which made the unrelated change look verified. Fields the message never mentions are now always flagged
   under CHECK THESE, whatever evidence the model claims.
 found_by: {seed: 1255, persona: adversarial_user, goal: skip_without_prerequisite, chaos: 0.4, live_logic: false}
@@ -13,7 +13,7 @@ messages:
     intended: [{path: print.droplets_per_spot, value: 2}]
   llm:
   - kind: interpret
-    reply: '{"intent": "change", "changes": [{"path": "print.droplets_per_spot", "value": 2, "evidence": "Print 2 drops per spot."}, {"path": "tips.return_tips", "value": true, "evidence": "Print 2 drops per spot."}], "explanation": "simulated interpretation", "clarification": ""}'
+    reply: '{"intent": "change", "changes": [{"path": "print.droplets_per_spot", "value": 2, "evidence": "Print 2 drops per spot."}, {"path": "tips.return_tips", "value": false, "evidence": "Print 2 drops per spot."}], "explanation": "simulated interpretation", "clarification": ""}'
     chaos: unrelated_extra
 - text: 'no'
   label: {category: reject, may_propose: false}

@@ -150,6 +150,12 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     if config["tips"].get("return_tips"):
         report.warn("tips.returned", "used tips go back into the rack; they are contaminated, "
                                      "so a later run must start after them")
+    if plan.policy == "single_tip":
+        liquids = ({op.role for op in plan.operations if op.kind == "transfer"}
+                   | {op.source for op in plan.operations if op.kind == "print"})
+        if len(liquids) > 1:     # a demo convenience: water, dye and every dilution share the tip
+            report.warn("tips.single_tip", "One tip will be reused for the entire run. This can cause "
+                                           "cross-contamination.")
     _check_print_liquid(config, plan, report)
     _check_dispense_clearance(config, plan, report)
     positions = [op.destination for op in plan.operations if op.kind == "print"]

@@ -39,10 +39,15 @@ LIQUID HANDLING (docs/ai_dye_demo/liquid_handling_parameters.md):
                      explains blow-out inside a loop at API 2.15.
 
 TIPS are taken in rack order from tips.start_tip, one pick-up per tip group:
-  per_liquid (default)     all water transfers share a tip, all dye transfers
+  single_tip               ONE tip for the entire run: picked up once, kept on
+                           for every water, dye, mixing and print step, and
+                           released once at the end (liquids can carry over).
+  per_liquid               all water transfers share a tip, all dye transfers
                            share a tip, and each dilution gets its own print tip.
   new_tip_every_transfer   a fresh tip for every transfer and paper position.
-A step that does not run takes no tips.
+A step that does not run takes no tips. Each tip is released (returned to its
+rack position when tips.return_tips is true, else dropped in the trash) when the
+next group starts and after the last operation.
 
 Labware whose slot is OFF_DECK is not loaded; the pre-flight refuses a run that
 needs it. Release geometry and air handling are laboratory-owned and come from
@@ -149,7 +154,7 @@ ROWS = tuple("ABCDEFGH")
 EPSILON_UL = 0.01
 OFF_DECK = "OFF_DECK"
 LABWARE_ROLES = ("tuberack", "plate", "paper", "tiprack")
-TIP_POLICIES = ("per_liquid", "new_tip_every_transfer")
+TIP_POLICIES = ("single_tip", "per_liquid", "new_tip_every_transfer")
 TIP_ORDER = tuple(f"{row}{column}" for column in range(1, 13) for row in ROWS)
 
 
@@ -326,6 +331,14 @@ def _plan_paper_layout(paper_columns_available):
     return placed, skipped
 
 
+def _tip_group(policy, liquid_group, own_group):
+    """One tip for the whole run (single_tip), one per liquid or printed sample (per_liquid), or one per operation.
+    Mirrors src/agents/dye_demo/plan.py::tip_group."""
+    if policy == "single_tip":
+        return "run"
+    return liquid_group if policy == "per_liquid" else own_group
+
+
 def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=None):
     """Every tip-bearing operation in execution order, each with its tip group.
 
@@ -352,7 +365,7 @@ def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=N
                 for index, chunk in enumerate(chunks, start=1):
                     operations.append({
                         "kind": "transfer",
-                        "group": role if policy == "per_liquid" else f"{role}:{well}:{index}",
+                        "group": _tip_group(policy, role, f"{role}:{well}:{index}"),
                         "role": role, "well": well, "factor": factor, "total_ul": volume,
                         "volume_ul": chunk, "chunk": index, "chunks": len(chunks),
                         "from_top_mm": float(dilution[height_key]),
@@ -369,7 +382,7 @@ def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=N
             for paper_well in entry["positions"]:
                 operations.append({
                     "kind": "print",
-                    "group": f"print:{source}" if policy == "per_liquid" else f"print:{paper_well}",
+                    "group": _tip_group(policy, f"print:{source}", f"print:{paper_well}"),
                     "row": source[0], "source": source, "paper_well": paper_well,
                     "factor": float(made.get(source, 0.0)), "column": int(paper_well[1:]),
                     "volume_ul": volume, "droplets": droplets,
@@ -383,7 +396,7 @@ def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=N
                 paper_well = f"{paper_row}{spot['column']}"
                 operations.append({
                     "kind": "print",
-                    "group": f"print:{row}" if policy == "per_liquid" else f"print:{paper_well}",
+                    "group": _tip_group(policy, f"print:{row}", f"print:{paper_well}"),
                     "row": row, "source": f"{row}{column}", "paper_well": paper_well,
                     "factor": factor, "column": spot["column"],
                     "volume_ul": spot["volume_ul"], "droplets": spot["droplets"],

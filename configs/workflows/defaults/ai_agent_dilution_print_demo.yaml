@@ -111,11 +111,16 @@ print:
   post_dispense_delay_s: 2.0
 
 # Tips are taken in rack order from start_tip, one pick-up per tip group:
+#   single_tip              ONE tip for the entire run (water, dye, mixing and
+#                           printing), returned or dropped once at the end
 #   per_liquid              one tip for all water transfers, one for all dye
 #                           transfers, one per dilution for printing
 #   new_tip_every_transfer  a fresh tip for every transfer and paper position
-# A step that does not run takes no tips.
-tips: {start_tip: A1, return_tips: false, policy: per_liquid}
+# A step that does not run takes no tips. This demo defaults to single_tip with
+# the tip returned to the rack, to keep the demo fast; liquids can carry over,
+# so ask for "one tip per liquid" or "a fresh tip every transfer" (and "don't
+# return the tips") for a contamination-sensitive run.
+tips: {start_tip: A1, return_tips: true, policy: single_tip}
 
 flow_rates: {aspirate: 3.0, dispense: 3.0}
 

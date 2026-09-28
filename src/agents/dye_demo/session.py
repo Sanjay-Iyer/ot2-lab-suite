@@ -3175,17 +3175,19 @@ class DemoSession:
         if plan.next_tip is None:
             self.say("The tip rack is used up: load a fresh rack, then tell me the starting tip.")
             return
-        used = tips_used[0] if len(tips_used) == 1 else f"{tips_used[0]}-{tips_used[-1]}"
+        one = len(tips_used) == 1                     # one tip for the entire run (single_tip) reads "Tip A1 was"
+        used = tips_used[0] if one else f"{tips_used[0]}-{tips_used[-1]}"
+        tips_were = f"Tip {used} was" if one else f"Tips {used} were"
         try:
             proposal = self.state.propose(
                 [{"path": "tips.start_tip", "value": plan.next_tip, "kind": "dependent",
-                  "why": f"run {run_number} used tips {used}"}],
+                  "why": f"run {run_number} used tip{'' if one else 's'} {used}"}],
                 request=f"(after run {run_number})", source="post-run")
         except ProposalRejected as exc:
-            self.say(f"Tips {used} were used, so the next unused tip is {plan.next_tip}, but I cannot move the "
+            self.say(f"{tips_were} used, so the next unused tip is {plan.next_tip}, but I cannot move the "
                      f"starting tip there with the current plan: {exc}")
             return
         if proposal.empty:
             return
-        self.say(f"Tips {used} were used by this run, so the next unused tip is {plan.next_tip}.")
+        self.say(f"{tips_were} used by this run, so the next unused tip is {plan.next_tip}.")
         self._show_proposal(proposal)

@@ -30,6 +30,11 @@ def tips_config(**tips):
     return config
 
 
+def per_liquid(**tips):
+    """The multi-tip drawing cases: one tip per liquid, set explicitly (the demo default uses one tip for the run)."""
+    return tips_config(policy="per_liquid", return_tips=False, **tips)
+
+
 def tip_circle(svg: str, tip: str) -> str:
     """The circle drawn for one rack position, found by its tooltip."""
     match = re.search(rf'<circle [^>]*><title>Tip {tip}:[^<]*</title></circle>', svg)
@@ -47,8 +52,9 @@ def deck_slot(svg: str, slot: int) -> str:
 # ── the tip rack card: where the rack is, which tips this run takes ─────────────────────────────────────────────────
 
 def test_tip_rack_card_shows_the_rack_slot_in_green_and_the_tips_this_run_uses():
-    svg = render_tiprack_svg(DEFAULT)
-    plan = build_plan(DEFAULT)
+    config = per_liquid()
+    svg = render_tiprack_svg(config)
+    plan = build_plan(config)
     used = [assignment.tip for assignment in plan.tips]
     assert "P20 Tip Rack — Slot 9" in svg
     assert used == list(TIP_ORDER[:10]) and plan.tips_needed == 10          # water, dye, one per printed dilution
@@ -67,7 +73,7 @@ def test_tip_rack_card_shows_the_rack_slot_in_green_and_the_tips_this_run_uses()
 
 
 def test_tip_rack_card_follows_the_start_tip_and_the_rack_slot():
-    config = tips_config(start_tip="G1")
+    config = per_liquid(start_tip="G1")
     config["deck"]["tiprack"]["slot"] = 6
     svg = render_tiprack_svg(config)
     assert "P20 Tip Rack — Slot 6" in svg
@@ -89,7 +95,7 @@ def test_a_new_tip_every_transfer_takes_more_tips_from_the_rack():
 
 
 def test_tip_rack_card_warns_when_the_rack_runs_short_or_is_off_the_deck():
-    assert "Needs 10 tips, only 1 left from H12" in render_tiprack_svg(tips_config(start_tip="H12"))
+    assert "Needs 10 tips, only 1 left from H12" in render_tiprack_svg(per_liquid(start_tip="H12"))
     config = deepcopy(DEFAULT)
     config["deck"]["tiprack"]["slot"] = OFF_DECK
     svg = render_tiprack_svg(config)
@@ -98,7 +104,9 @@ def test_tip_rack_card_warns_when_the_rack_runs_short_or_is_off_the_deck():
 
 
 @pytest.mark.parametrize("tips,shown", [
-    ({}, [("Start tip", "A1"), ("Return tips", "No"), ("Tip policy", "One tip per liquid")]),
+    ({}, [("Start tip", "A1"), ("Return tips", "Yes"), ("Tip policy", "One tip for entire run")]),
+    ({"policy": "per_liquid", "return_tips": False},
+     [("Start tip", "A1"), ("Return tips", "No"), ("Tip policy", "One tip per liquid")]),
     ({"start_tip": "g1", "return_tips": True, "policy": "new_tip_every_transfer"},
      [("Start tip", "G1"), ("Return tips", "Yes"), ("Tip policy", "New tip every transfer")]),
 ])
@@ -114,8 +122,8 @@ TIP_REQUESTS = [
     ("use G1 as the first tip", {}, "tips.start_tip", "G1"),
     ("use tip B3", {}, "tips.start_tip", "B3"),
     ("change start tip to B3", {}, "tips.start_tip", "B3"),
-    ("return the tips", {}, "tips.return_tips", True),
-    ("set return tips to yes", {}, "tips.return_tips", True),
+    ("return the tips", {"return_tips": False}, "tips.return_tips", True),
+    ("set return tips to yes", {"return_tips": False}, "tips.return_tips", True),
     ("don't return the tips", {"return_tips": True}, "tips.return_tips", False),
     ("set return tips to no", {"return_tips": True}, "tips.return_tips", False),
     ("use a fresh tip every transfer", {}, "tips.policy", "new_tip_every_transfer"),
@@ -167,18 +175,20 @@ def test_a_tip_that_is_not_on_the_rack_is_refused_in_one_clear_sentence(tmp_path
 
 def test_a_start_tip_too_late_for_the_plan_is_refused_with_the_latest_that_fits(tmp_path):
     text = "keep everything else the same, just change the start tip to H12"
-    conversation = talk(tmp_path, says(text, proposes(change("tips.start_tip", "H12", "change the start tip to H12"))))
+    conversation = talk(tmp_path, says(text, proposes(change("tips.start_tip", "H12", "change the start tip to H12"))),
+                        config=per_liquid())
     out = conversation.out(1)
     assert conversation.pending is None and conversation.config["tips"]["start_tip"] == "A1"
     assert "this plan needs 10 tips but only 1 remain from H12" in out and "G11 is the latest that fits" in out
     # G11 does fit: the same request with it is a one-change proposal
-    fits = talk(tmp_path, says("start from tip G11", proposes(change("tips.start_tip", "G11", "start from tip G11"))))
+    fits = talk(tmp_path, says("start from tip G11", proposes(change("tips.start_tip", "G11", "start from tip G11"))),
+                config=per_liquid())
     assert fits.proposal_paths(1) == [["tips.start_tip"]]
 
 
 def test_a_tip_setting_that_is_already_set_proposes_nothing(tmp_path):
-    conversation = talk(tmp_path, says("don't return the tips", proposes(change("tips.return_tips", False,
-                                                                               "don't return the tips"))))
+    conversation = talk(tmp_path, says("return the tips", proposes(change("tips.return_tips", True,
+                                                                         "return the tips"))))
     assert conversation.pending is None and "already set" in conversation.out(1)
 
 
@@ -188,7 +198,7 @@ def start_tip_g1_on_slot_6(message):
     return {"route": "experiment_change", "explanation": "Proposes the tip changes.", "changes": [
         {"path": "deck.tiprack.slot", "value": 6, "evidence": "move the tip rack to slot 6"},
         {"path": "tips.start_tip", "value": "G1", "evidence": "start from tip G1"},
-        {"path": "tips.return_tips", "value": True, "evidence": "return the tips"}]}
+        {"path": "tips.return_tips", "value": False, "evidence": "don't return the tips"}]}
 
 
 def _panel(element) -> str:
@@ -238,20 +248,20 @@ async def _check_tip_cards(tmp_path, monkeypatch):
             await tick()
             cards = tip_cards(client)
             assert set(cards) == {"current"}                                  # no proposal: one tip rack card
-            assert cards["current"]["settings"] == {"Start tip": ("A1", False), "Return tips": ("No", False),
-                                                    "Tip policy": ("One tip per liquid", False)}
+            assert cards["current"]["settings"] == {"Start tip": ("A1", False), "Return tips": ("Yes", False),
+                                                    "Tip policy": ("One tip for entire run", False)}
             assert "P20 Tip Rack — Slot 9" in cards["current"]["svg"]
 
-            assert adapter.submit_text("move the tip rack to slot 6, start from tip G1 and return the tips")
+            assert adapter.submit_text("move the tip rack to slot 6, start from tip G1 and don't return the tips")
             wait_for(lambda: adapter.waiting == "proposal")
             await tick()
             cards = tip_cards(client)
             # the applied plan is unchanged until Apply; the proposal shows its own values, changed ones marked
-            assert cards["current"]["settings"] == {"Start tip": ("A1", False), "Return tips": ("No", False),
-                                                    "Tip policy": ("One tip per liquid", False)}
+            assert cards["current"]["settings"] == {"Start tip": ("A1", False), "Return tips": ("Yes", False),
+                                                    "Tip policy": ("One tip for entire run", False)}
             assert "P20 Tip Rack — Slot 9" in cards["current"]["svg"]
-            assert cards["proposed"]["settings"] == {"Start tip": ("G1", True), "Return tips": ("Yes", True),
-                                                     "Tip policy": ("One tip per liquid", False)}
+            assert cards["proposed"]["settings"] == {"Start tip": ("G1", True), "Return tips": ("No", True),
+                                                     "Tip policy": ("One tip for entire run", False)}
             assert "P20 Tip Rack — Slot 6" in cards["proposed"]["svg"]
             assert GREEN in deck_slot(cards["proposed"]["svg"], 6) and GREEN in deck_slot(cards["current"]["svg"], 9)
 
@@ -260,8 +270,8 @@ async def _check_tip_cards(tmp_path, monkeypatch):
             await tick()
             cards = tip_cards(client)
             assert set(cards) == {"current"}
-            assert cards["current"]["settings"] == {"Start tip": ("G1", False), "Return tips": ("Yes", False),
-                                                    "Tip policy": ("One tip per liquid", False)}
+            assert cards["current"]["settings"] == {"Start tip": ("G1", False), "Return tips": ("No", False),
+                                                    "Tip policy": ("One tip for entire run", False)}
             assert "P20 Tip Rack — Slot 6" in cards["current"]["svg"]
             assert GREEN in deck_slot(cards["current"]["svg"], 6) and GREEN not in deck_slot(cards["current"]["svg"], 9)
     finally:

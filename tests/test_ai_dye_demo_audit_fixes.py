@@ -169,13 +169,15 @@ def test_a_run_in_another_plate_column_does_not_empty_the_first_column(tmp_path)
 
 
 def test_tips_a_live_run_used_are_never_picked_up_again(tmp_path):
+    per_liquid = deepcopy(DEFAULT)                          # several tips per run (the demo default uses one)
+    per_liquid["tips"].update(policy="per_liquid", return_tips=False)
     session, out = live(tmp_path, MAKE_ACE, "yes", RUN,
                         "no",                                # the post-run starting-tip proposal is discarded
                         says("Use plate column 10 for the dilutions.",
                              proposes(change("dilution.plate_column", 10, "plate column 10"))), "yes",
                         RUN,                                 # would pick up A1-E1 again
                         "I loaded a fresh tip rack.", "yes", "yes",
-                        RUN)
+                        RUN, config=per_liquid)
     assert "Tips A1, B1, C1, D1, E1 were already used by an earlier run" in out[6]
     assert "Set the starting tip to F1" in out[6] and "a fresh tip rack is loaded" in out[6]
     used = ["A1", "B1", "C1", "D1", "E1"]
@@ -242,7 +244,7 @@ def test_a_new_plate_clears_the_liquid_record_and_a_fresh_rack_the_used_tips(tmp
     session, out = live(tmp_path, MAKE_ACE, "yes", RUN, "no", "I replaced the plate.", "yes")
     physical = session.state.physical
     assert physical["dilutions_prepared"] is None and physical["well_volumes"] == {}
-    assert physical["tips_used"] == ["A1", "B1", "C1", "D1", "E1"]         # the tip rack was not replaced
+    assert physical["tips_used"] == ["A1"]            # the tip rack was not replaced (one tip for the entire run)
 
 
 # ════════════════════════════════════════════════════════════════════════════════

@@ -129,7 +129,7 @@ def test_the_current_plan_is_one_screen_with_every_section_in_order():
     assert starts == sorted(starts)
     assert heading("DILUTIONS", "made in this run") in lines and heading("PRINTING", "in this run") in lines
     assert heading("LAB-OWNED PARAMETERS", "never changed in conversation") in lines
-    assert screen.index("All plan checks passed.") > starts[-1]
+    assert screen.index("One tip will be reused for the entire run.") > starts[-1]     # the default's own notes
     assert lines[-2:] == [">>> TO RUN THE SIMULATION NOW, TYPE:  run",
                           "    No robot is contacted. Or keep talking to change the plan first."]
     assert all(len(line) <= render.WIDTH for line in plan_block(screen).splitlines())
@@ -304,6 +304,7 @@ def test_every_lab_owned_parameter_the_run_uses_is_visible():
 
 LAYOUTS = {
     "default": DEFAULT,
+    "default, one tip per liquid": configured(tips={"policy": "per_liquid", "return_tips": False}),
     "three dilutions, stacked replicates": configured(
         dilution={"factors": [2, 5, 10], "total_volume_ul": 100.0, "start_row": "C", "plate_column": "3"},
         print={"droplets_per_spot": 3, "replicates": 2, "paper_start_column": 4}),
@@ -349,7 +350,8 @@ def test_the_derived_values_are_what_the_protocol_does(layout):
 
     tips = value_of(screen, "Tips required")
     assert int(tips.split()[0]) == len(moved["tips"]) == plan.tips_needed
-    assert tips.endswith(f"({moved['tips'][0]}-{moved['tips'][-1]})")
+    first, last = moved["tips"][0], moved["tips"][-1]
+    assert tips.endswith(f"({first})" if len(moved["tips"]) == 1 else f"({first}-{last})")
     dilutions = value_of(screen, "Dilutions")
     assert int(dilutions.split()[0]) == len(plan.wells)
     if plan.do_dilution:
@@ -406,7 +408,8 @@ def test_after_yes_the_current_plan_is_exactly_the_plan_that_was_proposed(tmp_pa
     # the move still to make is an ATTENTION item under the plan, and the plan command no longer repeats it
     notice = applied.split("!!! ATTENTION !!!", 1)[1]
     assert "Now physically move the Vial rack from Slot 7 to Slot 6." in notice
-    assert "ATTENTION" not in plan and "All plan checks passed." in plan
+    assert "Now physically move" not in plan
+    assert "One tip will be reused for the entire run." in attention_block(plan)
     assert_clean(applied)
 
 
@@ -420,13 +423,13 @@ def attention_block(screen):
 
 def test_unverified_changes_are_under_attention_below_the_plan(tmp_path):
     message = said("Print three drops on each position.", change("print.droplets_per_spot", 3, "three drops"),
-                   change("tips.return_tips", True, ""))
+                   change("tips.return_tips", False, ""))
     message["label"]["intended"] = [change("print.droplets_per_spot", 3, "three drops")]
     result = talk(tmp_path, message, NO)
     screen = output(result, 1)
     block = attention_block(screen)
     assert "CHECK THESE - I could not find them in what you typed:" in block
-    assert "  - Return used tips to the rack: yes" in block
+    assert "  - Return used tips to the rack: no" in block
     assert screen.index("ATTENTION") > screen.index(plan_block(screen)) + len(plan_block(screen))
     assert screen.index("ATTENTION") < screen.index(render.APPLY_PROMPT)
     assert "CHECK THESE" not in plan_block(screen)
@@ -437,7 +440,7 @@ def test_warnings_and_errors_are_under_attention_and_errors_withhold_the_run_ins
     warned = current_plan(configured(tips={"return_tips": True}))
     assert "Warning: used tips go back into the rack" in attention_block(warned)
     assert ">>> TO RUN THE SIMULATION NOW, TYPE:  run" in warned and "All plan checks passed." not in warned
-    broken = current_plan(configured(tips={"start_tip": "G12"}))
+    broken = current_plan(configured(tips={"start_tip": "G12", "policy": "per_liquid"}))
     block = attention_block(broken)
     assert "This plan cannot run. Execution is blocked until these are fixed:" in block
     assert "  - this plan needs 10 tips but only 2 remain from G12" in block
@@ -541,7 +544,7 @@ def test_the_run_banner_summarises_the_run_without_revisions(tmp_path):
     assert "STARTING SIMULATION" in banner and events(result, 1, "run")
     assert value_of(banner, "Operator") == "Replay | redteam-0 | run 1"
     for label, value in (("Dilutions made", "8   (plate wells A11-H11)"), ("Paper columns", "1"),
-                         ("Print positions", "8"), ("Total drops", "8"), ("Tips", "10   (A1-B2)"),
+                         ("Print positions", "8"), ("Total drops", "8"), ("Tips", "1   (A1)"),
                          ("Vial rack", "Slot 7")):
         assert value_of(banner, label) == value
     assert "revision" not in banner.lower() and "TIP CONFIGURATION" not in banner

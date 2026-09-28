@@ -500,7 +500,8 @@ def format_value(path: str, value: Any) -> str:
     if path == "dilution.factors":
         return pipes(fmt_factor(item) for item in value)
     if path == "tips.policy":
-        return "one tip per liquid" if value == "per_liquid" else "new tip every transfer"
+        return {"single_tip": "one tip for entire run", "per_liquid": "one tip per liquid",
+                "new_tip_every_transfer": "new tip every transfer"}.get(str(value), str(value))
     if path == "print.source_map":
         return pipes(f"{entry['source']} → {positions_text(entry['positions'])} ({len(entry['positions'])})"
                      for entry in value) if isinstance(value, list) else str(value)
@@ -908,6 +909,10 @@ def render_steps(config: dict[str, Any]) -> str:
 
 
 def _group_label(config: dict[str, Any], plan: Plan, op: Operation, count: int) -> str:
+    if plan.policy == "single_tip":
+        transfers = sum(o.kind == "transfer" for o in plan.operations)
+        prints = sum(o.kind == "print" for o in plan.operations)
+        return f"the whole run ({transfers} transfer(s), {prints} print(s))"
     if op.kind == "transfer":
         name = material_label(config, op.role)
         if plan.policy == "per_liquid":
@@ -922,7 +927,7 @@ def _group_label(config: dict[str, Any], plan: Plan, op: Operation, count: int) 
 def render_tip_configuration(config: dict[str, Any], plan: Plan) -> str:
     tips = config["tips"]
     spec = config["deck"]["tiprack"]
-    reuse = "Yes" if plan.policy == "per_liquid" else "No"
+    reuse = "Yes" if plan.policy in ("single_tip", "per_liquid") else "No"
     lines = [
         "TIP CONFIGURATION",
         f"  Tip rack               : {_where(config, 'tiprack')} ({spec.get('load_name')})",

@@ -123,7 +123,7 @@ def test_off_deck_vial_rack_is_not_loaded_for_a_print_only_run(protocol_module, 
     context = run_protocol(protocol_module, print_only_off_deck(config))
     assert RACK not in [name for name, _ in context.loaded]
     assert not [entry for entry in context.log if entry[0] == "aspirate" and entry[2][0] == RACK]
-    assert [entry[1] for entry in context.log if entry[0] == "pick_up_tip"] == ["D1", "E1", "F1"]
+    assert [entry[1] for entry in context.log if entry[0] == "pick_up_tip"] == ["D1"]
     assert any("Off deck (not loaded): tuberack" in text for text in context.comments)
 
 

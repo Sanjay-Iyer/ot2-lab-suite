@@ -341,7 +341,12 @@ FIELDS (the only paths besides the selections):
   paper rows).
 - tips.start_tip: first tip to use, A1-H12 (rack order A1..H1, A2..H2, ...).
 - tips.return_tips: true returns used tips to the rack, false drops them in the trash.
-- tips.policy: "per_liquid" (one tip per liquid) or "new_tip_every_transfer".
+- tips.policy: how tips are reused - three different things:
+  "single_tip": ONE tip for the entire run - picked up once and kept for every water, dye, mixing and print step
+    ("only use one tip", "use the same tip for everything", "don't change tips", "one tip for the whole run");
+  "per_liquid": one tip per liquid - one for all the water, one for all the dye, one per printed sample;
+  "new_tip_every_transfer": a fresh tip for every transfer and every print.
+  Whether the used tip(s) go back into the rack at the end is tips.return_tips, a separate setting.
 
 SELECTION ROUTING:
 - Row selections may be consecutive or sparse ("rows A C E", "rows 1 3 5", "just A and H"): {"path": "rows", "value":

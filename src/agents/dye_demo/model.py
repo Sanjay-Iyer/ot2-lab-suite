@@ -37,6 +37,7 @@ MATERIAL_ROLES = ("sample", "solvent")
 VIAL_NAMES = tuple(f"{row}{column}" for row in "AB" for column in range(1, 5))
 TIP_ORDER = tuple(f"{row}{column}" for column in range(1, 13) for row in ROWS)
 TIP_POLICIES = {
+    "single_tip": "one tip for the entire run (every transfer, mix and print; liquids can carry over)",
     "per_liquid": "one tip per liquid (a tip is reused only for the same liquid)",
     "new_tip_every_transfer": "a new tip for every transfer and every printed position",
 }
@@ -289,12 +290,15 @@ def normalize_bool(value: Any) -> bool:
 
 def normalize_policy(value: Any) -> str:
     text = re.sub(r"[\s\-]+", "_", str(value).strip().lower())
+    if text in {"single_tip", "single", "one_tip", "single_tip_entire_run", "one_tip_entire_run",
+                "one_tip_for_entire_run", "same_tip"}:
+        return "single_tip"
     if text in {"per_liquid", "reuse", "reuse_per_liquid", "one_tip_per_liquid"}:
         return "per_liquid"
     if text in {"new_tip_every_transfer", "new_tip", "always_replace", "always_new",
                 "fresh_tip", "never_reuse", "no_reuse"}:
         return "new_tip_every_transfer"
-    raise FieldError(f"tip policy is per_liquid or new_tip_every_transfer, got {value!r}")
+    raise FieldError(f"tip policy is single_tip, per_liquid or new_tip_every_transfer, got {value!r}")
 
 
 def normalize_label(value: Any) -> str:

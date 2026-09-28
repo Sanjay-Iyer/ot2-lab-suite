@@ -246,6 +246,15 @@ def steps_enabled(config: dict[str, Any]) -> tuple[bool, bool]:
     return do_dilution, do_print
 
 
+def tip_group(policy: str, liquid_group: str, own_group: str) -> str:
+    """The tip group of one operation (a new tip is picked up whenever the group changes): every operation shares one
+    tip under single_tip, one tip per liquid or printed sample under per_liquid, and one tip each under
+    new_tip_every_transfer. Mirrors the protocol's _tip_group."""
+    if policy == "single_tip":
+        return "run"
+    return liquid_group if policy == "per_liquid" else own_group
+
+
 def build_operations(config: dict[str, Any], rows: list[str], factors: list[float],
                      spots: list[dict[str, Any]], do_dilution: bool,
                      do_print: bool) -> list[Operation]:
@@ -272,7 +281,7 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
                 well = f"{row}{column}"
                 chunks = split_volume(volume, max_transfer, minimum)
                 for index, chunk in enumerate(chunks, start=1):
-                    group = role if policy == "per_liquid" else f"{role}:{well}:{index}"
+                    group = tip_group(policy, role, f"{role}:{well}:{index}")
                     operations.append(Operation(
                         kind="transfer", group=group, source=vials.get(role, ""),
                         destination=well, volume_ul=chunk, factor=factor, role=role,
@@ -292,7 +301,7 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
                 source = entry["source"]
                 volume = float(entry.get("volume_ul", default_volume))
                 for position in entry["positions"]:
-                    group = f"print:{source}" if policy == "per_liquid" else f"print:{position}"
+                    group = tip_group(policy, f"print:{source}", f"print:{position}")
                     operations.append(Operation(
                         kind="print", group=group, source=source, destination=position, volume_ul=volume,
                         factor=float(made.get(source, 0.0)), droplets=droplets, column=int(position[1:]),
@@ -304,7 +313,7 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
                 source = f"{row}{column}"
                 for spot in spots:
                     position = f"{paper_row}{spot['column']}"
-                    group = f"print:{row}" if policy == "per_liquid" else f"print:{position}"
+                    group = tip_group(policy, f"print:{row}", f"print:{position}")
                     operations.append(Operation(
                         kind="print", group=group, source=source, destination=position,
                         volume_ul=float(spot["volume_ul"]), factor=factor,

@@ -214,7 +214,7 @@ def test_run_uses_the_approved_state_and_the_session_continues(tmp_path):
                                                     "session_label": "2026-09-03 Demo 1",
                                                     "session_id": "run", "revision": 0}
     for expected in ("STARTING SIMULATION", "  Operator              Stephen | 2026-09-03 Demo 1 | run 1", "THIS RUN",
-                     "  Tips                  10   (A1-B2)", "Run 1 finished with exit code 0",
+                     "  Tips                  1   (A1)", "Run 1 finished with exit code 0",
                      "Simulation only: no tips, liquid or paper were used.", "You can plan another run"):
         assert expected in harness.text
     assert (tmp_path / "run" / "executed_config_run1.yaml").exists()
@@ -244,9 +244,9 @@ def test_a_live_print_only_run_asks_that_the_dilutions_already_exist(tmp_path):
 
 def test_after_a_live_run_the_next_tip_is_proposed_not_silently_changed(tmp_path):
     harness = Harness(tmp_path, ["Stephen", "run", "yes", "quit"], simulate=False).run()
-    assert "Tips A1-B2 were used by this run, so the next unused tip is C2." in harness.text
-    assert "  - tip start: run 1 used tips A1-B2" in harness.text
-    assert harness.state.config["tips"]["start_tip"] == "C2"
+    assert "Tip A1 was used by this run, so the next unused tip is B1." in harness.text
+    assert "  - tip start: run 1 used tip A1" in harness.text
+    assert harness.state.config["tips"]["start_tip"] == "B1"
     assert harness.state.history[-1]["source"] == "post-run"
     assert harness.state.printed_positions == {f"{row}1" for row in "ABCDEFGH"}
 

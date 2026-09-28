@@ -151,7 +151,7 @@ def test_a_failure_is_saved_with_its_seed_and_a_replayable_regression_candidate(
 
 def test_recorded_model_replies_replay_exactly(tmp_path):
     corrupt = ('{"intent": "change", "changes": [{"path": "deck.plate.slot", "value": 6, "evidence": "x"}, '
-               '{"path": "tips.return_tips", "value": true, "evidence": "x"}], "explanation": "chaos"}')
+               '{"path": "tips.return_tips", "value": false, "evidence": "x"}], "explanation": "chaos"}')
     result = replay([{"text": "Move the dilution plate to slot 6.", "llm": [{"kind": "interpret", "reply": corrupt}]}],
                     workdir=tmp_path, keep_transcript=True)
     [proposal] = [event for event in result["transcript"][0]["events"] if event["type"] == "proposal"]

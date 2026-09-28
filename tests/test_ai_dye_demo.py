@@ -143,7 +143,6 @@ def test_hardware_and_calibration_are_not_the_agents_to_change(state, path, valu
     ("dilution.total_volume_ul", 400, "400 µL total per dilution", "total_volume_ul must be in"),
     ("dilution.total_volume_ul", 60, "60 µL total per dilution", "tip would draw air"),
     ("materials.dye.vial", "A1", "dye in vial A1", "different vials"),
-    ("tips.start_tip", "H12", "start tips at H12", "start from an earlier tip"),
     ("deck.plate.slot", 12, "plate to slot 12", "trash"),
     ("deck.plate.slot", 0, "plate to slot 0", "1-11"),
 ])
@@ -195,10 +194,19 @@ def test_values_that_are_already_set_are_not_reported_as_changes(state):
     assert proposal.paths == ["deck.paper.slot"]
 
 
+def test_a_start_tip_that_leaves_too_few_tips_is_refused_when_the_policy_needs_several(config):
+    # one tip per liquid needs 10 tips for the default plan and H12 leaves one; under the demo default (one tip for the
+    # entire run) H12 is enough - test_ai_dye_demo_single_tip.py
+    config["tips"]["policy"] = "per_liquid"
+    with pytest.raises(ProposalRejected, match="start from an earlier tip"):
+        ExperimentState(config).propose([change("tips.start_tip", "H12", "start tips at H12")],
+                                        request="start tips at H12")
+
+
 def test_changes_the_request_does_not_support_are_flagged_or_refused(state):
     proposal = state.propose([
         change("print.droplets_per_spot", 3, "three drops"),
-        change("tips.return_tips", True, ""),
+        change("tips.return_tips", False, ""),
     ], request="print three drops on each position")
     flags = {item.path: (item.verified, item.concern) for item in proposal.changes}
     assert flags["print.droplets_per_spot"] == (True, "")
@@ -206,7 +214,7 @@ def test_changes_the_request_does_not_support_are_flagged_or_refused(state):
     text = render.render_proposal(proposal)
     attention = text.split("ATTENTION", 1)[1]
     assert "CHECK THESE - I could not find them in what you typed" in attention
-    assert "  - Return used tips to the rack: yes" in attention
+    assert "  - Return used tips to the rack: no" in attention
     with pytest.raises(ProposalRejected, match="You typed A20") as caught:
         state.propose([change("tips.start_tip", "A2", "tip A20")], request="start at tip A20")
     assert caught.value.kind == "well_mismatch"
@@ -361,7 +369,7 @@ def test_every_print_step_names_its_source_and_destination(config):
     assert text.count("PRINT STEP") == 3
     for expected in ("FROM : 96-well dilution plate, Slot 4, well A11", "2× dye dilution in water",
                      "TO   : Paper print plate, Slot 5, position A1",
-                     "Volume per drop: 5 µL   Drops: 1   Total: 5 µL   Tip: C1",
+                     "Volume per drop: 5 µL   Drops: 1   Total: 5 µL   Tip: A1",
                      "FROM : 96-well dilution plate, Slot 4, well C11", "10× dye dilution in water"):
         assert expected in text
 
@@ -378,15 +386,23 @@ def test_tip_configuration_is_summarised(config):
     config = three(config)
     text = render.render_tip_configuration(config, build_plan(config))
     for expected in ("TIP CONFIGURATION", "Tip rack               : P20 tip rack, Slot 9",
-                     "Starting tip           : A1", "Tip reuse              : Yes",
-                     "Estimated tips required: 5   (A1-E1)", "Available from start   : 96",
-                     "Next unused tip after  : F1", "Estimated remaining    : 91 after this run"):
+                     "Starting tip           : A1", "Tip reuse              : Yes - one tip for the entire run",
+                     "Estimated tips required: 1   (A1)", "Available from start   : 96",
+                     "Next unused tip after  : B1", "Estimated remaining    : 95 after this run",
+                     "Used tips              : returned to the rack",
+                     "A1                 the whole run (", "transfer(s), 3 print(s))"):
+        assert expected in text
+    config["tips"].update(policy="per_liquid", return_tips=False)
+    text = render.render_tip_configuration(config, build_plan(config))
+    for expected in ("Tip reuse              : Yes - one tip per liquid", "Estimated tips required: 5   (A1-E1)",
+                     "Next unused tip after  : F1", "Estimated remaining    : 91 after this run",
+                     "Used tips              : dropped in the trash"):
         assert expected in text
 
 
 def test_a_step_that_does_not_run_takes_no_tips(config):
     config = three(config, enabled=False)
-    config["tips"]["start_tip"] = "D1"
+    config["tips"].update(start_tip="D1", policy="per_liquid")
     assert [tip.tip for tip in build_plan(config).tips] == ["D1", "E1", "F1"]
 
 
@@ -411,13 +427,15 @@ def test_the_three_dilution_experiment_from_the_guide_is_valid(config):
     run_two["print"].update(droplets_per_spot=3, paper_start_column=2)
     run_two["tips"]["start_tip"] = "D1"
     report = validate(run_two)
-    assert report.ok and [issue.code for issue in report.warnings] == ["print.assumes_prepared"]
+    assert report.ok and sorted(issue.code for issue in report.warnings) == [
+        "print.assumes_prepared", "tips.returned", "tips.single_tip"]
 
 
 def test_the_summary_names_both_steps_and_how_to_start(config):
     simulated = render.render_current_plan(config, validate(config), simulate=True, operator="Stephen")
     for expected in ("CURRENT PLAN", "SIMULATION - nothing contacts the robot   |   Stephen", "DILUTIONS",
-                     "PRINTING", "DECK", "LIQUIDS", "PIPETTING", "LAB-OWNED PARAMETERS", "All plan checks passed.",
+                     "PRINTING", "DECK", "LIQUIDS", "PIPETTING", "LAB-OWNED PARAMETERS",
+                     "One tip will be reused for the entire run. This can cause cross-contamination.",
                      f">>> TO RUN THE SIMULATION NOW, TYPE:  {TRIGGER}", "No robot is contacted.", "A11", "H11"):
         assert expected in simulated
     live = render.render_current_plan(config, validate(config), simulate=False, operator="Stephen")
