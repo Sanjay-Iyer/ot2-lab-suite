@@ -336,7 +336,7 @@ def test_the_paper_drawing_shows_the_allocated_positions_and_marks_the_new_ones(
     current = single_at_a12()
     proposed = propose(current, REPLICATES_2, "do 2 replicates").after
     svg = render_paper_svg(proposed, current)
-    assert "Position A12 (1 drop / position, original)" in svg         # kept: plain green
+    assert "Position A12 (1 drop on this position, original)" in svg   # kept: plain green
     assert re.search(r'fill="#3b82f6" stroke="#d97706"[^>]*><title>Position A11 \([^)]*repeat, new in this proposal\)', svg)
     assert "Position A13" not in svg and "1 new" in svg
     assert "1 unique · 2 replicates · 2 spots" in svg

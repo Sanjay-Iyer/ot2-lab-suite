@@ -45,7 +45,7 @@ expected:
     run: true
     output_contains: ["Tip A1 was used by this run, so the next unused tip is B1."]
   - turn: 5
-    output_contains: ["PROPOSED PLAN #3", "SKIPPED - already in the plate", "  Drops per position    3  (stacked)",
+    output_contains: ["PROPOSED PLAN #3", "SKIPPED - already in the plate", "  Drops per position    3  (stacked on one spot)",
                       "  Paper columns         2", "  Tip start             B1",
                       "Warning: this run does not make dilutions: it assumes plate wells A11-C11 already hold them",
                       "the other changes are to the plan"]

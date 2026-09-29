@@ -24,6 +24,8 @@ from src.agents.dye_demo.model import (
 from src.agents.dye_demo.plan import build_plan, steps_enabled
 
 from src.agents.dye_demo.gui.labware_svg import (
+    dilution_settings,
+    drops_per_position,
     paper_summary,
     render_deck_svg,
     render_paper_svg,
@@ -84,7 +86,9 @@ def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUAL
         with _workflow_step("dilutions", 1, "DILUTIONS", "Vial rack → 96-well plate", do_dilution):
             _flow_card("FROM", "Vial Rack", render_tuberack_svg(config))
             _flow_arrow()
-            _flow_card("TO", "96-Well Plate", render_plate_svg(config, role="dilution"))
+            with _flow_card("TO", "96-Well Plate", render_plate_svg(config, role="dilution")):
+                _settings_grid(dilution_settings(config), dilution_settings(baseline) if baseline is not None else None,
+                               "dilution-settings")
         with _workflow_step("printing", 2, "PRINTING", "96-well plate → paper substrate", do_print):
             _flow_card("FROM", "96-Well Plate", render_plate_svg(config, role="print"))
             _flow_arrow()
@@ -94,6 +98,7 @@ def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUAL
                     ui.label(f"Unique drops: {unique}")
                     ui.label(f"Total replicates: {total_replicates}")
                     ui.label(f"Total printed spots: {total_spots}")
+                    ui.label(f"Drops per position: {drops_per_position(config)}")
     # outside both steps: the tips serve every step that runs, and the deck holds all the labware
     serves = {(True, True): "Supports both steps", (True, False): "Supports the dilutions",
               (False, True): "Supports the printing"}.get((do_dilution, do_print), "No step uses tips")
@@ -139,11 +144,16 @@ def _flow_arrow() -> None:
 
 def _tip_settings(config: dict[str, Any], baseline: dict[str, Any] | None) -> None:
     """Start tip, return tips and tip policy above the tip rack; in a proposal, the values it changes stand out."""
-    applied = dict(tip_settings(baseline)) if baseline is not None else {}
-    with ui.element("div").classes("tip-settings w-full"):
-        for label, value in tip_settings(config):
+    _settings_grid(tip_settings(config), tip_settings(baseline) if baseline is not None else None, "tip-settings")
+
+
+def _settings_grid(settings: list[tuple[str, str]], applied: list[tuple[str, str]] | None, kind: str) -> None:
+    """Label: value pairs; in a proposal (`applied` is the current plan's), the values it changes are amber."""
+    before = dict(applied or [])
+    with ui.element("div").classes(f"{kind} settings-grid w-full"):
+        for label, value in settings:
             ui.label(f"{label}:").classes("plan-label")
-            changed = bool(applied) and applied.get(label) != value
+            changed = bool(before) and before.get(label) != value
             shown = ui.label(value).classes("font-semibold" + (" tip-setting-changed" if changed else ""))
             if changed:
                 shown.props('title="Changed by this proposal"')     # a plain hover title: no extra grid element
@@ -264,10 +274,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             .flow-arrow-icon { transform:rotate(90deg); }
             .support-row { grid-template-columns:minmax(0,1fr); }
         }
-        .tip-settings { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:14px; background:#ffffff;
-                        border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; }
+        .settings-grid { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-size:14px; background:#ffffff;
+                         border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; }
         .tip-setting-changed { background:#fef3c7; color:#92400e; border-radius:4px; padding:0 4px; }
         .run-action.disabled { opacity: 1 !important; }
+        .run-reason { max-width: 360px; text-align: right; white-space: normal; line-height: 1.25; }
     """)
 
     with ui.column().classes("w-full max-w-screen-2xl mx-auto p-4 gap-4"):
@@ -287,9 +298,13 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                                                        on_click=lambda: adapter.submit_text("no"),
                                                        color="negative").props("outline dense size=sm")
                 top_proposal_actions.set_visibility(False)
-                top_run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
-                                           color="warning").classes("run-action text-lg")
-                top_run_button.set_enabled(False)
+                with ui.column().classes("items-end gap-1"):
+                    top_run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
+                                               color="warning").classes("run-action text-lg")
+                    top_run_button.set_enabled(False)
+                    # why the button is unavailable, where the button is (a disabled button shows no message)
+                    top_run_reason = ui.label().classes("run-reason text-xs font-semibold text-amber-800")
+                    top_run_reason.set_visibility(False)
                 stop_button = ui.button("Stop robot", icon="stop", color="negative").classes("text-lg")
                 stop_button.set_visibility(False)
 
@@ -319,7 +334,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                 run_button = ui.button(adapter.run_label, icon="precision_manufacturing",
                                        color="warning").classes("run-action text-lg")
                 run_button.set_enabled(False)
-            run_block_label = ui.label().classes("w-full text-sm font-semibold text-amber-800")
+            run_block_label = ui.label().classes("w-full text-sm font-semibold text-amber-800 whitespace-pre-wrap")
             run_block_label.set_visibility(False)
             ui.label("ROBOT RUNNER OUTPUT").classes("text-sm font-semibold text-slate-500 mt-2")
             output_log = ui.log(max_lines=OUTPUT_LINES).classes("w-full h-72 text-xs")
@@ -346,7 +361,8 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             ui.button("Cancel", on_click=confirm_run.close).props("flat")
             start_button = ui.button("Start run", icon="precision_manufacturing", color="negative")
 
-    last = {"revision": -1, "proposal": object(), "messages": 0, "output": 0, "state": None}
+    last = {"revision": -1, "proposal": object(), "messages": 0, "output": 0, "state": None,
+            "run_requests": adapter.run_confirmation_count}
 
     @ui.refreshable
     def render_current() -> None:
@@ -402,7 +418,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     def request_run_confirmation() -> None:
         snapshot = adapter.snapshot()
         if not snapshot.run_ready:
-            ui.notify("Run blocked: " + snapshot.run_block_reason, type="warning")
+            ui.notify("Run unavailable: " + " ".join(snapshot.run_block_reasons), type="warning", multi_line=True)
             return
         confirm_run.open()
 
@@ -460,10 +476,14 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             output_log.push(line)
         last["output"] += len(lines)
         snapshot = adapter.snapshot()
-        if snapshot.waiting == "idle" and adapter.take_run_confirmation_request():
+        requests = adapter.run_confirmation_count
+        if requests != last["run_requests"] and snapshot.waiting == "idle":
+            last["run_requests"] = requests
+            adapter.take_run_confirmation_request()          # the request is answered here
             request_run_confirmation()
+        reasons = snapshot.run_block_reasons
         state = (snapshot.status, snapshot.waiting, snapshot.running, snapshot.question,
-                 snapshot.operator, snapshot.run_ready, snapshot.run_block_reason, snapshot.proposed is not None)
+                 snapshot.operator, snapshot.run_ready, reasons, snapshot.proposed is not None)
         if state != last["state"]:
             last["state"] = state
             user_badge.text = f"Current User = {snapshot.operator or 'waiting for chat input'}"
@@ -476,8 +496,12 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             for button in (top_run_button, run_button):
                 button.props(f"color={'positive' if snapshot.run_ready else 'warning'}")
                 button.set_enabled(snapshot.run_ready)
-            run_block_label.text = "Run blocked: " + snapshot.run_block_reason if snapshot.run_block_reason else ""
-            run_block_label.set_visibility(bool(snapshot.run_block_reason))
+            run_block_label.text = ("Run unavailable:\n" + "\n".join(f"- {reason}" for reason in reasons)) if reasons \
+                else ""
+            run_block_label.set_visibility(bool(reasons))
+            top_run_reason.text = ("Run unavailable: " + reasons[0]
+                                   + (f" (+{len(reasons) - 1} more below)" if len(reasons) > 1 else "")) if reasons else ""
+            top_run_reason.set_visibility(bool(reasons))
             submit_controls.set_enabled(idle)
             send_button.set_enabled(snapshot.waiting != "busy")
             answer_row.set_visibility(snapshot.waiting == "question")
@@ -548,6 +572,12 @@ def _controls(config: dict[str, Any]) -> dict[str, Any]:
         first_column = ui.number("First paper column", value=printing["paper_start_column"], min=1, max=12, step=1)
         replicates = ui.number("Total replicates", value=printing["replicates"], min=1, max=12, step=1)
         drops = ui.number("Drops per position", value=printing["droplets_per_spot"], min=1, step=1)
+    lh = config.get("liquid_handling") or {}
+    with ui.row().classes("w-full gap-4 items-end"):
+        mixing_enabled = ui.switch("Mix dilutions", value=bool(config["mixing"].get("enabled", True)))
+        air_gap = ui.number("Air gap (µL, 0 = off)", value=float(lh.get("air_gap_ul", 0) or 0), min=0, max=5, step=0.5)
+        blow_out = ui.switch("Blow-out", value=bool(lh.get("blow_out", True)))
+        shake = ui.switch("Shake after dispense", value=bool((lh.get("well_plate_shake") or {}).get("enabled", True)))
     with ui.row().classes("w-full gap-4"):
         # every deck slot, and OFF DECK: labware the plan does not need may be off the robot (a list of slots alone
         # refused the page with the vial rack off deck, and left the form unable to submit anything)
@@ -558,6 +588,7 @@ def _controls(config: dict[str, Any]) -> dict[str, Any]:
         tiprack = ui.select(options, value=deck["tiprack"]["slot"], label="P20 tip rack slot")
     return {"factors": factors, "dilution": dilution_enabled, "printing": printing_enabled,
             "first_column": first_column, "replicates": replicates, "drops": drops,
+            "mixing": mixing_enabled, "air_gap": air_gap, "blow_out": blow_out, "shake": shake,
             "plate": plate, "paper": paper, "tuberack": tuberack, "tiprack": tiprack}
 
 
@@ -572,6 +603,10 @@ def _control_values(controls: dict[str, Any]) -> dict[str, Any]:
         "print.paper_start_column": int(controls["first_column"].value),
         "print.replicates": int(controls["replicates"].value),
         "print.droplets_per_spot": int(controls["drops"].value),
+        "mixing.enabled": bool(controls["mixing"].value),
+        "liquid_handling.air_gap_ul": float(controls["air_gap"].value),
+        "liquid_handling.blow_out": bool(controls["blow_out"].value),
+        "liquid_handling.well_plate_shake.enabled": bool(controls["shake"].value),
         "deck.plate.slot": _slot_value(controls["plate"].value),
         "deck.paper.slot": _slot_value(controls["paper"].value),
         "deck.tuberack.slot": _slot_value(controls["tuberack"].value),
@@ -590,7 +625,11 @@ def _sync_controls(controls: dict[str, Any], config: dict[str, Any]) -> None:
         "factors": ", ".join(map(str, dilution["factors"])),
         "dilution": dilution["enabled"], "printing": printing["enabled"],
         "first_column": printing["paper_start_column"], "replicates": printing["replicates"],
-        "drops": printing["droplets_per_spot"], "plate": deck["plate"]["slot"],
+        "drops": printing["droplets_per_spot"], "mixing": bool(config["mixing"].get("enabled", True)),
+        "air_gap": float((config.get("liquid_handling") or {}).get("air_gap_ul", 0) or 0),
+        "blow_out": bool((config.get("liquid_handling") or {}).get("blow_out", True)),
+        "shake": bool(((config.get("liquid_handling") or {}).get("well_plate_shake") or {}).get("enabled", True)),
+        "plate": deck["plate"]["slot"],
         "paper": deck["paper"]["slot"], "tuberack": deck["tuberack"]["slot"],
         "tiprack": deck["tiprack"]["slot"],
     }

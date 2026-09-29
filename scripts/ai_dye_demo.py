@@ -27,6 +27,7 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from src.agents.dye_demo.experiment_memory import HISTORY_DIR  # noqa: E402
 from src.agents.dye_demo.llm import LLMClient  # noqa: E402
 from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config  # noqa: E402
 from src.agents.dye_demo.session import DemoSession, SessionSettings, SubprocessExecutor  # noqa: E402
@@ -93,6 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         operator=args.operator,
         first_request=args.request,
         llm_description="" if args.offline else Config.describe_llm_auth(),
+        history_dir=HISTORY_DIR,
     )
     llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=0))
     session = DemoSession(settings, load_config(source), llm=llm,

@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from src.agents.dye_demo.intent import TurnContext, analyze_turn
-from src.agents.dye_demo.model import DEFAULT_CONFIG, OFF_DECK
+from src.agents.dye_demo.model import DEFAULT_CONFIG, OFF_DECK, liquid_handling
 from src.agents.dye_demo.plan import build_plan
 from src.agents.dye_demo.redteam.fake_opentrons import load_protocol_module, run_protocol
 from src.agents.dye_demo.redteam.harness import ConversationSpec, ReplayDriver, run_conversation
@@ -31,13 +31,15 @@ DYE_VIAL = next(material["vial"] for material in DEFAULT["materials"].values() i
 
 
 def dye_on_fake_ot2(config) -> dict[str, float]:
-    """µL of dye (the sample vial) protocol v19 dispenses into each plate well on the recording fake OT-2."""
+    """µL of dye (the sample vial) protocol v19 dispenses into each plate well on the recording fake OT-2 (each dispense
+    carries the air gap taken after the aspiration; the liquid is the dispense less that gap)."""
+    gap = float(liquid_handling(config).get("air_gap_ul", 0) or 0)
     dye, from_dye = {}, False
     for entry in run_protocol(load_protocol_module(), config).log:
         if entry[0] == "aspirate":
             from_dye = tuple(entry[2][:2]) == (RACK, DYE_VIAL)
         elif entry[0] == "dispense" and entry[2][0] == PLATE and from_dye:
-            dye[entry[2][1]] = dye.get(entry[2][1], 0.0) + entry[1]
+            dye[entry[2][1]] = round(dye.get(entry[2][1], 0.0) + entry[1] - gap, 6)
     return dye
 
 
@@ -54,12 +56,13 @@ def dye_in_pinned_simulator(config, tmp_path: Path) -> dict[str, float]:
     aspirate = re.compile(r"^\s*Aspirating ([\d.]+) uL from ([A-H]\d+) of .+? on slot (\d+)")
     dispense = re.compile(r"^\s*Dispensing ([\d.]+) uL into ([A-H]\d+) of .+? on slot (\d+)")
     plate, rack = str(config["deck"]["plate"]["slot"]), str(config["deck"]["tuberack"]["slot"])
+    gap = float(liquid_handling(config).get("air_gap_ul", 0) or 0)
     dye, from_dye = {}, False
     for line in output.splitlines():
         if match := aspirate.match(line):
             from_dye = match.group(3) == rack and match.group(2) == DYE_VIAL
         elif (match := dispense.match(line)) and match.group(3) == plate and from_dye:
-            dye[match.group(2)] = dye.get(match.group(2), 0.0) + float(match.group(1))
+            dye[match.group(2)] = round(dye.get(match.group(2), 0.0) + float(match.group(1)) - gap, 6)
     return dye
 
 
@@ -147,10 +150,13 @@ def live(tmp_path, *messages, config=None):
 
 
 def plate_draws_on_fake_ot2(config) -> dict[str, float]:
-    """µL the print step aspirates from each plate well on the recording fake OT-2 (mixing is logged separately)."""
-    drawn = {}
-    for entry in run_protocol(load_protocol_module(), config).log:
-        if entry[0] == "aspirate" and entry[2][0] == PLATE:
+    """µL the print step takes from each plate well on the recording fake OT-2 (a dilution mix dispenses what it
+    aspirates straight back into the well)."""
+    drawn, log = {}, run_protocol(load_protocol_module(), config).log
+    for index, entry in enumerate(log):
+        following = log[index + 1] if index + 1 < len(log) else ("",)
+        if entry[0] == "aspirate" and entry[2][0] == PLATE and not (following[0] == "dispense"
+                                                                     and following[2][0] == PLATE):
             drawn[entry[2][1]] = drawn.get(entry[2][1], 0.0) + entry[1]
     return drawn
 
@@ -193,15 +199,16 @@ def test_printing_again_from_printed_wells_is_checked_against_the_liquid_left(tm
                       change("rows", ["A", "C", "E"], "in A11, C11 and E11"),
                       change("print.replicates", 12, "print each 12 times"))), "yes",
         RUN, "yes",                                  # 150 µL made, 12 x 5 µL printed from each well: 90 µL left
-        says("The dilutions are already made. Print them again on paper rows B, D and F.",
+        says("The dilutions are already made. Print them again on paper rows B, D and F, 2 drops each.",
              proposes(change("dilution.enabled", False, "already made"),
-                      change("paper_rows", ["B", "D", "F"], "paper rows B, D and F"))), "yes",
-        dict(RUN, gates=["yes"]),                    # would mix at 2 mm in 85 µL: draws air
+                      change("paper_rows", ["B", "D", "F"], "paper rows B, D and F"),
+                      change("print.droplets_per_spot", 2, "2 drops each"))), "yes",
+        dict(RUN, gates=["yes"]),                    # 24 drops of 5 µL from the 90 µL left: the tip would draw air
         says("Each well holds 150 µL now, I topped them up.",
              proposes(change("dilution.prepared_volume_ul", 150, "Each well holds 150 µL"))), "yes",
         dict(RUN, gates=["yes"]))
     assert "A11 ~90 µL | C11 ~90 µL | E11 ~90 µL" in out[2]
-    assert "Not enough liquid is recorded in the plate" in out[6] and "85 µL" in out[6]
+    assert "Not enough liquid is recorded in the plate" in out[6] and "15 µL" in out[6]
     assert [run["run"] for run in session.state.runs] == [1, 2]           # the second after the stated volume only
     assert validate(session.state.config).ok
 
@@ -232,11 +239,14 @@ def plate_draws_in_pinned_simulator(config, tmp_path: Path) -> dict[str, float]:
     ok, output = builder.simulate(path, str(PINNED_SIMULATOR))
     assert ok, output[-1500:]
     aspirate = re.compile(r"^Aspirating ([\d.]+) uL from ([A-H]\d+) of .+? on slot (\d+)")
+    back = re.compile(r"^Dispensing [\d.]+ uL into ([A-H]\d+) of .+? on slot (\d+)")
     plate = str(config["deck"]["plate"]["slot"])
     drawn = {}
-    for line in output.splitlines():
-        if (match := aspirate.match(line)) and match.group(3) == plate:
-            drawn[match.group(2)] = drawn.get(match.group(2), 0.0) + float(match.group(1))
+    lines = [line for line in output.splitlines() if line.startswith(("Aspirating", "Dispensing"))]
+    for index, line in enumerate(lines):
+        following = back.match(lines[index + 1]) if index + 1 < len(lines) else None
+        if (match := aspirate.match(line)) and match.group(3) == plate and not (following and following.group(2) == plate):
+            drawn[match.group(2)] = drawn.get(match.group(2), 0.0) + float(match.group(1))   # a mix returns its draw
     return drawn
 
 

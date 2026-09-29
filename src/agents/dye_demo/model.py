@@ -277,6 +277,24 @@ def normalize_count(value: Any) -> int:
     return count
 
 
+def normalize_drops(value: Any) -> int:
+    """Drops on one paper position: 1-20 dispenses onto the same spot (never more paper positions)."""
+    count = _integer(value, "a drop count")
+    if not 1 <= count <= 20:
+        raise FieldError(f"drops per paper position are 1-20, got {value!r}")
+    return count
+
+
+def normalize_air_gap(value: Any) -> float:
+    """The air gap after each vial aspiration, in µL: 0 (off) up to 5 µL; "on" is the lab default volume."""
+    if isinstance(value, bool) or str(value).strip().lower() in {"on", "off", "true", "false", "yes", "no"}:
+        return float(default_liquid_handling().get("air_gap_ul", 1.0)) if normalize_bool(value) else 0.0
+    volume = volume_in_microlitres(value, "the air gap")
+    if not 0 <= volume <= 5:
+        raise FieldError(f"the air gap is 0 (off) to 5 µL, got {value!r}")
+    return float(volume)
+
+
 
 def normalize_replicates(value: Any) -> int:
     """Zero repeats still prints each condition once; a negative count is invalid."""
@@ -387,13 +405,38 @@ def _as_list(value: Any) -> list[Any]:
     return [part for part in re.split(r"[\s,;]+", str(value).strip()) if part]
 
 
+def positions_with_drops(value: Any) -> tuple[list[str], dict[str, int]]:
+    """Paper positions, and any drop counts written with them: ["A1", "A2"], "A1 A2", {"A1": 1, "A2": 3} or
+    [{"position": "A2", "drops": 3}, "B5"] (a position without a count takes the plan's drops per position)."""
+    if isinstance(value, dict):
+        items: list[Any] = [{"position": position, "drops": drops} for position, drops in value.items()]
+    else:
+        items = _as_list(value)
+    positions: list[str] = []
+    drops: dict[str, int] = {}
+    for item in items:
+        if isinstance(item, dict):
+            raw = next((item[key] for key in ("position", "paper_position", "well", "to") if key in item), None)
+            position = paper_position(raw)
+            if item.get("drops") not in (None, ""):
+                drops[position] = normalize_drops(item["drops"])
+        else:
+            position = paper_position(item)
+        positions.append(position)
+    return positions, drops
+
+
 def normalize_source_map(value: Any) -> list[dict[str, Any]]:
     """print.source_map: which plate well prints on which paper positions, in print order.
 
-        [{"source": "A11", "positions": ["A1", "B1", ...]}, {"source": "B11", "positions": [...], "volume_ul": 3}]
+        [{"source": "A11", "positions": ["A1", "B1", ...]}, {"source": "B11", "positions": [...], "volume_ul": 3},
+         {"source": "C11", "positions": ["A2", "A3"], "drops": {"A3": 3}}]
 
     One source may feed any number of positions, and any number of sources may be used; nothing here ties the sources
     to the dilution factors. Every well and position must exist, and no paper position may be printed twice.
+    "drops" (optional) is how many drops land on a position - several dispenses onto that ONE spot, never more
+    positions. A number applies to every position of the entry; a position without a count takes
+    print.droplets_per_spot. The canonical form lists only the counts that were given.
     """
     entries = value if isinstance(value, (list, tuple)) else [value]
     result: list[dict[str, Any]] = []
@@ -404,18 +447,30 @@ def normalize_source_map(value: Any) -> list[dict[str, Any]]:
         raw_source = next((item[key] for key in ("source", "well", "from", "source_well") if key in item), None)
         raw_positions = next((item[key] for key in ("positions", "to", "destinations", "paper_positions")
                               if key in item), None)
-        if raw_source in (None, "") or raw_positions in (None, "", []):
+        if raw_source in (None, "") or raw_positions in (None, "", [], {}):
             raise FieldError("each print-map entry needs a source well and at least one paper position")
         source = plate_well(raw_source)
-        positions = [paper_position(position) for position in _as_list(raw_positions)]
+        positions, drops = positions_with_drops(raw_positions)
         for position in positions:
             if position in used:
                 raise FieldError(f"paper position {position} is printed twice (from {used[position]} and {source}); "
                                  "each paper position takes one sample")
             used[position] = source
+        raw_drops = item.get("drops")
+        if isinstance(raw_drops, dict):
+            for position, count in raw_drops.items():
+                position = paper_position(position)
+                if position not in positions:
+                    raise FieldError(f"{position} gets a drop count but {source} does not print on it")
+                drops[position] = normalize_drops(count)
+        elif raw_drops not in (None, ""):
+            count = normalize_drops(raw_drops)
+            drops.update({position: count for position in positions})
         entry: dict[str, Any] = {"source": source, "positions": positions}
         if item.get("volume_ul") not in (None, ""):
             entry["volume_ul"] = normalize_volume(item["volume_ul"])
+        if drops:
+            entry["drops"] = {position: drops[position] for position in positions if position in drops}
         result.append(entry)
     if not result:
         raise FieldError("a print map needs at least one source well")
@@ -442,11 +497,15 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "dilution.rows": ("Dilution plate rows", normalize_rows),
     "dilution.total_volume_ul": ("Final volume per dilution", normalize_volume),
     "dilution.prepared_volume_ul": ("Volume now in each prepared well", normalize_optional_volume),
-    "mixing.reps": ("Mixes before each print", normalize_count),
+    "mixing.enabled": ("Mix each dilution after it is made", normalize_bool),
+    "mixing.reps": ("Mixes per dilution well", normalize_count),
     "mixing.volume_ul": ("Mixing volume", normalize_volume),
+    "liquid_handling.air_gap_ul": ("Air gap after each vial aspiration", normalize_air_gap),
+    "liquid_handling.blow_out": ("Blow-out after each plate dispense", normalize_bool),
+    "liquid_handling.well_plate_shake.enabled": ("Shake after dispense (96-well plate)", normalize_bool),
     "print.enabled": ("Print in this run", normalize_bool),
     "print.droplet_volume_ul": ("Drop volume", normalize_drop_volumes),
-    "print.droplets_per_spot": ("Drops per paper position", normalize_count),
+    "print.droplets_per_spot": ("Drops per paper position", normalize_drops),
     "print.replicates": ("Total replicates (prints of each condition)", normalize_replicates),
     "print.paper_start_column": ("First paper column", normalize_paper_column),
     "print.paper_rows": ("Paper rows (print destinations)", normalize_paper_rows),
@@ -458,18 +517,20 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
 
 LAB_OWNED_FIELDS = {
     "print.z_mm": "print release height above the paper",
-    "print.aspirate_height_mm": "aspirate height inside the dilution well",
-    "print.air_gap_ul": "trailing air gap",
+    "print.air_gap_ul": "trailing air gap of the print cycle",
     "print.air_gap_height_mm": "air-gap height",
     "print.push_out_ul": "push-out volume",
     "print.blow_out": "print blow-out",
     "print.post_dispense_delay_s": "post-drop dwell",
     "print.paper_columns": "paper width",
     "dilution.max_transfer_ul": "largest single P20 transfer",
-    "dilution.solvent_dispense_from_top_mm": "water dispense height",
-    "dilution.sample_dispense_from_top_mm": "dye dispense height",
-    "dilution.blow_out_after_dispense": "dilution blow-out",
-    "mixing.height_mm": "mixing height",
+    "liquid_handling.plate_aspirate_height_mm": "plate aspirate height",
+    "liquid_handling.plate_dispense_height_mm": "plate dispense height",
+    "liquid_handling.plate_mix_height_mm": "plate mixing height",
+    "liquid_handling.well_plate_shake.radius": "shake radius",
+    "liquid_handling.well_plate_shake.v_offset_mm": "shake height",
+    "liquid_handling.well_plate_shake.speed_mm_s": "shake speed",
+    "liquid_handling.well_plate_shake.cycles": "shake cycles",
 }
 LAB_OWNED_ROOTS = {
     "pipette": "the pipette",
@@ -478,6 +539,7 @@ LAB_OWNED_ROOTS = {
     "run_modes": "the run modes",
     "protocol_version": "the protocol version",
     "session": "the session record",
+    "liquid_handling": "the plate heights and droplet-release geometry",
 }
 
 _DECK_ALIASES = {
@@ -493,6 +555,29 @@ _FIELD_ALIASES = {
     "print.volume_ul": "print.droplet_volume_ul",
     "print.drop_volume_ul": "print.droplet_volume_ul",
     "print.drops_per_spot": "print.droplets_per_spot",
+    "print.drops_per_location": "print.droplets_per_spot",
+    "print.drops_per_position": "print.droplets_per_spot",
+    "print.total_replicates": "print.replicates",
+    "total_replicates": "print.replicates",
+    "mixing.enable": "mixing.enabled",
+    "air_gap": "liquid_handling.air_gap_ul",
+    "air_gap_ul": "liquid_handling.air_gap_ul",
+    "liquid_handling.air_gap": "liquid_handling.air_gap_ul",
+    "dilution.air_gap_ul": "liquid_handling.air_gap_ul",
+    "blow_out": "liquid_handling.blow_out",
+    "blowout": "liquid_handling.blow_out",
+    "dilution.blow_out": "liquid_handling.blow_out",
+    "dilution.blow_out_after_dispense": "liquid_handling.blow_out",
+    "shake": "liquid_handling.well_plate_shake.enabled",
+    "well_plate_shake": "liquid_handling.well_plate_shake.enabled",
+    "well_plate_shake_enabled": "liquid_handling.well_plate_shake.enabled",
+    "well_plate_droplet_release_enabled": "liquid_handling.well_plate_shake.enabled",
+    "liquid_handling.shake": "liquid_handling.well_plate_shake.enabled",
+    "liquid_handling.well_plate_shake": "liquid_handling.well_plate_shake.enabled",
+    "liquid_handling.well_plate_shake_enabled": "liquid_handling.well_plate_shake.enabled",
+    "mixing.height_mm": "liquid_handling.plate_mix_height_mm",
+    "print.aspirate_height_mm": "liquid_handling.plate_aspirate_height_mm",
+    "dilution.dispense_height_mm": "liquid_handling.plate_dispense_height_mm",
     "print.rows": "print.paper_rows",
     "print.paper_row": "print.paper_rows",
     "print.destination_rows": "print.paper_rows",
@@ -544,12 +629,12 @@ def lab_owned_reason(canonical_path: str) -> str | None:
     """Why a canonical path cannot be changed in conversation, or None if editable."""
     if canonical_path in EDITABLE_FIELDS:
         return None
-    root = canonical_path.split(".")[0]
-    if root in LAB_OWNED_ROOTS:
-        return f"{LAB_OWNED_ROOTS[root]} is lab-owned"
     if canonical_path in LAB_OWNED_FIELDS:
         return (f"the {LAB_OWNED_FIELDS[canonical_path]} is lab-owned: it is calibrated "
                 "on the instrument")
+    root = canonical_path.split(".")[0]
+    if root in LAB_OWNED_ROOTS:
+        return f"{LAB_OWNED_ROOTS[root]} is lab-owned"
     parts = canonical_path.split(".")
     if parts[0] == "materials" and parts[-1] in {"aspirate_height_mm", "role"}:
         return "vial aspirate heights and material roles are lab-owned: calibrated on the instrument"
@@ -653,8 +738,44 @@ def circle_area_mm2(diameter_mm: float) -> float:
 
 # ── loading ─────────────────────────────────────────────────────────────────────
 
+@lru_cache(maxsize=1)
+def _default_liquid_handling() -> str:
+    data = yaml.safe_load(DEFAULT_CONFIG.read_text(encoding="utf-8")) or {}
+    return json.dumps(data.get("liquid_handling") or {})
+
+
+def default_liquid_handling() -> dict[str, Any]:
+    """The liquid_handling section of the demo's default YAML - the one place its values are written down."""
+    return json.loads(_default_liquid_handling())
+
+
+def _merged(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    result = deepcopy(base)
+    for key, value in override.items():
+        result[key] = _merged(result[key], value) if isinstance(value, dict) and isinstance(result.get(key), dict) \
+            else deepcopy(value)
+    return result
+
+
+def liquid_handling(config: dict[str, Any]) -> dict[str, Any]:
+    """The physical liquid-handling settings of a plan: plate heights (mm above the well bottom), the air gap after each
+    vial aspiration, blow-out and the well-plate shake. The plan, the checks and the rendered plan read them here; the
+    protocol reads the same section of its embedded config. A plan without the section uses the default YAML's."""
+    own = config.get("liquid_handling")
+    return _merged(default_liquid_handling(), own if isinstance(own, dict) else {})
+
+
+# older plans kept these settings elsewhere (heights and blow-out moved into liquid_handling on 2026-09-28)
+_LEGACY_LIQUID_HANDLING = {
+    "plate_aspirate_height_mm": ("print", "aspirate_height_mm"),
+    "plate_mix_height_mm": ("mixing", "height_mm"),
+    "blow_out": ("dilution", "blow_out_after_dispense"),
+}
+_RETIRED_KEYS = (("dilution", "solvent_dispense_from_top_mm"), ("dilution", "sample_dispense_from_top_mm"))
+
+
 def normalize_loaded_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Canonical shapes for the fields the checks compare (slots, tip policy)."""
+    """Canonical shapes for the fields the checks compare (slots, tip policy, the liquid-handling section)."""
     config = deepcopy(config)
     for role in LABWARE_ROLES:
         spec = (config.get("deck") or {}).get(role)
@@ -665,6 +786,25 @@ def normalize_loaded_config(config: dict[str, Any]) -> dict[str, Any]:
                 pass    # left as-is; validation names the problem
     tips = config.setdefault("tips", {})
     tips.setdefault("policy", "per_liquid")
+    own = config.get("liquid_handling") if isinstance(config.get("liquid_handling"), dict) else {}
+    for key, (section, old) in _LEGACY_LIQUID_HANDLING.items():
+        holder = config.get(section)
+        if isinstance(holder, dict) and old in holder:
+            value = holder.pop(old)
+            own.setdefault(key, value)
+    for section, old in _RETIRED_KEYS:
+        if isinstance(config.get(section), dict):
+            config[section].pop(old, None)
+    if "liquid_handling" in config or own or any(section in config for section in ("dilution", "print")):
+        config["liquid_handling"] = liquid_handling({"liquid_handling": own})
+    if isinstance(config.get("mixing"), dict):
+        config["mixing"].setdefault("enabled", True)
+    printing = config.get("print")
+    if isinstance(printing, dict) and printing.get("source_map") not in (None, "", []):
+        try:
+            printing["source_map"] = normalize_source_map(printing["source_map"])   # the one shape the run embeds
+        except FieldError:
+            pass    # left as-is; validation names the problem
     return config
 
 

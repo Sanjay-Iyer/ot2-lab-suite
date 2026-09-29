@@ -30,6 +30,10 @@ runs:
       dilution.prepared_volume_ul: null
       mixing.reps: 2
       mixing.volume_ul: 15
+      mixing.enabled: true
+      liquid_handling.air_gap_ul: 1.0
+      liquid_handling.blow_out: true
+      liquid_handling.well_plate_shake.enabled: true
       print.enabled: true
       print.droplet_volume_ul: 5
       print.droplets_per_spot: 1
@@ -49,6 +53,6 @@ runs:
         - [B11, B1, 1, 5]
         - [C11, C1, 1, 5]
         - [D11, D1, 1, 5]
-      transfers: 43
+      transfers: 46
       total_drops: 4
       tips: [A1]

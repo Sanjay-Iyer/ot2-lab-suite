@@ -54,6 +54,7 @@ from src.agents.dye_demo.language import (
     TEMPORAL_FUTURE,
     conflicting_well_reference,
     evidence_supported,
+    numbers_in,
     numbers_mentioned,
     well_tokens,
 )
@@ -76,6 +77,7 @@ from src.agents.dye_demo.model import (
     normalize_slot,
     normalize_source_map,
     positions_text,
+    positions_with_drops,
     resolve_path,
     set_path,
     slot_of,
@@ -83,6 +85,7 @@ from src.agents.dye_demo.model import (
 )
 from src.agents.dye_demo.natural import (
     SelectionError,
+    expand_drops_at,
     expand_paper_columns,
     expand_paper_rows,
     expand_print_map,
@@ -216,7 +219,7 @@ _PLATE_COLUMN_LIST = re.compile(
     rf"\bplate\s+columns\s+(\d{{1,2}}(?:\s*(?:,|&|\band\b|\bor\b)\s*\d{{1,2}})+)\b{_NOT_A_COLUMN_AFTER}|"
     rf"\bcolumns\s+(\d{{1,2}}(?:\s*(?:,|&|\band\b|\bor\b)\s*\d{{1,2}})+)\s+(?:of|in|on|from)\s+the\s+"
     r"(?:96[-\s]?well\s+|dilution\s+)?plate\b", re.I)
-SELECTION_PATHS = frozenset({"rows", "paper_rows", "paper_columns", "print_map"})
+SELECTION_PATHS = frozenset({"rows", "paper_rows", "paper_columns", "print_map", "drops_at"})
 # The fields each selection sets: a selection whose fields the scientist asked to keep ("keep my dilution wells the
 # same") is left out like any kept change. "rows" is where the dilutions are (plate rows); "paper_rows" where they print.
 SELECTION_FIELDS = {
@@ -224,6 +227,7 @@ SELECTION_FIELDS = {
     "paper_rows": frozenset({"print.paper_rows"}),
     "paper_columns": frozenset({"print.paper_start_column", "print.replicates"}),
     "print_map": frozenset({"print.source_map"}),
+    "drops_at": frozenset({"print.source_map"}),
 }
 # concerns that mean "this value is not in the current message": the scientist's earlier words may still hold it
 _GROUNDING_CONCERNS = {"those factors are not in your request", "not found in your request"}
@@ -370,7 +374,7 @@ _COUNT_QUESTIONS = {
     "print.droplets_per_spot": "How many drops should be stacked on each paper position?",
 }
 # Proposals that restore stored values or book-keep a finished run are not read against the words of a request.
-_NO_COLUMN_CHECK_SOURCES = {"rollback", "post-run"}
+_NO_COLUMN_CHECK_SOURCES = {"rollback", "post-run", "history"}      # values from a record, not from the words
 
 
 
@@ -1128,6 +1132,13 @@ class ExperimentState:
                 stated = _sources_stated
                 wells = [entry["source"] for entry in items]
                 what = f"plate well{'s' if len(wells) > 1 else ''} {', '.join(wells)}"
+            elif path == "drops_at":
+                # how many drops land on particular paper positions: the positions must be the scientist's own words
+                changes, note = expand_drops_at(raw.get("value"), config)
+                items = positions_with_drops(raw.get("value"))[0]
+                stated = lambda positions, words: all(  # noqa: E731
+                    re.search(rf"\b{position[0]}\s*-?\s*0*{position[1:]}\b", words, re.I) for position in positions)
+                what = f"paper position{'s' if len(items) > 1 else ''} {', '.join(items)}"
             else:
                 items = selected_columns(raw.get("value"))
                 if column_side_unclear(text, recent_paths=grounding.get("recent_paths", ()), config=self._config):
@@ -1151,7 +1162,7 @@ class ExperimentState:
                 raise ProposalRejected(f"{exc}", kind="print_split", question=exc.question,
                                        fix_changes=[{"path": "print_map", "value": exc.fix,
                                                      "evidence": str(raw.get("evidence") or "")}]) from exc
-            if path == "print_map":
+            if path in {"print_map", "drops_at"}:
                 raise ProposalRejected(f"{exc}", kind="print_map", question=exc.question) from exc
             raise ProposalRejected(f"{exc} Nothing was changed.", kind="paper_layout" if path == "paper_columns"
                                    else "selection", question=exc.question) from exc
@@ -1449,7 +1460,11 @@ class ExperimentState:
         if canonical in _COUNT_PATHS:
             if canonical == "print.replicates" and (
                     str(raw.get("op") or "").lower() == "none"
-                    or raw.get("value") == 0 and numbers_mentioned(0, final_text)):
+                    or raw.get("value") == 0 and numbers_mentioned(0, final_text)
+                    # 1 is the floor - each condition printed once - which is what "no replicates" or "remove the
+                    # replicates" asks for: stated when the words name the replicates and give no other count
+                    or value == 1 and not numbers_in(final_text)
+                    and re.search(_FIELD_HINTS["print.replicates"], final_text, re.I)):
                 return True, ""
             if canonical in _PAPER_LAYOUT_PATHS:
                 gap = gap_conflict(final_text)

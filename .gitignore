@@ -16,6 +16,8 @@ configs/workflows/user/*.yaml
 !configs/workflows/user/.gitkeep
 archive/
 runs/
+# per-user experiment memory (experiment_memory.py): lives on the laptop that ran the experiments
+experiment_history/
 vision_runs/
 vision/raw/
 vision_tests/outputs/

@@ -18,7 +18,8 @@ from typing import Any
 
 from src.agents.dye_demo import render
 from src.agents.dye_demo.history import differences
-from src.agents.dye_demo.model import EDITABLE_FIELDS, FieldError, canonicalize_path, get_path, occupancy, resolve_path
+from src.agents.dye_demo.model import (EDITABLE_FIELDS, FieldError, canonicalize_path, get_path, liquid_handling, occupancy,
+                                       resolve_path)
 from src.agents.dye_demo.plan import build_plan
 from src.agents.dye_demo.redteam.fake_opentrons import load_protocol_module, run_protocol
 from src.agents.dye_demo.redteam.interpreter import is_external_model_error
@@ -390,12 +391,20 @@ def protocol_mismatches(config: dict[str, Any]) -> list[str]:
     if transfers != planned:
         problems.append(f"{len(transfers)} vial aspirations differ from the {len(planned)} planned transfers")
     into_plate = [(key[1], volume) for _, volume, key, _ in (e for e in log if e[0] == "dispense") if key[0] == plate]
-    expected_plate = [(op.destination, op.volume_ul) for op in plan.operations if op.kind == "transfer"]
+    # each transfer dispenses its liquid and the air gap that rode with it; each dilution mix dispenses its volume
+    # reps times into the same well
+    gap = float(liquid_handling(config).get("air_gap_ul", 0.0) or 0.0)
+    expected_plate: list[tuple[str, float]] = []
+    for op in plan.operations:
+        if op.kind == "transfer":
+            expected_plate.append((op.destination, op.volume_ul + gap))
+        elif op.kind == "mix":
+            expected_plate += [(op.destination, op.volume_ul)] * op.reps
     if len(into_plate) != len(expected_plate) or any(
         well != expected_well or abs(volume - expected_volume) > 1e-6
         for (well, volume), (expected_well, expected_volume) in zip(into_plate, expected_plate)
     ):
-        problems.append("plate dispenses differ from the planned dilution transfers")
+        problems.append("plate dispenses differ from the planned dilution transfers and mixes")
     drops = [key[1] for _, _, key, _ in (e for e in log if e[0] == "dispense") if key[0] == paper]
     expected = [op.destination for op in plan.operations if op.kind == "print" for _ in range(op.droplets)]
     if drops != expected:

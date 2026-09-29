@@ -250,6 +250,74 @@ async def _check_run_dialog(tmp_path, monkeypatch):
         client.delete()
 
 
+def test_three_live_runs_in_one_session_say_why_run_waits_and_then_run(tmp_path):
+    """The reported lockout: after a live run the Run button was disabled with no reason shown. Each wait now has a
+    reason from the one eligibility list, and doing what it says makes the next run possible (fake robot executor)."""
+    executor = FakeRobotExecutor()
+    adapter = started(make_adapter(tmp_path, executor=executor, simulate=False))
+    try:
+        assert adapter.snapshot().run_ready, adapter.snapshot().run_block_reasons
+        assert adapter.run()
+        wait_for(lambda: len(executor.calls) == 1 and adapter.waiting == "proposal")    # the next starting tip
+        snapshot = adapter.snapshot()
+        assert not snapshot.run_ready and snapshot.run_block_reason.startswith("Proposal #1 is waiting")
+        assert "Before this plan can run again:" in chat_text(adapter)
+        assert adapter.submit_text("yes")
+        wait_for(lambda: adapter.waiting == "idle" and adapter.snapshot().revision == 1)
+        reasons = adapter.snapshot().run_block_reasons                   # the same plan: its wells are full now
+        assert len(reasons) == 1 and "already hold dilutions" in reasons[0]
+        for run, column in ((2, 3), (3, 5)):
+            # print the made dilutions again on fresh paper
+            apply_form(adapter, {"dilution.enabled": False, "print.paper_start_column": column})
+            assert adapter.snapshot().run_ready, adapter.snapshot().run_block_reasons
+            assert adapter.run()
+            wait_for(lambda: adapter.waiting == "question")                # do the wells hold the dilutions?
+            assert adapter.snapshot().run_block_reason.startswith("A yes/no question is waiting")
+            assert adapter.submit_text("yes")
+            wait_for(lambda run=run: len(executor.calls) == run and adapter.waiting == "proposal")
+            assert adapter.submit_text("yes")                             # the next starting tip
+            wait_for(lambda: adapter.waiting == "idle")
+        assert [record["status"] for record in adapter.session.state.runs] == ["succeeded"] * 3
+        assert [record["tips_used"] for record in adapter.session.state.runs] == [["A1"], ["B1"], ["C1"]]
+    finally:
+        adapter.stop()
+
+
+def test_the_page_says_why_run_is_unavailable_next_to_the_run_button(tmp_path, monkeypatch):
+    asyncio.run(_check_run_reason(tmp_path, monkeypatch))
+
+
+async def _check_run_reason(tmp_path, monkeypatch):
+    monkeypatch.setattr(core, "loop", asyncio.get_running_loop())
+    monkeypatch.setattr(ui, "run_javascript", lambda *args, **kwargs: None)
+    ticks = []
+    monkeypatch.setattr(ui, "timer", lambda interval, callback: ticks.append(callback))
+    adapter = started(make_adapter(tmp_path))
+    client = Client(ui.page("/run-reason-test"))
+
+    async def tick():
+        ticks[0]()
+        await asyncio.sleep(0.05)
+
+    try:
+        with client:
+            build_page(adapter)
+            await tick()
+            labels = [element for element in client.elements.values() if "run-reason" in element.classes]
+            assert len(labels) == 1 and not labels[0].visible                     # ready: nothing to explain
+            assert adapter.propose_form({"print.droplets_per_spot": 2})
+            wait_for(lambda: adapter.waiting == "proposal")
+            await tick()
+            assert labels[0].visible
+            assert labels[0].text == "Run unavailable: Proposal #1 is waiting: apply or discard it first."
+            card = [element for element in client.elements.values() if isinstance(element, ui.label)
+                    and element.text.startswith("Run unavailable:\n")]
+            assert card and "- Proposal #1 is waiting: apply or discard it first." in card[0].text
+    finally:
+        adapter.stop()
+        client.delete()
+
+
 def test_llm_request_run_requires_confirmation_and_pending_plan_blocks_it(tmp_path):
     calls = []
     model = router(lambda message: {"route": "request_run", "changes": []})

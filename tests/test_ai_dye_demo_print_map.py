@@ -12,7 +12,7 @@ from copy import deepcopy
 
 import pytest
 
-from src.agents.dye_demo.model import DEFAULT_CONFIG, FieldError, load_config, normalize_source_map
+from src.agents.dye_demo.model import DEFAULT_CONFIG, FieldError, liquid_handling, load_config, normalize_source_map
 from src.agents.dye_demo.natural import SelectionError, expand_print_map
 from src.agents.dye_demo.plan import build_plan
 from src.agents.dye_demo.redteam.fake_opentrons import load_protocol_module, run_protocol
@@ -232,13 +232,17 @@ def test_protocol_motion_matches_the_approved_plan(protocol_module, variant):
     plan = build_plan(config)
     log = run_protocol(protocol_module, config).log
     assert [entry[1] for entry in log if entry[0] == "pick_up_tip"] == [tip.tip for tip in plan.tips]
-    plate_dispenses = [(key[1], volume) for _, volume, key, _ in (e for e in log if e[0] == "dispense")
-                       if key[0] == PLATE]
-    assert plate_dispenses == [(op.destination, op.volume_ul) for op in plan.operations if op.kind == "transfer"]
+    gap = liquid_handling(config)["air_gap_ul"]
+    # transfers: plate dispenses that do not follow a plate aspiration (a dilution mix does)
+    plate_dispenses = [(entry[2][1], entry[1]) for index, entry in enumerate(log)
+                       if entry[0] == "dispense" and entry[2][0] == PLATE
+                       and not (log[index - 1][0] == "aspirate" and log[index - 1][2][0] == PLATE)]
+    assert plate_dispenses == [(op.destination, op.volume_ul + gap) for op in plan.operations if op.kind == "transfer"]
     drops = [key[1] for _, _, key, _ in (e for e in log if e[0] == "dispense") if key[0] == PAPER]
     assert drops == [op.destination for op in plan.operations if op.kind == "print" for _ in range(op.droplets)]
-    drawn_from = [key[1] for _, volume, key, _ in (e for e in log if e[0] == "aspirate")
-                  if key[0] == PLATE and key[2:] == ("bottom", 1.0)]
+    # print draws: plate aspirations that do not go straight back into the well (a dilution mix does)
+    drawn_from = [entry[2][1] for index, entry in enumerate(log) if entry[0] == "aspirate" and entry[2][0] == PLATE
+                  and not (log[index + 1][0] == "dispense" and log[index + 1][2][0] == PLATE)]
     assert drawn_from == [op.source for op in plan.operations if op.kind == "print" for _ in range(op.droplets)]
 
 

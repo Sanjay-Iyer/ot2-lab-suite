@@ -18,6 +18,7 @@ from src.agents.dye_demo.model import (
     FieldError,
     circle_area_mm2,
     is_off_deck,
+    liquid_handling,
     normalize_source_map,
     slot_of,
     well_geometry,
@@ -37,10 +38,12 @@ class DilutionWell:
 class Operation:
     """One tip-bearing unit of work, in execution order.
 
-    transfer: aspirate `volume_ul` from vial `source`, dispense it `from_top_mm`
-              below the top of plate well `destination`, then blow out.
-    print:    mix plate well `source`, then `droplets` drops of `volume_ul` each
-              onto paper position `destination`.
+    transfer: aspirate `volume_ul` from vial `source`, take the air gap, dispense liquid + gap `height_mm` above the
+              bottom of plate well `destination`, then blow-out and the well shake (liquid_handling).
+    mix:      mix plate well `destination` `reps` times with `volume_ul`, right after its dye, with that transfer's
+              tip; then blow-out and the well shake.
+    print:    `droplets` drops of `volume_ul` each from plate well `source` onto the ONE paper position
+              `destination` (no mixing before printing).
     Consecutive operations with the same `group` share one tip.
     """
 
@@ -53,9 +56,10 @@ class Operation:
     role: str = ""
     chunk: int = 0
     chunks: int = 0
-    from_top_mm: float = 0.0
+    height_mm: float = 0.0
     droplets: int = 0
     column: int = 0
+    reps: int = 0
 
 
 @dataclass(frozen=True)
@@ -255,13 +259,32 @@ def tip_group(policy: str, liquid_group: str, own_group: str) -> str:
     return liquid_group if policy == "per_liquid" else own_group
 
 
+def transfer_limit(config: dict[str, Any]) -> float:
+    """The most liquid one vial transfer carries: the transfer ceiling, less the air gap that rides in the same tip
+    (liquid + air gap never exceeds the P20). Mirrors the protocol's _transfer_limit."""
+    dilution = config.get("dilution") or {}
+    p20_max = float((config.get("safety") or {}).get("p20_max_volume_ul", 20.0))
+    air_gap = float(liquid_handling(config).get("air_gap_ul", 0.0) or 0.0)
+    return min(float(dilution.get("max_transfer_ul", 20.0)), p20_max - air_gap)
+
+
+def mixes_dilutions(config: dict[str, Any]) -> bool:
+    mixing = config.get("mixing") or {}
+    try:
+        return bool(mixing.get("enabled", True)) and int(mixing.get("reps", 0) or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def build_operations(config: dict[str, Any], rows: list[str], factors: list[float],
                      spots: list[dict[str, Any]], do_dilution: bool,
                      do_print: bool) -> list[Operation]:
     dilution = config.get("dilution") or {}
+    mixing = config.get("mixing") or {}
     policy = str((config.get("tips") or {}).get("policy", "per_liquid"))
     minimum = float((config.get("safety") or {}).get("p20_min_volume_ul", 1.0))
-    max_transfer = float(dilution.get("max_transfer_ul", 20.0))
+    limit = transfer_limit(config)
+    dispense_mm = float(liquid_handling(config)["plate_dispense_height_mm"])
     column = str(dilution.get("plate_column", ""))
     total = float(dilution.get("total_volume_ul", 0.0) or 0.0)
     vials = {
@@ -271,28 +294,33 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
     }
     operations: list[Operation] = []
     if do_dilution:
-        for role, height_key in (("solvent", "solvent_dispense_from_top_mm"),
-                                 ("sample", "sample_dispense_from_top_mm")):
+        for role in ("solvent", "sample"):
             for row, factor in zip(rows, factors):
                 sample_ul = total / factor
                 volume = total - sample_ul if role == "solvent" else sample_ul
                 if volume <= EPSILON_UL:
                     continue
                 well = f"{row}{column}"
-                chunks = split_volume(volume, max_transfer, minimum)
+                chunks = split_volume(volume, limit, minimum)
                 for index, chunk in enumerate(chunks, start=1):
                     group = tip_group(policy, role, f"{role}:{well}:{index}")
                     operations.append(Operation(
                         kind="transfer", group=group, source=vials.get(role, ""),
                         destination=well, volume_ul=chunk, factor=factor, role=role,
-                        chunk=index, chunks=len(chunks),
-                        from_top_mm=float(dilution.get(height_key, -2.0)),
+                        chunk=index, chunks=len(chunks), height_mm=dispense_mm,
+                    ))
+                if role == "sample" and mixes_dilutions(config) and total - volume > EPSILON_UL:
+                    # the dye is in and the well holds both liquids: mix it now, with the tip that just dispensed
+                    operations.append(Operation(
+                        kind="mix", group=operations[-1].group, source=well, destination=well,
+                        volume_ul=float(mixing.get("volume_ul", 0) or 0), factor=factor, reps=int(mixing["reps"]),
                     ))
     if do_print:
         entries = print_map(config)
         if entries is not None:
             # An explicit map: each source well prints exactly its positions, in order. A source may feed any
-            # number of positions; its factor is known only when this run makes that well.
+            # number of positions; its factor is known only when this run makes that well. A position may take its
+            # own drop count (entry "drops"); the others take print.droplets_per_spot.
             volumes = droplet_volumes(config)
             default_volume = volumes[0] if volumes else 0.0
             droplets = int((config.get("print") or {}).get("droplets_per_spot", 1))
@@ -300,11 +328,13 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
             for entry in entries:
                 source = entry["source"]
                 volume = float(entry.get("volume_ul", default_volume))
+                drops = entry.get("drops") or {}
                 for position in entry["positions"]:
                     group = tip_group(policy, f"print:{source}", f"print:{position}")
                     operations.append(Operation(
                         kind="print", group=group, source=source, destination=position, volume_ul=volume,
-                        factor=float(made.get(source, 0.0)), droplets=droplets, column=int(position[1:]),
+                        factor=float(made.get(source, 0.0)), droplets=int(drops.get(position, droplets)),
+                        column=int(position[1:]),
                     ))
         else:
             # Each series row prints on its paper row (print.paper_rows, or the row with the same letter), one paper

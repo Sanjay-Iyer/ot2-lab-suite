@@ -19,14 +19,16 @@ from src.agents.dye_demo.model import (
     ROWS,
     FieldError,
     fmt_factor,
+    normalize_drops,
     normalize_paper_column,
     normalize_paper_rows,
     normalize_source_map,
     paper_position,
     plate_well,
+    positions_with_drops,
 )
 from src.agents.dye_demo.placement import Need, PlacementError, allocate, placement_of
-from src.agents.dye_demo.plan import build_plan, droplet_volumes, explicit_paper_rows, steps_enabled
+from src.agents.dye_demo.plan import build_plan, droplet_volumes, explicit_paper_rows, print_map, steps_enabled
 
 
 class SelectionError(ValueError):
@@ -433,6 +435,8 @@ def expand_print_map(value: Any, config: dict[str, Any], *,
 
     Entry forms the router uses (all resolved here, never by the model):
       {"source": "A11", "positions": ["A1", "B1"]}       exactly these paper positions, in this order
+      {"source": "A11", "positions": {"A1": 1, "A2": 3}} those positions with their drop counts (also a "drops" key:
+                                                         a number for every position, or {"A2": 3})
       {"source": "A11", "positions": "all"}              every position the plan prints now ("use this for all prints")
       {"source": "A11", "count": 10}                     10 prints on free positions: along the source's own paper row
                                                          nearest the column it prints on now (else the first paper
@@ -483,6 +487,7 @@ def expand_print_map(value: Any, config: dict[str, Any], *,
         raise _split_question(sources, len(current))
     taken: set[str] = set(occupied)             # counted prints never go where an earlier live run printed
     resolved: dict[int, list[str]] = {}
+    counted: dict[int, dict[str, int]] = {}     # drop counts written with the positions
     for index, (entry, kind, source) in enumerate(zip(entries, kinds, sources)):
         try:
             if kind == "all":
@@ -491,7 +496,9 @@ def expand_print_map(value: Any, config: dict[str, Any], *,
                                          f"How many prints should {source} make?")
                 resolved[index] = list(current)
             elif kind == "positions":
-                resolved[index] = [paper_position(item) for item in _as_items(entry["positions"])]
+                raw = entry["positions"]
+                resolved[index], counted[index] = positions_with_drops(raw if isinstance(raw, dict) else
+                                                                       [item for item in _as_items(raw)])
             elif kind == "grid":
                 rows = (normalize_paper_rows(entry["rows"]) if entry.get("rows") not in (None, "", [])
                         else [home.get(source, source[0])])
@@ -519,7 +526,9 @@ def expand_print_map(value: Any, config: dict[str, Any], *,
     try:
         mapped = normalize_source_map([
             {"source": source, "positions": resolved[index],
-             **({"volume_ul": entry["volume_ul"]} if entry.get("volume_ul") not in (None, "") else {})}
+             **({"volume_ul": entry["volume_ul"]} if entry.get("volume_ul") not in (None, "") else {}),
+             **({"drops": _entry_drops(entry.get("drops"), counted.get(index), resolved[index])}
+                if entry.get("drops") not in (None, "", {}) or counted.get(index) else {})}
             for index, (entry, source) in enumerate(zip(entries, sources))])
     except FieldError as exc:
         raise SelectionError(str(exc)) from exc
@@ -531,3 +540,78 @@ def expand_print_map(value: Any, config: dict[str, Any], *,
     summary = "; ".join(f"{entry['source']} on {len(entry['positions'])} paper position"
                         f"{'s' if len(entry['positions']) != 1 else ''}" for entry in mapped)
     return changes, f"I mapped the prints as: {summary}."
+
+
+def _entry_drops(raw: Any, counted: dict[str, int] | None, positions: list[str]) -> dict[str, int]:
+    """One entry's drop counts: a number for all its positions, or {position: count}; counts written with the
+    positions themselves win."""
+    drops: dict[str, int] = {}
+    if isinstance(raw, dict):
+        drops.update({paper_position(position): normalize_drops(count) for position, count in raw.items()})
+    elif raw not in (None, ""):
+        drops.update({position: normalize_drops(raw) for position in positions})
+    drops.update(counted or {})
+    return drops
+
+
+# ── drops on particular paper positions ───────────────────────────────────────────
+
+def expand_drops_at(value: Any, config: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+    """How many drops land on particular paper positions ("3 drops on A2 and 2 on B5"): the current print plan as an
+    explicit print map - the same plate wells, paper positions and order - with those counts. Every other position
+    keeps print.droplets_per_spot. The drops of one position all land on that one position (they are not replicates);
+    a position the plan does not print is refused, never added.
+
+        {"A2": 3, "B5": 2}   or   [{"position": "A2", "drops": 3}, {"position": "B5", "drops": 2}]
+    """
+    try:
+        positions, counts = positions_with_drops(value)
+    except FieldError as exc:
+        raise SelectionError(str(exc)) from exc
+    missing = [position for position in positions if position not in counts]
+    if missing or not counts:
+        raise SelectionError(f"no drop count was given for {', '.join(missing) or 'any position'}",
+                             "How many drops should land on each of those paper positions?")
+    plan = build_plan(config)
+    if not plan.do_print:
+        raise SelectionError("this plan does not print, so no paper position takes drops", "Should this run print?")
+    outside = [position for position in counts if position not in plan.print_positions]
+    if outside:
+        raise SelectionError(f"this plan does not print on {', '.join(outside)} (it prints "
+                             f"{', '.join(plan.print_positions[:12])}{', ...' if len(plan.print_positions) > 12 else ''})",
+                             "Which of the printed paper positions should get the extra drops?")
+    entries = deepcopy(print_map(config) or [])
+    if not entries:
+        # the series layout as an equivalent map: one entry per plate well and drop volume, in print order
+        for op in (op for op in plan.operations if op.kind == "print"):
+            entry = next((item for item in entries if item["source"] == op.source
+                          and item["volume_ul"] == op.volume_ul), None)
+            if entry is None:
+                entry = {"source": op.source, "positions": [], "volume_ul": op.volume_ul, "drops": {}}
+                entries.append(entry)
+            entry["positions"].append(op.destination)
+            if op.droplets != int((config.get("print") or {}).get("droplets_per_spot", 1)):
+                entry["drops"][op.destination] = op.droplets
+        if len(droplet_volumes(config)) <= 1:
+            for entry in entries:
+                entry.pop("volume_ul", None)        # one drop volume: the map's entries need not repeat it
+    for entry in entries:
+        own = dict(entry.get("drops") or {})
+        own.update({position: count for position, count in counts.items() if position in entry["positions"]})
+        if own:
+            entry["drops"] = own
+        else:
+            entry.pop("drops", None)
+    try:
+        mapped = normalize_source_map(entries)
+    except FieldError as exc:
+        raise SelectionError(str(exc)) from exc
+    changes: list[dict[str, Any]] = [{"path": "print.source_map", "value": mapped}]
+    if explicit_paper_rows(config) is not None:
+        changes.append({"path": "print.paper_rows", "value": None, "kind": "dependent",
+                        "why": "the print map names every paper position"})
+    default = int((config.get("print") or {}).get("droplets_per_spot", 1))
+    note = ("Drops per paper position: " + ", ".join(f"{position} {count}" for position, count in counts.items())
+            + f" (all on that one position); every other position keeps {default}.")
+    return changes, note
+

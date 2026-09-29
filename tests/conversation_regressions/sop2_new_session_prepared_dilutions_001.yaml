@@ -31,7 +31,7 @@ expected:
   - turn: 1
     output_contains: ["PROPOSED PLAN #1",
                       "Saying yes records plate wells A11-C11 as already holding the dilutions (2× | 5× | 10×",
-                      "SKIPPED - already in the plate", "  Drops per position    3  (stacked)",
+                      "SKIPPED - already in the plate", "  Drops per position    3  (stacked on one spot)",
                       "  Paper columns         2"]
     output_excludes: ["I did not update the record", " -> "]
   - turn: 3

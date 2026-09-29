@@ -6,8 +6,9 @@ Generates self-contained SVG strings directly from authoritative experiment stat
 from __future__ import annotations
 
 from typing import Any
-from src.agents.dye_demo.model import TIP_ORDER, format_slot, material_label, material_spec, occupancy, slot_of
-from src.agents.dye_demo.plan import build_plan
+from src.agents.dye_demo.model import (TIP_ORDER, fmt_ul, format_slot, liquid_handling, material_label, material_spec,
+                                       occupancy, slot_of)
+from src.agents.dye_demo.plan import build_plan, mixes_dilutions
 from src.agents.dye_demo.render import format_value
 
 WELL_ROWS = tuple("ABCDEFGH")
@@ -152,9 +153,12 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
     width = 256
     height = 200
 
-    drops = int((config.get("print") or {}).get("droplets_per_spot", 1))
-    drop_unit = "drop" if drops == 1 else "drops"
-    summary_label = f"{drops} {drop_unit} / position" if (plan.do_print and printed_positions) else "No printing planned"
+    # drops land on ONE position each; a position may take its own count (drawn on its spot)
+    drops_at = {(op.destination[0], int(op.destination[1:])): op.droplets for op in plan.operations if op.kind == "print"}
+    counts = sorted(set(drops_at.values())) or [int((config.get("print") or {}).get("droplets_per_spot", 1))]
+    span = f"{counts[0]}" if len(counts) == 1 else f"{counts[0]}-{counts[-1]}"
+    summary_label = (f"{span} drop{'' if span == '1' else 's'} / position" if (plan.do_print and printed_positions)
+                     else "No printing planned")
 
     svg_parts = [
         f'<svg viewBox="0 0 {width} {height}" width="100%" max-width="{width}px" height="auto" xmlns="http://www.w3.org/2000/svg" style="width: {width}px; max-width: 100%; height: auto; background: white; border-radius: 6px; font-family: system-ui, sans-serif;">',
@@ -181,9 +185,14 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
                 sw = "2.5" if pos in added else "1"
                 label = "repeat" if repeat else "original"
                 pending = ", new in this proposal" if pos in added else ""
+                count = drops_at.get(pos, 1)
+                drops_here = f"{count} drop{'' if count == 1 else 's'} on this position"
                 svg_parts.append(f'<circle cx="{cx}" cy="{cy}" r="5" fill="{fill}" stroke="{stroke}" '
-                                 f'stroke-width="{sw}"><title>Position {r}{c} ({summary_label}, {label}{pending})'
+                                 f'stroke-width="{sw}"><title>Position {r}{c} ({drops_here}, {label}{pending})'
                                  '</title></circle>')
+                if count > 1:
+                    svg_parts.append(f'<text x="{cx}" y="{cy + 2.6}" font-size="7" font-weight="bold" fill="#ffffff" '
+                                     f'text-anchor="middle" pointer-events="none">{count}</text>')
 
     if added:
         summary_label += f" · {len(added)} new"
@@ -193,6 +202,30 @@ def render_paper_svg(config: dict[str, Any], baseline: dict[str, Any] | None = N
     svg_parts.append(f'<text x="135" y="192" font-size="9" fill="#475569" text-anchor="middle">{summary_label}</text>')
     svg_parts.append('</svg>')
     return "".join(svg_parts)
+
+
+def dilution_settings(config: dict[str, Any]) -> list[tuple[str, str]]:
+    """The dilution step's liquid handling, shown in the DILUTIONS box (the switches a scientist can change)."""
+    lh = liquid_handling(config)
+    mixing = config.get("mixing") or {}
+    gap = float(lh.get("air_gap_ul", 0) or 0)
+    return [
+        ("Air gap", fmt_ul(gap) if gap else "Off"),
+        ("Blow-out", "On" if lh.get("blow_out") else "Off"),
+        ("Shake after dispense", "On" if (lh.get("well_plate_shake") or {}).get("enabled") else "Off"),
+        ("Mixing", f"{int(mixing.get('reps', 0))} × {fmt_ul(mixing.get('volume_ul', 0))}" if mixes_dilutions(config)
+         else "Off"),
+        ("Plate heights", f"{lh['plate_aspirate_height_mm']:g} / {lh['plate_dispense_height_mm']:g} / "
+                          f"{lh['plate_mix_height_mm']:g} mm"),
+    ]
+
+
+def drops_per_position(config: dict[str, Any]) -> str:
+    """'1', or '1 (A2: 3, B5: 2)' when some paper positions take their own drop count."""
+    default = int((config.get("print") or {}).get("droplets_per_spot", 1))
+    own = [(op.destination, op.droplets) for op in build_plan(config).operations
+           if op.kind == "print" and op.droplets != default]
+    return f"{default}" + (f" ({', '.join(f'{position}: {count}' for position, count in own)})" if own else "")
 
 
 def tip_settings(config: dict[str, Any]) -> list[tuple[str, str]]:

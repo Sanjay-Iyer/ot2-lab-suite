@@ -50,34 +50,46 @@ class GuiSnapshot:
     running: bool         # the build or robot runner is running
     operator: str         # display the existing session identity
     validation_ok: bool   # the existing plan validation report, not a separate check
-    # physical reasons the session would refuse this run (ExperimentState.run_blockers: wells already full, ...)
+    # physical reasons the session would refuse this run (DemoSession.physical_run_blockers: wells already full, ...)
     blockers: tuple[str, ...] = ()
     validation_errors: tuple[str, ...] = ()
 
     @property
-    def run_block_reason(self) -> str:
-        if self.proposed is not None:
-            return "Apply or discard the proposal first."
-        if self.waiting in {"proposal", "clarify", "question"}:
-            return "Answer or cancel the pending question first."
-        if self.waiting == "operator":
-            return "Enter the operator name first."
-        if self.waiting == "busy" or self.running:
-            return "The agent or run is still working."
+    def run_block_reasons(self) -> tuple[str, ...]:
+        """Every reason the Run button is unavailable, in the order to fix them (empty: it can run). The same list as
+        DemoSession.run_block_reasons - a proposal or question waiting, the plan's errors, the recorded physical state
+        (these fields come from the same session calls) - plus what only the page knows: a run in progress, the agent
+        still busy, a yes/no question, no operator yet."""
         if self.status == "SESSION ENDED":
-            return "The session has ended."
-        if self.validation_errors:
-            return self.validation_errors[0]
-        if self.blockers:
-            return self.blockers[0]
-        return ""
+            return ("The session has ended.",)
+        reasons: list[str] = []
+        if self.running:
+            reasons.append("A run is in progress: wait until it finishes (or press Stop).")
+        elif self.waiting == "busy":
+            reasons.append("The agent is still working on the last message.")
+        if self.waiting == "operator" or not self.operator:
+            reasons.append("Enter the operator name first.")
+        if self.proposed is not None or self.waiting == "proposal":
+            number = f" #{self.proposal_id}" if self.proposal_id is not None else ""
+            reasons.append(f"Proposal{number} is waiting: apply or discard it first.")
+        if self.waiting == "clarify":
+            reasons.append("A question is waiting: answer or cancel it first.")
+        if self.waiting == "question":
+            question = " ".join(self.question.split())
+            reasons.append("A yes/no question is waiting: " + (question[:160] or "answer it first."))
+        reasons += self.validation_errors or (() if self.validation_ok else ("The plan does not pass its checks.",))
+        reasons += self.blockers
+        return tuple(dict.fromkeys(reasons))
+
+    @property
+    def run_block_reason(self) -> str:
+        reasons = self.run_block_reasons
+        return reasons[0] if reasons else ""
 
     @property
     def run_ready(self) -> bool:
-        """UI readiness; the existing run path still performs all execution-time checks."""
-        return (self.waiting == "idle" and not self.running and self.proposed is None
-                and bool(self.operator) and self.validation_ok and not self.blockers
-                and self.status != "SESSION ENDED")
+        """UI readiness from the shared eligibility list; the run path repeats every execution-time check."""
+        return not self.run_block_reasons
 
 
 class DemoGuiAdapter:
@@ -102,6 +114,7 @@ class DemoGuiAdapter:
         self._thread: threading.Thread | None = None
         self._diagnostics: list[str] = []
         self._run_confirmation_requested = False
+        self._run_confirmation_count = 0      # every chat run request; each open page answers each one once
         session.request_run_confirmation = self._request_run_confirmation
         session.input = self._read
         session.output = self._write
@@ -215,6 +228,14 @@ class DemoGuiAdapter:
     def _request_run_confirmation(self) -> None:
         with self._lock:
             self._run_confirmation_requested = True
+            self._run_confirmation_count += 1
+
+    @property
+    def run_confirmation_count(self) -> int:
+        """How many run confirmations the chat has requested. A page opens its dialog for each new one, so the dialog
+        appears on the page the scientist is looking at even with the page open in two tabs."""
+        with self._lock:
+            return self._run_confirmation_count
 
     def take_run_confirmation_request(self) -> bool:
         with self._lock:
@@ -291,12 +312,7 @@ class DemoGuiAdapter:
         prepared = session.state.physical.get("dilutions_prepared")
         proposed_prepared = pending.physical.get("dilutions_prepared", prepared) if pending else prepared
         report = session.state.validate()
-        blockers = list(session.state.run_blockers())
-        if not session.state.lab_owned_intact():
-            blockers.append("Lab-owned settings changed during this session.")
-        if session.unreconciled_reports:
-            blockers.append("A physical report has not been reconciled: " + session.unreconciled_reports[0])
-        blockers = tuple(blockers)
+        blockers = tuple(session.physical_run_blockers())
         with self._lock:
             waiting, question, ended = self._state(self._waiting), self._question, self._ended
         running = self.running
@@ -354,9 +370,17 @@ def _phrase(path: str, value: Any) -> str:
     if path == "print.paper_start_column":
         return f"start at paper column {value}"
     if path == "print.replicates":
-        return f"use {value} replicate paper columns"
+        return f"use {value} total replicates"
     if path == "print.droplets_per_spot":
         return f"use {value} drops per paper position"
+    if path == "mixing.enabled":
+        return "mix the dilutions after they are made" if value else "do not mix the dilutions"
+    if path == "liquid_handling.air_gap_ul":
+        return f"use a {value:g} uL air gap" if value else "no air gap"
+    if path == "liquid_handling.blow_out":
+        return "blow out after each plate dispense" if value else "no blow-out after plate dispenses"
+    if path == "liquid_handling.well_plate_shake.enabled":
+        return "shake after dispensing into the plate" if value else "turn off the well-plate shake"
     deck = {
         "deck.plate.slot": "96-well dilution plate",
         "deck.paper.slot": "paper print plate",

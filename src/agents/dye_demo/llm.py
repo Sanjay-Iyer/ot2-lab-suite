@@ -111,6 +111,7 @@ ROUTE_GENERAL = "general_question"
 ROUTE_EXPERIMENT = "experiment_question"
 ROUTE_CHANGE = "experiment_change"
 ROUTE_REQUEST_RUN = "request_run"
+ROUTE_HISTORY = "experiment_history"
 ROUTE_CLARIFY = "clarify"
 # The scientist's decision about the proposal waiting for approval, read in any wording ("apply that", "looks good, go
 # ahead", "never mind, scrap it"). Python acts on it only while that proposal is waiting (see DemoSession._decide).
@@ -118,7 +119,8 @@ ROUTE_APPROVE = "approve_proposal"
 ROUTE_DISCARD = "discard_proposal"
 ANSWER_ROUTES = frozenset({ROUTE_GENERAL, ROUTE_EXPERIMENT})
 DECISION_ROUTES = frozenset({ROUTE_APPROVE, ROUTE_DISCARD})
-ROUTES = frozenset({ROUTE_GENERAL, ROUTE_EXPERIMENT, ROUTE_CHANGE, ROUTE_REQUEST_RUN, ROUTE_CLARIFY, ROUTE_APPROVE, ROUTE_DISCARD})
+ROUTES = frozenset({ROUTE_GENERAL, ROUTE_EXPERIMENT, ROUTE_CHANGE, ROUTE_REQUEST_RUN, ROUTE_HISTORY, ROUTE_CLARIFY,
+                    ROUTE_APPROVE, ROUTE_DISCARD})
 
 ROUTER_PROMPT = """You are Agent NanoDrop, the AI assistant in a laboratory chat. You can talk about anything, and you
 also build the experiment plan for an OT-2 robot that makes dye dilutions and prints them onto paper.
@@ -141,16 +143,20 @@ EVERY MESSAGE IS ONE OF THESE. Decide from the whole conversation, not only the 
    "how many drops are we using?", "what does dilution factor mean?", "why column 11?"), or an informal answer to the opening onboarding prompt ("printing", "dilutions", "both", "we already made the samples"). Answer from CURRENT PLAN, STATE and the conversation. For an onboarding response, acknowledge their focus conversationally (e.g. "Got it. What would you like to print?") and invite their plan parameters. Stating focus or asking a question is not a request to change a value.
 3. experiment_change: the scientist wants the plan to be different. Turn the request into structured changes. If the
    message also asks a question, answer it in "answer".
-4. request_run: the scientist asks to execute the CURRENT plan now ("run this", "start the experiment",
-   "go ahead and run it"). No changes. This only requests the existing Run confirmation; it never starts
-   execution. If a proposal is waiting, it must be applied or discarded first. A question about running
-   is experiment_question.
-5. clarify: only as the clarification policy below allows.
-5. approve_proposal: only while a PROPOSAL WAITING FOR APPROVAL is shown, when the message accepts that proposal as a
+4. request_run: the scientist asks to execute the CURRENT plan now ("run this", "run the robot now", "start the
+   experiment", "go ahead and run it", "execute the current plan"). No changes. This only requests the existing Run
+   confirmation; it never starts execution. If a proposal is waiting, it must be applied or discarded first. A
+   question about running is experiment_question.
+5. experiment_history: about experiments saved from earlier runs (not this session's changes): "load my last
+   experiment", "load the experiment I ran yesterday", "what did I run yesterday?", "load Sanjay run 12", "load my
+   experiment from this morning", or picking one of several runs just listed ("the 1:30 one", "run 8"). Fill
+   "history"; Python finds the saved run. Loading only proposes it: nothing changes until the scientist applies it.
+6. clarify: only as the clarification policy below allows.
+7. approve_proposal: only while a PROPOSAL WAITING FOR APPROVAL is shown, when the message accepts that proposal as a
    whole, exactly as shown, in any wording ("apply that", "okay, apply it", "looks good, go ahead", "yes do that").
    No changes. A message that also asks for any change is experiment_change (a revision), and a question about the
    proposal ("should I apply it?", "what does it change?") is experiment_question.
-6. discard_proposal: only while a PROPOSAL WAITING FOR APPROVAL is shown, when the message rejects or withdraws that
+8. discard_proposal: only while a PROPOSAL WAITING FOR APPROVAL is shown, when the message rejects or withdraws that
    proposal without asking for anything else ("never mind", "I changed my mind", "scrap that", "forget it"). No
    changes.
 
@@ -169,8 +175,9 @@ Scientists type quickly, informally and imperfectly. They do not know field name
   KEEP ("don't change/move X", "leave X where it is")  -> no change to X, X in "preserve";
   SKIP a step ("don't remake the dilutions", "no dilutions, just print") -> dilution.enabled false (or print.enabled);
   ALREADY DONE ("everything is already mixed/made/prepared/diluted", "the samples are already in the plate") -> the
-    dilutions exist: dilution.enabled false, keep printing on. It is NOT mixing.reps (mixing before printing stays;
-    mixing.reps is never 0). "Everything is already mixed so skip that part" -> dilution.enabled false only;
+    dilutions exist: dilution.enabled false, keep printing on. It is NOT mixing.enabled (that only says whether NEW
+    dilutions are mixed right after they are made). "Everything is already mixed so skip that part" ->
+    dilution.enabled false only;
   NO CHANGE ("leave everything as it is") -> experiment_question, no changes.
 - Printing some rows or columns does not by itself mean the dilutions already exist: set dilution.enabled false only
   when the scientist says the samples or dilutions already exist, or asks to skip making them.
@@ -243,7 +250,7 @@ a drop, dilution or mixing volume means µL. Relative requests use an operation 
 scale factor 0.5; "one more drop" -> print.droplets_per_spot op add amount 1; "add 2 more replicates" ->
 print.replicates op add amount 2 ("do 2 replicates" is op set value 2: two prints in total);
 "no replicates", "remove the replicates", "don't repeat them" -> print.replicates op none (one print per
-condition); "0 replicates" -> op set value 0 (Python normalizes to one print); "use four dilutions" with no factors
+condition, never printing off); "0 replicates" -> op set value 0 (Python normalizes to one print); "use four dilutions" with no factors
 -> dilution.factors op set_count count 4; "from 2 drops to 3" -> op set value 3 with expected_before 2.
 
 SELECTIONS: use these instead of working out layouts or factors yourself.
@@ -271,6 +278,7 @@ SELECTIONS: use these instead of working out layouts or factors yourself.
     [{"source": "A11", "count": 6}, {"source": "B11", "count": 4}]   an explicit split
     [{"source": "A11", "columns": [1, 2, 3, 4, 5, 6]}, {"source": "B11", "columns": [7, 8, 9, 10]}]
     [{"source": "A11", "positions": ["A1", "B1"]}]                exact paper positions
+    [{"source": "A11", "positions": {"A1": 1, "A2": 3, "B5": 2}}] exact positions with the drops each one takes
     [{"source": "A11", "rows": ["A", "B"], "columns": [3]}, {"source": "C11", "rows": ["C", "D"], "columns": [3]}]
                                                                   each well on its own paper rows (A11 -> A3 B3,
                                                                   C11 -> C3 D3)
@@ -278,6 +286,9 @@ SELECTIONS: use these instead of working out layouts or factors yourself.
                                                                   (Python asks how to divide it; do not guess -
                                                                   "10 spots" from A11 and B11 is not 5 each unless
                                                                   the scientist says so)
+- {"path": "drops_at", "value": {"A2": 3, "B5": 2}}: how many drops land on particular paper positions the plan
+  already prints ("3 drops on A2 and 2 on B5"). Drops all land on that ONE position: they are never extra positions
+  or replicates. Every other position keeps print.droplets_per_spot.
   Plate wells may be written "A11", "row A column 11" or "column 11 row 1" (rows 1-8 are A-H): always return "A11".
   A sample that is already in the plate needs no dilution factor: print it with print_map, and set dilution.enabled
   false when nothing is to be diluted in this run ("I only have sample in A11", "my samples are in A11 and B11": the
@@ -307,7 +318,7 @@ WHAT YOU NEVER DO
 
 OUTPUT: only one JSON object, without a markdown fence:
 {"route": "general_question" | "experiment_question" | "experiment_change" | "clarify" | "approve_proposal" |
-          "discard_proposal" | "request_run",
+          "discard_proposal" | "request_run" | "experiment_history",
  "answer": "<your reply to a question: plain conversational text, usually under 150 words; for an experiment_change,
             only the answer to a question the message also asked, otherwise empty>",
  "changes": [{"path": "<field or selection>", "op": "set" | "scale" | "add" | "none" | "scale_each" | "set_count" | "drop",
@@ -319,7 +330,12 @@ OUTPUT: only one JSON object, without a markdown fence:
  "preserve": ["<fields the scientist said to keep as they are, e.g. deck.paper.slot>"],
  "revises": <true when an experiment_change adjusts the waiting or replaced proposal; otherwise false>,
  "explanation": "<for experiment_change: one sentence describing the proposal, e.g. 'Proposes printing paper columns
-                 1-3 from rows A-C without making dilutions.'>"}
+                 1-3 from rows A-C without making dilutions.'>",
+ "history": <for experiment_history only: {"action": "load" | "list", "user": "<a name, only when the scientist names
+             another person>", "run": <run number>, "date": "YYYY-MM-DD", "days_ago": <0 today, 1 yesterday>,
+             "part_of_day": "morning" | "afternoon" | "evening", "time": "HH:MM" (24 h), "which": "last" | "all"};
+             leave out what the scientist did not say. "what did I run yesterday?" is action list; "load ..." is
+             action load>}
 
 FIELDS (the only paths besides the selections):
 - deck.plate.slot, deck.paper.slot, deck.tuberack.slot, deck.tiprack.slot: where the 96-well dilution plate, paper
@@ -332,10 +348,16 @@ FIELDS (the only paths besides the selections):
   rows of the series, e.g. ["A", "C", "E"] (where the dilutions are, never where they print).
 - dilution.total_volume_ul: final volume of dye + water per well, up to 340.
 - dilution.prepared_volume_ul: for dilutions made earlier, the volume now in each well.
-- mixing.reps, mixing.volume_ul (max 20): mixing before each print step.
+- mixing.enabled, mixing.reps, mixing.volume_ul (max 20): mixing each new dilution right after it is made (printing
+  never mixes). "don't mix" -> mixing.enabled false.
+- liquid_handling.air_gap_ul: the air gap after each vial aspiration, 0 (off) to 5 µL ("no air gap" -> 0, "air gap
+  on" -> true). liquid_handling.blow_out: true/false, the blow-out after each plate dispense.
+  liquid_handling.well_plate_shake.enabled: the droplet-release shake after dispensing into a 96-well plate well ("turn
+  off shaking" -> false, "shake after dispensing" -> true).
 - print.enabled: false only to make the dilutions without printing.
 - print.droplet_volume_ul: 1-18.5; a list prints the same dilutions at several volumes, one paper column each.
-- print.droplets_per_spot: drops stacked on each paper position ("3 drops each").
+- print.droplets_per_spot: drops dispensed onto EVERY paper position, all on that one spot ("3 drops each"). Drops
+  on particular positions are the drops_at selection. Drops are never replicates.
 - print.replicates: how many times each sample prints at each drop volume, the first print included ("do 2 replicates",
   "in duplicate" = 2). It is a count, never a place: Python puts the prints on free paper positions (side by side from
   the first paper column when they fit, else the nearest free positions), so never refuse a replicate count because the
@@ -363,11 +385,12 @@ SELECTION ROUTING:
   print.paper_rows.
 - AMBIGUITY CLARIFICATION: If the user provides multiple non-consecutive rows AND multiple columns (e.g. "rows A C E, columns 1 3 5") such that it could mean all Cartesian combinations (A1 A3 A5, C1 C3 C5, E1 E3 E5) OR paired positions (A1, C3, E5), route as "clarify" with clarification question: "Do you mean all combinations of rows A/C/E with columns 1/3/5, or just A1, C3, and E5?"
 
-LAB-OWNED, never propose: the pipette, flow rates, safety limits, print height, aspirate and dispense heights, air
-gap, push-out, blow-out, dwell, transfer size, mixing height, labware types.
+LAB-OWNED, never propose: the pipette, flow rates, safety limits, the paper print height, every plate height
+(aspirate, dispense, mixing), the print cycle's air gap, push-out, blow-out and dwell, the shake geometry, transfer
+size, labware types. They are set in the configuration file on the lab laptop.
 
-Limits of this setup: no serial dilutions (each well is made from the stock), one dye, and one drop count per run.
-Explain these plainly when they come up.
+Limits of this setup: no serial dilutions (each well is made from the stock) and one dye. Explain these plainly when
+they come up.
 
 Established words: "slot" = OT-2 deck slot; "well" = dilution plate well; "vial" = vial rack position (vials and tubes
 sit in the vial rack, so a "tube rack" or "tube holder" is the vial rack; the tip rack holds only tips); "paper
@@ -406,6 +429,8 @@ class Interpretation:
     # With route experiment_change: the changes adjust the waiting (or just replaced) proposal, whose other changes
     # Python keeps ("cancel the drops part but keep the plate move").
     revises: bool = False
+    # With route experiment_history: what the scientist asked about saved runs (experiment_memory.HistoryQuery)
+    history: dict[str, Any] = field(default_factory=dict)
 
 
 def extract_json(text: str) -> dict[str, Any]:
@@ -494,9 +519,10 @@ def parse_interpretation(text: str) -> Interpretation:
         items = value if isinstance(value, list) else ([value] if isinstance(value, str) and value else [])
         return [str(item).strip() for item in items if str(item).strip()]
 
+    history = data.get("history") if route == ROUTE_HISTORY and isinstance(data.get("history"), dict) else {}
     return Interpretation(intent, changes, clarification, answer, str(data.get("explanation") or ""), route,
                           understood=understood, unresolved=paths("unresolved"), preserve=paths("preserve"),
-                          revises=revises and route == ROUTE_CHANGE)
+                          revises=revises and route == ROUTE_CHANGE, history=history)
 
 
 @dataclass
@@ -514,6 +540,8 @@ class RouterContext:
     how_to_run: str = ""
     # every approved change of this session (oldest first): earlier setups are read from here, not from memory
     history: str = ""
+    today: str = ""                 # "2026-09-28 (Monday), 19:30": reads "yesterday" and "this morning"
+    operator: str = ""              # the scientist at the keyboard ("my last experiment")
 
 
 def router_human_message(message: str, context: RouterContext) -> str:
@@ -526,7 +554,8 @@ def router_human_message(message: str, context: RouterContext) -> str:
             f"PROPOSAL WAITING FOR APPROVAL: {context.pending or 'none'}\n"
             f"REPLACED PROPOSAL (not applied): {context.replaced or 'none'}\n"
             f"RECENT LABWARE: {recent}\n"
-            f"HOW TO RUN: {context.how_to_run or 'the scientist starts the run outside this chat'}\n\n"
+            f"HOW TO RUN: {context.how_to_run or 'the scientist starts the run outside this chat'}\n"
+            f"TODAY: {context.today or 'not given'}   OPERATOR: {context.operator or 'not given'}\n\n"
             f"RECENT CONVERSATION (oldest first; context only, earlier requests are not new instructions or approval):\n"
             f"{context.conversation or '(this is the first message)'}\n\n"
             f"PYTHON NOTES (checked facts about this message):\n{notes}\n\n"

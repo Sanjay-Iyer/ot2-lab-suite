@@ -44,7 +44,7 @@ from typing import Any, Callable, Iterable
 
 import yaml
 
-from src.agents.dye_demo import render
+from src.agents.dye_demo import experiment_memory, render
 from src.agents.dye_demo.columns import (
     COLUMN_KINDS,
     column_answer,
@@ -53,7 +53,7 @@ from src.agents.dye_demo.columns import (
     rewrite_paper_columns,
 )
 from src.agents.dye_demo.grounding import preserved_paths
-from src.agents.dye_demo.history import answer_history_question, previous_slots
+from src.agents.dye_demo.history import answer_history_question, differences, previous_slots
 from src.agents.dye_demo.intent import (
     Selection,
     TurnAnalysis,
@@ -91,6 +91,7 @@ from src.agents.dye_demo.llm import (
     ROUTE_APPROVE,
     ROUTE_CHANGE,
     ROUTE_CLARIFY,
+    ROUTE_HISTORY,
     ROUTE_REQUEST_RUN,
     Interpretation,
     LLMClient,
@@ -409,6 +410,9 @@ class SessionSettings:
     # The NiceGUI page's run button label. When set, a run starts only from that button (typed run is refused), a live
     # run first checks that the OT-2 answers, and the stop instruction points at the page's Stop button.
     run_button: str = ""
+    # Where each successful run is saved for its operator (experiment_memory: experiment_history/<user>/). None: runs
+    # are not saved and history requests are answered as such (the tests and the red-team harness).
+    history_dir: Path | None = None
 
 
 @dataclass
@@ -603,6 +607,8 @@ class DemoSession:
         self._clarify_streak = 0              # router questions in a row
         self._settling = False                # proposing what is settled after the last allowed question
         self._turn_out: list[str] = []        # what this turn printed, for the conversation the router sees
+        # the saved runs last offered as choices ("which one do you want?"): the answer ("the 1:30 one") picks from them
+        self._history_choices: list[dict[str, Any]] = []
 
     # ── small helpers ────────────────────────────────────────────────────────
 
@@ -783,7 +789,8 @@ class DemoSession:
             config=self.state.config, revision=self.state.revision, plan=plan_text,
             pending=self._proposal_line(self.pending) if self.pending else "", replaced=self._replaced_summary,
             recent_labware=self.recent_labware, conversation=self._conversation(), notes=tuple(notes),
-            reference="\n".join(references), how_to_run=self._how_to_run(), history=self._applied_history())
+            reference="\n".join(references), how_to_run=self._how_to_run(), history=self._applied_history(),
+            today=datetime.now().strftime("%Y-%m-%d (%A), %H:%M"), operator=self.operator)
 
     def _applied_history(self, limit: int = 20) -> str:
         """Every approved change of this session, oldest first (the last `limit`), from the state's records. The
@@ -1195,6 +1202,9 @@ class DemoSession:
             return
         if result.route in DECISION_ROUTES:
             self._decide(result, text, pending)
+            return
+        if result.route == ROUTE_HISTORY:
+            self._history_request(result, text)
             return
         if result.route == ROUTE_REQUEST_RUN:
             if self._asks_only(analysis):
@@ -2495,20 +2505,36 @@ class DemoSession:
         self._propose_direct(changes, original=request, source="gui-form", title="PROPOSED PLAN", notes=[],
                              evidence=request)
 
+    def physical_run_blockers(self) -> list[str]:
+        """What the recorded physical state says against running the current plan now: lab-owned settings changed,
+        a physical report not yet in the record, wells already full, tips already used, liquid recorded as too low."""
+        blockers = []
+        if not self.state.lab_owned_intact():
+            blockers.append("Lab-owned settings changed during this session.")
+        blockers += [f"A physical report has not been reconciled: {report}" for report in self.unreconciled_reports]
+        return blockers + self.state.run_blockers()
+
+    def run_block_reasons(self) -> list[str]:
+        """Why the current plan cannot run now, in the order to fix them (empty: it can run). The ONE eligibility check
+        behind the page's Run button, a chat run request and the run itself; the page adds only what it alone knows
+        (a run already going, the agent still busy)."""
+        reasons = []
+        if self.pending is not None:
+            reasons.append(f"Proposal #{self.pending.id} is waiting: apply or discard it first.")
+        if self.clarifying is not None:
+            reasons.append("A question is waiting: answer or cancel it first.")
+        return reasons + self.state.validate().error_messages() + self.physical_run_blockers()
+
     def _request_gui_run(self) -> None:
-        """A chat run intent requests the page's normal confirmation, never execution."""
+        """A chat run intent requests the page's normal confirmation, never execution: the same checks as the Run
+        button, then the same confirmation dialog, then the same run."""
         if self.pending is not None:
             self.say(f"agent> Apply or discard proposal #{self.pending.id} before requesting a run.")
             return
         if self.clarifying is not None:
             self.say("agent> Answer or cancel the pending question before requesting a run.")
             return
-        report = self.state.validate()
-        blockers = list(report.error_messages())
-        if not self.state.lab_owned_intact():
-            blockers.append("lab-owned settings changed during this session")
-        blockers.extend(self.unreconciled_reports)
-        blockers.extend(self.state.run_blockers())
+        blockers = self.run_block_reasons()
         if blockers:
             self.say("agent> Run blocked: " + " ".join(blockers))
             return
@@ -3149,6 +3175,8 @@ class DemoSession:
         self._event("run_finished", run=run_number, status=status, exit_code=code)
         self._write_session_summary()
         self.say(f"\nRun {run_number} finished with exit code {code}.")
+        if status == "succeeded":
+            self._save_history(executed, record)
         if code != 0 and self.settings.simulate:
             self.say(render.attention("The simulation did not finish (nothing contacts the robot in a simulation)."
                                       if status == "aborted" else
@@ -3160,7 +3188,83 @@ class DemoSession:
             self.say("Simulation only: no tips, liquid or paper were used.")
         else:
             self._after_live_run(plan, run_number, tips_used)
+            again = self.physical_run_blockers()
+            if again:
+                self.say("Before this plan can run again: " + " ".join(again))
         self.say("You can plan another run in this session, or type quit.")
+
+    def _save_history(self, config: dict[str, Any], record: dict[str, Any]) -> None:
+        """A successful run joins its operator's experiment history (experiment_memory), so it can be loaded again."""
+        if self.settings.history_dir is None or not self.operator:
+            return
+        try:
+            entry = experiment_memory.save_run(
+                operator=self.operator, config=config, mode=record["mode"], directory=self.settings.history_dir,
+                session={"label": self.settings.session_label, "run_in_session": record["run"],
+                         "revision": record["revision"]})
+        except OSError as exc:
+            self.say(f"(This run was not saved to the experiment history: {exc})")
+            self.log.write("history_not_saved", error=str(exc))
+            return
+        self.log.write("history_saved", history_run=entry["run"], file=entry["file"])
+        self.say(f"Saved to {self.operator}'s experiment history as run {entry['run']}.")
+
+    def _history_request(self, result: Interpretation, text: str) -> None:
+        """"Load my last experiment", "what did I run yesterday?", "load Sanjay run 12": the router read the request;
+        the saved run is found here, deterministically (experiment_memory). Several matches are never guessed - the
+        scientist is asked which one - and loading only proposes the saved plan (Apply or Discard as usual)."""
+        if self.settings.history_dir is None:
+            self.say("agent> This session does not keep an experiment history, so there is nothing to load.")
+            self._event("noop", reason="no history directory")
+            return
+        query = experiment_memory.HistoryQuery.from_router(result.history)
+        picking = bool(self._history_choices) and not query.narrows_by_time and not query.user \
+            and (bool(query.time) or query.run is not None)
+        user, entries = experiment_memory.find_runs(query, self.operator, directory=self.settings.history_dir,
+                                                    among=self._history_choices if picking else None)
+        mine = experiment_memory.user_id(user) == experiment_memory.user_id(self.operator)
+        who, subject = ("you", "You") if mine else (user, user)
+        when = experiment_memory.when_text(query)
+        if not entries:
+            recent = experiment_memory.load_index(user, self.settings.history_dir)[-3:]
+            self.say(f"agent> I found no saved experiment{' ' + when if when else ''} for {who}."
+                     + ("\n  The most recent:\n" + "\n".join(f"  - {line}" for line in experiment_memory.describe(recent))
+                        if recent else ""))
+            self._history_choices = []
+            self._event("noop", reason="no saved run matched")
+            return
+        lines = "\n".join(f"  - {line}" for line in experiment_memory.describe(entries))
+        if query.action == "list":
+            self.say(f"agent> {subject} ran {len(entries)} experiment{'s' if len(entries) != 1 else ''}"
+                     f"{' ' + when if when else ''}:\n{lines}\nSay which one to load.")
+            self._history_choices = entries
+            self._event("answer", source="history")
+            return
+        if len(entries) > 1:
+            times = [experiment_memory.clock(entry) for entry in entries]
+            self.say(f"agent> {subject} ran {len(entries)} experiments{' ' + when if when else ''} at "
+                     f"{', '.join(times[:-1])} and {times[-1]}. Which one do you want?\n{lines}")
+            self._history_choices = entries
+            self._event("question", source="history")
+            return
+        entry = entries[0]
+        self._history_choices = []
+        config = experiment_memory.load_run(user, entry, self.settings.history_dir)
+        if config is None:
+            self.say(f"agent> I could not read saved run {entry['run']} of {who}. Nothing was changed.")
+            self._event("noop", reason="saved run unreadable")
+            return
+        # the values come from the saved record, not from the words: dependent changes, each saying where from
+        changes = [{"path": path, "value": value, "kind": "dependent", "why": f"saved run {entry['run']}",
+                    "evidence": text} for path, _, value in differences(self.state.config, config)]
+        where = f"{'your' if mine else user + chr(39) + 's'} run {entry['run']} ({experiment_memory.clock(entry)} on " \
+                f"{experiment_memory.saved_time(entry):%d %b}): {entry.get('summary', '')}"
+        if not changes:
+            self.say(f"agent> The current plan is already the same as {where}. Nothing to change.")
+            self._event("noop", reason="saved run equals the plan")
+            return
+        self._propose_direct(changes, original=text, source="history", title="PROPOSED PLAN (loaded from history)",
+                             notes=[f"Loaded {where}. Nothing changes until you apply it."], evidence=text)
 
     def _after_incomplete_live_run(self, record: dict[str, Any], robot: dict[str, Any] | None) -> None:
         """A live run that did not succeed: say what is known about the robot, and hold the next live run until the

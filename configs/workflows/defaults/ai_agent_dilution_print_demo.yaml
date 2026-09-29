@@ -14,9 +14,11 @@
 #   src/protocols/generated/ai_agent_dilution_print_demo_latest.py  <- uploaded
 #
 # Conversation may change: deck slots (or OFF_DECK), vials and material names,
-# the dilution series, mixing counts, the print plan, and the tip settings. The
-# pipette, every height, the air handling, blow-out, dwell, transfer size and the
-# safety limits are laboratory-owned and stay fixed (src/agents/dye_demo/model.py).
+# the dilution series, mixing, the print plan (drops per position included), the
+# tip settings, and the on/off liquid-handling switches (air gap, blow-out, well
+# shake). The pipette, every height, the print release cycle, dwell, transfer size
+# and the safety limits are laboratory-owned (src/agents/dye_demo/model.py): change
+# them in THIS file and restart the GUI.
 
 protocol_version: 19
 
@@ -72,38 +74,59 @@ dilution:
   start_row: A
   factors: [1, 2, 3, 4, 6, 8, 12, 16]
   total_volume_ul: 150.0
-  max_transfer_ul: 20.0        # lab-owned: P20 ceiling per transfer
-  solvent_dispense_from_top_mm: -2.0   # lab-owned: dispense above the liquid
-  sample_dispense_from_top_mm: -1.0    # lab-owned: dispense above the liquid
-  # Lab-owned. Blow out after every dilution dispense, in air at the dispense
-  # position. The P20 GEN2's default push-out is 0 uL, so without this the end of
-  # each transfer can stay in the tip. See docs/ai_dye_demo/liquid_handling_parameters.md.
-  blow_out_after_dispense: true
+  max_transfer_ul: 20.0        # lab-owned: P20 ceiling per transfer (liquid + air gap)
 
-# Mix the source well immediately before each print aspiration (height lab-owned).
-mixing: {reps: 2, volume_ul: 15.0, height_mm: 2.0}
+# Mix each dilution well once it is made (right after its dye), with the tip that
+# just dispensed: aspirate at plate_aspirate_height_mm, dispense at
+# plate_mix_height_mm, reps times, then blow-out and the well shake. A 1x (neat)
+# well holds one liquid and is not mixed. Printing never mixes.
+mixing: {enabled: true, reps: 2, volume_ul: 15.0}
+
+# --- physical liquid handling ------------------------------------------------------
+# Tune these here on the work laptop, then restart the GUI. The plan, the validator
+# and the protocol all read these same values. Heights are mm above the well bottom.
+# Sequence per vial transfer (scripts/test_single_dilution_c12.py, physically tested):
+# aspirate from the vial -> air gap -> dispense liquid + gap at plate_dispense_height_mm
+# -> blow-out there -> well shake.
+liquid_handling:
+  plate_aspirate_height_mm: 0.3   # 96-well plate: print aspiration and mix aspiration
+  plate_dispense_height_mm: 0.3   # 96-well plate: every water and dye dispense
+  plate_mix_height_mm: 0.3        # 96-well plate: mix dispense
+  air_gap_ul: 1.0                 # after each vial aspiration; 0 = off; counts toward the P20's 20 uL
+  blow_out: true                  # after every plate dispense and after mixing
+  # Droplet release after every plate dispense and after mixing: the touch-tip
+  # motion of scripts/test_single_dilution_c12.py (Opentrons touch_tip with its
+  # default geometry). 96-well plate only - never the vial rack, paper or tip rack.
+  well_plate_shake:
+    enabled: true
+    radius: 1.0                   # fraction of the well radius reached (Opentrons default)
+    v_offset_mm: -1.0             # height relative to the well top (Opentrons default)
+    speed_mm_s: 60.0              # Opentrons default
+    cycles: 1                     # how many times the motion is repeated
 
 # --- printing the dilutions onto paper ------------------------------------------
 # Each dilution prints on its own paper ROW; each droplet volume x replicate gets
-# its own paper COLUMN, starting at paper_start_column.
+# its own paper position, starting at paper_start_column (Python places replicates
+# on free positions when they do not fit side by side). A print map (source_map)
+# can name exact positions and a drop count per position.
 #   droplet_volume_ul: 5.0        -> one 5 uL drop per dilution, paper column 1
 #   droplet_volume_ul: [5.0, 10] -> 5 uL in column 1, 10 uL in column 2
 print:
   enabled: true
   droplet_volume_ul: 5.0
-  droplets_per_spot: 1          # stacked drops on the same spot
+  droplets_per_spot: 1          # drops dispensed onto the SAME paper position (not replicates)
   replicates: 1                 # total printed copies of each condition, including the first
   paper_start_column: 1
   paper_columns: 12
 
-  # --- laboratory-owned release geometry; do not tune these for a demo ---------
-  # From configs/machines/ot2_standard_printing_p20_v1.yaml: paper dispense 1.1 mm
-  # off the bottom, 1.5 uL trailing air gap released 5 mm up, 3.0 uL push-out,
-  # blow-out on, and a 2 s dwell so the drop separates from the tip.
-  # 0.5 mm is the last physically confirmed release height; 1.1 mm was requested
-  # on 2026-08-31 and its physical revalidation is pending.
+  # --- laboratory-owned release geometry --------------------------------------
+  # From configs/machines/ot2_standard_printing_p20_v1.yaml: 1.5 uL trailing air gap
+  # released 5 mm up, 3.0 uL push-out, blow-out on, and a 2 s dwell so the drop
+  # separates from the tip. The plate aspiration height is liquid_handling above.
+  # z_mm is the PAPER dispense height (mm above the paper bottom), tuned on its own:
+  # 0.5 mm is the last physically confirmed release height; 1.1 mm was requested on
+  # 2026-08-31 and its physical revalidation is pending.
   z_mm: 1.1
-  aspirate_height_mm: 1.0       # inside the dilution well (inherited from v6)
   air_gap_ul: 1.5
   air_gap_height_mm: 5.0
   push_out_ul: 3.0

@@ -32,6 +32,7 @@ from src.agents.dye_demo.model import (
     format_slot,
     get_path,
     is_off_deck,
+    liquid_handling,
     material_label,
     material_spec,
     occupancy,
@@ -39,7 +40,7 @@ from src.agents.dye_demo.model import (
     slot_of,
     well_geometry,
 )
-from src.agents.dye_demo.plan import Operation, Plan, build_plan, paper_layout
+from src.agents.dye_demo.plan import Operation, Plan, build_plan, mixes_dilutions, paper_layout, transfer_limit
 from src.agents.dye_demo.validation import DeckConflict, Report, free_slots, off_deck_blocker
 
 WIDTH = 72
@@ -231,6 +232,37 @@ def _dilutions(config: dict[str, Any], plan: Plan, prepared: dict[str, Any] | No
     return section
 
 
+ON_OFF = {True: "on", False: "off"}
+_SWITCHES = {"mixing.enabled", "liquid_handling.blow_out", "liquid_handling.well_plate_shake.enabled"}
+
+
+def drops_text(config: dict[str, Any], plan: Plan) -> str:
+    """Drops per paper position: '1', or '1 (A2: 3, B5: 2)' when some positions take their own count."""
+    default = int((config.get("print") or {}).get("droplets_per_spot", 1))
+    own = [(op.destination, op.droplets) for op in plan.operations if op.kind == "print" and op.droplets != default]
+    base = f"{default}" + ("  (stacked on one spot)" if default > 1 else "")
+    return base + (f"   ({', '.join(f'{position}: {count}' for position, count in own)})" if own else "")
+
+
+def liquid_handling_text(config: dict[str, Any]) -> str:
+    """One line: the plate heights and switches of the dilution step."""
+    lh = liquid_handling(config)
+    shake = lh.get("well_plate_shake") or {}
+    gap = float(lh.get("air_gap_ul", 0) or 0)
+    return (f"plate aspirate {fmt_num(lh['plate_aspirate_height_mm'])} | dispense "
+            f"{fmt_num(lh['plate_dispense_height_mm'])} | mix {fmt_num(lh['plate_mix_height_mm'])} mm above the well "
+            f"bottom | air gap {fmt_ul(gap) if gap else 'off'} | blow-out {ON_OFF[bool(lh.get('blow_out'))]} | "
+            f"shake after dispense {ON_OFF[bool(shake.get('enabled'))]}")
+
+
+def mixing_text(config: dict[str, Any]) -> str:
+    mixing = config.get("mixing") or {}
+    if not mixes_dilutions(config):
+        return "off (the dilution wells are not mixed; printing never mixes)"
+    return (f"{int(mixing['reps'])} × {fmt_ul(mixing['volume_ul'])} in each dilution well right after it is made "
+            "(printing does not mix)")
+
+
 def _drop_volumes(config: dict[str, Any]) -> str:
     by_volume: dict[float, list[int]] = {}
     for spot in paper_layout(config, include_overflow=True):
@@ -246,20 +278,18 @@ def _printing(config: dict[str, Any], plan: Plan) -> PlanSection:
         return PlanSection("PRINTING", "SKIPPED - this run does not print")
     printing = config["print"]
     if plan.mapped:
-        droplets = int(printing.get("droplets_per_spot", 1))
         section = PlanSection("PRINTING", "in this run")
         section.add("Print map", print_map_text(plan))
         section.add("Paper positions", f"{len(plan.print_positions)}   (from {_plural(len(plan.print_sources), 'plate well')})")
         section.add("Drop volume", pipes(dict.fromkeys(fmt_ul(op.volume_ul) for op in plan.operations
                                                         if op.kind == "print")) or "none")
-        section.add("Drops per position", f"{droplets}" + ("  (stacked)" if droplets > 1 else ""))
+        section.add("Drops per position", drops_text(config, plan))
         section.add("Total drops", plan.total_drops)
         section.add("Printed volume", f"{fmt_ul(plan.printed_fluid_ul)}   (" + pipes(
             f"{source.well}: {fmt_ul(source.draw_ul)} of {fmt_ul(source.start_ul)}" for source in plan.print_sources)
                     + ")")
         return section
     columns = paper_columns_printed(config)
-    droplets = int(printing.get("droplets_per_spot", 1))
     replicates = int(printing.get("replicates", 1))
     positions = sum(op.kind == "print" for op in plan.operations)
     left = max(plan.source_volume_ul - plan.print_draw_per_well_ul, 0.0)
@@ -267,7 +297,7 @@ def _printing(config: dict[str, Any], plan: Plan) -> PlanSection:
     section.add("Paper columns", pipes(columns) if columns else "none")
     section.add("Paper rows", paper_rows_text(plan))
     section.add("Drop volume", _drop_volumes(config))
-    section.add("Drops per position", f"{droplets}" + ("  (stacked)" if droplets > 1 else ""))
+    section.add("Drops per position", drops_text(config, plan))
     section.add("Replicates", f"{_plural(replicates, 'side-by-side column')} per drop volume")
     section.add("Print positions", f"{positions}   ({_plural(len(plan.wells), 'row')} × "
                                    f"{_plural(len(columns), 'column')})")
@@ -321,10 +351,9 @@ def _liquids(config: dict[str, Any], plan: Plan) -> PlanSection:
 def _pipetting(config: dict[str, Any], plan: Plan) -> PlanSection:
     mixing, tips = config["mixing"], config["tips"]
     section = PlanSection("PIPETTING")
-    if plan.do_print:
-        section.add("Mixing", f"{int(mixing['reps'])} × {fmt_ul(mixing['volume_ul'])} before each print step")
-    else:
-        section.add("Mixing", "none (a well is mixed only before it is printed)")
+    section.add("Mixing", mixing_text(config) if plan.do_dilution else "none (this run makes no dilutions; "
+                                                                       "printing never mixes)")
+    section.add("Liquid handling", liquid_handling_text(config))
     section.add("Tip start", plan.start_tip or tips.get("start_tip"))
     if plan.tips_short:
         section.add("Tips required", f"{plan.tips_needed}   (only {plan.tips_available} left from {plan.start_tip})")
@@ -340,7 +369,7 @@ def _pipetting(config: dict[str, Any], plan: Plan) -> PlanSection:
 
 
 def _lab_owned(config: dict[str, Any]) -> PlanSection:
-    printing, dilution, mixing, pipette = config["print"], config["dilution"], config["mixing"], config["pipette"]
+    printing, pipette = config["print"], config["pipette"]
     water = material_spec(config, "solvent").get("aspirate_height_mm", 4.0)
     dye = material_spec(config, "sample").get("aspirate_height_mm", 4.0)
     on = {True: "on", False: "off"}
@@ -354,15 +383,18 @@ def _lab_owned(config: dict[str, Any]) -> PlanSection:
     section.add("Drop release", f"{fmt_ul(printing.get('push_out_ul', 0))} push-out | "
                                 f"blow-out {on[bool(printing.get('blow_out'))]} | "
                                 f"{fmt_num(printing.get('post_dispense_delay_s', 0))} s dwell")
-    section.add("Air gap", f"{fmt_ul(printing.get('air_gap_ul', 0))}, taken "
-                           f"{fmt_num(printing.get('air_gap_height_mm', 0))} mm above the well top")
-    section.add("Print aspirate", f"{fmt_num(printing.get('aspirate_height_mm', 0))} mm above the well bottom")
-    section.add("Mixing height", f"{fmt_num(mixing.get('height_mm', 2.0))} mm above the well bottom")
-    section.add("Dilution dispense",
-                f"water {fmt_num(-float(dilution.get('solvent_dispense_from_top_mm', -2.0)))} mm | "
-                f"dye {fmt_num(-float(dilution.get('sample_dispense_from_top_mm', -1.0)))} mm below the well top")
-    section.add("Dilution transfers", f"at most {fmt_ul(dilution.get('max_transfer_ul', 20))} each | blow-out "
-                                      f"{on[bool(dilution.get('blow_out_after_dispense', True))]}")
+    section.add("Print air gap", f"{fmt_ul(printing.get('air_gap_ul', 0))}, taken "
+                                 f"{fmt_num(printing.get('air_gap_height_mm', 0))} mm above the well top")
+    lh = liquid_handling(config)
+    shake = lh.get("well_plate_shake") or {}
+    section.add("Plate heights", f"aspirate {fmt_num(lh['plate_aspirate_height_mm'])} | dispense "
+                                 f"{fmt_num(lh['plate_dispense_height_mm'])} | mix "
+                                 f"{fmt_num(lh['plate_mix_height_mm'])} mm above the well bottom")
+    section.add("Dilution transfers", f"at most {fmt_ul(transfer_limit(config))} of liquid each (the air gap rides "
+                                      "in the same tip)")
+    section.add("Well shake", f"touch-tip radius {fmt_num(shake.get('radius', 1))}, "
+                              f"{fmt_num(shake.get('v_offset_mm', -1))} mm from the top, "
+                              f"{fmt_num(shake.get('speed_mm_s', 60))} mm/s × {shake.get('cycles', 1)}")
     section.add("Vial aspirate", f"{fmt_num(water)} mm above the vial bottom" if float(water) == float(dye)
                 else f"water {fmt_num(water)} mm | dye {fmt_num(dye)} mm above the vial bottom")
     return section
@@ -480,7 +512,9 @@ _CHANGE_NAMES = {
     "mixing.reps": "mixes", "mixing.volume_ul": "mixing volume", "print.droplet_volume_ul": "drop volume",
     "print.droplets_per_spot": "drops per position", "print.replicates": "replicates",
     "print.paper_start_column": "first paper column", "tips.start_tip": "tip start", "tips.return_tips": "used tips",
-    "tips.policy": "tip use", "print.source_map": "print map",
+    "tips.policy": "tip use", "print.source_map": "print map", "mixing.enabled": "dilution mixing",
+    "liquid_handling.air_gap_ul": "air gap", "liquid_handling.blow_out": "blow-out",
+    "liquid_handling.well_plate_shake.enabled": "well shake",
 }
 
 
@@ -504,7 +538,13 @@ def format_value(path: str, value: Any) -> str:
                 "new_tip_every_transfer": "new tip every transfer"}.get(str(value), str(value))
     if path == "print.source_map":
         return pipes(f"{entry['source']} → {positions_text(entry['positions'])} ({len(entry['positions'])})"
+                     + ("" if not entry.get("drops") else " [" + ", ".join(
+                         f"{position} ×{count}" for position, count in entry["drops"].items()) + " drops]")
                      for entry in value) if isinstance(value, list) else str(value)
+    if path in _SWITCHES and isinstance(value, bool):
+        return ON_OFF[value]
+    if path == "liquid_handling.air_gap_ul":
+        return fmt_ul(value) if float(value or 0) > 0 else "off"
     if path in {"dilution.rows", "print.paper_rows"} and isinstance(value, (list, tuple)):
         return ", ".join(str(item) for item in value)                   # "A, C, F", not "['A', 'C', 'F']"
     if isinstance(value, bool):
@@ -540,8 +580,10 @@ def interpretation_lines(proposal: Any) -> list[str]:
     if "print.source_map" in paths:
         if plan.mapped and plan.do_print:
             for source in plan.print_sources:
+                own = [f"{op.destination} ×{op.droplets}" for op in plan.operations
+                       if op.kind == "print" and op.source == source.well and op.droplets > 1]
                 lines.append(f"print {source.well} on {_plural(len(source.positions), 'paper position')} "
-                             f"({positions_text(source.positions)})")
+                             f"({positions_text(source.positions)})" + (f", drops {', '.join(own)}" if own else ""))
         else:
             lines.append("print each dilution on its paper row (no print map)")
     if "print.paper_rows" in paths and "print.source_map" not in paths and plan.do_print and not plan.mapped:
@@ -827,13 +869,17 @@ def render_dilution_step(config: dict[str, Any], plan: Plan) -> str:
             f"      {fmt_ul(sum(op.volume_ul for op in ops))} in {len(ops)} transfer(s); "
             f"tip(s) {_range(tips) if len(tips) > 2 else ', '.join(tips)}",
         ]
-    dilution = config["dilution"]
-    blow = "then blow out" if dilution.get("blow_out_after_dispense", True) else "no blow-out"
+    lh = liquid_handling(config)
+    gap = float(lh.get("air_gap_ul", 0) or 0)
+    after = [part for part, on in (("blow out", lh.get("blow_out")),
+                                   ("shake", (lh.get("well_plate_shake") or {}).get("enabled"))) if on]
     lines.append(
-        f"  Each transfer: aspirate {fmt_num(solvent.get('aspirate_height_mm', 4.0))} mm above the vial "
-        f"bottom, dispense {fmt_num(-float(dilution.get('solvent_dispense_from_top_mm', -2.0)))} mm (water) / "
-        f"{fmt_num(-float(dilution.get('sample_dispense_from_top_mm', -1.0)))} mm (dye) below the well top, {blow}."
+        f"  Each transfer: aspirate {fmt_num(solvent.get('aspirate_height_mm', 4.0))} mm above the vial bottom"
+        + (f", {fmt_ul(gap)} air gap" if gap else "")
+        + f", dispense {fmt_num(lh['plate_dispense_height_mm'])} mm above the well bottom"
+        + (f", then {' and '.join(after)}." if after else ".")
     )
+    lines.append(f"  Mixing: {mixing_text(config)}.")
     return "\n".join(lines)
 
 
@@ -892,11 +938,12 @@ def render_print_step(config: dict[str, Any], plan: Plan) -> str:
                 f"  {number:>4}  {op.source:<9}  {dilution_name(config, op.factor)[:30]:<30}  -> {op.destination:<9} "
                 f"{fmt_ul(op.volume_ul):<9} {op.droplets:<6} {fmt_ul(op.volume_ul * op.droplets):<9} "
                 f"{_tip_of_operation(plan, index)}")
-    mixing, printing = config["mixing"], config["print"]
+    printing = config["print"]
     lines += [
         f"  Totals: {len(steps)} print step(s), {plan.total_drops} drop(s), {fmt_ul(plan.printed_fluid_ul)} printed.",
-        f"  Every print step first mixes its source well {int(mixing['reps'])}× with {fmt_ul(mixing['volume_ul'])}; "
-        f"each drop is released {fmt_num(printing['z_mm'])} mm above the paper with a "
+        f"  No mixing before printing. Each drop is aspirated "
+        f"{fmt_num(liquid_handling(config)['plate_aspirate_height_mm'])} mm above the well bottom and released "
+        f"{fmt_num(printing['z_mm'])} mm above the paper with a "
         f"{fmt_ul(printing.get('air_gap_ul', 0))} air gap, {fmt_ul(printing.get('push_out_ul', 0))} push-out"
         f"{', blow-out' if printing.get('blow_out') else ''} and a {fmt_num(printing.get('post_dispense_delay_s', 0))} s dwell.",
     ]
@@ -970,15 +1017,14 @@ _PROFILE_FIELDS = (
     ("Push-out (µL)", "print.push_out_ul", ("print_release", "push_out_ul")),
     ("Blow-out after each drop", "print.blow_out", ("print_release", "blow_out")),
     ("Dwell after each drop (s)", "print.post_dispense_delay_s", ("print_release", "post_dispense_delay_s")),
-    ("Aspirate height in dilution well (mm)", "print.aspirate_height_mm", ("labware:plate", "aspirate_height_mm")),
-    ("Water dispense, offset from well top (mm)", "dilution.solvent_dispense_from_top_mm", ("labware:plate", "dispense_height_mm")),
-    ("Dye dispense, offset from well top (mm)", "dilution.sample_dispense_from_top_mm", ("labware:plate", "dispense_height_mm")),
+    ("Plate aspirate height (mm)", "liquid_handling.plate_aspirate_height_mm", ("labware:plate", "aspirate_height_mm")),
+    ("Plate dispense height (mm)", "liquid_handling.plate_dispense_height_mm", ("labware:plate", "dispense_height_mm")),
     ("Aspirate flow rate (µL/s)", "flow_rates.aspirate", ("pipette", "flow_rates", "aspirate_ul_s")),
     ("Dispense flow rate (µL/s)", "flow_rates.dispense", ("pipette", "flow_rates", "dispense_ul_s")),
 )
 DOCUMENTED_DIFFERENCES = {
-    "print.aspirate_height_mm": "inherited from the working v6 dilution/print protocol",
-    "dilution.sample_dispense_from_top_mm": "inherited from the working v6 dilution/print protocol",
+    "liquid_handling.plate_aspirate_height_mm": "low-volume plate setting, tuned in liquid_handling",
+    "liquid_handling.plate_dispense_height_mm": "low-volume plate setting, tuned in liquid_handling",
 }
 
 
@@ -1017,17 +1063,14 @@ def profile_comparison(config: dict[str, Any], profile: dict[str, Any]) -> list[
 
 
 def render_settings(config: dict[str, Any], profile: dict[str, Any]) -> str:
-    dilution, mixing = config["dilution"], config["mixing"]
-    lines = ["LAB-OWNED LIQUID HANDLING (never changed in conversation)",
+    lines = ["LAB-OWNED LIQUID HANDLING (the numbers are changed in the config file, not in conversation)",
              "  setting                                   demo      machine profile   status"]
     for label, demo, reference, status in profile_comparison(config, profile):
         lines.append(f"  {label:<41} {str(demo):<9} {str(reference):<17} {status}")
     lines += [
-        f"  Largest single dilution transfer          {fmt_ul(dilution.get('max_transfer_ul', 20))}",
-        f"  Blow-out after each dilution dispense     {'yes' if dilution.get('blow_out_after_dispense', True) else 'no'}"
-        "   (the P20's default push-out is 0 µL, so this is what empties the tip)",
-        f"  Mixing before each print step             {mixing.get('reps')}× {fmt_ul(mixing.get('volume_ul'))} "
-        f"at {fmt_num(mixing.get('height_mm', 2.0))} mm above the well bottom",
+        f"  Liquid per dilution transfer              at most {fmt_ul(transfer_limit(config))}",
+        f"  Dilution liquid handling                  {liquid_handling_text(config)}",
+        f"  Mixing                                    {mixing_text(config)}",
         "  Release height history: 0.5 mm was physically confirmed (four_clover_spacing_v13);",
         "  1.1 mm was requested on 2026-08-31 and its physical revalidation is still pending.",
         "  See docs/ai_dye_demo/liquid_handling_parameters.md.",

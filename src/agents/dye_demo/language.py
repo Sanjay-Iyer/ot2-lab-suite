@@ -157,6 +157,11 @@ def _number_tokens(text: str) -> set[float]:
     return numbers
 
 
+def numbers_in(text: str) -> set[float]:
+    """Every number the text states, in digits or words."""
+    return _number_tokens(text)
+
+
 def numbers_mentioned(value: Any, request: str) -> bool:
     """Every number in `value` appears in the request (for requested numeric changes)."""
     values = value if isinstance(value, (list, tuple)) else [value]

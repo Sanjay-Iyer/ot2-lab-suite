@@ -22,21 +22,29 @@ Everything a demo audience changes by talking — deck slots (or OFF_DECK), how
 many dilutions, which plate column, which paper column, drop volume, replicates,
 drops per spot, starting tip, tip policy — is configuration, not code.
 
-LIQUID HANDLING (docs/ai_dye_demo/liquid_handling_parameters.md):
-  dilution transfer  aspirate at vial bottom + aspirate_height_mm; dispense below
-                     the well top (solvent/sample_dispense_from_top_mm) so a shared
-                     tip never touches the liquid; then BLOW OUT at the same place.
-                     The P20 GEN2's default push-out is 0 uL, so without the
-                     blow-out the end of every transfer can stay in the tip.
-                     (blow_out_after_dispense, added 2026-09-10.)
-  volume splitting   at most max_transfer_ul per transfer; a remainder below the
-                     P20 minimum is rebalanced with the previous transfer
-                     (20 + 0.63 uL -> 10.31 + 10.31 uL).
-  print step         mix the source well, then for each drop: aspirate at well
-                     bottom + aspirate_height_mm, trailing air gap, dispense liquid
-                     + gap with push-out at paper bottom + z_mm, blow out, dwell.
-                     Unchanged from the validated cycle; 11_standard_print.py
-                     explains blow-out inside a loop at API 2.15.
+LIQUID HANDLING (CONFIG["liquid_handling"]; docs/ai_dye_demo/liquid_handling_parameters.md).
+The dilution sequence is the one physically tested by scripts/test_single_dilution_c12.py:
+  dilution transfer  aspirate at vial bottom + aspirate_height_mm; air gap
+                     (air_gap_ul, 0 = off); dispense liquid + gap at plate well
+                     bottom + plate_dispense_height_mm; blow out there (blow_out);
+                     then the well shake. The P20 GEN2's default push-out is 0 uL,
+                     so the blow-out is what empties the tip.
+  volume splitting   at most max_transfer_ul - air_gap_ul of liquid per transfer; a
+                     remainder below the P20 minimum is rebalanced with the previous
+                     transfer (19 + 0.63 uL -> 9.81 + 9.82 uL).
+  dilution mix       once the dye is in (a 1x well holds one liquid and is not mixed):
+                     reps x (aspirate at bottom + plate_aspirate_height_mm, dispense
+                     at bottom + plate_mix_height_mm), blow out, well shake - with
+                     the tip that dispensed the dye.
+  well shake         droplet release after every plate dispense and every mix: the
+                     C12 script's touch_tip on the plate well (radius, v_offset_mm,
+                     speed_mm_s, repeated `cycles` times). Plate wells only.
+  print step         NO mixing. For each drop: aspirate at well bottom +
+                     plate_aspirate_height_mm, trailing air gap, dispense liquid +
+                     gap with push-out at paper bottom + z_mm, blow out, dwell.
+                     The validated release cycle; 11_standard_print.py explains
+                     blow-out inside a loop at API 2.15. A print-map position may
+                     take its own number of drops (all on that one position).
 
 TIPS are taken in rack order from tips.start_tip, one pick-up per tip group:
   single_tip               ONE tip for the entire run: picked up once, kept on
@@ -102,12 +110,17 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
                 'factors': [1, 2, 3, 4, 6, 8, 12, 16],
                 'total_volume_ul': 150.0,
                 'max_transfer_ul': 20.0},
+  'mixing': {'enabled': True, 'reps': 2, 'volume_ul': 15.0},
   'liquid_handling': { 'plate_aspirate_height_mm': 0.3,
                        'plate_dispense_height_mm': 0.3,
+                       'plate_mix_height_mm': 0.3,
                        'air_gap_ul': 1.0,
                        'blow_out': True,
-                       'touch_tip': True},
-  'mixing': {'reps': 2, 'volume_ul': 15.0},
+                       'well_plate_shake': { 'enabled': True,
+                                             'radius': 1.0,
+                                             'v_offset_mm': -1.0,
+                                             'speed_mm_s': 60.0,
+                                             'cycles': 1}},
   'print': { 'enabled': True,
              'droplet_volume_ul': 5.0,
              'droplets_per_spot': 1,
@@ -127,11 +140,6 @@ CONFIG = { 'deck': { 'tuberack': { 'slot': 7,
               'p20_max_volume_ul': 20.0,
               'p20_min_volume_ul': 1.0,
               'max_well_fill_ul': 340.0},
-  'session': { 'operator': 'Tester',
-               'operator_id': 'tester',
-               'session_label': '2026-09-28 NiceGUI',
-               'session_id': '20260928_161045',
-               'revision': 0},
   'protocol_version': 19}
 # <<< CONFIG END <<<
 
@@ -216,19 +224,35 @@ def _paper_rows(rows):
 
 
 def _source_map():
-    """print.source_map as [{"source": "A11", "positions": [...], "volume_ul"?: x}], or None when printing follows
-    the series rows. Entries are the canonical form the agent writes; the pre-flight checks every name."""
+    """print.source_map as [{"source": "A11", "positions": [...], "volume_ul"?: x, "drops"?: {"A2": 3}}], or None when
+    printing follows the series rows. Entries are the canonical form the agent writes; the pre-flight checks every
+    name and count."""
     raw = CONFIG["print"].get("source_map")
     if raw in (None, "", []):
         return None
     entries = []
     for item in raw:
-        entry = {
-            "source": str(item["source"]).strip().upper(),
-            "positions": [str(position).strip().upper() for position in item["positions"]],
-        }
+        # positions as a list, as {"A1": 1, "A2": 3} (position: drops) or as [{"position": "A2", "drops": 3}];
+        # an entry-level "drops" (one number, or {position: drops}) wins. Mirrors model.normalize_source_map.
+        listed = item["positions"]
+        listed = ([{"position": position, "drops": count} for position, count in listed.items()]
+                  if isinstance(listed, dict) else list(listed))
+        positions, drops = [], {}
+        for position in listed:
+            name = str(position.get("position") if isinstance(position, dict) else position).strip().upper()
+            positions.append(name)
+            if isinstance(position, dict) and position.get("drops") not in (None, ""):
+                drops[name] = int(position["drops"])
+        explicit = item.get("drops")
+        if isinstance(explicit, dict):
+            drops.update({str(position).strip().upper(): int(count) for position, count in explicit.items()})
+        elif explicit not in (None, ""):
+            drops.update({name: int(explicit) for name in positions})
+        entry = {"source": str(item["source"]).strip().upper(), "positions": positions}
         if item.get("volume_ul") not in (None, ""):
             entry["volume_ul"] = float(item["volume_ul"])
+        if drops:
+            entry["drops"] = drops
         entries.append(entry)
     return entries
 
@@ -325,6 +349,26 @@ def _tip_group(policy, liquid_group, own_group):
     return liquid_group if policy == "per_liquid" else own_group
 
 
+def _liquid_handling():
+    """CONFIG["liquid_handling"]: plate heights (mm above the well bottom), the air gap after each vial aspiration,
+    blow-out and the well shake. The pre-flight refuses a run without every value."""
+    return CONFIG["liquid_handling"]
+
+
+def _transfer_limit():
+    """Liquid per vial transfer: the transfer ceiling less the air gap riding in the same tip.
+    Mirrors src/agents/dye_demo/plan.py::transfer_limit."""
+    p20_max = float(CONFIG["safety"]["p20_max_volume_ul"])
+    air_gap = float(_liquid_handling().get("air_gap_ul", 0.0) or 0.0)
+    return min(float(CONFIG["dilution"]["max_transfer_ul"]), p20_max - air_gap)
+
+
+def _mixes_dilutions():
+    """Mirrors src/agents/dye_demo/plan.py::mixes_dilutions."""
+    mixing = CONFIG.get("mixing") or {}
+    return bool(mixing.get("enabled", True)) and int(mixing.get("reps", 0) or 0) > 0
+
+
 def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=None):
     """Every tip-bearing operation in execution order, each with its tip group.
 
@@ -332,32 +376,38 @@ def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=N
     summary is rendered from.
     """
     dilution = CONFIG["dilution"]
+    mixing = CONFIG.get("mixing") or {}
     policy = str(CONFIG["tips"].get("policy", "per_liquid"))
     minimum = float(CONFIG["safety"].get("p20_min_volume_ul", 1.0))
-    max_transfer = float(dilution["max_transfer_ul"])
+    limit = _transfer_limit()
     column = str(dilution["plate_column"])
     total = float(dilution["total_volume_ul"])
     operations = []
     if do_dilution:
-        for role, height_key in (("solvent", "solvent_dispense_from_top_mm"),
-                                 ("sample", "sample_dispense_from_top_mm")):
+        for role in ("solvent", "sample"):
             for row, factor in zip(rows, factors):
                 sample_ul = total / factor
                 volume = total - sample_ul if role == "solvent" else sample_ul
                 if volume <= EPSILON_UL:
                     continue
                 well = f"{row}{column}"
-                chunks = _split_volume(volume, max_transfer, minimum)
+                chunks = _split_volume(volume, limit, minimum)
                 for index, chunk in enumerate(chunks, start=1):
                     operations.append({
                         "kind": "transfer",
                         "group": _tip_group(policy, role, f"{role}:{well}:{index}"),
                         "role": role, "well": well, "factor": factor, "total_ul": volume,
                         "volume_ul": chunk, "chunk": index, "chunks": len(chunks),
-                        "from_top_mm": float(dilution[height_key]),
+                    })
+                if role == "sample" and _mixes_dilutions() and total - volume > EPSILON_UL:
+                    # the dye is in and the well holds both liquids: mix it now, with the tip that just dispensed
+                    operations.append({
+                        "kind": "mix", "group": operations[-1]["group"], "well": well, "factor": factor,
+                        "volume_ul": float(mixing.get("volume_ul", 0) or 0), "reps": int(mixing["reps"]),
                     })
     if do_print and source_map is not None:
-        # Explicit map: each source well prints exactly its positions, in order.
+        # Explicit map: each source well prints exactly its positions, in order; a position may take its own number
+        # of drops (all on that one position).
         volumes = _droplet_volumes()
         default_volume = volumes[0] if volumes else 0.0
         droplets = int(CONFIG["print"].get("droplets_per_spot", 1))
@@ -365,13 +415,14 @@ def _build_operations(rows, factors, placed, do_dilution, do_print, source_map=N
         for entry in source_map:
             source = entry["source"]
             volume = float(entry.get("volume_ul", default_volume))
+            drops = entry.get("drops") or {}
             for paper_well in entry["positions"]:
                 operations.append({
                     "kind": "print",
                     "group": _tip_group(policy, f"print:{source}", f"print:{paper_well}"),
                     "row": source[0], "source": source, "paper_well": paper_well,
                     "factor": float(made.get(source, 0.0)), "column": int(paper_well[1:]),
-                    "volume_ul": volume, "droplets": droplets,
+                    "volume_ul": volume, "droplets": int(drops.get(paper_well, droplets)),
                 })
     elif do_print:
         # Each series row prints on its paper row (print.paper_rows, or the row with the same letter); a row the
@@ -405,6 +456,46 @@ def _release_tip(pipette, return_tips):
         pipette.return_tip()
     else:
         pipette.drop_tip()
+
+
+PLATE_HEIGHTS = ("plate_aspirate_height_mm", "plate_dispense_height_mm", "plate_mix_height_mm")
+
+
+def _liquid_handling_errors(labware, p20_min, p20_max):
+    """Every liquid_handling value present and physically possible in this plate (the validator applies the same
+    limits to the same values)."""
+    lh = CONFIG.get("liquid_handling")
+    required = PLATE_HEIGHTS + ("air_gap_ul", "blow_out", "well_plate_shake")
+    if not isinstance(lh, dict) or any(key not in lh for key in required):
+        return ["liquid_handling must set " + ", ".join(required)]
+    errors = []
+    depth = getattr(labware["plate"].wells()[0], "depth", None) if "plate" in labware else None
+    for key in PLATE_HEIGHTS:
+        height = float(lh[key])
+        if height <= 0 or (depth and height >= float(depth)):
+            errors.append(f"liquid_handling.{key} must be above 0 and below the plate well depth, got {height:g}")
+    air_gap = float(lh["air_gap_ul"] or 0.0)
+    if not 0 <= air_gap <= p20_max - p20_min:
+        errors.append(f"liquid_handling.air_gap_ul must be 0-{p20_max - p20_min:g} uL, got {air_gap:g}")
+    shake = lh["well_plate_shake"]
+    if not isinstance(shake, dict) or "enabled" not in shake:
+        errors.append("liquid_handling.well_plate_shake must set enabled")
+    elif shake["enabled"]:
+        try:
+            radius, offset = float(shake["radius"]), float(shake["v_offset_mm"])
+            speed, cycles = float(shake["speed_mm_s"]), int(shake["cycles"])
+        except (KeyError, TypeError, ValueError):
+            errors.append("liquid_handling.well_plate_shake needs radius, v_offset_mm, speed_mm_s and cycles")
+        else:
+            if not 0 < radius <= 1:
+                errors.append(f"well_plate_shake.radius must be in (0, 1], got {radius:g}")
+            if offset > 0 or (depth and -offset >= float(depth)):
+                errors.append(f"well_plate_shake.v_offset_mm must be at or below the well top, got {offset:g}")
+            if not 1 <= speed <= 80:
+                errors.append(f"well_plate_shake.speed_mm_s must be 1-80, got {speed:g}")
+            if not 1 <= cycles <= 5:
+                errors.append(f"well_plate_shake.cycles must be 1-5, got {cycles}")
+    return errors
 
 
 def _preflight(protocol, labware, p20, do_dilution, do_print):
@@ -491,10 +582,12 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
     if str(CONFIG["tips"].get("policy", "per_liquid")) not in TIP_POLICIES:
         errors.append(f"tips.policy must be one of {TIP_POLICIES}")
 
+    errors += _liquid_handling_errors(labware, p20_min, p20_max)
+    if do_dilution and _mixes_dilutions() and not 0 < float(mixing.get("volume_ul", 0) or 0) <= p20_max:
+        errors.append(f"mixing.volume_ul must be in (0, {p20_max:g}]")
+
     placed, skipped = [], []
     if do_print:
-        if not 0 < float(mixing["volume_ul"]) <= p20_max:
-            errors.append(f"mixing.volume_ul must be in (0, {p20_max:g}]")
         air_gap = float(pr.get("air_gap_ul", 0.0) or 0.0)
         if air_gap < 0:
             errors.append("print.air_gap_ul must be >= 0")
@@ -536,6 +629,11 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
                                   "several drop volumes are configured")
                 if not entry["positions"]:
                     errors.append(f"print.source_map entry {entry['source']} names no paper positions")
+                for position, count in (entry.get("drops") or {}).items():
+                    if position not in entry["positions"]:
+                        errors.append(f"{position} has a drop count but {entry['source']} does not print on it")
+                    if not 1 <= int(count) <= 20:
+                        errors.append(f"{position}: drops per position must be 1-20, got {count}")
                 for position in entry["positions"]:
                     if position in seen:
                         errors.append(f"paper position {position} is printed from both {seen[position]} and "
@@ -595,55 +693,39 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
 
 
 def _liquid_warnings(protocol, labware, placed, do_dilution, do_print, operations=(), rows=()):
-    """Comment when a dilution well would get too shallow for the mix or aspirate height."""
-    prints = [op for op in operations if op["kind"] == "print"]
-    if not do_print or not (placed or prints) or "plate" not in labware:
+    """Comment when the tip would draw air: mixing a fresh dilution, or aspirating a drop from a well running low.
+    Heights are liquid_handling's (the validator uses the same values)."""
+    if "plate" not in labware:
         return
     diameter = getattr(labware["plate"].wells()[0], "diameter", None)
     if not diameter:
         return
     area = math.pi * (float(diameter) / 2.0) ** 2
-    prepared = CONFIG["dilution"].get("prepared_volume_ul")
+    lh = _liquid_handling()
+    aspirate_mm = float(lh["plate_aspirate_height_mm"])
     total = float(CONFIG["dilution"]["total_volume_ul"])
-    if not placed:
-        # An explicit print map: each source well, in print order.
-        made = {f"{row}{CONFIG['dilution']['plate_column']}" for row in rows} if do_dilution else set()
-        mix_ul = float(CONFIG["mixing"]["volume_ul"])
-        mix_mm = float(CONFIG["mixing"].get("height_mm", 2.0))
-        aspirate_mm = float(CONFIG["print"]["aspirate_height_mm"])
-        left = {}
-        for op in prints:
-            source = op["source"]
-            if source not in left:
-                left[source] = total if source in made or prepared in (None, "") else float(prepared)
-            if left[source] < mix_ul + mix_mm * area:
-                protocol.comment(f"WARNING: mixing at {mix_mm:g} mm may draw air in {source} before paper "
+    mixes = [op for op in operations if op["kind"] == "mix"]
+    if mixes:
+        need = mixes[0]["volume_ul"] + max(aspirate_mm, float(lh["plate_mix_height_mm"])) * area
+        if total < need:
+            protocol.comment(f"WARNING: mixing {mixes[0]['volume_ul']:g} uL may draw air: each {total:g} uL "
+                             f"dilution needs at least {need:.0f} uL.")
+    prints = [op for op in operations if op["kind"] == "print"]
+    if not do_print or not prints:
+        return
+    prepared = CONFIG["dilution"].get("prepared_volume_ul")
+    made = {f"{row}{CONFIG['dilution']['plate_column']}" for row in rows} if do_dilution else set()
+    left = {}
+    for op in prints:
+        source = op["source"]
+        if source not in left:
+            left[source] = total if source in made or prepared in (None, "") else float(prepared)
+        for _ in range(int(op["droplets"])):
+            if left[source] < float(op["volume_ul"]) + aspirate_mm * area:
+                protocol.comment(f"WARNING: aspirating at {aspirate_mm:g} mm may draw air in {source} at paper "
                                  f"{op['paper_well']} (~{left[source]:.0f} uL left).")
                 return
-            for _ in range(int(op["droplets"])):
-                if left[source] < float(op["volume_ul"]) + aspirate_mm * area:
-                    protocol.comment(f"WARNING: aspirating at {aspirate_mm:g} mm may draw air in {source} at paper "
-                                     f"{op['paper_well']} (~{left[source]:.0f} uL left).")
-                    return
-                left[source] -= float(op["volume_ul"])
-        return
-    volume = total if do_dilution or prepared in (None, "") else float(prepared)
-    if sum(spot["volume_ul"] * spot["droplets"] for spot in placed) > volume:
-        protocol.comment("WARNING: printing draws more than each dilution well holds; later spots may run dry.")
-    mix_ul = float(CONFIG["mixing"]["volume_ul"])
-    mix_mm = float(CONFIG["mixing"].get("height_mm", 2.0))
-    aspirate_mm = float(CONFIG["print"]["aspirate_height_mm"])
-    for spot in placed:
-        if volume < mix_ul + mix_mm * area:
-            protocol.comment(f"WARNING: mixing at {mix_mm:g} mm may draw air before paper column "
-                             f"{spot['column']} (~{volume:.0f} uL left per well).")
-            return
-        for _ in range(int(spot["droplets"])):
-            if volume < float(spot["volume_ul"]) + aspirate_mm * area:
-                protocol.comment(f"WARNING: aspirating at {aspirate_mm:g} mm may draw air at paper column "
-                                 f"{spot['column']} (~{volume:.0f} uL left per well).")
-                return
-            volume -= float(spot["volume_ul"])
+            left[source] -= float(op["volume_ul"])
 
 
 def _set_flow_rates(p20):
@@ -658,24 +740,38 @@ def _group_description(operation):
     if operation["kind"] == "transfer":
         name, _ = _material_by_role(operation["role"])
         return f"{name} -> {operation['well']}"
+    if operation["kind"] == "mix":
+        return f"mixing {operation['well']}"
     return f"printing {operation['source']} -> paper {operation['paper_well']}"
 
 
+def _shake(p20, well, shake):
+    """Droplet release after a dispense into a 96-well plate well: the touch-tip motion of
+    scripts/test_single_dilution_c12.py (p20.touch_tip on that well; the script used Opentrons' default radius 1.0,
+    v_offset -1.0 mm and speed 60 mm/s), repeated `cycles` times. Only ever called for plate wells."""
+    if not shake.get("enabled"):
+        return
+    for _ in range(int(shake.get("cycles", 1))):
+        p20.touch_tip(well, radius=float(shake["radius"]), v_offset=float(shake["v_offset_mm"]),
+                      speed=float(shake["speed_mm_s"]))
+
+
 def _execute(protocol, labware, p20, operations, tip_names):
-    dilution, mixing, pr = CONFIG["dilution"], CONFIG["mixing"], CONFIG["print"]
+    dilution, pr, lh = CONFIG["dilution"], CONFIG["print"], _liquid_handling()
     return_tips = bool(CONFIG["tips"].get("return_tips", False))
-    blow_out_dilution = bool(dilution.get("blow_out_after_dispense", True))
     materials = {role: _material_by_role(role) for role in ("solvent", "sample")}
+    plate_aspirate = float(lh["plate_aspirate_height_mm"])
+    plate_dispense = float(lh["plate_dispense_height_mm"])
+    plate_mix = float(lh["plate_mix_height_mm"])
+    transfer_gap = float(lh.get("air_gap_ul", 0.0) or 0.0)
+    plate_blow_out = bool(lh.get("blow_out", True))
+    shake = lh["well_plate_shake"]
     z = float(pr["z_mm"])
-    asp_h = float(pr["aspirate_height_mm"])
     air_gap = float(pr.get("air_gap_ul", 0.0) or 0.0)
     air_gap_height = float(pr.get("air_gap_height_mm", 5.0))
     push_out = float(pr.get("push_out_ul", 0.0) or 0.0)
     blow_out = bool(pr.get("blow_out", True))
     dwell = float(pr.get("post_dispense_delay_s", 0.0) or 0.0)
-    mix_reps = int(mixing["reps"])
-    mix_vol = float(mixing["volume_ul"])
-    mix_h = float(mixing["height_mm"])
 
     group = None
     tip_index = -1
@@ -689,37 +785,52 @@ def _execute(protocol, labware, p20, operations, tip_names):
             group = op["group"]
 
         if op["kind"] == "transfer":
+            # scripts/test_single_dilution_c12.py: aspirate, air gap, dispense liquid + gap low in the well, blow
+            # out there (the P20 GEN2's default push-out is 0 uL), then the droplet-release shake
             name, material = materials[op["role"]]
             if op["role"] == "sample" and op["chunk"] == 1:
                 protocol.comment(f"Diluting {op['well']} to {op['factor']:g}x ({name} {op['total_ul']:.2f} uL).")
             vial = labware["tuberack"][material["vial"]].bottom(float(material["aspirate_height_mm"]))
-            destination = labware["plate"][op["well"]].top(op["from_top_mm"])
+            well = labware["plate"][op["well"]]
+            destination = well.bottom(plate_dispense)
             protocol.comment(f"P20 {name} -> {op['well']}: transfer {op['chunk']} of {op['chunks']}, "
                              f"{op['volume_ul']:.2f} uL.")
             p20.aspirate(op["volume_ul"], vial)
-            p20.dispense(op["volume_ul"], destination)
-            if blow_out_dilution:
-                # Dispensed in air above the liquid: blow out right there so the whole
-                # transfer leaves the tip (default push-out on the P20 GEN2 is 0 uL).
+            if transfer_gap > 0:
+                p20.air_gap(transfer_gap)
+            p20.dispense(op["volume_ul"] + transfer_gap, destination)
+            if plate_blow_out:
                 p20.blow_out(destination)
+            _shake(p20, well, shake)
             following = operations[index + 1] if index + 1 < len(operations) else None
-            if following is None or following["kind"] != "transfer":
+            if following is None or following["kind"] == "print":
+                protocol.comment(f"Dilution series ready in column {dilution['plate_column']}.")
+            continue
+
+        if op["kind"] == "mix":
+            well = labware["plate"][op["well"]]
+            protocol.comment(f"Mixing {op['well']}: {op['reps']} x {op['volume_ul']:g} uL.")
+            for _ in range(op["reps"]):
+                p20.aspirate(op["volume_ul"], well.bottom(plate_aspirate))
+                p20.dispense(op["volume_ul"], well.bottom(plate_mix))
+            if plate_blow_out:
+                p20.blow_out(well.bottom(plate_mix))
+            _shake(p20, well, shake)
+            following = operations[index + 1] if index + 1 < len(operations) else None
+            if following is None or following["kind"] == "print":
                 protocol.comment(f"Dilution series ready in column {dilution['plate_column']}.")
             continue
 
         source = labware["plate"][op["source"]]
         paper_well = labware["paper"][op["paper_well"]]
-        protocol.comment(
-            f"{op['source']} -> paper {op['paper_well']}: mix {mix_reps}x, then "
-            f"{op['droplets']} x {op['volume_ul']:g} uL drop(s)."
-        )
-        p20.mix(mix_reps, mix_vol, source.bottom(mix_h))
+        protocol.comment(f"{op['source']} -> paper {op['paper_well']}: {op['droplets']} x {op['volume_ul']:g} uL "
+                         "drop(s) on this one position.")
         for layer in range(1, op["droplets"] + 1):
             # The physically validated print cycle (11_standard_print.py):
             # aspirate, trailing air gap, dispense everything with push-out,
             # blow out, then dwell so the drop separates from the tip.
             destination = paper_well.bottom(z)
-            p20.aspirate(op["volume_ul"], source.bottom(asp_h))
+            p20.aspirate(op["volume_ul"], source.bottom(plate_aspirate))
             if air_gap > 0:
                 p20.air_gap(air_gap, height=air_gap_height)
             piston = op["volume_ul"] + air_gap
@@ -794,7 +905,7 @@ def run(protocol: protocol_api.ProtocolContext):
                 + (f" x{droplets} drops" if droplets > 1 else "") + ")"
                 for entry in source_map
             )
-            + f"; mix {CONFIG['mixing']['reps']}x before each."
+            + "."
         )
     elif do_print:
         protocol.comment(
@@ -804,7 +915,7 @@ def run(protocol: protocol_api.ProtocolContext):
                 + (f" x{spot['droplets']} drops" if spot["droplets"] > 1 else "")
                 for spot in placed
             )
-            + f"; mix {CONFIG['mixing']['reps']}x before each."
+            + "."
         )
         if _explicit_paper_rows() is not None:
             column = CONFIG["dilution"]["plate_column"]

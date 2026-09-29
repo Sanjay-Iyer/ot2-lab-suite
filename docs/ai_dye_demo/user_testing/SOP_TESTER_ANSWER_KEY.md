@@ -68,7 +68,7 @@ Dilutions the tester *reports* as made are recorded, and block a run that would 
 | Paper print plate location | Slot 5 | | Drops per paper position | 1 |
 | Vial rack location | Slot 7 | | Total replicates | 1 |
 | P20 tip rack location | Slot 9 | | First paper column | 1 |
-| **Dye (sample) vial** | **B1** | | Mixes before each print | 2 |
+| **Dye (sample) vial** | **B1** | | Mixes per dilution well | 2 |
 | Water (solvent) vial | A1 | | Mixing volume | 15 µL |
 | Make dilutions in this run | yes | | Print in this run | yes |
 | **Dilution factors** | **2×, 4×, 8×, 16×** | | Starting tip | A1 |
@@ -87,7 +87,7 @@ Changes from the start: dye vial, dilution factors, final volume.
 | C11 | 8× | 25 µL | 175 µL |
 | D11 | 16× | 12.5 µL | 187.5 µL |
 
-- Water: FROM vial rack (slot 7) vial A1 TO dilution plate (slot 4) wells A11–D11. 612.5 µL in 32 transfers, tip A1.
+- Water: FROM vial rack (slot 7) vial A1 TO dilution plate (slot 4) wells A11–D11. 612.5 µL in 34 transfers, tip A1.
 - Dye: FROM vial rack (slot 7) vial B1 TO wells A11–D11. 187.5 µL in 12 transfers, using the same tip A1.
 - Load at least 2.65 mL of dye in B1 and 3.08 mL of water in A1 (plan → LIQUIDS).
 
@@ -105,7 +105,7 @@ Changes from the start: dye vial, dilution factors, final volume.
 ### Tips and operations
 
 - 1 tip, A1; next unused tip B1; 95 remaining.
-- 43 dilution transfers, 4 print steps (mix, then drop), 4 drops, 1 tip pick-up.
+- 46 dilution transfers (each well mixed right after its dye), 4 print steps (no mixing before printing), 4 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -152,7 +152,7 @@ The dye vial stays A2, the final volume 150 µL, plate column 11 from row A, dro
 | B11 | 10× | 15 µL | 135 µL |
 | C11 | 20× | 7.5 µL | 142.5 µL |
 
-- Water: FROM vial A1 TO wells A11–C11. 397.5 µL in 21 transfers, tip A1.
+- Water: FROM vial A1 TO wells A11–C11. 397.5 µL in 23 transfers, tip A1.
 - Dye: FROM vial A2 TO wells A11–C11. 52.5 µL in 4 transfers, using tip A1.
 - Load at least 2.52 mL of dye and 2.86 mL of water.
 
@@ -169,7 +169,7 @@ The dye vial stays A2, the final volume 150 µL, plate column 11 from row A, dro
 ### Tips and operations
 
 - 1 tip, A1; next unused tip B1.
-- 25 transfers, 3 print steps, 6 drops, 1 tip pick-up.
+- 27 transfers, 3 print steps, 6 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -214,7 +214,7 @@ As the starting plan, except: **Dilution factors 3×, 6×, 12×**; **Dilution pl
 | E3 | 6× | 25 µL | 125 µL |
 | F3 | 12× | 12.5 µL | 137.5 µL |
 
-- Water: FROM vial A1 TO wells D3–F3. 362.5 µL in 19 transfers, tip A1.
+- Water: FROM vial A1 TO wells D3–F3. 362.5 µL in 21 transfers, tip A1.
 - Dye: FROM vial A2 TO wells D3–F3. 87.5 µL in 6 transfers, using tip A1.
 - Load at least 2.55 mL of dye and 2.83 mL of water.
 
@@ -235,7 +235,7 @@ As the starting plan, except: **Dilution factors 3×, 6×, 12×**; **Dilution pl
 ### Tips and operations
 
 - 1 tip, A1, reused for all dilution and print steps; next unused tip B1.
-- 25 transfers, 6 print steps, 6 drops, 1 tip pick-up.
+- 27 transfers, 6 print steps, 6 drops, 1 tip pick-up.
 
 ### Expected agent events
 
@@ -291,7 +291,7 @@ Total replicates stay 2; tip policy stays one tip for the entire run.
 | C6 | 16× | 12.5 µL | 187.5 µL |
 | D6 | 32× | 6.25 µL | 193.75 µL |
 
-- Water: FROM vial A1 TO wells A6–D6. 706.25 µL in 37 transfers, tip A1.
+- Water: FROM vial A1 TO wells A6–D6. 706.25 µL in 39 transfers, tip A1.
 - Dye: FROM vial A2 TO wells A6–D6. 93.75 µL in 7 transfers, using tip A1.
 - Load at least 2.56 mL of dye and 3.17 mL of water.
 
@@ -316,7 +316,7 @@ Total replicates stay 2; tip policy stays one tip for the entire run.
 
 | | Transfers | Print steps | Drops | Tips | Next unused tip |
 |---|---|---|---|---|---|
-| Run 1 | 44 | 8 | 8 | 1 (A1) | B1 |
+| Run 1 | 46 | 8 | 8 | 1 (A1) | B1 |
 | Run 2 | 0 (dilution step SKIPPED, no vial aspirations) | 8 | 24 | 1 (B1) | C1 |
 
 ### Expected agent events
@@ -386,8 +386,8 @@ plate from Slot 4 to Slot 8; move the P20 tip rack from Slot 8 to Slot 11."
 | B11 | 9× | 20 µL | 160 µL |
 | C11 | 27× | 6.67 µL | 173.33 µL |
 
-- Water: FROM vial A1 TO wells A11–C11. 453.33 µL in 23 transfers, a new tip for each.
-- Dye: FROM vial A2 TO wells A11–C11. 86.67 µL in 5 transfers, a new tip for each.
+- Water: FROM vial A1 TO wells A11–C11. 453.33 µL in 26 transfers, a new tip for each.
+- Dye: FROM vial A2 TO wells A11–C11. 86.67 µL in 7 transfers, a new tip for each.
 - Load at least 2.55 mL of dye and 2.92 mL of water.
 
 ### Printing plan
@@ -402,8 +402,8 @@ plate from Slot 4 to Slot 8; move the P20 tip rack from Slot 8 to Slot 11."
 
 ### Tips and operations
 
-- 34 tips (28 transfers + 6 printed positions): A2–H2, A3–H3, A4–H4, A5–H5, A6–B6. Next unused tip C6; 54 remain of the 88 from A2.
-- 28 transfers, 6 print steps, 12 drops, 34 tip pick-ups.
+- 39 tips (33 transfers + 6 printed positions): A2–H2, A3–H3, A4–H4, A5–H5, A6–G6. Next unused tip H6; 49 remain of the 88 from A2.
+- 33 transfers, 6 print steps, 12 drops, 39 tip pick-ups.
 
 ### Expected agent events
 

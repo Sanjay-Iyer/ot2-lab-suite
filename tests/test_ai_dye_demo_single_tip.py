@@ -67,7 +67,7 @@ def test_the_demo_default_is_one_tip_for_the_entire_run_and_needs_exactly_one_ti
     # the same plan under the other policies counts their tips (the count comes from the policy, not a special case)
     assert build_plan(tips(policy="per_liquid")).tips_needed == 10
     every = build_plan(tips(policy="new_tip_every_transfer"))
-    assert every.tips_needed == sum(op.kind in ("transfer", "print") for op in every.operations) == 74
+    assert every.tips_needed == sum(op.kind in ("transfer", "print") for op in every.operations) == 76
 
 
 def test_reusing_one_tip_is_a_warning_not_a_refusal():
@@ -93,7 +93,8 @@ def test_the_same_tip_stays_on_through_the_dilutions_the_mixing_and_the_printing
     assert picked < min(liquid) and max(liquid) < released                  # every liquid step with the tip on
     assert {entry[3] for entry in log if entry[0] == "aspirate"} == {"A1"}
     assert {entry[2][0] for entry in log if entry[0] == "aspirate"} == {RACK, PLATE}     # water, dye, then prints
-    assert any(entry[0] == "mix" for entry in log)
+    assert any(entry[0] == "aspirate" and entry[2][0] == PLATE and following[0] == "dispense" and following[2][0] == PLATE
+               for entry, following in zip(log, log[1:]))                     # the dilution mix, same tip
     assert any(entry[0] == "dispense" and entry[2][0] == PAPER for entry in log)
 
 
@@ -243,18 +244,18 @@ def test_one_tip_per_liquid_is_unchanged(protocol_module):
     log = run_protocol(protocol_module, config).log
     assert [tip for kind, tip in tip_events(log) if kind == "pick_up_tip"] == [tip.tip for tip in plan.tips]
     assert [tip for kind, tip in tip_events(log) if kind == "drop_tip"] == [tip.tip for tip in plan.tips]
-    touched: dict[str, set] = {}
+    vials: dict[str, set] = {}
     for entry in log:
-        if entry[0] == "aspirate":
-            touched.setdefault(entry[3], set()).add(tuple(entry[2][:2]))
-    assert all(len(sources) == 1 for sources in touched.values())       # every tip draws one liquid only
+        if entry[0] == "aspirate" and entry[2][0] == RACK:
+            vials.setdefault(entry[3], set()).add(entry[2][1])
+    assert all(len(sources) == 1 for sources in vials.values())         # every tip draws from one vial only
 
 
 def test_a_new_tip_every_transfer_is_unchanged(protocol_module):
     config = tips(policy="new_tip_every_transfer", return_tips=False)
     plan = build_plan(config)
     picked = [tip for kind, tip in tip_events(run_protocol(protocol_module, config).log) if kind == "pick_up_tip"]
-    assert picked == [tip.tip for tip in plan.tips] and len(set(picked)) == len(picked) == plan.tips_needed == 74
+    assert picked == [tip.tip for tip in plan.tips] and len(set(picked)) == len(picked) == plan.tips_needed == 76
 
 
 # ── the tip ledger after a live run ─────────────────────────────────────────────────────────────────────────────────

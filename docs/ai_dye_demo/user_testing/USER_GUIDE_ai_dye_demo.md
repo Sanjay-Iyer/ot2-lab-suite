@@ -24,7 +24,7 @@ Type in plain language at `you>`. Some examples:
 | You type | What happens |
 |---|---|
 | `Move the vial rack to slot 6.` | A numbered **PROPOSED PLAN**: the complete plan with the vial rack in Slot 6, and the move to make under **ATTENTION**. `yes` applies it and shows the **CURRENT PLAN**, which repeats the physical move: "Now physically move the Vial rack from Slot 7 to Slot 6." |
-| `Why are we mixing after every dilution?` | An answer (**ASK MODE — no experiment parameters changed**). A question never changes anything, even when it rests on a wrong idea. Here, each dilution well is actually mixed right before it is printed, not right after it is made. |
+| `Why are we mixing after every dilution?` | An answer (**ASK MODE — no experiment parameters changed**). A question never changes anything. Here the answer is yes: each dilution well is mixed right after its dye is added (printing never mixes). |
 | `What is currently in slot 8?` | An answer from the current plan. Type `deck` for the deck itself. |
 | `How many tips will this use?` | An answer. Type `tips` for the exact tip configuration. |
 | `What have I changed so far?` | The list of applied changes, read from the stored history. |
@@ -170,14 +170,18 @@ Names in **bold** are the labels used in proposals.
 | Number of dilutions | How many factors | `Use three dilutions.` | 1–8 | Keeps the first factors of the current series (or extends a regular series); otherwise asks for the factors. |
 | **Dilution plate column** | Plate column the series is made in | `Make the dilutions in plate column 9.` | 1–12 | |
 | **Dilution start row** | Plate row of the first dilution | `Start the dilutions at row B.` | A–H | The series must fit by row H. Paper rows follow the plate rows. |
-| **Final volume per dilution** | Dye plus water in each well | `Make each dilution 100 µL total.` | µL, up to 340 | Must leave enough in the well to mix and print (mixing needs about 89 µL in the well). |
+| **Final volume per dilution** | Dye plus water in each well | `Make each dilution 100 µL total.` | µL, up to 340 | Must leave enough in the well to mix and print (mixing 15 µL needs about 26 µL in the well). |
 | **Make dilutions in this run** | Whether this run makes the dilutions | `The dilutions are already made.` | yes / no | Turned off only with a record that the dilutions exist. |
 | **Volume now in each prepared well** | Liquid left in wells made earlier | `Each well now holds about 120 µL.` | µL | Only for dilutions that already exist; used for the liquid-depth checks. |
-| **Mixes before each print** | Mixing repetitions before each print step | `Mix three times before printing.` | whole number ≥ 1 | |
+| **Mix each dilution after it is made** | Whether each new dilution is mixed right after its dye | `Don't mix the dilutions.` | yes / no | Printing never mixes. |
+| **Mixes per dilution well** | Mixing repetitions in each new dilution | `Mix three times.` | whole number ≥ 1 | |
 | **Mixing volume** | Volume per mix | `Mix with 10 µL.` | µL, up to 20 | |
 | **Print in this run** | Whether this run prints | `Skip printing.` | yes / no | |
 | **Drop volume** | Volume of one drop | `Print 8 µL drops.` | µL, 1–18.5 | A list of volumes (`4 and 8 µL`) prints each volume in its own paper column. |
-| **Drops per paper position** | Drops stacked on one position | `Stack two drops on each position.` | whole number ≥ 1 | The same for every printed column in one run. |
+| **Drops per paper position** | Drops dispensed onto ONE position (never more positions) | `Stack two drops on each position.` | 1–20 | Particular positions can take their own count: `3 drops on A2 and 2 on B5.` |
+| **Air gap after each vial aspiration** | Air taken after the liquid, dispensed with it | `No air gap.` / `Use a 2 µL air gap.` | 0 (off) – 5 µL | Counts toward the P20's 20 µL, so each transfer carries 19 µL at 1 µL. |
+| **Blow-out after each plate dispense** | Empties the tip after every dispense into the plate | `Turn off blowout.` | on / off | |
+| **Shake after dispense (96-well plate)** | Droplet-release motion after every plate dispense and mix | `Turn off shaking.` | on / off | The touch-tip motion of scripts/test_single_dilution_c12.py. Plate wells only. |
 | **Total replicates** | Total printed copies of each condition | `Print each condition three times.` | whole number ≥ 1 | `No replicates` means one print per condition. |
 | **First paper column** | Anchor for automatic paper placement | `Start printing at paper column 12.` | 1–12 | The allocator uses other free positions if more copies are needed. |
 | **Starting tip** | First tip this run picks up | `Start from tip C4.` | A1–H12 | Tips are used in column order. |
@@ -198,14 +202,12 @@ them next to the machine profile.
 |---|---|---|
 | Pipette | P20 single-channel GEN2, left mount | The whole workflow and its limits assume it |
 | Drop release height above the paper | 1.1 mm | Calibrated release; affects hanging drops |
-| Aspirate height in a dilution well | 1.0 mm above the bottom | Keeps the tip submerged when printing |
+| Plate aspirate / dispense / mixing heights | 0.3 / 0.3 / 0.3 mm above the well bottom | `liquid_handling` in the demo configuration |
 | Trailing air gap | 1.5 µL, taken 5 mm above the well | Part of the validated drop release |
 | Push-out, print blow-out, dwell after each drop | 3 µL, on, 2 s | Part of the validated drop release |
 | Vial aspirate height | 4 mm above the vial bottom | Calibrated to the vial rack |
-| Water / dye dispense height | 2 mm / 1 mm below the well top | Dispenses above the liquid, so a shared tip never touches it |
-| Blow-out after each dilution dispense | on | Empties the tip after every transfer |
-| Largest single transfer | 20 µL | P20 limit; larger volumes are split |
-| Mixing height | 2 mm above the well bottom | |
+| Well-shake geometry | touch-tip radius 1.0, 1 mm below the top, 60 mm/s, once | The standalone C12 test's motion |
+| Largest single transfer | 20 µL, air gap included | P20 limit; larger volumes are split |
 | Flow rates | 3 µL/s aspirate and dispense | |
 | Paper width | 12 columns | Paper labware geometry |
 | Safety limits, labware types, protocol version | fixed | |

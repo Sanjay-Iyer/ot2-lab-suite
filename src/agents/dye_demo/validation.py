@@ -21,6 +21,7 @@ from src.agents.dye_demo.model import (
     fmt_num,
     fmt_ul,
     is_off_deck,
+    liquid_handling,
     normalize_source_map,
     occupancy,
     positions_text,
@@ -34,6 +35,7 @@ from src.agents.dye_demo.plan import (
     droplet_volumes,
     explicit_paper_rows,
     factors_of,
+    mixes_dilutions,
     paper_layout,
     print_map,
     steps_enabled,
@@ -127,6 +129,7 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     _check_materials(config, report)
     _check_dilution(config, report, p20_min, max_fill)
     _check_mixing(config, report, p20_max)
+    _check_liquid_handling(config, report, p20_min, p20_max)
     _check_print(config, report, p20_min, p20_max)
     _check_tip_fields(config, report)
     if report.errors:
@@ -156,14 +159,14 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
         if len(liquids) > 1:     # a demo convenience: water, dye and every dilution share the tip
             report.warn("tips.single_tip", "One tip will be reused for the entire run. This can cause "
                                            "cross-contamination.")
+    _check_dilution_mix(config, plan, report)
     _check_print_liquid(config, plan, report)
-    _check_dispense_clearance(config, plan, report)
     positions = [op.destination for op in plan.operations if op.kind == "print"]
     if len(positions) != len(set(positions)):
         report.error("print.duplicate_positions", "two print steps target the same paper position")
-    if plan.do_dilution and not plan.do_print:
-        report.warn("dilution.not_mixed", "a dilute-only run does not mix the wells; they are mixed "
-                                          "only right before each print step")
+    if plan.do_dilution and not mixes_dilutions(config) and any(well.solvent_ul > 0.01 for well in plan.wells):
+        report.warn("dilution.not_mixed", "mixing is off, so the dilution wells are not mixed after they are made "
+                                          "(printing does not mix either)")
     if plan.do_print and plan.mapped:
         existing = [source.well for source in plan.print_sources if not source.made_here]
         if existing:
@@ -319,6 +322,8 @@ def _check_volumes(config: dict[str, Any], report: Report, max_fill: float, *, f
 
 def _check_mixing(config: dict[str, Any], report: Report, p20_max: float) -> None:
     mixing = config["mixing"]
+    if not mixing.get("enabled", True):
+        return
     try:
         volume = float(mixing.get("volume_ul", 0) or 0)
         reps = int(mixing.get("reps", 0) or 0)
@@ -328,7 +333,62 @@ def _check_mixing(config: dict[str, Any], report: Report, p20_max: float) -> Non
     if not 0 < volume <= p20_max:
         report.error("mixing.volume", f"the mixing volume must be in (0, {fmt_num(p20_max)}] µL")
     if reps < 1:
-        report.error("mixing.reps", "mixing must repeat at least once")
+        report.error("mixing.reps", "mixing must repeat at least once (or turn mixing off)")
+
+
+def _check_liquid_handling(config: dict[str, Any], report: Report, p20_min: float, p20_max: float) -> None:
+    """liquid_handling: the plate heights, the air gap and the well shake the protocol uses - the same values, the same
+    limits as its pre-flight (a height the protocol would refuse is refused here first)."""
+    lh = liquid_handling(config)
+    geometry = well_geometry(str((config["deck"].get("plate") or {}).get("load_name", "")))
+    depth = geometry[1] if geometry else None
+    for key, label in (("plate_aspirate_height_mm", "plate aspirate height"),
+                       ("plate_dispense_height_mm", "plate dispense height"),
+                       ("plate_mix_height_mm", "plate mixing height")):
+        try:
+            height = float(lh[key])
+        except (KeyError, TypeError, ValueError):
+            report.error("liquid_handling.height", f"the {label} (liquid_handling.{key}) must be a number")
+            continue
+        if height <= 0 or (depth and height >= depth):
+            report.error("liquid_handling.height", f"the {label} must be above 0 mm and below the "
+                                                   f"{fmt_num(depth or 0)} mm well depth, got {fmt_num(height)} mm")
+    try:
+        air_gap = float(lh.get("air_gap_ul", 0) or 0)
+    except (TypeError, ValueError):
+        air_gap = -1.0
+    if not 0 <= air_gap <= p20_max - p20_min:
+        report.error("liquid_handling.air_gap", f"the air gap must be 0 (off) to {fmt_num(p20_max - p20_min)} µL")
+    shake = lh.get("well_plate_shake") or {}
+    if shake.get("enabled"):
+        try:
+            radius, offset = float(shake["radius"]), float(shake["v_offset_mm"])
+            speed, cycles = float(shake["speed_mm_s"]), int(shake["cycles"])
+        except (KeyError, TypeError, ValueError):
+            report.error("liquid_handling.shake", "the well shake needs radius, v_offset_mm, speed_mm_s and cycles")
+            return
+        if not 0 < radius <= 1 or offset > 0 or (depth and -offset >= depth) or not 1 <= speed <= 80 \
+                or not 1 <= cycles <= 5:
+            report.error("liquid_handling.shake", "the well shake geometry is outside what the OT-2 allows (radius "
+                                                  "0-1, at or below the well top, 1-80 mm/s, 1-5 cycles)")
+
+
+def _check_dilution_mix(config: dict[str, Any], plan, report: Report) -> None:
+    """A dilution well is mixed right after it is made: the tip must stay submerged at the mix heights."""
+    mixes = [op for op in plan.operations if op.kind == "mix"]
+    if not mixes:
+        return
+    area = well_area_mm2(config, "plate")
+    if not area:
+        return
+    lh = liquid_handling(config)
+    lowest = max(float(lh["plate_aspirate_height_mm"]), float(lh["plate_mix_height_mm"]))
+    need = mixes[0].volume_ul + lowest * area
+    if plan.total_volume_ul + 1e-6 < need:
+        report.error("mixing.draws_air",
+                     f"mixing {fmt_ul(mixes[0].volume_ul)} needs at least {need:.0f} µL in each dilution well, but "
+                     f"each holds {fmt_ul(plan.total_volume_ul)}; the tip would draw air. Use more volume per dilution "
+                     "or a smaller mixing volume")
 
 
 def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max: float) -> None:
@@ -345,10 +405,10 @@ def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max
             report.error("print.volume_over_max",
                          f"a {fmt_ul(volume)} drop plus the {fmt_ul(air_gap)} air gap is "
                          f"{fmt_ul(volume + air_gap)}, over the P20's {fmt_num(p20_max)} µL")
-    for key, label in (("replicates", "replicates"), ("droplets_per_spot", "drops per position")):
+    for key, label, most in (("replicates", "replicates", 96), ("droplets_per_spot", "drops per position", 20)):
         try:
-            if int(printing.get(key, 1)) < 1:
-                report.error(f"print.{key}", f"{label} must be at least 1")
+            if not 1 <= int(printing.get(key, 1)) <= most:
+                report.error(f"print.{key}", f"{label} must be 1-{most}")
         except (TypeError, ValueError):
             report.error(f"print.{key}", f"{label} must be a whole number")
     try:
@@ -443,31 +503,20 @@ def _check_tip_fields(config: dict[str, Any], report: Report) -> None:
 
 
 def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
-    """Keep the tip submerged while mixing and aspirating inside each dilution well."""
+    """Keep the tip submerged while aspirating each drop inside each dilution well (printing does not mix)."""
     if not plan.do_print or not (plan.spots or plan.print_sources):
         return
     area = well_area_mm2(config, "plate")
     if not area:
         report.warn("print.geometry_unknown", "the plate's well geometry is unknown, so liquid depth was not checked")
         return
-    mixing, printing = config["mixing"], config["print"]
-    mix_ul, mix_mm = float(mixing["volume_ul"]), float(mixing.get("height_mm", 2.0))
-    aspirate_mm = float(printing.get("aspirate_height_mm", 1.0))
+    aspirate_mm = float(liquid_handling(config)["plate_aspirate_height_mm"])
     if plan.mapped:
-        _check_source_liquid(plan, area, mix_ul, mix_mm, aspirate_mm, report)
+        _check_source_liquid(plan, area, aspirate_mm, report)
         return
     volume = plan.source_volume_ul
     wells = positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)
     for spot in plan.spots:
-        need = mix_ul + mix_mm * area
-        if volume + 1e-6 < need:
-            report.error(
-                "print.mix_draws_air",
-                f"mixing {fmt_ul(mix_ul)} at {fmt_num(mix_mm)} mm needs at least {need:.0f} µL in each "
-                f"dilution well ({wells}), but a well would hold {volume:.0f} µL before printing paper "
-                f"column {spot['column']}; the tip would draw air. Use more volume per dilution or print less",
-            )
-            return
         for _ in range(int(spot["droplets"])):
             need = float(spot["volume_ul"]) + aspirate_mm * area
             if volume + 1e-6 < need:
@@ -492,16 +541,15 @@ def recorded_liquid_errors(config: dict[str, Any], recorded: dict[str, float]) -
     area = well_area_mm2(config, "plate")
     if not area:
         return []
-    mixing, printing = config["mixing"], config["print"]
     report = Report()
-    _check_source_liquid(plan, area, float(mixing["volume_ul"]), float(mixing.get("height_mm", 2.0)),
-                         float(printing.get("aspirate_height_mm", 1.0)), report, recorded=recorded)
+    _check_source_liquid(plan, area, float(liquid_handling(config)["plate_aspirate_height_mm"]), report,
+                         recorded=recorded)
     return report.error_messages()
 
 
-def _check_source_liquid(plan, area: float, mix_ul: float, mix_mm: float, aspirate_mm: float, report: Report, *,
+def _check_source_liquid(plan, area: float, aspirate_mm: float, report: Report, *,
                          recorded: dict[str, float] | None = None) -> None:
-    """Each mapped source well, in print order: enough liquid to mix and to keep the tip submerged for every drop.
+    """Each mapped source well, in print order: enough liquid to keep the tip submerged for every drop.
     With `recorded`, only the wells this run does not make that have a recorded volume, starting from that volume."""
     for source in plan.print_sources:
         volume = source.start_ul
@@ -513,15 +561,6 @@ def _check_source_liquid(plan, area: float, mix_ul: float, mix_mm: float, aspira
             assumed = (" (recorded: what earlier runs of this session left in it; if you refilled it, tell me the "
                        "volume now in the well)")
         for operation in (op for op in plan.operations if op.kind == "print" and op.source == source.well):
-            need = mix_ul + mix_mm * area
-            if volume + 1e-6 < need:
-                report.error(
-                    "print.mix_draws_air",
-                    f"mixing {fmt_ul(mix_ul)} at {fmt_num(mix_mm)} mm needs at least {need:.0f} µL in {source.well}, "
-                    f"but it would hold {volume:.0f} µL{assumed} before printing {operation.destination}; the tip "
-                    f"would draw air. Print fewer positions from {source.well} or use more liquid",
-                )
-                return
             for _ in range(operation.droplets):
                 need = operation.volume_ul + aspirate_mm * area
                 if volume + 1e-6 < need:
@@ -534,26 +573,3 @@ def _check_source_liquid(plan, area: float, mix_ul: float, mix_mm: float, aspira
                     )
                     return
                 volume -= operation.volume_ul
-
-
-def _check_dispense_clearance(config: dict[str, Any], plan, report: Report) -> None:
-    """Dilution dispenses happen above the liquid so a shared tip never touches it."""
-    if not plan.do_dilution or not plan.wells:
-        return
-    geometry = well_geometry(str(config["deck"]["plate"].get("load_name", "")))
-    if not geometry:
-        return
-    area = 3.141592653589793 * (geometry[0] / 2.0) ** 2
-    depth = geometry[1]
-    dilution = config["dilution"]
-    water_tip = depth + float(dilution.get("solvent_dispense_from_top_mm", -2.0))
-    dye_tip = depth + float(dilution.get("sample_dispense_from_top_mm", -1.0))
-    water_level = max(well.solvent_ul for well in plan.wells) / area
-    final_level = plan.total_volume_ul / area
-    if water_level > water_tip - 1.0 or final_level > dye_tip - 1.0:
-        report.warn(
-            "dilution.tip_near_liquid",
-            f"at {fmt_ul(plan.total_volume_ul)} per well the liquid rises to within 1 mm of the "
-            f"dispense height, so the shared water/dye tip may touch the liquid and carry it back "
-            f"into the vials; a smaller total volume avoids this",
-        )

@@ -26,6 +26,7 @@ from src.agents.dye_demo.model import (
     OFF_DECK,
     FieldError,
     get_path,
+    liquid_handling,
     load_config,
     load_machine_profile,
     normalize_slot,
@@ -89,7 +90,7 @@ def test_lab_owned_print_release_matches_the_machine_profile(config):
     by_label = {label: status for label, _, _, status in rows}
     assert by_label["Drop release height above paper (mm)"] == "match"
     assert by_label["Trailing air gap (µL)"] == "match"
-    assert config["dilution"]["blow_out_after_dispense"] is True
+    assert liquid_handling(config)["blow_out"] is True
 
 
 # ── proposals: explicit, validated, confirmed ───────────────────────────────────
@@ -124,7 +125,8 @@ def test_conversational_edits_become_a_proposal_before_anything_changes(state):
     ("print.blow_out", False),
     ("print.post_dispense_delay_s", 0),
     ("dilution.max_transfer_ul", 200),
-    ("dilution.blow_out_after_dispense", False),
+    ("liquid_handling.plate_dispense_height_mm", 1.0),
+    ("liquid_handling.well_plate_shake.speed_mm_s", 10),
     ("mixing.height_mm", 0.5),
     ("materials.dye.aspirate_height_mm", 1.0),
     ("deck.plate.load_name", "some_other_plate"),
@@ -141,7 +143,7 @@ def test_hardware_and_calibration_are_not_the_agents_to_change(state, path, valu
     ("dilution.factors", [1, 2, 3, 4, 5, 6, 7, 8, 9], "dilution factors 1, 2, 3, 4, 5, 6, 7, 8, 9", "1 to 8 dilutions"),
     ("dilution.factors", [1, 1000], "dilution factors 1 and 1000", "under the P20"),
     ("dilution.total_volume_ul", 400, "400 µL total per dilution", "total_volume_ul must be in"),
-    ("dilution.total_volume_ul", 60, "60 µL total per dilution", "tip would draw air"),
+    ("dilution.total_volume_ul", 20, "20 µL total per dilution", "tip would draw air"),
     ("materials.dye.vial", "A1", "dye in vial A1", "different vials"),
     ("deck.plate.slot", 12, "plate to slot 12", "trash"),
     ("deck.plate.slot", 0, "plate to slot 0", "1-11"),
@@ -416,7 +418,10 @@ def test_new_tip_policy_counts_a_tip_for_every_transfer_and_position(config):
     config = three(config)
     config["tips"]["policy"] = "new_tip_every_transfer"
     plan = build_plan(config)
-    assert plan.tips_needed == len(plan.operations) == 20
+    # every transfer and print position takes a tip; a dilution mix uses the tip that just dispensed the dye
+    assert plan.tips_needed == sum(op.kind in ("transfer", "print") for op in plan.operations) == 22
+    assert all(op.group == plan.operations[index - 1].group
+               for index, op in enumerate(plan.operations) if op.kind == "mix")
 
 
 def test_volume_splitting_never_leaves_a_transfer_below_the_minimum():
@@ -570,8 +575,13 @@ def test_session_labels_carry_the_date(tmp_path):
     assert get_path({"a": {"b": 1}}, "a.b") == 1
 
 
-def test_a_dilute_only_run_warns_that_its_wells_are_not_mixed(config):
-    config["print"]["enabled"] = False
+def test_the_dilutions_are_mixed_after_they_are_made_and_printing_never_mixes(config):
+    config["print"]["enabled"] = False                       # a dilute-only run mixes its wells too
+    plan = build_plan(config)
+    assert [op.destination for op in plan.operations if op.kind == "mix"] == [f"{row}11" for row in "BCDEFGH"]
+    assert "dilution.not_mixed" not in [issue.code for issue in validate(config).warnings]
+    assert plan.total_drops == 0
+    config["mixing"]["enabled"] = False                      # turned off, the plan says the wells stay unmixed
     report = validate(config)
     assert report.ok and "dilution.not_mixed" in [issue.code for issue in report.warnings]
-    assert build_plan(config).total_drops == 0
+    assert not [op for op in build_plan(config).operations if op.kind == "mix"]

@@ -23,6 +23,10 @@ runs:
       dilution.prepared_volume_ul: null
       mixing.reps: 2
       mixing.volume_ul: 15
+      mixing.enabled: true
+      liquid_handling.air_gap_ul: 1.0
+      liquid_handling.blow_out: true
+      liquid_handling.well_plate_shake.enabled: true
       print.enabled: true
       print.droplet_volume_ul: 5
       print.droplets_per_spot: 1
@@ -46,7 +50,7 @@ runs:
         - [C6, C2, 1, 5]
         - [D6, D1, 1, 5]
         - [D6, D2, 1, 5]
-      transfers: 44
+      transfers: 46
       total_drops: 8
       tips: [A1]
   - name: run 2 (print only from the same wells, three stacked drops in paper columns 4 and 5)
@@ -65,6 +69,10 @@ runs:
       dilution.total_volume_ul: 200
       mixing.reps: 2
       mixing.volume_ul: 15
+      mixing.enabled: true
+      liquid_handling.air_gap_ul: 1.0
+      liquid_handling.blow_out: true
+      liquid_handling.well_plate_shake.enabled: true
       print.enabled: true
       print.droplet_volume_ul: 5
       print.droplets_per_spot: 3

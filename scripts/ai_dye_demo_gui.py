@@ -22,6 +22,7 @@ if str(REPO) not in sys.path:
 
 from nicegui import app, ui  # noqa: E402
 
+from src.agents.dye_demo.experiment_memory import HISTORY_DIR  # noqa: E402
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter  # noqa: E402
 from src.agents.dye_demo.gui.app import build_page  # noqa: E402
 from src.agents.dye_demo.llm import LLMClient  # noqa: E402
@@ -83,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         operator=args.operator,
         llm_description="" if args.offline else Config.describe_llm_auth(),
         run_button=RUN_ON_OT2,              # the same page in both modes; only the executor below differs
+        history_dir=HISTORY_DIR,            # each successful run is saved for its operator (experiment_memory)
     )
     if args.simulate:
         print(f"SIMULATION: '{RUN_ON_OT2}' builds and simulates the protocol on this laptop; the OT-2 is never "

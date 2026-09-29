@@ -27,7 +27,7 @@ from src.agents.dye_demo.model import (
     is_off_deck,
     load_config,
 )
-from src.agents.dye_demo.plan import build_plan
+from src.agents.dye_demo.plan import build_plan, mixes_dilutions
 from src.agents.dye_demo.redteam.fake_opentrons import load_protocol_module, run_protocol
 from src.agents.dye_demo.redteam.harness import replay
 from src.agents.dye_demo.redteam.sop_paths import PATHS, START_CONFIGS, change, run, said
@@ -215,6 +215,10 @@ SPARSE_ROWS = configured(dilution={"factors": [2, 5, 10], "rows": ["B", "D", "H"
 # made in plate rows B, D, H; printed on paper rows A, B, C: where a dilution prints is independent of where it is made
 PAPER_ROWS = configured(dilution={"factors": [2, 5, 10], "rows": ["B", "D", "H"]}, print={"paper_rows": ["A", "B", "C"]})
 MAPPED = configured(dilution={"enabled": False}, print={"source_map": [{"source": "A11", "positions": ["A1", "B1", "C1"]}]})
+NO_MIXING = configured(mixing={"enabled": False})
+SWITCHES_OFF = configured(liquid_handling={"air_gap_ul": 0.0, "blow_out": False,
+                                           "well_plate_shake": {**DEFAULT["liquid_handling"]["well_plate_shake"],
+                                                                "enabled": False}})
 
 # every conversation-editable setting, the screen that shows it changed, and how it reads there
 EDITABLE_ROWS = {
@@ -224,7 +228,7 @@ EDITABLE_ROWS = {
     "deck.tiprack.slot": (CHANGED, lambda s: value_of(s, "P20 tip rack") == "Slot 10"),
     "materials.sample.vial": (CHANGED, lambda s: value_of(s, "Crystal violet (dye)").startswith("vial B1 | uses ")),
     "materials.solvent.vial": (CHANGED, lambda s: value_of(s, "Buffer (water)").startswith("vial B2 | uses ")),
-    "materials.sample.label": (CHANGED, lambda s: value_of(s, "Transfers").endswith("| 6 crystal violet")),
+    "materials.sample.label": (CHANGED, lambda s: value_of(s, "Transfers").endswith("| 7 crystal violet")),
     "materials.solvent.label": (CHANGED, lambda s: " buffer |" in value_of(s, "Transfers")),
     "dilution.enabled": (PREPARED, lambda s: heading("DILUTIONS", "SKIPPED - already in the plate") in s),
     "dilution.factors": (CHANGED, lambda s: squash("Factor 2× 5× 10×") in squash(s)),
@@ -235,11 +239,17 @@ EDITABLE_ROWS = {
                       and squash("Well B11 D11 H11") in squash(s)),
     "dilution.total_volume_ul": (CHANGED, lambda s: value_of(s, "Final volume") == "120 µL in each well"),
     "dilution.prepared_volume_ul": (PREPARED, lambda s: value_of(s, "Volume in each well") == "140 µL"),
-    "mixing.reps": (CHANGED, lambda s: value_of(s, "Mixing") == "3 × 10 µL before each print step"),
-    "mixing.volume_ul": (CHANGED, lambda s: value_of(s, "Mixing") == "3 × 10 µL before each print step"),
+    "mixing.enabled": (NO_MIXING, lambda s: value_of(s, "Mixing").startswith("off")),
+    "mixing.reps": (CHANGED, lambda s: value_of(s, "Mixing") == "3 × 10 µL in each dilution well right after it is "
+                                                                 "made (printing does not mix)"),
+    "mixing.volume_ul": (CHANGED, lambda s: value_of(s, "Mixing").startswith("3 × 10 µL in each dilution well")),
+    "liquid_handling.air_gap_ul": (SWITCHES_OFF, lambda s: "air gap off" in value_of(s, "Liquid handling")),
+    "liquid_handling.blow_out": (SWITCHES_OFF, lambda s: "blow-out off" in value_of(s, "Liquid handling")),
+    "liquid_handling.well_plate_shake.enabled": (SWITCHES_OFF,
+                                                 lambda s: "shake after dispense off" in value_of(s, "Liquid handling")),
     "print.enabled": (NOT_PRINTING, lambda s: heading("PRINTING", "SKIPPED - this run does not print") in s),
     "print.droplet_volume_ul": (CHANGED, lambda s: value_of(s, "Drop volume") == "4 µL"),
-    "print.droplets_per_spot": (CHANGED, lambda s: value_of(s, "Drops per position") == "2  (stacked)"),
+    "print.droplets_per_spot": (CHANGED, lambda s: value_of(s, "Drops per position") == "2  (stacked on one spot)"),
     "print.replicates": (CHANGED, lambda s: value_of(s, "Replicates") == "2 side-by-side columns per drop volume"),
     "print.paper_start_column": (CHANGED, lambda s: value_of(s, "Paper columns") == "6 | 7"),
     "print.paper_rows": (PAPER_ROWS, lambda s: value_of(s, "Paper rows") == "A | B | C   (B11 → A, D11 → B, H11 → C)"
@@ -264,11 +274,12 @@ def test_every_conversation_setting_is_visible_in_the_plan(path):
 
 
 LAB_OWNED = configured(
-    print={"z_mm": 0.5, "aspirate_height_mm": 1.5, "air_gap_ul": 2.0, "air_gap_height_mm": 4.0, "push_out_ul": 2.5,
-           "blow_out": False, "post_dispense_delay_s": 1.5},
-    dilution={"max_transfer_ul": 15.0, "solvent_dispense_from_top_mm": -3.0, "sample_dispense_from_top_mm": -1.5,
-              "blow_out_after_dispense": False},
-    mixing={"height_mm": 2.5},
+    print={"z_mm": 0.5, "air_gap_ul": 2.0, "air_gap_height_mm": 4.0, "push_out_ul": 2.5, "blow_out": False,
+           "post_dispense_delay_s": 1.5},
+    dilution={"max_transfer_ul": 15.0},
+    liquid_handling={"plate_aspirate_height_mm": 0.5, "plate_dispense_height_mm": 0.4, "plate_mix_height_mm": 0.6,
+                     "well_plate_shake": {"enabled": True, "radius": 0.8, "v_offset_mm": -2.0, "speed_mm_s": 40.0,
+                                          "cycles": 2}},
 )
 LAB_OWNED["materials"]["dye"]["aspirate_height_mm"] = 5.0
 LAB_OWNED["flow_rates"] = {"aspirate": 4.0, "dispense": 5.0}
@@ -277,14 +288,22 @@ LAB_OWNED_ROWS = {
     "print.push_out_ul": ("Drop release", "2.5 µL push-out | blow-out off | 1.5 s dwell"),
     "print.blow_out": ("Drop release", "2.5 µL push-out | blow-out off | 1.5 s dwell"),
     "print.post_dispense_delay_s": ("Drop release", "2.5 µL push-out | blow-out off | 1.5 s dwell"),
-    "print.air_gap_ul": ("Air gap", "2 µL, taken 4 mm above the well top"),
-    "print.air_gap_height_mm": ("Air gap", "2 µL, taken 4 mm above the well top"),
-    "print.aspirate_height_mm": ("Print aspirate", "1.5 mm above the well bottom"),
-    "mixing.height_mm": ("Mixing height", "2.5 mm above the well bottom"),
-    "dilution.solvent_dispense_from_top_mm": ("Dilution dispense", "water 3 mm | dye 1.5 mm below the well top"),
-    "dilution.sample_dispense_from_top_mm": ("Dilution dispense", "water 3 mm | dye 1.5 mm below the well top"),
-    "dilution.max_transfer_ul": ("Dilution transfers", "at most 15 µL each | blow-out off"),
-    "dilution.blow_out_after_dispense": ("Dilution transfers", "at most 15 µL each | blow-out off"),
+    "print.air_gap_ul": ("Print air gap", "2 µL, taken 4 mm above the well top"),
+    "print.air_gap_height_mm": ("Print air gap", "2 µL, taken 4 mm above the well top"),
+    "liquid_handling.plate_aspirate_height_mm": ("Plate heights", "aspirate 0.5 | dispense 0.4 | mix 0.6 mm above the "
+                                                                  "well bottom"),
+    "liquid_handling.plate_dispense_height_mm": ("Plate heights", "aspirate 0.5 | dispense 0.4 | mix 0.6 mm above the "
+                                                                  "well bottom"),
+    "liquid_handling.plate_mix_height_mm": ("Plate heights", "aspirate 0.5 | dispense 0.4 | mix 0.6 mm above the "
+                                                             "well bottom"),
+    "dilution.max_transfer_ul": ("Dilution transfers", "at most 15 µL of liquid each (the air gap rides in the same "
+                                                       "tip)"),
+    "liquid_handling.well_plate_shake.radius": ("Well shake", "touch-tip radius 0.8, -2 mm from the top, 40 mm/s × 2"),
+    "liquid_handling.well_plate_shake.v_offset_mm": ("Well shake", "touch-tip radius 0.8, -2 mm from the top, 40 mm/s "
+                                                                   "× 2"),
+    "liquid_handling.well_plate_shake.speed_mm_s": ("Well shake", "touch-tip radius 0.8, -2 mm from the top, 40 mm/s "
+                                                                  "× 2"),
+    "liquid_handling.well_plate_shake.cycles": ("Well shake", "touch-tip radius 0.8, -2 mm from the top, 40 mm/s × 2"),
 }
 
 
@@ -325,14 +344,19 @@ def robot(config):
     log = context.log
     vials = {role: next(spec["vial"] for spec in config["materials"].values() if spec["role"] == role)
              for role in ("sample", "solvent")}
+    # a dilution mix aspirates in a plate well and dispenses straight back into it; a print draw goes to the paper
+    mixing = [index for index, entry in enumerate(log[:-1]) if entry[0] == "aspirate" and entry[2][0] == plate
+              and log[index + 1][0] == "dispense" and log[index + 1][2][0] == plate]
     return {
         "tips": [entry[1] for entry in log if entry[0] == "pick_up_tip"],
         "drops": [entry[2][1] for entry in log if entry[0] == "dispense" and entry[2][0] == paper],
-        "printed_ul": sum(entry[1] for entry in log if entry[0] == "aspirate" and entry[2][0] == plate),
+        "printed_ul": sum(entry[1] for index, entry in enumerate(log)
+                          if entry[0] == "aspirate" and entry[2][0] == plate and index not in mixing),
         "filled": sorted({entry[2][1] for entry in log if entry[0] == "dispense" and entry[2][0] == plate}),
         "vial_ul": {role: sum(entry[1] for entry in log if entry[0] == "aspirate" and entry[2][:2] == (rack, vial))
                     for role, vial in vials.items()},
-        "mixes": {(entry[1], entry[2]) for entry in log if entry[0] == "mix"},
+        "mixes": Counter((log[index][2][1], log[index][1]) for index in mixing),     # (well, µL) -> aspirate/dispense
+        "unmixed_calls": [entry for entry in log if entry[0] == "mix"],
         "slots": dict(context.loaded),
     }
 
@@ -359,9 +383,19 @@ def test_the_derived_values_are_what_the_protocol_does(layout):
         for role, label in (("sample", "Dye"), ("solvent", "Water")):
             used = value_of(screen, label).split(" | ")[1]
             assert abs(number(used.removeprefix("uses ")) - moved["vial_ul"][role]) < 0.011, label
+        mixing = value_of(screen, "Mixing")
+        if mixes_dilutions(config):
+            # each well that holds both liquids is mixed right after its dye: reps x volume, as the screen says
+            reps, volume = number(mixing), number(mixing.split("× ")[1])
+            mixed = [well.well for well in plan.wells if well.solvent_ul > 0.01]
+            assert moved["mixes"] == Counter({(well, volume): int(reps) for well in mixed})
+        else:
+            assert mixing.startswith("off") and not moved["mixes"]
     else:
         assert moved["filled"] == [] and moved["vial_ul"] == {"sample": 0, "solvent": 0}
         assert value_of(screen, "Dye") == "vial A2 | not used in this run"
+        assert not moved["mixes"]
+    assert moved["unmixed_calls"] == []                          # printing never mixes
 
     if not plan.do_print:
         assert heading("PRINTING", "SKIPPED - this run does not print") in screen and moved["drops"] == []
@@ -379,8 +413,6 @@ def test_the_derived_values_are_what_the_protocol_does(layout):
         assert per_position == {int(value_of(screen, "Drops per position").split()[0])}
         assert int(value_of(screen, "Total drops")) == len(drops) == plan.total_drops
         assert abs(number(value_of(screen, "Printed volume")) - moved["printed_ul"]) < 0.011
-        reps, volume = number(value_of(screen, "Mixing")), number(value_of(screen, "Mixing").split("× ")[1])
-        assert {(int(reps), volume)} == moved["mixes"]
 
     for role in LABWARE_ROLES:
         slot = config["deck"][role]["slot"]

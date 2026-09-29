@@ -1,5 +1,29 @@
 # Liquid-handling parameters — dye dilution + paper print demo (protocol v19)
 
+## Current settings (2026-09-28): `liquid_handling` in the demo configuration
+
+The physical settings now live in one section of
+`configs/workflows/defaults/ai_agent_dilution_print_demo.yaml` (restart the GUI after editing). The plan, the
+validator and the protocol read the same values; older plans are migrated on load (`model.normalize_loaded_config`).
+
+| Setting | Default | Who may change it |
+|---|---|---|
+| `plate_aspirate_height_mm` (print draws and mix aspirations) | 0.3 mm above the well bottom | config file |
+| `plate_dispense_height_mm` (every water and dye dispense) | 0.3 mm | config file |
+| `plate_mix_height_mm` (mix dispenses) | 0.3 mm | config file |
+| `air_gap_ul` (after each vial aspiration; counts toward the P20's 20 µL) | 1.0 µL (0 = off) | chat, GUI form, config |
+| `blow_out` (after every plate dispense and after mixing) | on | chat, GUI form, config |
+| `well_plate_shake.enabled` (droplet release after every plate dispense and mix) | on | chat, GUI form, config |
+| `well_plate_shake.radius / v_offset_mm / speed_mm_s / cycles` | 1.0 / −1.0 mm / 60 mm/s / 1 | config file |
+| `print.z_mm` (paper release height, independent of the plate) | 1.1 mm | config file |
+
+The dilution sequence is the one physically tested by `scripts/test_single_dilution_c12.py`: aspirate at the vial, air
+gap, dispense liquid + gap at the plate height, blow out there, then `touch_tip` on that plate well (the "shake": the
+script's only post-dispense motion, Opentrons' default geometry). Each dilution is mixed once its dye is in (reps ×
+aspirate at the aspirate height / dispense at the mix height, then blow-out and shake), with the tip that just
+dispensed; a 1× well holds one liquid and is not mixed. **Printing never mixes.** A print-map position may take its own
+drop count (all drops land on that one position). The tables below record the 2026-09-10 state for history.
+
 Status as of 2026-09-10. The **Source** column says where each value was established. All
 of these values are lab-owned: the conversation cannot change any of them (the agent
 refuses), and `settings` in the demo prints the live comparison with the machine profile.

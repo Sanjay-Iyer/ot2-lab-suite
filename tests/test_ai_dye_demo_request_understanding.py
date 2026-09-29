@@ -734,14 +734,14 @@ def test_five_field_request_in_one_message(tmp_path):
 
 
 def test_five_changes_that_cannot_run_together_keep_all_and_ask_which_gives(tmp_path):
-    # 100 uL wells, 3 drops, two paper columns: a well would run dry before mixing. Any one of three changes causes it
+    # 30 uL wells, 3 drops, two paper columns: a well would run dry while printing. Any one of three changes causes it
     # (the validator decides which, by trying without each); all five are kept and one question asks which to change.
-    c = talk(tmp_path, says(FIVE.format(volume=100), proposes(*five_changes(100))),
+    c = talk(tmp_path, says(FIVE.format(volume=30), proposes(*five_changes(30))),
              says("Make it 200 uL each then.", proposes(change("dilution.total_volume_ul", "200 uL", "200 uL each"))),
              "yes")
-    assert not c.proposal_paths(1) and "the tip would draw air" in c.out(1)          # the validator's own reason
+    assert not c.proposal_paths(1) and "to keep the tip" in c.out(1) and "submerged" in c.out(1)   # the validator's
     assert "Which should change so that it fits - the final volume per dilution" in c.out(1)
-    assert "I kept the rest of your request" in c.out(1) and "Final volume per dilution: 100 µL" in c.out(1)
+    assert "I kept the rest of your request" in c.out(1) and "Final volume per dilution: 30 µL" in c.out(1)
     assert_five(c.config, 200.0)
 
 
@@ -788,9 +788,9 @@ def test_a_stated_source_is_not_challenged_again(tmp_path):
 
 
 def test_a_single_source_still_cannot_run_dry(tmp_path):
-    # 8 positions x 2 drops from one assumed-volume well would leave too little to mix: physics stays strict
+    # 8 positions x 4 drops of 5 uL from one assumed 150 uL well would run it dry: physics stays strict
     c = talk(tmp_path, says("Print everything from A11.",
                             proposes(change("dilution.enabled", False, "Print everything from A11"),
                                      change("print_map", [{"source": "A11", "positions": "all"}], "everything from A11"))),
-             "yes", says("Use 2 drops per spot.", proposes(change("print.droplets_per_spot", 2, "2 drops per spot"))))
+             "yes", says("Use 4 drops per spot.", proposes(change("print.droplets_per_spot", 4, "4 drops per spot"))))
     assert not c.proposal_paths(3) and "A11" in c.out(3) and c.config["print"]["droplets_per_spot"] == 1
