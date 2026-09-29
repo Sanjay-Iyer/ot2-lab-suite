@@ -577,9 +577,10 @@ def expand_drops_at(value: Any, config: dict[str, Any]) -> tuple[list[dict[str, 
         raise SelectionError("this plan does not print, so no paper position takes drops", "Should this run print?")
     outside = [position for position in counts if position not in plan.print_positions]
     if outside:
-        raise SelectionError(f"this plan does not print on {', '.join(outside)} (it prints "
-                             f"{', '.join(plan.print_positions[:12])}{', ...' if len(plan.print_positions) > 12 else ''})",
-                             "Which of the printed paper positions should get the extra drops?")
+        invalid = [p for p in outside if not (len(p) >= 2 and p[0].upper() in ROWS and p[1:].isdigit() and 1 <= int(p[1:]) <= 12)]
+        if invalid:
+            raise SelectionError(f"paper position{'s' if len(invalid) > 1 else ''} {', '.join(invalid)} do not exist",
+                                 "Which valid paper positions (A1-H12) should get drops?")
     entries = deepcopy(print_map(config) or [])
     if not entries:
         # the series layout as an equivalent map: one entry per plate well and drop volume, in print order
@@ -595,6 +596,11 @@ def expand_drops_at(value: Any, config: dict[str, Any]) -> tuple[list[dict[str, 
         if len(droplet_volumes(config)) <= 1:
             for entry in entries:
                 entry.pop("volume_ul", None)        # one drop volume: the map's entries need not repeat it
+    if outside and entries:
+        # Add outside positions to the first entry's positions
+        for pos in outside:
+            if pos not in entries[0]["positions"]:
+                entries[0]["positions"].append(pos)
     for entry in entries:
         own = dict(entry.get("drops") or {})
         own.update({position: count for position, count in counts.items() if position in entry["positions"]})

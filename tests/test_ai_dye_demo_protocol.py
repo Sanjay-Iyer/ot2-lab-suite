@@ -189,3 +189,64 @@ def test_dry_run_checks_everything_and_moves_nothing(protocol_module, config):
     context = run_protocol(protocol_module, config, dry_run=True)
     assert context.log == []
     assert any(text.startswith("Pre-flight validation passed") for text in context.comments)
+
+
+def test_preflight_refuses_paper_overflow_without_skipping_prints(protocol_module, config):
+    config["print"].update(replicates=13, paper_start_column=1)
+    context = FakeProtocol()
+    protocol_module.CONFIG = deepcopy(config)
+    protocol_module.DEFAULT_DRY_RUN = False
+    with pytest.raises(RuntimeError, match="past the paper width"):
+        protocol_module.run(context)
+    assert not [entry for entry in context.log if entry[0] == "dispense"]
+
+
+def test_preflight_refuses_liquid_depth_hazards(protocol_module, config):
+    config["dilution"].update(enabled=False, prepared_volume_ul=5)
+    context = FakeProtocol()
+    protocol_module.CONFIG = deepcopy(config)
+    protocol_module.DEFAULT_DRY_RUN = False
+    with pytest.raises(RuntimeError, match="would draw air"):
+        protocol_module.run(context)
+    assert not [entry for entry in context.log if entry[0] == "dispense"]
+
+
+@pytest.mark.parametrize("field,value,reason", [
+    ("replicates", 97, "print.replicates must be 1-96"),
+    ("droplets_per_spot", 21, "print.droplets_per_spot must be 1-20"),
+])
+def test_preflight_uses_the_same_print_count_bounds(protocol_module, config, field, value, reason):
+    config["print"][field] = value
+    context = FakeProtocol()
+    protocol_module.CONFIG = deepcopy(config)
+    protocol_module.DEFAULT_DRY_RUN = False
+    with pytest.raises(RuntimeError, match=reason):
+        protocol_module.run(context)
+    assert not [entry for entry in context.log if entry[0] == "dispense"]
+
+
+def test_preflight_refuses_invalid_current_well_volume(protocol_module, config):
+    config["dilution"]["enabled"] = False
+    config["dilution"]["prepared_volume_ul"] = 400
+    context = FakeProtocol()
+    protocol_module.CONFIG = deepcopy(config)
+    protocol_module.DEFAULT_DRY_RUN = False
+    with pytest.raises(RuntimeError, match="prepared volume 400.00 uL must be in"):
+        protocol_module.run(context)
+    assert not [entry for entry in context.log if entry[0] == "dispense"]
+
+
+def test_inactive_step_settings_do_not_block_the_active_step(protocol_module, config):
+    from src.agents.dye_demo.validation import validate
+
+    dilute_only = deepcopy(config)
+    dilute_only["print"].update(enabled=False, replicates=0, droplets_per_spot=0, air_gap_ul=-1)
+    assert validate(dilute_only).ok
+    assert [entry for entry in run_protocol(protocol_module, dilute_only).log if entry[0] == "dispense"]
+
+    print_only = deepcopy(config)
+    print_only["dilution"]["enabled"] = False
+    print_only["materials"]["dye"]["vial"] = "Z9"
+    print_only["liquid_handling"]["air_gap_ul"] = 99
+    assert validate(print_only).ok
+    assert [entry for entry in run_protocol(protocol_module, print_only).log if entry[0] == "dispense"]

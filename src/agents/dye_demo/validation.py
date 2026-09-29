@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
+from src.agents.dye_demo.limits import MAX_DROPS_PER_POSITION, MAX_REPLICATES, max_vial_air_gap
+
 from src.agents.dye_demo.model import (
     DECK_SLOTS,
     LABWARE_NAMES,
@@ -125,12 +127,19 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     p20_min = float(safety.get("p20_min_volume_ul", 1.0))
     max_fill = float(safety.get("max_well_fill_ul", 340.0))
 
+    try:
+        do_dilution, do_print = steps_enabled(config)
+    except (TypeError, ValueError):
+        do_dilution, do_print = True, True
     _check_deck(config, report)
-    _check_materials(config, report)
+    if do_dilution:
+        _check_materials(config, report)
     _check_dilution(config, report, p20_min, max_fill)
-    _check_mixing(config, report, p20_max)
+    if do_dilution:
+        _check_mixing(config, report, p20_max)
     _check_liquid_handling(config, report, p20_min, p20_max)
-    _check_print(config, report, p20_min, p20_max)
+    if do_print:
+        _check_print(config, report, p20_min, p20_max)
     _check_tip_fields(config, report)
     if report.errors:
         return report       # the plan-level checks below need a well-formed config
@@ -296,7 +305,11 @@ def _check_volumes(config: dict[str, Any], report: Report, max_fill: float, *, f
                      f"total_volume_ul must be in (0, {fmt_num(max_fill)}] µL, got {dilution.get('total_volume_ul')!r}")
         return
     prepared = dilution.get("prepared_volume_ul")
-    if prepared not in (None, ""):
+    try:
+        making = steps_enabled(config)[0]
+    except (TypeError, ValueError):
+        making = True
+    if prepared not in (None, "") and not making:
         try:
             prepared_ul = float(prepared)
         except (TypeError, ValueError):
@@ -340,11 +353,20 @@ def _check_liquid_handling(config: dict[str, Any], report: Report, p20_min: floa
     """liquid_handling: the plate heights, the air gap and the well shake the protocol uses - the same values, the same
     limits as its pre-flight (a height the protocol would refuse is refused here first)."""
     lh = liquid_handling(config)
+    try:
+        dilution_active, print_active = steps_enabled(config)
+    except (TypeError, ValueError):
+        dilution_active, print_active = True, True
     geometry = well_geometry(str((config["deck"].get("plate") or {}).get("load_name", "")))
     depth = geometry[1] if geometry else None
-    for key, label in (("plate_aspirate_height_mm", "plate aspirate height"),
-                       ("plate_dispense_height_mm", "plate dispense height"),
-                       ("plate_mix_height_mm", "plate mixing height")):
+    heights = []
+    if print_active or (dilution_active and config["mixing"].get("enabled", True)):
+        heights.append(("plate_aspirate_height_mm", "plate aspirate height"))
+    if dilution_active:
+        heights.append(("plate_dispense_height_mm", "plate dispense height"))
+    if dilution_active and config["mixing"].get("enabled", True):
+        heights.append(("plate_mix_height_mm", "plate mixing height"))
+    for key, label in heights:
         try:
             height = float(lh[key])
         except (KeyError, TypeError, ValueError):
@@ -357,10 +379,10 @@ def _check_liquid_handling(config: dict[str, Any], report: Report, p20_min: floa
         air_gap = float(lh.get("air_gap_ul", 0) or 0)
     except (TypeError, ValueError):
         air_gap = -1.0
-    if not 0 <= air_gap <= p20_max - p20_min:
-        report.error("liquid_handling.air_gap", f"the air gap must be 0 (off) to {fmt_num(p20_max - p20_min)} µL")
+    if dilution_active and not 0 <= air_gap <= max_vial_air_gap(config):
+        report.error("liquid_handling.air_gap", f"the air gap must be 0 (off) to {fmt_num(max_vial_air_gap(config))} µL")
     shake = lh.get("well_plate_shake") or {}
-    if shake.get("enabled"):
+    if shake.get("enabled") and dilution_active:
         try:
             radius, offset = float(shake["radius"]), float(shake["v_offset_mm"])
             speed, cycles = float(shake["speed_mm_s"]), int(shake["cycles"])
@@ -380,6 +402,7 @@ def _check_dilution_mix(config: dict[str, Any], plan, report: Report) -> None:
         return
     area = well_area_mm2(config, "plate")
     if not area:
+        report.error("mixing.geometry_unknown", "the plate's well geometry is unknown, so mixing depth cannot be checked")
         return
     lh = liquid_handling(config)
     lowest = max(float(lh["plate_aspirate_height_mm"]), float(lh["plate_mix_height_mm"]))
@@ -405,15 +428,19 @@ def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max
             report.error("print.volume_over_max",
                          f"a {fmt_ul(volume)} drop plus the {fmt_ul(air_gap)} air gap is "
                          f"{fmt_ul(volume + air_gap)}, over the P20's {fmt_num(p20_max)} µL")
-    for key, label, most in (("replicates", "replicates", 96), ("droplets_per_spot", "drops per position", 20)):
+    mapped = printing.get("source_map") not in (None, "", [])
+    counts = [("droplets_per_spot", "drops per position", MAX_DROPS_PER_POSITION)]
+    if not mapped:
+        counts.append(("replicates", "replicates", MAX_REPLICATES))
+    for key, label, most in counts:
         try:
             if not 1 <= int(printing.get(key, 1)) <= most:
                 report.error(f"print.{key}", f"{label} must be 1-{most}")
         except (TypeError, ValueError):
             report.error(f"print.{key}", f"{label} must be a whole number")
     try:
-        start = int(printing.get("paper_start_column", 1))
         width = int(printing.get("paper_columns", 12))
+        start = int(printing.get("paper_start_column", 1)) if not mapped else 1
     except (TypeError, ValueError):
         report.error("print.paper_column", "the first paper column must be a whole number")
         return
@@ -422,10 +449,7 @@ def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max
         prints = steps_enabled(config)[1]
     except (TypeError, ValueError):
         prints = True
-    if printing.get("source_map") not in (None, "", []):
-        if paper_rows is not None and prints:
-            report.error("print.paper_rows_with_map", "paper rows cannot be combined with a print map: the print map "
-                                                      "already names every paper position")
+    if mapped:
         _check_print_map(printing["source_map"], volumes, width, air_gap, p20_min, p20_max, report)
         return              # the map names every position; the column layout settings are not used
     if paper_rows is not None and prints:
@@ -508,7 +532,7 @@ def _check_print_liquid(config: dict[str, Any], plan, report: Report) -> None:
         return
     area = well_area_mm2(config, "plate")
     if not area:
-        report.warn("print.geometry_unknown", "the plate's well geometry is unknown, so liquid depth was not checked")
+        report.error("print.geometry_unknown", "the plate's well geometry is unknown, so liquid depth cannot be checked")
         return
     aspirate_mm = float(liquid_handling(config)["plate_aspirate_height_mm"])
     if plan.mapped:

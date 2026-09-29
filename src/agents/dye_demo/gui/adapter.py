@@ -6,13 +6,17 @@ import threading
 import time
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Collection
 
 from src.agents.dye_demo import render
 from src.agents.dye_demo.language import TRIGGER
-from src.agents.dye_demo.session import DemoSession
+from src.agents.dye_demo.session import DEMO_RESET_BANNER, DemoSession
 
 LOOP_PROMPTS = {"you>", "confirm>", "clarify>"}      # the session's own prompts; any other prompt is a question to show
+# Reset Demo is taken only at the session's main prompt: idle, or a proposal or question of its own waiting. Never while
+# it works or runs, and never inside a run's yes/no safety question.
+RESET_STATES = frozenset({"idle", "proposal", "clarify"})
+RESET_BUTTON = "Reset Demo"
 STOP_WAIT_S = 180.0                                   # how long a server shutdown waits for a stopped robot run
 LOADING_MESSAGE = "Loading AI Agent NanoDrop..."
 # The page shows the same run statuses whichever execution backend (simulator or real OT-2) runs the plan.
@@ -29,8 +33,8 @@ def print_diagnostic(text: str) -> None:
 
 @dataclass(frozen=True)
 class ChatMessage:
-    role: str             # user, assistant, or status (a quiet progress line such as the loading message)
-    text: str
+    role: str             # user, assistant, status (a quiet progress line such as the loading message) or marker
+    text: str             # (Reset Demo: where the new experiment starts in the transcript)
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,24 @@ class GuiSnapshot:
     # physical reasons the session would refuse this run (DemoSession.physical_run_blockers: wells already full, ...)
     blockers: tuple[str, ...] = ()
     validation_errors: tuple[str, ...] = ()
+    optional_clarification: bool = False
+    resets: int = 0       # how often Reset Demo started the experiment over: the page redraws everything when it changes
+
+    @property
+    def reset_block_reason(self) -> str:
+        """Why Reset Demo is unavailable ("" when it can be pressed). Never during a run: a reset is no way to stop
+        the robot."""
+        if self.status == "SESSION ENDED":
+            return "The session has ended."
+        if self.running:
+            return "Cannot reset while a robot run is active."
+        if self.waiting == "busy":
+            return "The agent is still working on the last message."
+        if self.waiting == "operator":
+            return "Enter the operator name first."
+        if self.waiting not in RESET_STATES:
+            return "Answer the yes/no question first (No cancels the run)."
+        return ""
 
     @property
     def run_block_reasons(self) -> tuple[str, ...]:
@@ -72,7 +94,7 @@ class GuiSnapshot:
         if self.proposed is not None or self.waiting == "proposal":
             number = f" #{self.proposal_id}" if self.proposal_id is not None else ""
             reasons.append(f"Proposal{number} is waiting: apply or discard it first.")
-        if self.waiting == "clarify":
+        if self.waiting == "clarify" and not self.optional_clarification:
             reasons.append("A question is waiting: answer or cancel it first.")
         if self.waiting == "question":
             question = " ".join(self.question.split())
@@ -146,8 +168,12 @@ class DemoGuiAdapter:
         prompt = prompt.strip()
         if prompt not in LOOP_PROMPTS:
             self._add("assistant", prompt)       # a question asked through the prompt itself: who is running this
+        # the session's main prompt, not a yes/no question asked in the middle of a turn ("confirm>" with no proposal)
+        main = prompt in LOOP_PROMPTS and (prompt != "confirm>" or self.session.pending is not None)
         while True:
             with self._lock:
+                if main:      # an action handled below (Reset Demo) can clear the proposal or question it was for
+                    prompt = self.session.main_prompt().strip()
                 self._waiting = prompt
                 self._question = self._last_said if prompt == "confirm>" and self.session.pending is None else ""
             item = self._inputs.get()
@@ -160,6 +186,12 @@ class DemoGuiAdapter:
 
     def _write(self, text: str = "") -> None:
         text = str(text)
+        if text.strip() == DEMO_RESET_BANNER:            # drawn as a divider: "DEMO RESET · New experiment ..."
+            marker = " · ".join(line for line in DEMO_RESET_BANNER.splitlines() if line.strip("-"))
+            with self._lock:
+                self._last_said = ""
+                self._messages.append(ChatMessage("marker", marker))
+            return
         display = text.strip("\n").strip()
         if display.startswith("agent> "):
             display = display[7:].lstrip()
@@ -208,10 +240,10 @@ class DemoGuiAdapter:
             return "clarify"
         return "question" if waiting == "confirm>" else "idle"
 
-    def _offer(self, item: str | Callable[[], None], *, shown: str, idle: bool = False) -> bool:
-        """Hand one input to the session if it is waiting for one (at its main prompt, when idle=True)."""
+    def _offer(self, item: str | Callable[[], None], *, shown: str, states: Collection[str] | None = None) -> bool:
+        """Hand one input to the session if it is waiting for one (in one of `states`, when given)."""
         with self._lock:
-            if self._waiting is None or (idle and self._state(self._waiting) != "idle"):
+            if self._waiting is None or (states is not None and self._state(self._waiting) not in states):
                 return False
             self._waiting = None
             self._messages.append(ChatMessage("user", shown))
@@ -246,7 +278,13 @@ class DemoGuiAdapter:
 
     def run(self) -> bool:
         """The run button: the session's own run command, only while the session is idle at its main prompt."""
-        return self._offer(self.session.run_from_button, shown=self.run_label, idle=True)
+        if self.session.settings.llm_first and self.waiting == "clarify" \
+                and not self.session.clarification_blocks_run():
+            def run_current_plan() -> None:
+                self.session.clarifying = None
+                self.session.run_from_button()
+            return self._offer(run_current_plan, shown=self.run_label)
+        return self._offer(self.session.run_from_button, shown=self.run_label, states=("idle",))
 
     def propose_form(self, values: dict[str, Any]) -> bool:
         if self.waiting != "idle":
@@ -263,7 +301,24 @@ class DemoGuiAdapter:
             self._add("assistant", "GUI controls already match the Current Plan.")
             return False
         request = "GUI controls: " + "; ".join(phrases) + "."
-        return self._offer(lambda: self.session.propose_form(changes, request=request), shown=request, idle=True)
+        return self._offer(lambda: self.session.propose_form(changes, request=request), shown=request,
+                           states=("idle",))
+
+    def reset_demo(self, *, physical_reset_confirmed: bool = False) -> bool:
+        """Reset Demo, after the page's confirmation: DemoSession.reset_to_defaults on the session thread, taken only at
+        the session's main prompt (RESET_STATES). The session owns what a reset means and refuses it itself while a run
+        is active or, live, without the physical confirmation; here only a stale run request of the old experiment is
+        dropped. False when the session could not take it now."""
+        def reset() -> None:
+            if self.session.reset_to_defaults(physical_reset_confirmed=physical_reset_confirmed):
+                with self._lock:
+                    self._run_confirmation_requested = False
+
+        return not self.running and self._offer(reset, shown=RESET_BUTTON, states=RESET_STATES)
+
+    def physical_record(self) -> list[str]:
+        """What the session's physical record holds now (the live Reset Demo dialog lists it)."""
+        return self.session.physical_record_lines()
 
     def request_stop(self) -> bool:
         """The Stop button: the robot runner stops the OT-2 run exactly as it does on Ctrl-C in the terminal."""
@@ -337,6 +392,8 @@ class DemoGuiAdapter:
             validation_ok=report.ok,
             blockers=blockers,
             validation_errors=tuple(report.error_messages()),
+            optional_clarification=session.settings.llm_first and not session.clarification_blocks_run(),
+            resets=session.resets,
         )
 
     def _status(self, waiting: str, running: bool, ended: bool) -> str:

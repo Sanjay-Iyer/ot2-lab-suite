@@ -252,7 +252,9 @@ def _source_map():
     for item in raw:
         # positions as a list, as {"A1": 1, "A2": 3} (position: drops) or as [{"position": "A2", "drops": 3}];
         # an entry-level "drops" (one number, or {position: drops}) wins. Mirrors model.normalize_source_map.
-        listed = item["positions"]
+        listed = item.get("positions", item.get("destination"))
+        if isinstance(listed, str):
+            listed = [listed]
         listed = ([{"position": position, "drops": count} for position, count in listed.items()]
                   if isinstance(listed, dict) else list(listed))
         positions, drops = [], {}
@@ -337,8 +339,8 @@ def _material_by_role(role):
 def _plan_paper_layout(paper_columns_available):
     """One paper column per (droplet volume x replicate), left to right.
 
-    Columns start at print.paper_start_column and run consecutively. Spots past the
-    paper's width are reported and skipped rather than aborting the run.
+    Columns start at print.paper_start_column and run consecutively. Every requested
+    print must fit; pre-flight refuses overflow rather than silently skipping it.
     """
     pr = CONFIG["print"]
     budget = min(int(pr.get("paper_columns", paper_columns_available)),
@@ -479,23 +481,30 @@ def _release_tip(pipette, return_tips):
 PLATE_HEIGHTS = ("plate_aspirate_height_mm", "plate_dispense_height_mm", "plate_mix_height_mm")
 
 
-def _liquid_handling_errors(labware, p20_min, p20_max):
+def _liquid_handling_errors(labware, p20_min, p20_max, do_dilution, do_print):
     """Every liquid_handling value present and physically possible in this plate (the validator applies the same
     limits to the same values)."""
     lh = CONFIG.get("liquid_handling")
-    required = PLATE_HEIGHTS + ("air_gap_ul", "blow_out", "well_plate_shake")
+    required = []
+    if do_print or (do_dilution and _mixes_dilutions()):
+        required.append("plate_aspirate_height_mm")
+    if do_dilution:
+        required.extend(("plate_dispense_height_mm", "air_gap_ul", "blow_out", "well_plate_shake"))
+    if do_dilution and _mixes_dilutions():
+        required.append("plate_mix_height_mm")
     if not isinstance(lh, dict) or any(key not in lh for key in required):
         return ["liquid_handling must set " + ", ".join(required)]
     errors = []
     depth = getattr(labware["plate"].wells()[0], "depth", None) if "plate" in labware else None
-    for key in PLATE_HEIGHTS:
+    for key in (key for key in PLATE_HEIGHTS if key in required):
         height = float(lh[key])
         if height <= 0 or (depth and height >= float(depth)):
             errors.append(f"liquid_handling.{key} must be above 0 and below the plate well depth, got {height:g}")
-    air_gap = float(lh["air_gap_ul"] or 0.0)
-    if not 0 <= air_gap <= p20_max - p20_min:
-        errors.append(f"liquid_handling.air_gap_ul must be 0-{p20_max - p20_min:g} uL, got {air_gap:g}")
-    shake = lh["well_plate_shake"]
+    if do_dilution:
+        air_gap = float(lh["air_gap_ul"] or 0.0)
+        if not 0 <= air_gap <= p20_max - p20_min:
+            errors.append(f"liquid_handling.air_gap_ul must be 0-{p20_max - p20_min:g} uL, got {air_gap:g}")
+    shake = lh.get("well_plate_shake") if do_dilution else {"enabled": False}
     if not isinstance(shake, dict) or "enabled" not in shake:
         errors.append("liquid_handling.well_plate_shake must set enabled")
     elif shake["enabled"]:
@@ -530,10 +539,11 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
     if p20.name != CONFIG["pipette"]["name"]:
         errors.append(f"pipette must be {CONFIG['pipette']['name']}, got {p20.name}")
 
-    for role in ("solvent", "sample"):
-        matches = [n for n, s in CONFIG["materials"].items() if s.get("role") == role]
-        if len(matches) != 1:
-            errors.append(f"exactly one material must have role {role!r}, got {matches}")
+    if do_dilution:
+        for role in ("solvent", "sample"):
+            matches = [n for n, s in CONFIG["materials"].items() if s.get("role") == role]
+            if len(matches) != 1:
+                errors.append(f"exactly one material must have role {role!r}, got {matches}")
 
     if "tuberack" in labware:
         tuberack = labware["tuberack"]
@@ -547,17 +557,18 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
                 f"tuberack has {len(tuberack.wells())} wells; expected "
                 f"{safety['expected_well_count']}"
             )
-        for name, spec in CONFIG["materials"].items():
-            if spec["vial"] not in tuberack.wells_by_name():
-                errors.append(f"{name} vial {spec['vial']} is absent from the rack")
+        if do_dilution:
+            for name, spec in CONFIG["materials"].items():
+                if spec["vial"] not in tuberack.wells_by_name():
+                    errors.append(f"{name} vial {spec['vial']} is absent from the rack")
 
-    factors = _factors()
     try:
         source_map = _source_map() if do_print else None
     except (KeyError, TypeError, ValueError) as exc:
         errors.append(f"print.source_map is malformed: {exc!r}")
         source_map = None
     series_used = do_dilution or (do_print and source_map is None)
+    factors = _factors() if series_used else []
     rows = []
     if series_used:
         if not 1 <= len(factors) <= len(ROWS):
@@ -582,12 +593,18 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
             rows = _series_rows(factors)
 
     total = float(dilution["total_volume_ul"])
-    if total > float(safety["max_well_fill_ul"]):
-        errors.append(f"total volume {total:.2f} uL exceeds safe well fill {safety['max_well_fill_ul']:.2f} uL")
-    max_transfer = float(dilution["max_transfer_ul"])
-    if not 0 < max_transfer <= p20_max:
-        errors.append(f"dilution.max_transfer_ul must be in (0, {p20_max:g}]")
+    if not 0 < total <= float(safety["max_well_fill_ul"]):
+        errors.append(f"total volume {total:.2f} uL must be in (0, {safety['max_well_fill_ul']:.2f}] uL")
+    prepared = dilution.get("prepared_volume_ul")
+    if do_print and not do_dilution and prepared not in (None, ""):
+        prepared = float(prepared)
+        if not 0 < prepared <= float(safety["max_well_fill_ul"]):
+            errors.append(f"prepared volume {prepared:.2f} uL must be in "
+                          f"(0, {safety['max_well_fill_ul']:.2f}] uL")
     if do_dilution:
+        max_transfer = float(dilution["max_transfer_ul"])
+        if not 0 < max_transfer <= p20_max:
+            errors.append(f"dilution.max_transfer_ul must be in (0, {p20_max:g}]")
         for factor in factors:
             if factor < 1:
                 continue
@@ -600,7 +617,7 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
     if str(CONFIG["tips"].get("policy", "per_liquid")) not in TIP_POLICIES:
         errors.append(f"tips.policy must be one of {TIP_POLICIES}")
 
-    errors += _liquid_handling_errors(labware, p20_min, p20_max)
+    errors += _liquid_handling_errors(labware, p20_min, p20_max, do_dilution, do_print)
     if do_dilution and _mixes_dilutions() and not 0 < float(mixing.get("volume_ul", 0) or 0) <= p20_max:
         errors.append(f"mixing.volume_ul must be in (0, {p20_max:g}]")
 
@@ -614,10 +631,10 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
                 errors.append(f"droplet volume {volume:g} uL is below the P20's {p20_min:g} uL minimum")
             if volume + air_gap > p20_max:
                 errors.append(f"droplet {volume:g} uL + air gap {air_gap:g} uL exceeds the P20's {p20_max:g} uL")
-        if int(pr.get("replicates", 1)) < 1:
-            errors.append("print.replicates must be >= 1")
-        if int(pr.get("droplets_per_spot", 1)) < 1:
-            errors.append("print.droplets_per_spot must be >= 1")
+        if not 1 <= int(pr.get("replicates", 1)) <= 96:
+            errors.append("print.replicates must be 1-96")
+        if not 1 <= int(pr.get("droplets_per_spot", 1)) <= 20:
+            errors.append("print.droplets_per_spot must be 1-20")
         if int(pr.get("paper_start_column", 1)) < 1:
             errors.append("print.paper_start_column must be >= 1")
         explicit_paper_rows = _explicit_paper_rows()
@@ -633,9 +650,6 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
                     errors.append(f"print.paper_rows gives {len(explicit_paper_rows)} paper row(s) for "
                                   f"{len(rows)} dilution row(s): one paper row per dilution")
         else:
-            if explicit_paper_rows is not None:
-                errors.append("print.paper_rows cannot be combined with print.source_map: the map names every "
-                              "paper position")
             seen = {}
             for entry in source_map:
                 if "volume_ul" in entry:
@@ -695,42 +709,41 @@ def _preflight(protocol, labware, p20, do_dilution, do_print):
             if position not in paper_names:
                 errors.append(f"paper position {position} does not exist")
 
+    if skipped:
+        errors.append(f"the print plan has {len(skipped)} position(s) past the paper width; "
+                      "choose valid explicit destinations")
+    errors.extend(_liquid_errors(labware, do_dilution, do_print, operations, rows))
     if errors:
         protocol.comment("PRE-FLIGHT VALIDATION FAILED")
         raise RuntimeError("PRE-FLIGHT VALIDATION FAILED:\n- " + "\n- ".join(errors))
     protocol.comment("Pre-flight validation passed: config + labware geometry OK.")
-
-    # Soft warnings (do not abort): paper overflow, per-well liquid budget, depth.
-    if skipped:
-        protocol.comment(
-            f"WARNING: the print plan needs {len(placed) + len(skipped)} paper columns "
-            f"but only {len(placed)} fit; {len(skipped)} will be skipped."
-        )
-    _liquid_warnings(protocol, labware, placed, do_dilution, do_print, operations, rows)
     return rows, factors, placed, skipped, operations, tip_names, source_map
 
 
-def _liquid_warnings(protocol, labware, placed, do_dilution, do_print, operations=(), rows=()):
-    """Comment when the tip would draw air: mixing a fresh dilution, or aspirating a drop from a well running low.
-    Heights are liquid_handling's (the validator uses the same values)."""
+def _liquid_errors(labware, do_dilution, do_print, operations=(), rows=()):
+    """Refuse plans that would aspirate above liquid at the configured tip height."""
+    errors = []
     if "plate" not in labware:
-        return
+        return errors
     diameter = getattr(labware["plate"].wells()[0], "diameter", None)
     if not diameter:
-        return
+        return ["plate well diameter is unavailable; liquid depth cannot be checked"] if do_print or any(
+            op["kind"] == "mix" for op in operations) else errors
     area = math.pi * (float(diameter) / 2.0) ** 2
+    mixes = [op for op in operations if op["kind"] == "mix"]
+    prints = [op for op in operations if op["kind"] == "print"]
+    if not mixes and not prints:
+        return errors
     lh = _liquid_handling()
     aspirate_mm = float(lh["plate_aspirate_height_mm"])
     total = float(CONFIG["dilution"]["total_volume_ul"])
-    mixes = [op for op in operations if op["kind"] == "mix"]
     if mixes:
         need = mixes[0]["volume_ul"] + max(aspirate_mm, float(lh["plate_mix_height_mm"])) * area
         if total < need:
-            protocol.comment(f"WARNING: mixing {mixes[0]['volume_ul']:g} uL may draw air: each {total:g} uL "
-                             f"dilution needs at least {need:.0f} uL.")
-    prints = [op for op in operations if op["kind"] == "print"]
+            errors.append(f"mixing {mixes[0]['volume_ul']:g} uL would draw air: each {total:g} uL "
+                          f"dilution needs at least {need:.0f} uL")
     if not do_print or not prints:
-        return
+        return errors
     prepared = CONFIG["dilution"].get("prepared_volume_ul")
     made = {f"{row}{CONFIG['dilution']['plate_column']}" for row in rows} if do_dilution else set()
     left = {}
@@ -740,10 +753,11 @@ def _liquid_warnings(protocol, labware, placed, do_dilution, do_print, operation
             left[source] = total if source in made or prepared in (None, "") else float(prepared)
         for _ in range(int(op["droplets"])):
             if left[source] < float(op["volume_ul"]) + aspirate_mm * area:
-                protocol.comment(f"WARNING: aspirating at {aspirate_mm:g} mm may draw air in {source} at paper "
-                                 f"{op['paper_well']} (~{left[source]:.0f} uL left).")
-                return
+                errors.append(f"aspirating at {aspirate_mm:g} mm would draw air in {source} at paper "
+                              f"{op['paper_well']} (~{left[source]:.0f} uL left)")
+                return errors
             left[source] -= float(op["volume_ul"])
+    return errors
 
 
 def _set_flow_rates(p20):

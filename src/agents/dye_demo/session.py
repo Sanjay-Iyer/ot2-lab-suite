@@ -91,6 +91,7 @@ from src.agents.dye_demo.llm import (
     ROUTE_APPROVE,
     ROUTE_CHANGE,
     ROUTE_CLARIFY,
+    ROUTE_DISCARD,
     ROUTE_HISTORY,
     ROUTE_REQUEST_RUN,
     Interpretation,
@@ -109,8 +110,11 @@ from src.agents.dye_demo.model import (
     canonicalize_path,
     field_label,
     get_path,
+    load_config,
     load_machine_profile,
     material_label,
+    normalize_volume,
+    plate_well,
     resolve_path,
     set_path,
 )
@@ -161,9 +165,12 @@ _TOPIC_CHANGE_KINDS = {"run", "run_like", "start_over", "undo", "physical_report
 _REPLACES = re.compile(r"\b(?:sorry|i\s+meant|i\s+mean|actually|instead|rather|scratch\s+that|forget\s+(?:the|that|it)|"
                        r"never\s*mind\s+the|not\s+(?:a|the)\s+(?:slot|column|plate|rack))\b|^\s*no\b", re.I)
 # Proposals built from what the scientist said in the chat: shown with "I interpreted that as ...".
-_INTERPRETED_SOURCES = {"conversation", "print-only-assumption"}
+_INTERPRETED_SOURCES = {"conversation", "print-only-assumption", "llm-first"}
+_RUN_CRITICAL_QUESTIONS = {"made_not_printed", "prerequisite", "tips_replaced", "reagent"}
+# Reset Demo's transcript marker: the page draws it as a divider, the terminal and the session log keep it as text.
+DEMO_RESET_BANNER = "-" * 16 + "\nDEMO RESET\nNew experiment started from defaults.\n" + "-" * 16
 
-GREETING = """agent> Hello {name}. I am the AI agent in control of the OT-2.
+GREETING ="""agent> Hello {name}. I am the AI agent in control of the OT-2.
 
        What are you working on today — **PRINTING**, **DILUTIONS**, or **BOTH**? You can also just tell me what you want to do.
 
@@ -413,6 +420,9 @@ class SessionSettings:
     # Where each successful run is saved for its operator (experiment_memory: experiment_history/<user>/). None: runs
     # are not saved and history requests are answered as such (the tests and the red-team harness).
     history_dir: Path | None = None
+    # The GUI demo lets the model interpret language; Python still owns proposals,
+    # physical state, confirmation, and protocol safety.
+    llm_first: bool = False
 
 
 @dataclass
@@ -556,10 +566,7 @@ class DemoSession:
                  output_fn: Callable[[str], None] = print, profile: dict[str, Any] | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  diagnostic_fn: Callable[[str], None] | None = None):
-        config = dict(config)
-        config.pop("session", None)
         self.settings = settings
-        self.state = ExperimentState(config)
         self.llm = llm
         self.executor = executor
         self.input = input_fn
@@ -571,9 +578,25 @@ class DemoSession:
         self.sleep = sleep
         self.log = SessionLog(settings.run_dir)
         self.operator = ""
+        self.started_utc = _now()
+        self._from_button = False
+        self.request_run_confirmation: Callable[[], None] | None = None
+        # Reset Demo (reset_to_defaults): how often the experiment was started over, and the turns and runs of the
+        # experiments before the current one - the session log and summary keep counting across resets
+        self.resets = 0
+        self._earlier_turns = 0
+        self._earlier_runs: list[dict[str, Any]] = []
+        self._start_experiment(config)
+
+    def _start_experiment(self, config: dict[str, Any], *, first_proposal_id: int = 1, first_run: int = 1) -> None:
+        """Everything that belongs to one experiment: the plan and its physical record, whatever waits for an answer,
+        and the conversation the router reads. A session starts with this and Reset Demo starts over with it, so a reset
+        cannot keep a piece of state that a new session would not have."""
+        config = dict(config)
+        config.pop("session", None)
+        self.state = ExperimentState(config, first_proposal_id=first_proposal_id, first_run=first_run)
         self.pending: Proposal | None = None
         self.clarifying: _Clarifying | None = None
-        self.started_utc = _now()
         self.turns: list[dict[str, Any]] = []
         self.recent_labware: tuple[str, ...] = ()
         self._recent_age = 0
@@ -602,8 +625,6 @@ class DemoSession:
         # A live run that may have moved the robot but did not finish: the next live run asks that the robot was checked.
         self.unverified_run: dict[str, Any] | None = None
         self._last_discarded: tuple[int, str] | None = None
-        self._from_button = False
-        self.request_run_confirmation: Callable[[], None] | None = None
         self._clarify_streak = 0              # router questions in a row
         self._settling = False                # proposing what is settled after the last allowed question
         self._turn_out: list[str] = []        # what this turn printed, for the conversation the router sees
@@ -674,8 +695,8 @@ class DemoSession:
             "source_config": self._rel(self.settings.config_source),
             "working_config": self._rel(self.settings.working_config),
             "llm": self.settings.llm_description, "revision": self.state.revision,
-            "applied_changes": len(self.state.history), "runs": self.state.runs, "turns": len(self.turns),
-            "exit_code": exit_code,
+            "applied_changes": len(self.state.history), "runs": self._earlier_runs + self.state.runs,
+            "turns": self._earlier_turns + len(self.turns), "resets": self.resets, "exit_code": exit_code,
         })
 
     def _read(self, prompt: str) -> str | None:
@@ -843,12 +864,7 @@ class DemoSession:
         self.note(f"\nUSER    : {name}\nSESSION : {self.settings.session_label}\nMODE    : {self._mode()}")
         self.note(f"Working config : {self._rel(self.settings.working_config)}")
         self.note(f"Session log    : {self._rel(self.log.path)}")
-        mismatches = [row for row in render.profile_comparison(self.state.config, self.profile) if row[3] == "MISMATCH"]
-        if mismatches:
-            self.say("WARNING: lab-owned settings differ from configs/machines/ot2_standard_printing_p20_v1.yaml: "
-                     + "; ".join(f"{label} {demo} vs {reference}" for label, demo, reference, _ in mismatches))
-        else:
-            self.note("Lab-owned print release settings match the machine profile (type settings for details).")
+        self._check_machine_profile()
         if report.errors:
             self.say("\nThe starting configuration cannot run:\n" + render.render_report(report))
             self.log.write("starting_config_invalid", errors=report.error_messages())
@@ -864,8 +880,7 @@ class DemoSession:
             if pending_input is not None:
                 text, pending_input = pending_input, None
             else:
-                prompt = "confirm> " if self.pending else ("clarify> " if self.clarifying else "you> ")
-                read = self._read("\n" + prompt)
+                read = self._read("\n" + self.main_prompt())
                 if read is None:
                     self.say("\nStopped. Nothing further was executed.")
                     self.log.write("session_stopped")
@@ -886,6 +901,19 @@ class DemoSession:
             if not keep_going:
                 self._write_session_summary(0)
                 return 0
+
+    def _check_machine_profile(self) -> None:
+        """The starting plan's lab-owned settings against the machine profile (at startup and after Reset Demo)."""
+        mismatches = [row for row in render.profile_comparison(self.state.config, self.profile) if row[3] == "MISMATCH"]
+        if mismatches:
+            self.say("WARNING: lab-owned settings differ from configs/machines/ot2_standard_printing_p20_v1.yaml: "
+                     + "; ".join(f"{label} {demo} vs {reference}" for label, demo, reference, _ in mismatches))
+        else:
+            self.note("Lab-owned print release settings match the machine profile (type settings for details).")
+
+    def main_prompt(self) -> str:
+        """The main loop's prompt: what the next line answers (a waiting proposal, a question of mine, or nothing)."""
+        return "confirm> " if self.pending else ("clarify> " if self.clarifying else "you> ")
 
     def _ask_operator(self) -> str | None:
         if self.settings.operator and self.settings.operator.strip():
@@ -910,7 +938,7 @@ class DemoSession:
         self._after_hypothetical = bool(previous and set(previous["flags"]) & {"hypothetical", "quoted", "pasted"}
                                         and previous["classification"] in {"question", "chat", "mixed"})
         self._turn = {
-            "turn": len(self.turns) + 1, "message": text, "revision_before": self.state.revision,
+            "turn": self._earlier_turns + len(self.turns) + 1, "message": text, "revision_before": self.state.revision,
             "state_before": self.state.full_fingerprint(), "pending_before": self.pending.id if self.pending else None,
             "clarifying_before": self.clarifying is not None, "runs_before": len(self.state.runs),
             "classification": None, "flags": [], "events": [],
@@ -966,6 +994,9 @@ class DemoSession:
             self._classify("ask")
             self._ask(question)
             return True
+        if self.settings.llm_first and self.llm is not None and not self._from_button:
+            self._handle_llm_first(stripped)
+            return True
         if self._command(lower):
             self._classify("command")
             return True
@@ -979,6 +1010,111 @@ class DemoSession:
             self._dispatch(stripped, analysis)
         self._age_referents()
         return True
+
+    def _handle_llm_first(self, text: str) -> None:
+        """The GUI path: only stop/cancel and an active yes/no are interpreted locally."""
+        lowered = " ".join(text.lower().split()).strip(" .!")
+        if lowered in {"cancel", "stop", "never mind"}:
+            if self.pending:
+                self._discard_pending("cancelled")
+            elif self.clarifying:
+                self.clarifying = None
+                self.say("agent> Cancelled the pending question.")
+            else:
+                self.say("agent> Nothing is waiting to cancel.")
+            return
+        if self.clarifying is not None and self.clarifying.ambiguity is not None \
+                and self.clarifying.ambiguity.yes_no and lowered in {"yes", "no"}:
+            self._with_clarifying(text, analyze_turn(text, self._turn_context()))
+            return
+        # Analysis contributes context only. Its regex classification never vetoes
+        # the message before the model has seen the scientist's exact words.
+        analysis = analyze_turn(text, self._turn_context())
+        self._classify("llm_first", analysis)
+        result = self._route_llm_first(text, analysis)
+        if result is None:
+            return
+        if result.route == ROUTE_REQUEST_RUN:
+            if self.clarifying is not None and not self.clarification_blocks_run():
+                self.clarifying = None  # superseded optional planning question
+            self._request_gui_run()
+            return
+        if result.route in DECISION_ROUTES:
+            if result.route == ROUTE_APPROVE and self.pending is not None:
+                self._apply_pending()
+            elif result.route == ROUTE_DISCARD and self.pending is not None:
+                self._discard_pending("model-interpreted discard")
+            else:
+                self.say("agent> No proposal is waiting for that decision.")
+            return
+        if result.route == ROUTE_HISTORY:
+            self._history_request(result, text)
+            return
+        if result.route == ROUTE_CLARIFY:
+            self._ask_intent(result.clarification or "What should I change?", text=text, analysis=analysis,
+                             understood=result.understood, unresolved=result.unresolved, request=text, notes=[])
+            return
+        if result.route in ANSWER_ROUTES:
+            self._answer(analysis, text=text, answer=result.answer or "(no answer)", source="llm", route=result.route)
+            return
+        changes = self._revision(result, self.pending)
+        try:
+            physical, dependent, physical_notes = self._physical_actions(result.physical_actions)
+        except (FieldError, ValueError) as exc:
+            self.say(f"agent> I cannot record that physical state: {exc}. Nothing changed.")
+            return
+        if self.pending is not None:
+            self._supersede(self.pending)
+        self._propose_changes(changes, original=text, analysis=analysis,
+                              explanation=result.explanation, evidence=text, preserve=result.preserve,
+                              source="llm-first", physical=physical, extra_changes=dependent,
+                              notes=physical_notes)
+
+    def _physical_actions(self, actions: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]], list[str]]:
+        """Prepare reviewable state transitions; nothing changes before Apply."""
+        physical: dict[str, Any] = {}
+        changes: list[dict[str, Any]] = []
+        notes: list[str] = []
+        current = self.state.physical
+        for action in actions:
+            kind = action["action"]
+            if kind == "replace_plate":
+                physical.update({"plate_id": current.get("plate_id", 1) + 1,
+                                 "dilutions_prepared": None, SOURCES_PRESENT: {}, WELL_VOLUMES: {}})
+                if not self.state.config["dilution"].get("enabled", True):
+                    changes.append({"path": "dilution.enabled", "value": True, "kind": "dependent",
+                                    "why": "a clean replacement plate has no prepared dilutions"})
+                notes.append("New plate: old prepared wells and liquid records will be cleared on Apply.")
+            elif kind == "replace_paper":
+                physical["paper_id"] = current.get("paper_id", 1) + 1
+                notes.append("New paper: earlier printed positions will be available again on Apply.")
+            elif kind == "replace_tip_rack":
+                physical.update({"tip_rack_id": current.get("tip_rack_id", 1) + 1, TIPS_USED: []})
+                changes.append({"path": "tips.start_tip", "value": "A1", "kind": "dependent",
+                                "why": "a fresh full tip rack starts at A1"})
+                notes.append("New tip rack: used-tip history will be cleared on Apply.")
+            elif kind == "refill_well":
+                well = plate_well(action.get("well"))
+                volume = normalize_volume(action.get("volume_ul"))
+                maximum = float(self.state.config["safety"].get("max_well_fill_ul", 340))
+                if volume > maximum:
+                    raise FieldError(f"{well} has {volume:g} µL, above its {maximum:g} µL safe fill")
+                volumes = deepcopy(physical.get(WELL_VOLUMES, current.get(WELL_VOLUMES) or {}))
+                volumes[well] = {"volume_ul": volume, "plate_id": physical.get("plate_id", current.get("plate_id", 1)),
+                                 "source": "operator reported", "timestamp_utc": _now()}
+                physical[WELL_VOLUMES] = volumes
+                present = deepcopy(physical.get(SOURCES_PRESENT, current.get(SOURCES_PRESENT) or {}))
+                present[well] = {"source": "operator reported refill"}
+                physical[SOURCES_PRESENT] = present
+                notes.append(f"{well}: operator reports {volume:g} µL now in the current plate.")
+        return physical, changes, notes
+
+    def _route_llm_first(self, text: str, analysis: TurnAnalysis) -> Interpretation | None:
+        try:
+            return converse(self.llm, text, self._router_context(analysis, []))
+        except LLMError as exc:
+            self.say(f"agent> The LLM could not interpret that request: {exc}. Nothing changed.")
+            return None
 
     def _command(self, lower: str) -> bool:
         config = self.state.config
@@ -1398,7 +1534,7 @@ class DemoSession:
         # Only the scientist's words say what to keep. The model's own "preserve" list is logged but never drops a
         # change: in the 2026-09-26 validation it listed every labware it was not moving as "kept" and later dropped a
         # move the scientist had just asked for (H01).
-        kept = set(preserved_paths(words, config))
+        kept = set(preserve) if self.settings.llm_first else set(preserved_paths(words, config))
         # the fields of the last request and of a proposal waiting or just replaced: "columns 3 and 4" answering a
         # paper-column proposal is about paper columns
         recent = tuple(dict.fromkeys(tuple(self._turn_context().recent_paths)
@@ -1715,10 +1851,11 @@ class DemoSession:
             others = changes[:index] + changes[index + 1:]
             try:
                 self.state.propose(others, request=request, source=source, superseded=analysis.superseded,
-                                   restrict_paths=analysis.restrict_paths,
+                                   restrict_paths=() if self.settings.llm_first else analysis.restrict_paths,
                                    physical=physical if physical else self._print_only_record(others), title=title,
                                    origin=original, context=self._hint_context(analysis), history=history,
-                                   dry_run=True, accepted=("made_not_printed", "unstated_split"), **grounding)
+                                   dry_run=True, accepted=("made_not_printed", "unstated_split"),
+                                   semantic_only=self.settings.llm_first, **grounding)
             except ProposalRejected:        # (questions about a valid request are not what this search looks for)
                 continue
             found.append(canonicalize_path(config, item.get("path", "")))
@@ -2342,9 +2479,11 @@ class DemoSession:
                 "referents": self.recent_labware, "recent_paths": self._turn_context().recent_paths}
             proposal = self.state.propose(
                 changes, request=request, explanation=explanation, notes=flags, source=source,
-                superseded=analysis.superseded, restrict_paths=analysis.restrict_paths, physical=physical,
+                superseded=analysis.superseded,
+                restrict_paths=() if self.settings.llm_first else analysis.restrict_paths,
+                physical=physical,
                 replaces=self._replaced_id, title=title, origin=original, context=self._hint_context(analysis),
-                history=history, accepted=accepted, **grounding)
+                history=history, accepted=accepted, semantic_only=self.settings.llm_first, **grounding)
         except ProposalRejected as exc:
             if exc.kind == "made_not_printed" and exc.question \
                     and self._asked_made_not_printed == (exc.question, len(self.turns) - 1):
@@ -2514,6 +2653,10 @@ class DemoSession:
         blockers += [f"A physical report has not been reconciled: {report}" for report in self.unreconciled_reports]
         return blockers + self.state.run_blockers()
 
+    def clarification_blocks_run(self) -> bool:
+        return self.clarifying is not None and (not self.settings.llm_first or
+                                                self.clarifying.purpose in _RUN_CRITICAL_QUESTIONS)
+
     def run_block_reasons(self) -> list[str]:
         """Why the current plan cannot run now, in the order to fix them (empty: it can run). The ONE eligibility check
         behind the page's Run button, a chat run request and the run itself; the page adds only what it alone knows
@@ -2521,7 +2664,7 @@ class DemoSession:
         reasons = []
         if self.pending is not None:
             reasons.append(f"Proposal #{self.pending.id} is waiting: apply or discard it first.")
-        if self.clarifying is not None:
+        if self.clarification_blocks_run():
             reasons.append("A question is waiting: answer or cancel it first.")
         return reasons + self.state.validate().error_messages() + self.physical_run_blockers()
 
@@ -2531,7 +2674,7 @@ class DemoSession:
         if self.pending is not None:
             self.say(f"agent> Apply or discard proposal #{self.pending.id} before requesting a run.")
             return
-        if self.clarifying is not None:
+        if self.clarification_blocks_run():
             self.say("agent> Answer or cancel the pending question before requesting a run.")
             return
         blockers = self.run_block_reasons()
@@ -2570,6 +2713,8 @@ class DemoSession:
                     and (item.get("op") or "set") == "set":
                 raise ProposalRejected(f"Your message gives two different values for the {field_label(path).lower()}, "
                                        "so nothing was changed.", kind="conflicting_request")
+            if path in merged and item.get("kind") != "dependent" and merged[path].get("kind") == "dependent":
+                merged[path] = item
             merged.setdefault(path, item)
         return list(merged.values())
 
@@ -3068,6 +3213,106 @@ class DemoSession:
                                                   "you want?", options)
         self._ask_choice(ambiguity, text, None, purpose="start_over", original=text)
 
+    # ── Reset Demo (the page's button) ───────────────────────────────────────
+
+    def reset_to_defaults(self, *, physical_reset_confirmed: bool = False) -> bool:
+        """Reset Demo: a new experiment from the startup configuration, read again from settings.config_source with the
+        loader the launcher used, and started the way a new session starts one (_start_experiment). The plan, its
+        revisions, any waiting proposal or question, the conversation the router reads and the physical record
+        (prepared wells, liquid volumes, printed paper positions, used tips, plate/paper/tip-rack identities, an
+        unfinished run, unreconciled reports) all start over. Not an undo: nothing of the old plan is carried over.
+
+        Kept: the operator, the session log (proposal, run and turn numbers keep counting) and the saved experiment
+        history (experiment_history/<user>/ is never touched, so "load my last experiment" still works). Refused with
+        nothing changed while a run is active (a reset never stops the robot), in the middle of a turn, in a live
+        session until the operator confirms the physical materials were reset or replaced (software cannot empty a
+        plate), and when the startup configuration no longer loads or passes its checks. True when it reset."""
+        live = not self.settings.simulate
+        if getattr(self.executor, "active", False):
+            return self._reset_refused("Cannot reset while a robot run is active. Nothing was changed; to stop the "
+                                       "robot, use Stop.", "run active")
+        if self._turn is not None:
+            return self._reset_refused("Not reset: answer the question that is waiting first. Nothing was changed.",
+                                       "question waiting")
+        if live and not physical_reset_confirmed:
+            return self._reset_refused("Not reset: a live reset needs your confirmation that the physical experiment "
+                                       "materials were reset or replaced as needed. Nothing was changed.",
+                                       "physical reset not confirmed")
+        source = self.settings.config_source
+        try:
+            config = load_config(source)
+        except Exception as exc:  # noqa: BLE001 - a broken startup file must leave the experiment as it is
+            return self._reset_refused(f"Not reset: the startup configuration {self._rel(source)} could not be read "
+                                       f"({type(exc).__name__}: {exc}). Nothing was changed.", "config unreadable")
+        report = ExperimentState(config).validate()
+        if report.errors:
+            return self._reset_refused(f"Not reset: the startup configuration {self._rel(source)} does not pass its "
+                                       "checks. Nothing was changed.\n" + render.render_report(report),
+                                       "config invalid", errors=report.error_messages())
+        before = self.state
+        forgotten = {"revision": before.revision, "state_sha256": before.full_fingerprint(),
+                     "pending_proposal": self.pending.id if self.pending else None,
+                     "question": self.clarifying.prompt if self.clarifying else None, "runs": len(before.runs),
+                     "physical": deepcopy(before.physical), "printed_positions": sorted(before.printed_positions),
+                     "unreconciled_reports": list(self.unreconciled_reports), "unverified_run": self.unverified_run}
+        moves = render.physical_moves(before.config, config)
+        self._earlier_turns += len(self.turns)
+        self._earlier_runs += before.runs
+        self.resets += 1
+        self._start_experiment(config, first_proposal_id=before.next_proposal_id, first_run=before.next_run)
+        if moves:
+            # the recorded deck went back to the default layout while the labware may still sit where it was: a live
+            # run first asks that the robot matches (the question every deck change gets)
+            self.state.deck_changed_since_run = True
+        self._write_working_config()
+        (self.settings.run_dir / f"starting_config_reset{self.resets}.yaml").write_text(
+            yaml.safe_dump(self._file_config(), sort_keys=False), encoding="utf-8")
+        self.log.write("demo_reset", reset=self.resets, mode="LIVE" if live else "SIMULATION",
+                       physical_reset_confirmed=physical_reset_confirmed, source_config=str(source),
+                       forgotten=forgotten, deck_moves=moves, state_sha256=self.state.fingerprint())
+        self.log.history({"event": "demo_reset", "reset": self.resets, "revision": self.state.revision,
+                          "timestamp_utc": _now(), "source_config": self._rel(source)})
+        self._write_session_summary()
+        self.say("\n" + DEMO_RESET_BANNER)
+        how = " using the confirmed fresh physical setup" if live else ""
+        self.say(f"agent> Agent NanoDrop reset to the default experiment{how}. Ready for a new run.")
+        if moves:
+            self.say("agent> The deck is back to the default layout: " + "; ".join(moves) + "."
+                     + (" Before the next run I will ask you to confirm the deck matches." if live else ""))
+        self._check_machine_profile()
+        return True
+
+    def _reset_refused(self, message: str, reason: str, **details: Any) -> bool:
+        self.say(f"agent> {message}")
+        self.log.write("demo_reset_refused", reason=reason, **details)
+        return False
+
+    def physical_record_lines(self) -> list[str]:
+        """What the physical record says is on the robot now, one line per kind (none: nothing recorded): what a live
+        Reset Demo shows the operator before it forgets it."""
+        state, physical = self.state, self.state.physical
+        in_plate = set((physical.get("dilutions_prepared") or {}).get("wells") or ())
+        in_plate |= {well for well, volume in state.recorded_volumes().items() if volume > 0}
+        in_plate |= set(physical.get(SOURCES_PRESENT) or {})
+        lines = []
+        if in_plate:
+            lines.append(f"96-well plate: liquid in {self._named_positions('well', in_plate)}.")
+        if state.printed_positions:
+            lines.append(f"Paper: {self._named_positions('position', state.printed_positions)} printed.")
+        tips = list(physical.get(TIPS_USED) or ())
+        if tips:
+            lines.append(f"Tip rack: {len(tips)} used tip{'' if len(tips) == 1 else 's'} ({render.positions_text(tips)}).")
+        if self.unverified_run is not None:
+            lines.append(f"Run {self.unverified_run['run']} did not finish ({self.unverified_run['status']}): the "
+                         "plate, paper and tip rack may be partly used.")
+        return lines + [f'Reported, not yet recorded: "{report}".' for report in self.unreconciled_reports]
+
+    @staticmethod
+    def _named_positions(noun: str, positions: Iterable[str]) -> str:
+        """'wells A11-H11', 'position B3': plate or paper positions in column order, the way the plan lists them."""
+        names = sorted(set(positions), key=lambda name: (int(name[1:]) if name[1:].isdigit() else 99, name[:1]))
+        return f"{noun}{'' if len(names) == 1 else 's'} {render.positions_text(names)}"
+
     # ── running ──────────────────────────────────────────────────────────────
 
     def _run(self) -> None:
@@ -3141,7 +3386,7 @@ class DemoSession:
                     self.log.write("run_cancelled", reason="prepared dilutions not confirmed")
                     self._event("refusal", reason="dilutions not confirmed")
                     return
-        run_number = len(self.state.runs) + 1
+        run_number = self.state.next_run
         self.say("\n" + render.render_run_banner(config, simulate=self.settings.simulate, operator=self.operator,
                                                  session_label=self.settings.session_label, run_number=run_number))
         if not self.settings.simulate:
@@ -3312,6 +3557,11 @@ class DemoSession:
             return
         if plan.next_tip is None:
             self.say("The tip rack is used up: load a fresh rack, then tell me the starting tip.")
+            return
+        if self.settings.llm_first:
+            self.state.advance_tip_after_run(plan.next_tip, run_number, self.operator)
+            self._write_working_config()
+            self.say(f"Next start tip: {plan.next_tip} (advanced automatically after live run {run_number}).")
             return
         one = len(tips_used) == 1                     # one tip for the entire run (single_tip) reads "Tip A1 was"
         used = tips_used[0] if one else f"{tips_used[0]}-{tips_used[-1]}"

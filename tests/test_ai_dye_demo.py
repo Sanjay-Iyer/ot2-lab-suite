@@ -560,9 +560,10 @@ def test_interpretations_are_parsed_strictly():
     # A router reply with no JSON at all is prose: shown as an answer, and it can never carry a change.
     prose = parse_interpretation("I would rather write you a protocol in Python.")
     assert prose.route == "experiment_question" and prose.changes == [] and prose.answer.startswith("I would rather")
-    # an answer or a question never carries changes, whatever else the reply contains
-    assert parse_interpretation('{"route": "general_question", "answer": "Hi.", "changes": [{"path": "deck.plate.slot", '
-                                '"value": 6}]}').changes == []
+    # Structured changes are not silently discarded when the route label is wrong.
+    mislabeled = parse_interpretation('{"route": "general_question", "answer": "Hi.", "changes": '
+                                       '[{"path": "deck.plate.slot", "value": 6}]}')
+    assert mislabeled.route == "experiment_change" and mislabeled.changes[0]["value"] == 6
 
 
 def test_session_labels_carry_the_date(tmp_path):

@@ -14,7 +14,8 @@ robot_data/data/logs/
 robot_data/data/outputs/
 configs/workflows/user/*.yaml
 !configs/workflows/user/.gitkeep
-archive/
+archive/*
+!archive/agent_nanodrop_strict_rules_20260929/
 runs/
 # per-user experiment memory (experiment_memory.py): lives on the laptop that ran the experiments
 experiment_history/

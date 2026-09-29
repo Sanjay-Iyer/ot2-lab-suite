@@ -10,8 +10,9 @@ from nicegui import app, events, ui
 
 from src.agents.dye_demo import render
 from src.agents.dye_demo.columns import format_columns, format_rows, paper_columns_printed
+from src.agents.dye_demo.limits import MAX_DROPS_PER_POSITION, MAX_REPLICATES, max_vial_air_gap
 from src.agents.dye_demo.render import print_map_text
-from src.agents.dye_demo.gui.adapter import DemoGuiAdapter, GuiSnapshot
+from src.agents.dye_demo.gui.adapter import RESET_BUTTON, DemoGuiAdapter, GuiSnapshot
 from src.agents.dye_demo.model import (
     DECK_SLOTS,
     OFF_DECK,
@@ -61,15 +62,27 @@ class FlowStep:
 @dataclass(frozen=True)
 class ExecutionTarget:
     """The only part of the page that names the execution backend. Every other label, button, card, status and dialog
-    is identical for --simulate and the real OT-2, so work on the page carries over to both."""
+    is identical for --simulate and the real OT-2, so work on the page carries over to both. The Reset Demo dialog says
+    what a reset clears; live it also asks that the physical materials were reset (software cannot empty a plate)."""
     badge: str              # header badge (same component, colour and place in both modes)
     confirm_title: str      # title of the run confirmation dialog
+    reset_title: str        # title of the Reset Demo confirmation dialog
+    reset_text: str
+    reset_check: str = ""   # live: the box to tick before Reset Demo may clear the physical record
 
 
 def execution_target(live: bool) -> ExecutionTarget:
     if live:
-        return ExecutionTarget("LIVE · REAL OT-2", "Start the real OT-2 run?")
-    return ExecutionTarget("SIMULATED OT-2", "Start the simulated OT-2 run?")
+        return ExecutionTarget(
+            "LIVE · REAL OT-2", "Start the real OT-2 run?", "Start a fresh Agent NanoDrop experiment?",
+            "Resetting software state does not physically replace labware. This restores the default experiment and "
+            "clears the current proposal, questions, conversation state and the recorded physical history: prepared "
+            "wells, liquid volumes, printed paper positions and used tips.",
+            "I have reset/replaced the physical experiment materials as needed.")
+    return ExecutionTarget(
+        "SIMULATED OT-2", "Start the simulated OT-2 run?", "Reset Agent NanoDrop?",
+        "This will restore the default experiment and clear the current proposal, questions, simulated physical "
+        "history, and conversation state.")
 
 
 def _labware_visualizations(config: dict[str, Any], title: str = "LABWARE VISUALIZATION",
@@ -279,12 +292,22 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         .tip-setting-changed { background:#fef3c7; color:#92400e; border-radius:4px; padding:0 4px; }
         .run-action.disabled { opacity: 1 !important; }
         .run-reason { max-width: 360px; text-align: right; white-space: normal; line-height: 1.25; }
+        .reset-reason { max-width: 170px; text-align: center; white-space: normal; line-height: 1.25; }
+        .reset-marker { display:flex; align-items:center; gap:12px; width:100%; margin:6px 0; color:#9a3412;
+                        font-size:13px; font-weight:800; letter-spacing:.08em; }
+        .reset-marker::before, .reset-marker::after { content:""; flex:1; border-top:2px dashed #fdba74; }
     """)
 
     with ui.column().classes("w-full max-w-screen-2xl mx-auto p-4 gap-4"):
         with ui.row().classes("page-header w-full items-center justify-between"):
             ui.label("Agent NanoDrop").classes("text-2xl font-semibold")
             with ui.row().classes("items-center gap-3 flex-wrap justify-end"):
+                # Reset Demo: beside the mode badge, away from Run, Apply and Discard; it always asks first
+                with ui.column().classes("items-center gap-1"):
+                    reset_button = ui.button(RESET_BUTTON, icon="restart_alt", color="deep-orange-8").props(
+                        "outline dense").classes("reset-demo px-2")
+                    reset_reason = ui.label().classes("reset-reason text-xs font-semibold text-orange-900")
+                    reset_reason.set_visibility(False)
                 ui.badge(target.badge, color="negative").classes("execution-target text-sm px-3 py-2")
                 user_badge = ui.badge("Current User = waiting for chat input", color=None).classes(
                     "current-user text-sm px-3 py-2")
@@ -361,7 +384,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             ui.button("Cancel", on_click=confirm_run.close).props("flat")
             start_button = ui.button("Start run", icon="precision_manufacturing", color="negative")
 
-    last = {"revision": -1, "proposal": object(), "messages": 0, "output": 0, "state": None,
+    # filled each time it opens (open_reset_dialog): the physical record as it is then, and an unticked box every time
+    with ui.dialog() as reset_dialog, ui.card().classes("p-6 max-w-lg") as reset_card:
+        pass
+
+    last = {"plan": None, "resets": adapter.snapshot().resets, "messages": 0, "output": 0, "state": None,
             "run_requests": adapter.run_confirmation_count}
 
     @ui.refreshable
@@ -436,6 +463,39 @@ def build_page(adapter: DemoGuiAdapter) -> None:
         else:
             ui.notify("No robot run is running.", type="info")
 
+    def open_reset_dialog() -> None:
+        reason = adapter.snapshot().reset_block_reason
+        if reason:
+            ui.notify(reason, type="warning")
+            return
+        reset_card.clear()
+        with reset_card:
+            ui.label(target.reset_title).classes("text-xl font-semibold")
+            ui.label(target.reset_text).classes("text-slate-600")
+            check = None
+            if target.reset_check:
+                record = adapter.physical_record()
+                ui.label("The physical record now says:" if record else "No prepared wells, printed positions or "
+                         "used tips are recorded.").classes("font-semibold text-slate-700 mt-2")
+                for line in record:
+                    ui.label(f"• {line}").classes("text-sm text-slate-700")
+                check = ui.checkbox(target.reset_check).classes("font-semibold text-orange-900 mt-2")
+            ui.label("Saved experiment history is kept.").classes("text-sm text-slate-500 mt-2")
+            with ui.row().classes("w-full justify-end gap-3 mt-4"):
+                ui.button("Cancel", on_click=reset_dialog.close).props("flat")
+                confirm = ui.button(RESET_BUTTON, icon="restart_alt", color="deep-orange-8",
+                                    on_click=lambda: confirm_reset(check is not None and bool(check.value)))
+            if check is not None:
+                confirm.set_enabled(False)
+                check.on_value_change(lambda event: confirm.set_enabled(bool(event.value)))
+        reset_dialog.open()
+
+    def confirm_reset(physical_reset_confirmed: bool) -> None:
+        reset_dialog.close()
+        if not adapter.reset_demo(physical_reset_confirmed=physical_reset_confirmed):
+            ui.notify("Not reset: " + (adapter.snapshot().reset_block_reason or "the agent is busy; try again."),
+                      type="warning")
+
     def submit_form() -> None:
         try:
             values = _control_values(controls)
@@ -457,11 +517,15 @@ def build_page(adapter: DemoGuiAdapter) -> None:
     start_button.on("click", start_run)
     stop_button.on("click", stop)
     submit_controls.on("click", submit_form)
+    reset_button.on("click", open_reset_dialog)
 
     def refresh() -> None:
         messages = adapter.messages(last["messages"])
         for message in messages:
             with chat_box:
+                if message.role == "marker":        # Reset Demo: where the new experiment starts
+                    ui.label(message.text).classes("reset-marker")
+                    continue
                 bubble = ui.chat_message(message.text, name="You" if message.role == "user" else "Agent NanoDrop",
                                          sent=message.role == "user")
             if message.role == "status":            # quiet progress line, e.g. while the agent loads
@@ -476,6 +540,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             output_log.push(line)
         last["output"] += len(lines)
         snapshot = adapter.snapshot()
+        if snapshot.resets != last["resets"]:
+            # Reset Demo: a dialog or run request this page still holds belongs to the experiment that was reset
+            last["resets"], last["run_requests"] = snapshot.resets, adapter.run_confirmation_count
+            confirm_run.close()
+            reset_dialog.close()
         requests = adapter.run_confirmation_count
         if requests != last["run_requests"] and snapshot.waiting == "idle":
             last["run_requests"] = requests
@@ -506,10 +575,16 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             send_button.set_enabled(snapshot.waiting != "busy")
             answer_row.set_visibility(snapshot.waiting == "question")
             question_label.text = snapshot.question
-        if (snapshot.revision, snapshot.proposal_id) != (last["revision"], last["proposal"]):
-            if snapshot.revision != last["revision"] and last["revision"] != -1:
+            reset_block = snapshot.reset_block_reason
+            reset_button.set_enabled(not reset_block)
+            # said where the button is while a run or its safety question holds it (a disabled button shows nothing)
+            reset_reason.text = reset_block if snapshot.running or snapshot.waiting == "question" else ""
+            reset_reason.set_visibility(bool(reset_reason.text))
+        plan = (snapshot.resets, snapshot.revision, snapshot.proposal_id)
+        if plan != last["plan"]:
+            if last["plan"] is not None and plan[:2] != last["plan"][:2]:      # a new revision, or a new experiment
                 _sync_controls(controls, snapshot.current)
-            last["revision"], last["proposal"] = snapshot.revision, snapshot.proposal_id
+            last["plan"] = plan
             render_current.refresh()
             render_proposed.refresh()
 
@@ -565,17 +640,21 @@ def _experiment_flow(config: dict[str, Any]) -> None:
 
 def _controls(config: dict[str, Any]) -> dict[str, Any]:
     dilution, printing, deck = config["dilution"], config["print"], config["deck"]
+    paper_width = int(printing.get("paper_columns", 12))
+    max_air_gap = max_vial_air_gap(config)
     with ui.row().classes("w-full gap-4 items-end"):
         factors = ui.input("Dilution factors", value=", ".join(map(str, dilution["factors"])))
         dilution_enabled = ui.switch("Dilution enabled", value=dilution["enabled"])
         printing_enabled = ui.switch("Printing enabled", value=printing["enabled"])
-        first_column = ui.number("First paper column", value=printing["paper_start_column"], min=1, max=12, step=1)
-        replicates = ui.number("Total replicates", value=printing["replicates"], min=1, max=12, step=1)
-        drops = ui.number("Drops per position", value=printing["droplets_per_spot"], min=1, step=1)
+        first_column = ui.number("First paper column", value=printing["paper_start_column"], min=1, max=paper_width, step=1)
+        replicates = ui.number("Total replicates", value=printing["replicates"], min=1, max=MAX_REPLICATES, step=1)
+        drops = ui.number("Drops per position", value=printing["droplets_per_spot"], min=1,
+                          max=MAX_DROPS_PER_POSITION, step=1)
     lh = config.get("liquid_handling") or {}
     with ui.row().classes("w-full gap-4 items-end"):
         mixing_enabled = ui.switch("Mix dilutions", value=bool(config["mixing"].get("enabled", True)))
-        air_gap = ui.number("Air gap (µL, 0 = off)", value=float(lh.get("air_gap_ul", 0) or 0), min=0, max=5, step=0.5)
+        air_gap = ui.number("Air gap (µL, 0 = off)", value=float(lh.get("air_gap_ul", 0) or 0), min=0,
+                            max=max_air_gap, step=0.5)
         blow_out = ui.switch("Blow-out", value=bool(lh.get("blow_out", True)))
         shake = ui.switch("Shake after dispense", value=bool((lh.get("well_plate_shake") or {}).get("enabled", True)))
     with ui.row().classes("w-full gap-4"):
@@ -593,6 +672,12 @@ def _controls(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _control_values(controls: dict[str, Any]) -> dict[str, Any]:
+    def whole(name: str) -> int:
+        number = float(controls[name].value)
+        if not number.is_integer():
+            raise ValueError(f"{name} must be a whole number")
+        return int(number)
+
     factors = [float(value.strip()) for value in str(controls["factors"].value).replace("×", "").replace("x", "").split(",")
                if value.strip()]
     factors = [int(value) if value.is_integer() else value for value in factors]
@@ -600,9 +685,9 @@ def _control_values(controls: dict[str, Any]) -> dict[str, Any]:
         "dilution.factors": factors,
         "dilution.enabled": bool(controls["dilution"].value),
         "print.enabled": bool(controls["printing"].value),
-        "print.paper_start_column": int(controls["first_column"].value),
-        "print.replicates": int(controls["replicates"].value),
-        "print.droplets_per_spot": int(controls["drops"].value),
+        "print.paper_start_column": whole("first_column"),
+        "print.replicates": whole("replicates"),
+        "print.droplets_per_spot": whole("drops"),
         "mixing.enabled": bool(controls["mixing"].value),
         "liquid_handling.air_gap_ul": float(controls["air_gap"].value),
         "liquid_handling.blow_out": bool(controls["blow_out"].value),

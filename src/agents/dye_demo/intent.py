@@ -317,9 +317,6 @@ _UNSUPPORTED = (
     (re.compile(r"\b(?:second|another|two|2|more\s+than\s+one|multiple|different)\s+(?:dyes?|samples?|reagents?|"
                 r"stocks?)\b", re.I),
      "This demo uses one dye (the sample) and one diluent (water); a second dye is not supported."),
-    (re.compile(rf"\b{_DROP_COUNT}\s+(?:stacked\s+|separate\s+)?drops?\b[^.;?!]{{0,60}}?\bcolumns?\b[^.;?!]{{0,60}}?"
-                rf"\b{_DROP_COUNT}\s+(?:stacked\s+|separate\s+)?drops?\b[^.;?!]{{0,40}}?\bcolumns?\b", re.I),
-     "One run uses the same number of drops in every paper column; different drop counts per column need two runs."),
     (re.compile(r"\b(?:aspirat\w*|pull\w*|draw\w*|suck\w*|take|taking)\b[^.?!]{0,60}\bfrom\s+(?:the\s+)?paper\b|"
                 r"\bpaper(?:\s+print)?(?:\s+plate)?\b[^.?!]{0,50}\bas\s+(?:the\s+)?source\b|"
                 r"\bfrom\s+(?:the\s+)?paper\b[^.?!]{0,50}\b(?:back\s+)?(?:in)?to\s+(?:the\s+)?(?:dilution\s+|96[-\s]?well\s+)?"

@@ -147,17 +147,17 @@ def test_physical_rules_stay_strict(paper_rows, reason):
         protocol_pairs(config)
 
 
-def test_paper_rows_and_a_print_map_together_are_refused():
+def test_explicit_print_map_supersedes_stale_paper_rows():
     config = series(*ACE, paper_rows=["A", "B", "C"], source_map=[{"source": "A11", "positions": ["A1"]}])
-    assert "print.paper_rows_with_map" in [issue.code for issue in validate(config).errors]
-    with pytest.raises(RuntimeError, match="cannot be combined"):
-        protocol_pairs(config)
+    assert validate(config).ok
+    assert plan_pairs(config) == [("A11", "A1")]
+    assert protocol_pairs(config) == [("A11", "A1")]
 
 
 def test_paper_rows_normalisation():
     assert normalize_paper_rows(["1", "2", "3"]) == ["A", "B", "C"]
     assert normalize_paper_rows("rows 1, 3 and 5") == ["A", "C", "E"]
-    assert normalize_paper_rows(["c", "A", "b"]) == ["A", "B", "C"]         # filled top to bottom in series order
+    assert normalize_paper_rows(["c", "A", "b"]) == ["C", "A", "B"]         # explicit source order is preserved
     assert normalize_paper_rows(None) is None and normalize_paper_rows("default") is None
     with pytest.raises(FieldError):
         normalize_paper_rows(["A", "I"])                                    # refused, never silently dropped

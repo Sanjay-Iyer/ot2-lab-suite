@@ -85,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         llm_description="" if args.offline else Config.describe_llm_auth(),
         run_button=RUN_ON_OT2,              # the same page in both modes; only the executor below differs
         history_dir=HISTORY_DIR,            # each successful run is saved for its operator (experiment_memory)
+        llm_first=not args.offline,
     )
     if args.simulate:
         print(f"SIMULATION: '{RUN_ON_OT2}' builds and simulates the protocol on this laptop; the OT-2 is never "

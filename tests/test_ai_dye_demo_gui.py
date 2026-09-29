@@ -228,7 +228,8 @@ async def _check_run_dialog(tmp_path, monkeypatch):
     try:
         with client:
             build_page(adapter)
-            [dialog] = [element for element in client.elements.values() if isinstance(element, ui.dialog)]
+            [dialog] = [element for element in client.elements.values() if isinstance(element, ui.dialog)
+                        and any(getattr(child, "text", "") == "Start run" for child in element.descendants())]
             run_buttons = [element for element in client.elements.values()
                            if isinstance(element, ui.button) and element.text == "Run on OT-2"]
             await tick()

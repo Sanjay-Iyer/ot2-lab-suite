@@ -16,6 +16,8 @@ from typing import Any, Callable, Iterable
 
 import yaml
 
+from src.agents.dye_demo.limits import MAX_DROPS_PER_POSITION
+
 REPO = Path(__file__).resolve().parents[3]
 DEFAULT_CONFIG = REPO / "configs" / "workflows" / "defaults" / "ai_agent_dilution_print_demo.yaml"
 MACHINE_PROFILE = REPO / "configs" / "machines" / "ot2_standard_printing_p20_v1.yaml"
@@ -280,18 +282,18 @@ def normalize_count(value: Any) -> int:
 def normalize_drops(value: Any) -> int:
     """Drops on one paper position: 1-20 dispenses onto the same spot (never more paper positions)."""
     count = _integer(value, "a drop count")
-    if not 1 <= count <= 20:
-        raise FieldError(f"drops per paper position are 1-20, got {value!r}")
+    if not 1 <= count <= MAX_DROPS_PER_POSITION:
+        raise FieldError(f"drops per paper position are 1-{MAX_DROPS_PER_POSITION}, got {value!r}")
     return count
 
 
 def normalize_air_gap(value: Any) -> float:
-    """The air gap after each vial aspiration, in µL: 0 (off) up to 5 µL; "on" is the lab default volume."""
+    """The air gap after each vial aspiration; capacity is checked against config by validation."""
     if isinstance(value, bool) or str(value).strip().lower() in {"on", "off", "true", "false", "yes", "no"}:
         return float(default_liquid_handling().get("air_gap_ul", 1.0)) if normalize_bool(value) else 0.0
     volume = volume_in_microlitres(value, "the air gap")
-    if not 0 <= volume <= 5:
-        raise FieldError(f"the air gap is 0 (off) to 5 µL, got {value!r}")
+    if volume < 0:
+        raise FieldError(f"the air gap cannot be negative, got {value!r}")
     return float(volume)
 
 
@@ -338,9 +340,10 @@ def normalize_label(value: Any) -> str:
 def normalize_rows(value: Any) -> list[str]:
     from src.agents.dye_demo.natural import selected_rows
     if isinstance(value, (list, tuple)):
-        result = [str(v).strip().upper() for v in value if str(v).strip().upper() in ROWS]
-        if result:
-            return sorted(set(result), key=ROWS.index)
+        result = [normalize_row(v) for v in value]
+        if result and len(result) == len(set(result)):
+            return result
+        raise FieldError("selected rows must be nonempty and cannot repeat a plate row")
     if isinstance(value, str):
         return selected_rows(value)
     raise FieldError(f"selected rows must be a list of row letters (A-H), got {value!r}")
@@ -374,7 +377,9 @@ def normalize_paper_rows(value: Any) -> list[str] | None:
         rows.append(ROWS[int(token) - 1] if token.isdigit() else token)
     if not rows:
         raise FieldError("paper rows must name at least one row (A-H)")
-    return sorted(set(rows), key=ROWS.index)
+    if len(rows) != len(set(rows)):
+        raise FieldError("paper rows cannot repeat a position")
+    return rows
 
 
 PLATE_COLUMNS = 12
@@ -445,7 +450,7 @@ def normalize_source_map(value: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             raise FieldError(f"each print-map entry names a source well and its paper positions, got {item!r}")
         raw_source = next((item[key] for key in ("source", "well", "from", "source_well") if key in item), None)
-        raw_positions = next((item[key] for key in ("positions", "to", "destinations", "paper_positions")
+        raw_positions = next((item[key] for key in ("positions", "destination", "to", "destinations", "paper_positions")
                               if key in item), None)
         if raw_source in (None, "") or raw_positions in (None, "", [], {}):
             raise FieldError("each print-map entry needs a source well and at least one paper position")
@@ -803,6 +808,7 @@ def normalize_loaded_config(config: dict[str, Any]) -> dict[str, Any]:
     if isinstance(printing, dict) and printing.get("source_map") not in (None, "", []):
         try:
             printing["source_map"] = normalize_source_map(printing["source_map"])   # the one shape the run embeds
+            printing["paper_rows"] = None  # legacy shorthand is superseded by exact map destinations
         except FieldError:
             pass    # left as-is; validation names the problem
     return config
