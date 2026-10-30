@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from src.agents.dye_demo import render
+from src.agents.dye_demo.compiler import compile_plan
 from src.agents.dye_demo.history import differences
 from src.agents.dye_demo.model import (EDITABLE_FIELDS, FieldError, canonicalize_path, get_path, liquid_handling, occupancy,
                                        resolve_path)
@@ -312,7 +313,13 @@ def check_turn(tracker: Tracker, session, label: UserTurn, record: dict[str, Any
         if executed:
             sent = deepcopy(executed[-1]["config"])
             sent.pop("session", None)
-            if fingerprint(sent) != fingerprint(snapshot["config"]):
+            # a run executes its revision COMPILED (compiler.py): the exact print map of that plan, laid out around the
+            # paper positions earlier successful live runs printed on that paper
+            this = next((run for run in state.runs if run["run"] == event["run"]), {})
+            occupied = {position for run in state.runs if run["run"] < event["run"] and run["mode"] == "LIVE"
+                        and run["status"] == "succeeded" and run.get("paper_id") == this.get("paper_id")
+                        for position in run["printed_positions"]}
+            if fingerprint(sent) != fingerprint(compile_plan(snapshot["config"], occupied=occupied).config):
                 tracker.fail("executed_config_differs_from_state", number,
                              f"run {event['run']} was given a configuration that differs from revision "
                              f"{event['revision']}")

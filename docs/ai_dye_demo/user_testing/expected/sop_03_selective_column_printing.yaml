@@ -34,6 +34,9 @@ runs:
       print.paper_start_column: 3
       print.paper_rows: null
       print.source_map: null
+      print.source: null
+      print.columns: null
+      print.drops_at: null
       tips.start_tip: A1
       tips.return_tips: true
       tips.policy: single_tip

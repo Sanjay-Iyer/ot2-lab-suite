@@ -27,6 +27,7 @@ file.
 | [`skills/ot2-protocols/`](skills/ot2-protocols/SKILL.md) | Build, validate, generate, or simulate any OT-2 workflow protocol. |
 | [`skills/ot2-labware/`](skills/ot2-labware/SKILL.md) | Create or modify custom labware definitions (plates, racks, reservoirs). |
 | [`skills/ot2-robot-control/`](skills/ot2-robot-control/SKILL.md) | Deploy to or run on the physical robot. **Lab laptop only.** |
+| [`skills/nanodrop-*/`](skills/nanodrop-edit-semantics/SKILL.md) | Change how Agent NanoDrop (the dye demo, `src/agents/dye_demo/`) reads a message: edit semantics, printing, dilutions, plan settings. These four are loaded into the router's prompt at runtime. |
 
 Sub-references inside `skills/vial-dilution-print/`:
 [TOOLS.md](skills/vial-dilution-print/TOOLS.md) (CLI utilities),

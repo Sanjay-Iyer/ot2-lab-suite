@@ -89,6 +89,8 @@ TANGLE = {
         {"path": "print.source_map", "value": [{"source": "A11", "destination": "A3"},
                                                 {"source": "B11", "destination": "B3"}]}]},
     "use 4 drops per position": change("print.droplets_per_spot", 4),
+    "make the second one bigger": {"kind": "clarification",
+                                   "clarification": "The second dilution or the second print position?"},
     "yes": APPROVE,
 }
 
@@ -97,9 +99,12 @@ def test_reset_demo_starts_a_tangled_experiment_over_from_the_startup_config(tmp
     demo, model, output = session(tmp_path / "demo", TANGLE)
     talk(demo, "use 3 drops per position", "yes", "use dilution factors 2, 5 and 10", "yes",
          "print them on paper rows D, E and F", "yes", "make 2 replicates", "yes",
-         "print A11 on A3 and B11 on B3", "print A11 on A3 and B11 on B3", "use 4 drops per position")
-    # the tangle: four applied edits, the paper rows now an explicit print map, a proposal AND a stale question waiting
-    assert demo.state.revision == 4 and demo.state.config["print"]["source_map"]
+         "print A11 on A3 and B11 on B3", "print A11 on A3 and B11 on B3", "use 4 drops per position",
+         "make the second one bigger")
+    # the tangle: four applied edits (paper rows and replicates, compiled into an exact print map only for a run), a
+    # proposal AND an open question waiting
+    assert demo.state.revision == 4 and demo.state.config["print"]["paper_rows"] == ["D", "E", "F"]
+    assert demo.state.config["print"]["replicates"] == 2 and demo.state.compile().source_map
     assert demo.pending is not None and demo.clarifying is not None and demo.run_block_reasons()
     waiting = demo.pending.id
 

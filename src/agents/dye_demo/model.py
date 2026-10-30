@@ -212,9 +212,24 @@ def _tidy(number: float) -> int | float:
     return int(number) if float(number).is_integer() else float(number)
 
 
+_DYE_PERCENT = re.compile(r"\s*([-+]?(?:\d+\.?\d*|\.\d+))\s*%\s*(?:dye|sample|stock)?\s*", re.I)
+
+
+def _factor(item: Any) -> int | float:
+    """A fold factor (2, "2x"), or the dye's share of a dye/water mixture ("10%" of dye is a 10x dilution of the stock:
+    factor = 100 / percent). The percentage is a unit Python converts, like mL to µL - never a guess."""
+    match = _DYE_PERCENT.fullmatch(item) if isinstance(item, str) else None
+    if match:
+        percent = float(match.group(1))
+        if not 0 < percent <= 100:
+            raise FieldError(f"a dye percentage is above 0 and at most 100, got {item!r}")
+        return _tidy(round(100.0 / percent, 6))
+    return _tidy(_number(item, "a dilution factor"))
+
+
 def normalize_factors(value: Any) -> list[int | float]:
     items = value if isinstance(value, (list, tuple)) else [value]
-    factors = [_tidy(_number(item, "a dilution factor")) for item in items]
+    factors = [_factor(item) for item in items]
     if not factors:
         raise FieldError("dilution factors must name at least one factor")
     return factors
@@ -431,6 +446,55 @@ def positions_with_drops(value: Any) -> tuple[list[str], dict[str, int]]:
     return positions, drops
 
 
+def map_source(value: Any) -> str:
+    """A print-map source: a plate well ("A11"), or a logical dilution reference ("dilution:2", references.py) that the
+    compiler resolves to the well that dilution is in when the run is prepared."""
+    from src.agents.dye_demo.references import parse_ref
+
+    try:
+        return plate_well(value)
+    except FieldError:
+        try:
+            return str(parse_ref(value))
+        except FieldError:
+            raise FieldError(f"I can't use {str(value).strip()!r} as a print source: name a plate well (A1-H12) or a "
+                             "dilution (dilution:1)") from None
+
+
+def normalize_print_source(value: Any) -> list[str] | None:
+    """print.source (references.normalize_sources): the liquids that print - dilution outputs ("dilution:1") or plate
+    wells holding a sample ("A11") - or None for every dilution of the series."""
+    from src.agents.dye_demo.references import normalize_sources
+
+    return normalize_sources(value)
+
+
+def normalize_paper_column_list(value: Any) -> list[int] | None:
+    """print.columns: the exact paper columns printed, gaps allowed ([1, 3, 5]); None prints side by side from
+    print.paper_start_column (print.replicates columns per drop volume)."""
+    if value is None or (isinstance(value, str) and value.strip().lower() in {"", "none", "null", "default"}):
+        return None
+    items = _as_list(value) if not isinstance(value, (int, float)) else [value]
+    columns = [normalize_paper_column(item) for item in items]
+    if not columns:
+        return None
+    if len(columns) != len(set(columns)):
+        raise FieldError("a paper column is listed twice")
+    return columns
+
+
+def normalize_drops_at(value: Any) -> dict[str, int] | None:
+    """print.drops_at: drops on particular paper positions ({"A2": 3}); every other position takes
+    print.droplets_per_spot. None clears them."""
+    if value is None or value in ("", {}, []) or (isinstance(value, str) and value.strip().lower() in {"none", "null"}):
+        return None
+    positions, drops = positions_with_drops(value)
+    missing = [position for position in positions if position not in drops]
+    if missing:
+        raise FieldError(f"no drop count was given for {', '.join(missing)}")
+    return {position: drops[position] for position in positions}
+
+
 def normalize_source_map(value: Any) -> list[dict[str, Any]]:
     """print.source_map: which plate well prints on which paper positions, in print order.
 
@@ -438,7 +502,9 @@ def normalize_source_map(value: Any) -> list[dict[str, Any]]:
          {"source": "C11", "positions": ["A2", "A3"], "drops": {"A3": 3}}]
 
     One source may feed any number of positions, and any number of sources may be used; nothing here ties the sources
-    to the dilution factors. Every well and position must exist, and no paper position may be printed twice.
+    to the dilution factors. Every well and position must exist, and no paper position may be printed twice. A source
+    may also be a dilution reference ("dilution:1", references.py): plan.print_map resolves it to the well that
+    dilution is in, so a dictated map follows its dilutions when they move.
     "drops" (optional) is how many drops land on a position - several dispenses onto that ONE spot, never more
     positions. A number applies to every position of the entry; a position without a count takes
     print.droplets_per_spot. The canonical form lists only the counts that were given.
@@ -454,7 +520,7 @@ def normalize_source_map(value: Any) -> list[dict[str, Any]]:
                               if key in item), None)
         if raw_source in (None, "") or raw_positions in (None, "", [], {}):
             raise FieldError("each print-map entry needs a source well and at least one paper position")
-        source = plate_well(raw_source)
+        source = map_source(raw_source)
         positions, drops = positions_with_drops(raw_positions)
         for position in positions:
             if position in used:
@@ -514,7 +580,10 @@ EDITABLE_FIELDS: dict[str, tuple[str, Callable[[Any], Any]]] = {
     "print.replicates": ("Total replicates (prints of each condition)", normalize_replicates),
     "print.paper_start_column": ("First paper column", normalize_paper_column),
     "print.paper_rows": ("Paper rows (print destinations)", normalize_paper_rows),
-    "print.source_map": ("Print map (plate well → paper positions)", normalize_source_map),
+    "print.columns": ("Paper columns (print destinations)", normalize_paper_column_list),
+    "print.source": ("Print source (which liquids print)", normalize_print_source),
+    "print.drops_at": ("Drops at particular paper positions", normalize_drops_at),
+    "print.source_map": ("Print map (source → paper positions)", normalize_source_map),
     "tips.start_tip": ("Starting tip", normalize_tip),
     "tips.return_tips": ("Return used tips to the rack", normalize_bool),
     "tips.policy": ("Tip policy", normalize_policy),
@@ -588,6 +657,11 @@ _FIELD_ALIASES = {
     "print.destination_rows": "print.paper_rows",
     "print_rows": "paper_rows",
     "dilution.plate_rows": "dilution.rows",
+    "print.sources": "print.source",
+    "print.print_source": "print.source",
+    "print.paper_column_list": "print.columns",
+    "print.drop_counts": "print.drops_at",
+    "print.drops_per_position_at": "print.drops_at",
 }
 
 

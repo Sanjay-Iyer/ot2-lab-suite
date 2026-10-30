@@ -366,8 +366,9 @@ class DemoGuiAdapter:
         proposed = deepcopy(pending.after) if pending else None
         prepared = session.state.physical.get("dilutions_prepared")
         proposed_prepared = pending.physical.get("dilutions_prepared", prepared) if pending else prepared
-        report = session.state.validate()
+        report = session.state.validate()        # the plan as a run would execute it (compiled, compiler.py)
         blockers = tuple(session.physical_run_blockers())
+        occupied = session.state.printed_positions
         with self._lock:
             waiting, question, ended = self._state(self._waiting), self._question, self._ended
         running = self.running
@@ -378,8 +379,9 @@ class DemoGuiAdapter:
             revision=session.state.revision,
             current=current,
             proposed=proposed,
-            current_sections=render.plan_model(current, prepared=prepared),
-            proposed_sections=render.plan_model(proposed, prepared=proposed_prepared) if proposed else [],
+            current_sections=render.plan_model(current, prepared=prepared, occupied=occupied),
+            proposed_sections=render.plan_model(proposed, prepared=proposed_prepared, occupied=occupied)
+            if proposed else [],
             proposal_id=pending.id if pending else None,
             proposal_attention=render.proposal_attention_items(pending) if pending else [],
             status=self._status(waiting, running, ended),

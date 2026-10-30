@@ -66,21 +66,28 @@ def test_parser_keeps_structured_changes_when_route_label_is_wrong():
     assert result.changes[0]["value"] == 3
 
 
-def test_only_explicit_value_contradictions_are_vetoed(tmp_path):
+def test_no_python_language_veto_but_physics_stays_strict(tmp_path):
+    """The semantic pipeline has no regex second-guessing of the model's reading (the old _explicit_contradiction):
+    the scientist reviews every proposal before it applies. Physics stays strict whatever the model returns."""
     replies = {
         "3 replicates": change("print.replicates", 8),
-        "35 µL drop": change("print.droplet_volume_ul", 5),
-        "put the dye in vial A3": {"route": "experiment_change", "changes": [
-            {"path": "materials.sample.vial", "value": "B3", "evidence": "dye in vial A3"}]},
         "print A11 on A3": {"route": "experiment_change", "changes": [
             {"path": "print.source_map", "value": [{"source": "A11", "destination": "B9"}]}]},
+        "35 µL drops": change("print.droplet_volume_ul", 35),
     }
     demo, _, _, output = session(tmp_path, replies)
-    for words in replies:
-        demo._handle(words)
-        assert demo.pending is None
-    assert sum("but the proposal used" in line for line in output) >= 3
-    assert any("positions in the proposal differ" in line for line in output)
+    demo._handle("3 replicates")
+    assert demo.pending is not None and demo.pending.after["print"]["replicates"] == 8      # shown for review
+    demo._handle("no")
+    demo._handle("print A11 on A3")
+    # A11 is a well the default dilution series fills: whether the scientist's own sample is in it is physical state
+    # only they know, so it is asked before anything is proposed (making the dilutions would dispense into it)
+    assert demo.pending is None and demo.safety is not None and "A11" in demo.safety.question
+    demo._handle("cancel")
+    assert demo.safety is None
+    demo._handle("35 µL drops")
+    assert demo.pending is None and demo.state.revision == 0                               # over the P20: refused
+    assert any("over the P20" in line for line in output)
 
 
 def test_polite_request_bare_volume_sparse_drops_and_run_reach_the_model(tmp_path):
@@ -182,7 +189,7 @@ def test_no_replicates_shaking_off_and_prepared_samples(tmp_path):
     assert demo.state.config["print"]["replicates"] == 1
     assert demo.state.config["liquid_handling"]["well_plate_shake"]["enabled"] is False
     assert demo.state.config["dilution"]["enabled"] is False
-    assert model.seen[::2] == list(replies)[:3]
+    assert model.seen == list(replies)[:3]          # the Apply control ("yes") is not sent to the model
 
 
 def test_repeat_on_new_paper_phrase_resets_occupancy(tmp_path):

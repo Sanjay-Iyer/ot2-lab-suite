@@ -1,5 +1,24 @@
 """Interactive controller for scripts/ai_dye_demo.py and the NiceGUI page (Agent NanoDrop).
 
+THE SEMANTIC PIPELINE (settings.llm_first: the page, and the terminal whenever a model is connected)
+
+    scientist message
+      -> conversation.interpret: the model reads it in context (its procedures: skills/nanodrop-*/SKILL.md)
+         -> TurnInterpretation(kind, response, operations, edit_modes)
+      -> question            answered from the plan; nothing is proposed or validated
+         plan_change         semantic patch operations, each with its scope's edit mode (add / modify / replace)
+                             -> ExperimentState.propose_patch (patches.py executes the modes; hard invariants only;
+                             what the plan still needs is shown and blocks only the run)
+         run_request / undo / cancel / approve / discard / history / clarification: handled here
+      -> PROPOSAL -> Apply (the page's button or "yes") -> the editable PlanSpec (ExperimentState.config)
+      -> RUN: compiler.compile_plan resolves references and lays out every print into the exact print map; every
+         check runs on the compiled plan, and only the compiled config is executed
+
+Only the page's own controls (Apply/Discard, cancel, a yes/no to my own yes/no question) are read here without the
+model. The legacy reader below (llm_first off) is kept for the offline terminal and its regression tests.
+
+THE LEGACY READER
+
     USER MESSAGE
       -> hard controls, decided by code (intent.py): commands, yes/no to the waiting proposal,
          run words, undo / start over / history, physical-state reports, injection attempts
@@ -44,7 +63,7 @@ from typing import Any, Callable, Iterable
 
 import yaml
 
-from src.agents.dye_demo import experiment_memory, render
+from src.agents.dye_demo import conversation, experiment_memory, render
 from src.agents.dye_demo.columns import (
     COLUMN_KINDS,
     column_answer,
@@ -91,7 +110,6 @@ from src.agents.dye_demo.llm import (
     ROUTE_APPROVE,
     ROUTE_CHANGE,
     ROUTE_CLARIFY,
-    ROUTE_DISCARD,
     ROUTE_HISTORY,
     ROUTE_REQUEST_RUN,
     Interpretation,
@@ -118,7 +136,10 @@ from src.agents.dye_demo.model import (
     resolve_path,
     set_path,
 )
+from src.agents.dye_demo.compiler import compile_plan
+from src.agents.dye_demo.patches import LIST_FIELDS
 from src.agents.dye_demo.plan import build_plan, print_map
+from src.agents.dye_demo.skills import loaded_skills
 from src.agents.dye_demo.state import (
     PREPARED_FROM_PLAN,
     ASSUMED_FROM_PLAN,
@@ -448,6 +469,27 @@ class _Clarifying:
         return self.question or (self.ambiguity.question if self.ambiguity else "")
 
 
+@dataclass
+class _SafetyQuestion:
+    """The open question about plate wells the dilution step would fill (state.propose_patch: made_not_printed) -
+    whether the scientist's own sample is already in them is physical state only the scientist knows, and making the
+    dilutions would dispense into it. It is kept apart from every other question (DemoSession.clarifying): an unrelated
+    edit, another question, a clarification or a new proposal neither answers, replaces nor forgets it. It is closed only
+    by an explicit answer (a bare yes/no, or the router reading dilution.enabled said either way), by cancel, or when
+    the held request no longer needs it in the plan as applied (rechecked after every applied change). While it is
+    open, no run starts."""
+
+    question: str
+    reason: str
+    changes: list[dict[str, Any]]      # the request that raised it: held, never applied before the answer
+    original: str
+    evidence: str
+    explanation: str = ""
+    preserve: tuple[str, ...] = ()
+    physical: dict[str, Any] | None = None
+    revision: int = 0                  # the plan revision the request was made against
+
+
 def merge_intent(config: dict[str, Any], understood: list[dict[str, Any]], unresolved: Iterable[str],
                  answer: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The request after a clarification answer: every understood change except the unresolved one(s), updated by the
@@ -496,21 +538,36 @@ def revise_request(config: dict[str, Any], request: list[dict[str, Any]], adjust
     kept. A value the router only restates - the one the waiting proposal (`proposed`, its resulting config) already
     has - is not a change: it neither replaces the proposal's own wording of it nor takes anything out (2026-09-27 X02.2:
     "paper columns 2 and 3" re-listed as "first paper column 2" lost the second column). Nothing is taken out by being
-    left out; only "op": "drop" removes."""
+    left out; only "op": "drop" removes.
+
+    A change to ONE item of a list field (a print group by "source" or "group", a dilution factor by "item") replaces
+    only the proposal's change to that same item; a change to the whole field replaces those too. An ADD or MODIFY of
+    the whole list ("edit_mode", patches.py) builds on the proposal's own change instead of replacing it: "also print
+    C11" keeps "print only A11 three times", and the patch engine applies both in order."""
     def key(change: dict[str, Any]) -> str:
-        return canonicalize_path(config, change.get("path", ""))
+        path = canonicalize_path(config, change.get("path", ""))
+        selector = next((f"{name}={change[name]}" for name in ("source", "group", "item")
+                         if change.get(name) not in (None, "")), "")
+        return f"{path}|{selector}" if selector else path
+
+    def field_of(change_key: str) -> str:
+        return change_key.split("|", 1)[0]
 
     def dropped(change: dict[str, Any]) -> bool:
         return str(change.get("op") or "").lower() == "drop"
 
+    def composes(change: dict[str, Any]) -> bool:
+        return not dropped(change) and str(change.get("edit_mode") or "").lower() in {"add", "modify"} \
+            and key(change) in LIST_FIELDS
+
     old = {key(change): change for change in request}
 
-    def seen(path: str) -> list[Any]:
-        """The values the scientist sees for this field in the waiting proposal."""
-        values = [old[path].get("value")] if path in old else []
-        if proposed is not None:
+    def seen(change_key: str) -> list[Any]:
+        """The values the scientist sees for this field (or item) in the waiting proposal."""
+        values = [old[change_key].get("value")] if change_key in old else []
+        if proposed is not None and "|" not in change_key:
             try:
-                values.append(get_path(proposed, resolve_path(proposed, path)))
+                values.append(get_path(proposed, resolve_path(proposed, change_key)))
             except FieldError:
                 pass
         return values
@@ -523,8 +580,17 @@ def revise_request(config: dict[str, Any], request: list[dict[str, Any]], adjust
     real = [change for change in adjustment
             if dropped(change) or str(change.get("op") or "set").lower() != "set"
             or change.get("value") not in seen(key(change))]
-    touched = set().union(*(_replaced_by(key(change)) for change in real)) if real else set()
-    return ([dict(change) for change in request if key(change) not in touched]
+    touched_items: set[str] = set()
+    touched_fields: set[str] = set()
+    for change in real:
+        if composes(change):
+            continue
+        if "|" in key(change):
+            touched_items.add(key(change))
+        else:
+            touched_fields |= _replaced_by(key(change))
+    return ([dict(change) for change in request
+             if key(change) not in touched_items and field_of(key(change)) not in touched_fields]
             + [dict(change) for change in real if not dropped(change)])
 
 
@@ -597,6 +663,12 @@ class DemoSession:
         self.state = ExperimentState(config, first_proposal_id=first_proposal_id, first_run=first_run)
         self.pending: Proposal | None = None
         self.clarifying: _Clarifying | None = None
+        self.safety: _SafetyQuestion | None = None       # the open safety question (semantic pipeline), if any
+        # what the latest proposed change was about, per scope (conversation.focus_of): the router's RECENT FOCUS
+        self._focus: dict[str, list[str]] = {}
+        # the change the scientist's last question asked about (conversation.TurnInterpretation.hypothetical): never
+        # proposed, kept for the next message only - "Yes, do that" becomes exactly that change
+        self._hypothetical: tuple[str, list[dict[str, Any]]] | None = None
         self.turns: list[dict[str, Any]] = []
         self.recent_labware: tuple[str, ...] = ()
         self._recent_age = 0
@@ -614,6 +686,7 @@ class DemoSession:
         self._requests: dict[int, list[dict[str, Any]]] = {}
         # the "is your sample already in ...?" question last asked, and the turn it was asked in
         self._asked_made_not_printed: tuple[str, int] = ("", -1)
+        self._skills_logged = False             # the router's skills are logged once, with the first interpretation
         self._asked_split: tuple[str, int] = ("", -1)      # the even-split question last asked, and its turn
         self._after_hypothetical = False
         # Physical reports ("I took the rack off") that are not in the record yet, oldest first: no run while any is
@@ -661,8 +734,9 @@ class DemoSession:
     def _mode(self) -> str:
         return "SIMULATION - nothing contacts the robot" if self.settings.simulate else "LIVE - the real OT-2 will move"
 
-    def _file_config(self) -> dict[str, Any]:
-        data = self.state.config
+    def _file_config(self, config: dict[str, Any] | None = None) -> dict[str, Any]:
+        """A config with this session's identity: the PlanSpec (default), or the compiled config a run executes."""
+        data = deepcopy(config) if config is not None else self.state.config
         data["session"] = {
             "operator": self.operator,
             "operator_id": operator_id(self.operator),
@@ -684,7 +758,8 @@ class DemoSession:
         """The CURRENT PLAN: what typing run carries out now (never how it got there)."""
         return render.render_current_plan(
             self.state.config, self.state.validate(), simulate=self.settings.simulate, operator=self.operator,
-            trigger=TRIGGER, prepared=self.state.physical.get("dilutions_prepared"), notices=notices or ())
+            trigger=TRIGGER, prepared=self.state.physical.get("dilutions_prepared"), notices=notices or (),
+            occupied=self.state.printed_positions)
 
     def _write_session_summary(self, exit_code: int | None = None) -> None:
         self.log.summary({
@@ -995,6 +1070,9 @@ class DemoSession:
             self._ask(question)
             return True
         if self.settings.llm_first and self.llm is not None and not self._from_button:
+            # The terminal keeps its typed commands (plan, deck, ..., run); the page has buttons for them.
+            if not self.settings.run_button and self._terminal_command(lower):
+                return True
             self._handle_llm_first(stripped)
             return True
         if self._command(lower):
@@ -1011,64 +1089,344 @@ class DemoSession:
         self._age_referents()
         return True
 
-    def _handle_llm_first(self, text: str) -> None:
-        """The GUI path: only stop/cancel and an active yes/no are interpreted locally."""
-        lowered = " ".join(text.lower().split()).strip(" .!")
-        if lowered in {"cancel", "stop", "never mind"}:
-            if self.pending:
-                self._discard_pending("cancelled")
-            elif self.clarifying:
-                self.clarifying = None
-                self.say("agent> Cancelled the pending question.")
+    def _terminal_command(self, lower: str) -> bool:
+        """The terminal's typed commands in the semantic pipeline: the display commands, and the run trigger typed by
+        itself (the same run as the legacy terminal; every run check still applies in _run)."""
+        if self._command(lower):
+            self._classify("command")
+            return True
+        if lower.strip(" .!") == TRIGGER:
+            self._classify("run")
+            if self.pending is not None:
+                self.say(f"agent> Proposal #{self.pending.id} is still waiting. Type yes to apply it or no to discard "
+                         f"it; then type {TRIGGER}.")
+            elif self.clarification_blocks_run():
+                self.say("agent> Answer or cancel the pending question before running.")
             else:
-                self.say("agent> Nothing is waiting to cancel.")
+                self.clarifying = None          # an optional planning question does not hold the current plan
+                self._run()
+            return True
+        return False
+
+    def _handle_llm_first(self, text: str) -> None:
+        """The semantic pipeline (the GUI, and the terminal with a model).
+
+        The router (conversation.interpret) reads the message in context and returns a TurnInterpretation; Python acts
+        on its kind. A question is answered and nothing else happens - it never passes through proposal or run checks.
+        A plan change is a list of semantic patch operations (patches.py) proposed with ExperimentState.propose_patch.
+        Read here without the model are only the page's own controls: Apply / Discard ("yes" / "no" while a proposal
+        waits), cancel, and a yes/no answer to one of my own yes/no questions."""
+        lowered = " ".join(text.lower().split()).strip(" .!")
+        if self.pending is not None and lowered in {"yes", "y", "apply"}:
+            self._classify("confirmation")
+            self._apply_pending()
+            return
+        if self.pending is not None and lowered in {"no", "n", "discard"}:
+            self._classify("confirmation")
+            self._discard_pending("no")
+            return
+        if lowered in {"cancel", "stop", "never mind"}:
+            self._classify("cancel")
+            self._cancel()
             return
         if self.clarifying is not None and self.clarifying.ambiguity is not None \
                 and self.clarifying.ambiguity.yes_no and lowered in {"yes", "no"}:
             self._with_clarifying(text, analyze_turn(text, self._turn_context()))
             return
-        # Analysis contributes context only. Its regex classification never vetoes
-        # the message before the model has seen the scientist's exact words.
+        if self.safety is not None and self.pending is None and self.clarifying is None \
+                and lowered in {"yes", "y", "no", "n"}:
+            self._classify("confirmation")
+            self._answer_safety(lowered in {"no", "n"}, [], original=text)     # yes: the sample is already there
+            return
+        # The analysis only separates quoted or pasted reference material for the router; it decides nothing.
         analysis = analyze_turn(text, self._turn_context())
         self._classify("llm_first", analysis)
-        result = self._route_llm_first(text, analysis)
+        result = self._interpret(text, analysis)
         if result is None:
             return
-        if result.route == ROUTE_REQUEST_RUN:
+        kind = result.kind
+        if kind == conversation.QUESTION:
+            self._answer(analysis, text=text, answer=result.response or "(no answer)", source="llm", route=kind)
+            if result.hypothetical:
+                self._hypothetical = (text, [dict(operation) for operation in result.hypothetical])
+                self.log.write("hypothetical_kept", question=text, operations=result.hypothetical)
+            self._still_waiting(self.pending)
+            if self.clarifying is not None:
+                self.say(f"(Still waiting for your answer: {self.clarifying.prompt})")
+            self._safety_reminder()
+            return
+        if kind == conversation.RUN_REQUEST:
             if self.clarifying is not None and not self.clarification_blocks_run():
                 self.clarifying = None  # superseded optional planning question
             self._request_gui_run()
             return
-        if result.route in DECISION_ROUTES:
-            if result.route == ROUTE_APPROVE and self.pending is not None:
+        if kind in {conversation.APPROVE, conversation.DISCARD}:
+            if kind == conversation.APPROVE and self.pending is not None:
                 self._apply_pending()
-            elif result.route == ROUTE_DISCARD and self.pending is not None:
+            elif kind == conversation.DISCARD and self.pending is not None:
                 self._discard_pending("model-interpreted discard")
             else:
                 self.say("agent> No proposal is waiting for that decision.")
             return
-        if result.route == ROUTE_HISTORY:
-            self._history_request(result, text)
+        if kind == conversation.CANCEL:
+            self._cancel()
             return
-        if result.route == ROUTE_CLARIFY:
-            self._ask_intent(result.clarification or "What should I change?", text=text, analysis=analysis,
-                             understood=result.understood, unresolved=result.unresolved, request=text, notes=[])
+        if kind == conversation.HISTORY:
+            self._history_request(Interpretation(route=ROUTE_HISTORY, history=result.history), text)
             return
-        if result.route in ANSWER_ROUTES:
-            self._answer(analysis, text=text, answer=result.answer or "(no answer)", source="llm", route=result.route)
+        if kind == conversation.UNDO:
+            self._undo_semantic(result, text)
             return
-        changes = self._revision(result, self.pending)
+        if kind == conversation.CLARIFICATION:
+            self._ask_semantic(result, text, analysis)
+            return
+        # plan_change / physical_report: only what changes, as patch operations
+        clarifying, self.clarifying = self.clarifying, None
+        operations = self._revised_operations(result)
         try:
             physical, dependent, physical_notes = self._physical_actions(result.physical_actions)
         except (FieldError, ValueError) as exc:
             self.say(f"agent> I cannot record that physical state: {exc}. Nothing changed.")
             return
+        answer = self._safety_answer(operations) if self.safety is not None else None
+        if answer is not None:
+            # my safety question answered in words, read by the router as its one field (dilution.enabled said either
+            # way); nothing else answers it
+            self._answer_safety(answer, operations, original=text, preserve=result.preserve, physical=physical,
+                                extra=dependent, notes=physical_notes)
+            return
         if self.pending is not None:
             self._supersede(self.pending)
-        self._propose_changes(changes, original=text, analysis=analysis,
-                              explanation=result.explanation, evidence=text, preserve=result.preserve,
-                              source="llm-first", physical=physical, extra_changes=dependent,
-                              notes=physical_notes)
+        if clarifying is not None and clarifying.payload.get("replaced") and self._replaced_id is None:
+            self._replaced_id, self._replaced_summary = clarifying.payload["replaced"]
+        held = self.safety
+        self._propose_changes(operations, original=text, analysis=analysis, explanation=result.response,
+                              evidence=text, preserve=result.preserve, source="llm-first", physical=physical,
+                              extra_changes=dependent, notes=physical_notes)
+        if held is not None and self.safety is held:
+            # another edit (whatever its edit mode: on the startup selection every named print is a replace) neither
+            # answers nor drops the held request; it is rechecked once the plan changes, and cancel drops it
+            self._safety_reminder()
+
+    # ── the safety question (made_not_printed) ─────────────────────────────────
+
+    def _ask_safety(self, exc: ProposalRejected, *, changes: list[dict[str, Any]], original: str, evidence: str,
+                    explanation: str, preserve: Iterable[str], physical: dict[str, Any] | None) -> None:
+        """Hold the request and ask. While a request is already held, a new one that needs the same answer is held
+        with it, in the order asked, and the one question covers both - one never replaces the other."""
+        held, changes = self.safety, [dict(change) for change in changes]
+        again = held is not None
+        revision = self.state.revision
+        if held is not None and changes != held.changes:
+            changes = held.changes + [change for change in changes if change not in held.changes]
+            original, evidence = f"{held.original} / {original}", f"{held.evidence} {evidence}"
+            explanation, revision = " ".join(part for part in (held.explanation, explanation) if part), held.revision
+            preserve, physical = tuple(held.preserve) + tuple(preserve), physical or held.physical
+            try:
+                self.state.propose_patch(changes, request=evidence, source="llm-first", dry_run=True,
+                                         preserved=preserve)
+            except ProposalRejected as both:
+                if both.kind == "made_not_printed" and both.question:
+                    exc = both                      # the one question, naming every well of both requests
+            except (FieldError, ValueError):
+                pass
+        self.safety = _SafetyQuestion(exc.question, str(exc), changes, original, evidence, explanation,
+                                      tuple(preserve), physical, revision)
+        self.say(f"\nagent> {'I still need your answer before I change this' if again else 'Before I change anything'}: "
+                 f"{exc}")
+        self.say(f"       {exc.question}")
+        self.say("       Answer yes or no, or tell me in your own words. Until then this request is held (not applied) "
+                 "and no run starts.")
+        self._reply(f"Safety question (request held, not applied): {exc.question}")
+        self._event("clarification", question=exc.question, purpose="made_not_printed")
+        self.log.write("safety_question_asked", question=exc.question, held=self.safety.changes, again=again)
+
+    def _safety_answer(self, operations: list[dict[str, Any]]) -> bool | None:
+        """The router's reading of my safety question's answer: dilution.enabled said explicitly (False: the sample is
+        already in the wells; True: make the dilutions first). None: this message does not answer it."""
+        values = [operation.get("value") for operation in operations
+                  if canonicalize_path(self.state.config, operation.get("path", "")) == "dilution.enabled"
+                  and str(operation.get("op") or "set").lower() == "set"]
+        if not values or values[-1] not in (True, False, "true", "false"):
+            return None
+        return values[-1] not in (False, "false")
+
+    def _answer_safety(self, make_dilutions: bool, operations: list[dict[str, Any]], *, original: str,
+                       preserve: Iterable[str] = (), physical: dict[str, Any] | None = None,
+                       extra: list[dict[str, Any]] | None = None, notes: list[str] | None = None) -> None:
+        """Propose the held request with the answer: the dilutions are made first (the named wells print the dilution
+        made there), or the sample is already there (the whole dilution step is off). The answer updates the held
+        request only (the router restates it); a proposal waiting meanwhile keeps its changes in the new proposal,
+        after the held request - the order they were asked in."""
+        held = self.safety
+        assert held is not None
+        self.safety = None
+        waiting: list[dict[str, Any]] = []
+        if self.pending is not None:
+            waiting = [dict(change) for change in self._requests.get(self.pending.id, [])]
+            self._supersede(self.pending)
+        answer = [dict(change) for change in operations]
+        if not any(canonicalize_path(self.state.config, change.get("path", "")) == "dilution.enabled"
+                   for change in answer):
+            answer.append({"op": "set", "path": "dilution.enabled", "value": make_dilutions,
+                           "evidence": original})
+        merged = revise_request(self.state.config, [dict(change) for change in held.changes], answer) + waiting
+        note = ("You said the dilutions are made first: the named wells print the dilution made there."
+                if make_dilutions else
+                "You said your sample is already in the plate: the whole dilution step is off (no dilutions are made).")
+        later = [note]
+        if self.state.revision != held.revision and any(change.get("edit_mode") == "replace" for change in held.changes):
+            later.append(f'"{held.original}" was asked before the changes applied since (revision {held.revision}); it '
+                         "replaces what it replaced then, as listed above.")
+        self.log.write("safety_question_answered", question=held.question, make_dilutions=make_dilutions,
+                       merged=merged)
+        self._propose_changes(merged, original=original, analysis=self._plain_analysis(original),
+                              # the held request's own conditional sentence; what the answer does is Python's note
+                              # (the answer turn's wording described it as already done)
+                              explanation=held.explanation,
+                              evidence=" ".join(part for part in (held.evidence, original) if part),
+                              preserve=tuple(held.preserve) + tuple(preserve), source="llm-first",
+                              physical=physical or held.physical, extra_changes=extra, notes=list(notes or []) + later,
+                              accepted=("made_not_printed",) if make_dilutions else ())
+
+    def _safety_reminder(self) -> None:
+        if self.safety is None:
+            return
+        tail = (' Say it in words ("my sample is already there" / "make the dilutions first"): yes or no now answers '
+                f"proposal #{self.pending.id}." if self.pending is not None else "")
+        self.say(f'(Still open - safety question about your earlier request "{self.safety.original}", which is held and '
+                 f"not applied: {self.safety.question}{tail})")
+
+    def _recheck_safety(self) -> None:
+        """After an applied change: does the held request still need the question? Asked against the plan as it is
+        now; when it no longer does, the question is closed and the scientist told the request was never applied."""
+        held = self.safety
+        if held is None:
+            return
+        try:
+            self.state.propose_patch(held.changes, request=held.evidence, source="llm-first", dry_run=True,
+                                     preserved=held.preserve)
+        except ProposalRejected as exc:
+            if exc.kind == "made_not_printed" and exc.question:
+                if exc.question != held.question:
+                    self.safety = _SafetyQuestion(exc.question, str(exc), held.changes, held.original, held.evidence,
+                                                  held.explanation, held.preserve, held.physical, held.revision)
+                    self.say(f"(The safety question about your earlier request now reads: {exc.question})")
+                return
+        except (FieldError, ValueError):
+            pass
+        self.safety = None
+        self.say(f'(The safety question about "{held.original}" no longer applies to the plan as it is now, so it is '
+                 "closed. That request was never applied - say it again if you still want it.)")
+        self.log.write("safety_question_closed", reason="no longer needed", question=held.question)
+
+    def _interpret(self, text: str, analysis: TurnAnalysis) -> "conversation.TurnInterpretation | None":
+        """The router's reading of one message, with the PLAN SPEC (logical references), what a run would do now and
+        what the plan still needs; an open question of mine travels with it."""
+        self.log.write("user_request", text=text, revision=self.state.revision,
+                       pending_proposal=self.pending.id if self.pending else None)
+        notes = []
+        if self.clarifying is not None:
+            # my open question, with the request it is about: an answer comes back as that complete request
+            asked = self.clarifying.understood or self.clarifying.payload.get("changes") or []
+            notes.append(conversation.understood_note(asked, self.clarifying.prompt))
+            if self.clarifying.purpose == "made_not_printed":
+                notes.append(conversation.MADE_NOT_PRINTED_NOTE)
+        if self.safety is not None:
+            notes.append(conversation.understood_note(self.safety.changes, self.safety.question))
+            notes.append(conversation.MADE_NOT_PRINTED_NOTE)
+        if conversation.selection_is_default(self.state.config):
+            notes.append(conversation.DEFAULT_SELECTION_NOTE)
+        hypothetical, self._hypothetical = self._hypothetical, None     # one message only, whatever it turns out to be
+        if hypothetical is not None:
+            notes.append(conversation.hypothetical_note(*hypothetical))
+        if not self._skills_logged:
+            self._skills_logged = True
+            self.log.write("router_skills", skills=[{"name": skill.name, "path": str(skill.path)}
+                                                    for skill in loaded_skills()])
+        compiled = self.state.compile()
+        context = conversation.SemanticContext(
+            router=self._router_context(analysis, notes),
+            spec=conversation.plan_spec_lines(self.state.config, compiled) + self._proposal_spec()
+            + conversation.focus_lines(self._focus)
+            + conversation.runs_lines(self.state.runs, self.state.history))
+        try:
+            result = conversation.interpret(self.llm, text, context)
+        except LLMError as exc:
+            self.say(f"agent> The LLM could not interpret that request: {exc}. Nothing changed.")
+            self.log.write("llm_failed", error=str(exc))
+            self._event("llm_failed", error=str(exc))
+            return None
+        if self._turn is not None:
+            self._turn["route"] = result.kind
+        self._event("route", route=result.kind, changes=len(result.operations))
+        self.log.write("interpretation", kind=result.kind, operations=result.operations, response=result.response,
+                       clarification=result.clarification, physical_actions=result.physical_actions,
+                       edit_modes=result.edit_modes, hypothetical=result.hypothetical)
+        return result
+
+    def _proposal_spec(self) -> list[str]:
+        """What the waiting proposal would make of the plan, compiled the same way (questions about it are answered
+        from these numbers, not from the applied plan's)."""
+        if self.pending is None:
+            return []
+        label = f"IF PROPOSAL #{self.pending.id} IS APPLIED, A RUN WOULD DO"
+        compiled = compile_plan(self.pending.after, occupied=self.state.printed_positions)
+        return conversation.compiled_lines(compiled, self.pending.after, label, f"PROPOSAL #{self.pending.id} STATUS")
+
+    def _revised_operations(self, result: "conversation.TurnInterpretation") -> list[dict[str, Any]]:
+        """The operations to propose: the router's, or - when it read the message as a revision of the waiting (or just
+        replaced) proposal - that proposal's request adjusted by them (revise_request)."""
+        return self._revision(Interpretation(route=ROUTE_CHANGE, changes=list(result.operations),
+                                             revises=result.revises), self.pending)
+
+    def _cancel(self) -> None:
+        if self.pending:
+            self._discard_pending("cancelled")
+        elif self.clarifying:
+            self.clarifying = None
+            self.say("agent> Cancelled the pending question. Nothing was changed.")
+        elif self.safety:
+            held, self.safety = self.safety, None
+            self.say(f'agent> Dropped the held request "{held.original}" and its safety question. Nothing was changed.')
+            self.log.write("safety_question_closed", reason="cancelled", question=held.question)
+        else:
+            self.say("agent> Nothing is waiting to cancel.")
+
+    def _ask_semantic(self, result: "conversation.TurnInterpretation", text: str, analysis: TurnAnalysis) -> None:
+        """The router's one short question. The operations it did understand are kept with the question (never
+        applied) and travel to the next turn, whose answer the router returns as the complete request."""
+        understood = [dict(operation) for operation in result.operations]
+        if self.clarifying is not None and self.clarifying.purpose == "intent" and not understood:
+            understood = list(self.clarifying.understood)
+        rounds = self.clarifying.rounds + 1 if self.clarifying is not None else 0
+        if self.pending is not None and understood:
+            self._supersede(self.pending)
+        self.clarifying = _Clarifying(text, text, [], analysis, None, result.clarification, rounds, "intent",
+                                      self._with_replaced({}), understood=understood,
+                                      unresolved=tuple(result.unresolved), request=text)
+        self._clarify_streak += 1
+        self.say(f"\nagent> {result.clarification}")
+        if understood:
+            self.say("       (I kept the rest of your request: " + "; ".join(self._change_text(change)
+                                                                            for change in understood)
+                     + ". Nothing changes until you apply the proposal.)")
+        self._reply(result.clarification)
+        self._event("clarification", question=result.clarification, purpose="intent",
+                    unresolved=list(result.unresolved), understood=[str(op.get("path", "")) for op in understood])
+        self.log.write("clarification_asked", question=result.clarification, purpose="intent",
+                       unresolved=list(result.unresolved), understood=understood, request=text)
+
+    def _undo_semantic(self, result: "conversation.TurnInterpretation", text: str) -> None:
+        """Undo, read by the router: the stored values of an earlier revision, proposed like any change."""
+        if self.state.revision == 0:
+            self.say("agent> Nothing has been changed yet in this session, so there is nothing to undo.")
+            self._event("noop", reason="nothing to undo")
+            return
+        target = result.revision if result.revision is not None else self.state.revision - 1
+        if self.pending is not None:
+            self._supersede(self.pending)
+        self._undo_to(int(target), None, text)
 
     def _physical_actions(self, actions: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]], list[str]]:
         """Prepare reviewable state transitions; nothing changes before Apply."""
@@ -1108,13 +1466,6 @@ class DemoSession:
                 physical[SOURCES_PRESENT] = present
                 notes.append(f"{well}: operator reports {volume:g} µL now in the current plate.")
         return physical, changes, notes
-
-    def _route_llm_first(self, text: str, analysis: TurnAnalysis) -> Interpretation | None:
-        try:
-            return converse(self.llm, text, self._router_context(analysis, []))
-        except LLMError as exc:
-            self.say(f"agent> The LLM could not interpret that request: {exc}. Nothing changed.")
-            return None
 
     def _command(self, lower: str) -> bool:
         config = self.state.config
@@ -1850,12 +2201,17 @@ class DemoSession:
         for index, item in enumerate(changes):
             others = changes[:index] + changes[index + 1:]
             try:
+                if self.settings.llm_first:
+                    self.state.propose_patch(others, request=request, source=source, physical=physical, title=title,
+                                             origin=original, dry_run=True, preserved=preserve,
+                                             accepted=("made_not_printed",))
+                    found.append(canonicalize_path(config, item.get("path", "")))
+                    continue
                 self.state.propose(others, request=request, source=source, superseded=analysis.superseded,
-                                   restrict_paths=() if self.settings.llm_first else analysis.restrict_paths,
+                                   restrict_paths=analysis.restrict_paths,
                                    physical=physical if physical else self._print_only_record(others), title=title,
                                    origin=original, context=self._hint_context(analysis), history=history,
-                                   dry_run=True, accepted=("made_not_printed", "unstated_split"),
-                                   semantic_only=self.settings.llm_first, **grounding)
+                                   dry_run=True, accepted=("made_not_printed", "unstated_split"), **grounding)
             except ProposalRejected:        # (questions about a valid request are not what this search looks for)
                 continue
             found.append(canonicalize_path(config, item.get("path", "")))
@@ -2460,7 +2816,9 @@ class DemoSession:
         messages in this conversation (then shown as carried over). `preserve` are fields the router says the scientist
         asked to keep; `rounds` counts the questions already asked about this request."""
         flags = list(notes or [])
-        flags += [note for note in analysis.notes if note not in flags]
+        if not self.settings.llm_first:
+            # the legacy reader's own notes; the semantic pipeline's notes come from Python's checks only
+            flags += [note for note in analysis.notes if note not in flags]
         extra_changes = list(extra_changes or [])
         if "injection" in analysis.flags:
             flags.append("you asked me to skip confirmation; I can't, so this is an ordinary proposal")
@@ -2469,6 +2827,13 @@ class DemoSession:
         changes: list[dict[str, Any]] = []
         given_physical = physical
         try:
+            if self.settings.llm_first:
+                # the semantic pipeline: the operations as they are (patches.py applies them in order, one at a time)
+                changes = list(extra_changes) + [dict(change) for change in raw_changes]
+                proposal = self.state.propose_patch(
+                    changes, request=request, explanation=explanation, notes=flags, source=source, physical=physical,
+                    replaces=self._replaced_id, title=title, origin=original, preserved=preserve, accepted=accepted)
+                return self._proposed(proposal, changes, explanation)
             changes = self._merge(extra_changes, list(raw_changes))
             changes = [ExperimentState._as_print_map(change, self.state.config) for change in changes]
             assumed = None if physical else self._print_only_record(changes)
@@ -2480,15 +2845,20 @@ class DemoSession:
             proposal = self.state.propose(
                 changes, request=request, explanation=explanation, notes=flags, source=source,
                 superseded=analysis.superseded,
-                restrict_paths=() if self.settings.llm_first else analysis.restrict_paths,
+                restrict_paths=analysis.restrict_paths,
                 physical=physical,
                 replaces=self._replaced_id, title=title, origin=original, context=self._hint_context(analysis),
-                history=history, accepted=accepted, semantic_only=self.settings.llm_first, **grounding)
+                history=history, accepted=accepted, **grounding)
         except ProposalRejected as exc:
-            if exc.kind == "made_not_printed" and exc.question \
+            if exc.kind == "made_not_printed" and exc.question and self.settings.llm_first:
+                self._ask_safety(exc, changes=changes, original=original, evidence=request, explanation=explanation,
+                                 preserve=preserve, physical=given_physical)
+                return
+            if exc.kind == "made_not_printed" and exc.question and not self.settings.llm_first \
                     and self._asked_made_not_printed == (exc.question, len(self.turns) - 1):
                 # asked in the turn before and answered in other words that kept the dilution step: never the same
-                # question twice in a row
+                # question twice in a row (the legacy reader; the semantic pipeline reads the answer as dilution.enabled
+                # and otherwise asks again, never assuming the wells are empty)
                 self._asked_made_not_printed = ("", -1)
                 self._propose_changes(changes, original=original, analysis=analysis, explanation=explanation,
                                       evidence=request, physical=physical, preserve=preserve, source=source,
@@ -2575,6 +2945,10 @@ class DemoSession:
             self._rejected(exc, text=request, original=original, analysis=analysis, notes=flags, rounds=0,
                            source=source)
             return
+        self._proposed(proposal, changes, explanation)
+
+    def _proposed(self, proposal: Proposal, changes: list[dict[str, Any]], explanation: str) -> None:
+        """Show a validated proposal, or say why there is nothing to propose."""
         if proposal.empty:
             kept = [note for note in proposal.notes if note.startswith("You asked to keep")]
             if kept:
@@ -2590,6 +2964,9 @@ class DemoSession:
             self.log.write("proposal_empty", changes=changes)
             return
         self._requests[proposal.id] = [dict(change) for change in changes]
+        if self.settings.llm_first:
+            focus = conversation.focus_of(proposal.before, proposal.after)
+            self._focus = {**self._focus, **focus}
         self._show_proposal(proposal, explanation)
 
     def _ask_paper_columns(self, exc: ProposalRejected, *, text: str, original: str, analysis: TurnAnalysis,
@@ -2651,6 +3028,9 @@ class DemoSession:
         if not self.state.lab_owned_intact():
             blockers.append("Lab-owned settings changed during this session.")
         blockers += [f"A physical report has not been reconciled: {report}" for report in self.unreconciled_reports]
+        if self.safety is not None:
+            blockers.append(f"A safety question is open: {self.safety.question} Answer it, or cancel the held request, "
+                            "before a run.")
         return blockers + self.state.run_blockers()
 
     def clarification_blocks_run(self) -> bool:
@@ -2682,6 +3062,13 @@ class DemoSession:
             self.say("agent> Run blocked: " + " ".join(blockers))
             return
         if self.request_run_confirmation is None:
+            if not self.settings.run_button:
+                # the terminal: the same run as typing run, after one explicit yes
+                if self._yes_no("Run the current plan now? (yes/no)"):
+                    self._run()
+                else:
+                    self.say("agent> OK - nothing was started.")
+                return
             self.say(f"agent> Check the plan and press {self.settings.run_button}. Nothing has started.")
             return
         self.request_run_confirmation()
@@ -2761,7 +3148,8 @@ class DemoSession:
             explanation = "Here is the change as I understood it. Nothing has been applied yet."
         # what I understood, from the validated changes themselves rather than the model's own description of them
         lines = render.interpretation_lines(proposal) if proposal.source in _INTERPRETED_SOURCES else []
-        if claimed or (explanation and not lines):
+        if claimed or (explanation and (not lines or proposal.progressive)):
+            # the semantic pipeline's one sentence also carries the answer to a question asked with the change
             self.say(f"\nagent> {explanation}")
         if lines:
             formatted = "\n       ".join(f"{line[0].upper()}{line[1:]}" if not line.endswith(".") else line for line in lines)
@@ -2771,7 +3159,10 @@ class DemoSession:
         # the complete plan that exists if the scientist types yes, with the prepared-dilutions record it would keep
         prepared = (proposal.physical["dilutions_prepared"] if "dilutions_prepared" in proposal.physical
                     else self.state.physical.get("dilutions_prepared"))
-        self.say(render.render_proposal(proposal, prepared=prepared))
+        new_paper = proposal.physical.get("paper_id", self.state.physical.get("paper_id")) != \
+            self.state.physical.get("paper_id")
+        self.say(render.render_proposal(proposal, prepared=prepared,
+                                        occupied=() if new_paper else self.state.printed_positions))
         self._event("proposal", id=proposal.id, paths=proposal.paths, physical=sorted(proposal.physical),
                     source=proposal.source, replaces=proposal.replaces,
                     unverified=[change.path for change in proposal.changes if not change.verified],
@@ -2960,6 +3351,7 @@ class DemoSession:
         self._event("applied", id=proposal.id, revision=self.state.revision, paths=proposal.paths,
                     physical=sorted(proposal.physical))
         self.say(f"\nAPPLIED proposal #{proposal.id}. This is now the current plan (recorded for {self.operator}).")
+        self._recheck_safety()
         # a report is recorded when the record says all of it: a reconciliation may record part of a report ("I put in
         # a fresh tip rack and moved the paper to slot 2" asks about the tips first; the paper is still to be recorded)
         self._clear_matched_reports("recorded")
@@ -3316,7 +3708,10 @@ class DemoSession:
     # ── running ──────────────────────────────────────────────────────────────
 
     def _run(self) -> None:
-        report = self.state.validate()
+        # Run preparation: the PlanSpec is compiled (compiler.py) - references resolved to wells, every paper position
+        # decided, the exact print map generated - and every check runs on the result. Only the compiled config runs.
+        compiled = self.state.compile()
+        report = compiled.report
         if report.errors:
             self.say(render.render_report(report) + "\nNothing was run.")
             self.log.write("run_refused", errors=report.error_messages())
@@ -3343,8 +3738,10 @@ class DemoSession:
             self.log.write("run_refused", errors=blockers)
             self._event("refusal", reason="physical blocker")
             return
-        config = self.state.config
-        plan = build_plan(config)
+        config = compiled.config
+        plan = compiled.plan
+        # what the scientist designed: the dilutions this plan prints without making them (the live check below)
+        designed = build_plan(self.state.config, occupied=self.state.printed_positions)
         if not self.settings.simulate:
             if self.settings.run_button and hasattr(self.executor, "check_robot"):
                 self.say("agent> Checking that the OT-2 answers before anything is uploaded ...")
@@ -3378,8 +3775,8 @@ class DemoSession:
                     self.log.write("run_cancelled", reason="physical deck not confirmed")
                     self._event("refusal", reason="deck not confirmed")
                     return
-            if plan.do_print and not plan.do_dilution and plan.wells:
-                wells = render.positions_text([well.well for well in plan.wells], limit=len(plan.wells) + 1)
+            if designed.do_print and not designed.do_dilution and designed.wells:
+                wells = render.positions_text([well.well for well in designed.wells], limit=len(designed.wells) + 1)
                 if not self._yes_no(f"This run prints without making dilutions. Do plate wells {wells} already hold "
                                     "the dilutions? (yes/no)"):
                     self.say("Run cancelled. Nothing was executed.")
@@ -3387,22 +3784,27 @@ class DemoSession:
                     self._event("refusal", reason="dilutions not confirmed")
                     return
         run_number = self.state.next_run
-        self.say("\n" + render.render_run_banner(config, simulate=self.settings.simulate, operator=self.operator,
-                                                 session_label=self.settings.session_label, run_number=run_number))
+        self.say("\n" + render.render_run_banner(self.state.config, simulate=self.settings.simulate,
+                                                 operator=self.operator, session_label=self.settings.session_label,
+                                                 run_number=run_number, occupied=self.state.printed_positions))
         if not self.settings.simulate:
             how = "press Stop at the top of the page" if self.settings.run_button else "press Ctrl-C once"
             self.say(f"\nTo stop the robot, {how}: the runner then asks the OT-2 to stop this run and waits "
                      "for the robot to report it stopped. If that is not confirmed, stop the run in the Opentrons App.")
         self.say(render.RULE)
-        executed = self._file_config()
-        for name in (f"executed_config_run{run_number}.yaml", "executed_config.yaml"):
-            (self.settings.run_dir / name).write_text(yaml.safe_dump(executed, sort_keys=False), encoding="utf-8")
+        executed = self._file_config(compiled.config)
+        executed_path = self.settings.run_dir / f"executed_config_run{run_number}.yaml"
+        for path in (executed_path, self.settings.run_dir / "executed_config.yaml"):
+            path.write_text(yaml.safe_dump(executed, sort_keys=False), encoding="utf-8")
+        # the PlanSpec the run was compiled from (what the scientist built), beside what the robot was given
+        (self.settings.run_dir / f"plan_spec_run{run_number}.yaml").write_text(
+            yaml.safe_dump(self._file_config(), sort_keys=False), encoding="utf-8")
         self._write_working_config()
         self.log.write("run_confirmed", run=run_number, revision=self.state.revision,
-                       state_sha256=self.state.fingerprint())
+                       state_sha256=self.state.fingerprint(), source_map=compiled.source_map)
         self._event("run", run=run_number, revision=self.state.revision, simulate=self.settings.simulate)
         try:
-            code = self.executor(self.settings.working_config, self.settings.simulate, self.log)
+            code = self.executor(executed_path, self.settings.simulate, self.log)
         except KeyboardInterrupt:
             # an executor that does not handle the interrupt itself: treat the run as stopped part-way
             self.log.write("run_interrupted")
@@ -3415,13 +3817,13 @@ class DemoSession:
         record = self.state.record_run(simulate=self.settings.simulate, exit_code=code, printed=printed,
                                        tips_used=tips_used, operator=self.operator,
                                        prepared=self._prepared_record(plan) if plan.do_dilution else None,
-                                       status=status, robot=robot)
+                                       status=status, robot=robot, plan=plan)
         self.log.write("run_finished", **record)
         self._event("run_finished", run=run_number, status=status, exit_code=code)
         self._write_session_summary()
         self.say(f"\nRun {run_number} finished with exit code {code}.")
         if status == "succeeded":
-            self._save_history(executed, record)
+            self._save_history(self._file_config(), record)     # the experiment as designed (the PlanSpec)
         if code != 0 and self.settings.simulate:
             self.say(render.attention("The simulation did not finish (nothing contacts the robot in a simulation)."
                                       if status == "aborted" else

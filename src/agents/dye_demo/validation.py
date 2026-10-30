@@ -24,6 +24,9 @@ from src.agents.dye_demo.model import (
     fmt_ul,
     is_off_deck,
     liquid_handling,
+    normalize_drops_at,
+    normalize_paper_column_list,
+    normalize_print_source,
     normalize_source_map,
     occupancy,
     positions_text,
@@ -33,18 +36,46 @@ from src.agents.dye_demo.model import (
 )
 from src.agents.dye_demo.plan import (
     build_plan,
-    dilution_rows,
     droplet_volumes,
     explicit_paper_rows,
     factors_of,
     mixes_dilutions,
-    paper_layout,
     print_map,
     steps_enabled,
     well_area_mm2,
 )
 
 REQUIRED_SECTIONS = ("deck", "pipette", "materials", "dilution", "mixing", "print", "tips", "safety")
+
+# Progressive validation. The same checks run at every step; what differs is WHEN an error blocks.
+#   HARD (blocks an edit): a value that is never valid whatever else changes - a malformed or impossible value, a
+#     schema problem, two labware in one slot, dye and water in one vial, a pipette/well/drop limit exceeded, a
+#     dictated print map printing one paper position twice. These keep the editable plan physically sane.
+#   RUN REQUIREMENTS (block only a run): everything that depends on how settings combine or on what is still missing -
+#     enough tips, liquid deep enough for the tip, labware the enabled steps need on the deck, a print source that
+#     resolves, paper rows for every printed sample, room on the paper, dye/water transfers above the P20 minimum for
+#     the chosen factor and volume. A scientist may build the plan in any order; the run waits until they all hold.
+HARD_CODES = frozenset({
+    "config.sections", "deck.missing", "deck.slot", "deck.collision",
+    "materials.role", "materials.vial", "materials.same_vial",
+    "dilution.factors", "dilution.count", "dilution.factor_below_1", "dilution.rows", "dilution.start_row",
+    "dilution.column", "dilution.total_volume", "dilution.prepared_volume",
+    "mixing.values", "mixing.volume", "mixing.reps",
+    "liquid_handling.height", "liquid_handling.air_gap", "liquid_handling.shake",
+    "print.volume", "print.volume_below_min", "print.volume_over_max", "print.droplets_per_spot", "print.replicates",
+    "print.paper_column", "print.paper_rows", "print.source_map", "print.source", "print.columns", "print.drops_at",
+    "tips.start_tip", "tips.policy",
+})
+
+
+def hard_errors(report: "Report") -> list["Issue"]:
+    """The errors that block an edit (HARD_CODES)."""
+    return [issue for issue in report.errors if issue.code in HARD_CODES]
+
+
+def run_requirements(report: "Report") -> list["Issue"]:
+    """The errors that block only a run: what the plan still needs before it can execute."""
+    return [issue for issue in report.errors if issue.code not in HARD_CODES]
 _WHY_REQUIRED = {
     "plate": "the dilutions are made in it and printing draws from it",
     "paper": "printing needs the paper",
@@ -118,6 +149,7 @@ def off_deck_blocker(config: dict[str, Any], role: str) -> str | None:
 
 def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -> Report:
     report = Report()
+    printed_positions = {str(position) for position in printed_positions}
     missing = [name for name in REQUIRED_SECTIONS if not isinstance(config.get(name), dict)]
     if missing:
         report.error("config.sections", "missing section(s): " + ", ".join(missing))
@@ -144,9 +176,13 @@ def validate(config: dict[str, Any], *, printed_positions: Iterable[str] = ()) -
     if report.errors:
         return report       # the plan-level checks below need a well-formed config
 
-    plan = build_plan(config)
+    plan = build_plan(config, occupied=printed_positions)
     if not plan.do_dilution and not plan.do_print:
         report.error("steps.none", "nothing to run: both the dilution step and the print step are off")
+    for issue in plan.print_issues:
+        report.error("print.layout", issue)
+    if plan.do_print and not plan.print_positions and not plan.print_issues:
+        report.error("print.nothing", "printing is on, but nothing would print: name what to print and where")
     if plan.tips_short:
         # the last start tip with enough fresh tips after it ("start from tip H12" on a 10-tip plan: G11)
         latest = f" ({TIP_ORDER[-plan.tips_needed]} is the latest that fits)" if plan.tips_needed <= len(TIP_ORDER) \
@@ -453,38 +489,32 @@ def _check_print(config: dict[str, Any], report: Report, p20_min: float, p20_max
         _check_print_map(printing["source_map"], volumes, width, air_gap, p20_min, p20_max, report)
         return              # the map names every position; the column layout settings are not used
     if paper_rows is not None and prints:
-        _check_paper_rows(config, paper_rows, report)
+        _check_paper_rows(paper_rows, report)
+    for key, label in (("source", "print source"), ("columns", "paper columns"), ("drops_at", "drops per position")):
+        normalize = {"source": normalize_print_source, "columns": normalize_paper_column_list,
+                     "drops_at": normalize_drops_at}[key]
+        try:
+            normalize(printing.get(key))
+        except FieldError as exc:
+            report.error(f"print.{key}", f"the {label}: {exc}")
     if start < 1:
         report.error("print.paper_column", "the first paper column must be 1-12")
-        return
-    try:
-        columns = [spot["column"] for spot in paper_layout(config, include_overflow=True)]
-    except (TypeError, ValueError):
-        return                  # malformed counts are already reported above
-    if columns and max(columns) > width:
-        report.error("print.past_paper",
-                     f"the print plan needs paper column {max(columns)}, past the paper's {width} "
-                     f"columns; start further left or use fewer volumes/replicates")
+    # A side-by-side layout past the paper's edge is not an error: replicates are a count, and the plan places the
+    # extra prints on free positions (plan.semantic_prints). Only a paper with no room left is, as a print issue.
 
 
-def _check_paper_rows(config: dict[str, Any], paper_rows: list[str], report: Report) -> None:
-    """print.paper_rows: where the dilutions print is independent of where they are made, but each printed dilution
-    needs exactly one real paper row of its own (the i-th dilution prints on the i-th paper row)."""
+def _check_paper_rows(paper_rows: list[str], report: Report) -> None:
+    """print.paper_rows: where the samples print is independent of where they are made. Each listed row must exist and
+    appear once; how many rows the printed samples need is a layout question (plan.semantic_prints: one row per
+    sample, or every listed row for a single sample) and is reported as a print issue."""
     invalid = [row for row in paper_rows if row not in ROWS]
     if invalid:
         report.error("print.paper_rows", f"the paper has rows A-H, so it has no row {', '.join(invalid)}")
         return
     repeated = sorted({row for row in paper_rows if paper_rows.count(row) > 1}, key=ROWS.index)
     if repeated:
-        report.error("print.paper_rows", f"paper row {', '.join(repeated)} is listed twice; each dilution prints on a "
+        report.error("print.paper_rows", f"paper row {', '.join(repeated)} is listed twice; each sample prints on a "
                                          "paper row of its own")
-        return
-    series = dilution_rows(config)
-    if len(paper_rows) != len(series):
-        report.error("print.paper_rows_count",
-                     f"{len(series)} dilution{'s' if len(series) != 1 else ''} would print on {len(paper_rows)} paper "
-                     f"row{'s' if len(paper_rows) != 1 else ''} ({', '.join(paper_rows)}); each dilution needs one paper "
-                     "row")
 
 
 def _check_print_map(raw: Any, volumes: list[float], width: int, air_gap: float, p20_min: float, p20_max: float,

@@ -25,6 +25,15 @@ area, with the exact commands, file paths, and safety gates needed to perform it
 | **standard-paper-printing** | [`standard-paper-printing/`](standard-paper-printing/SKILL.md) | Runtime procedure for registered exact-well standard printing workflows. |
 | **design-paper-printing** | [`design-paper-printing/`](design-paper-printing/SKILL.md) | Runtime procedure for registered continuous-coordinate design workflows. |
 | **four-clover-printing** | [`four-clover-printing/`](four-clover-printing/SKILL.md) | Runtime specialization selected after the design registry resolves `four_clover`. |
+| **nanodrop-edit-semantics** | [`nanodrop-edit-semantics/`](nanodrop-edit-semantics/SKILL.md) | Agent NanoDrop router: question vs change, scopes, and ADD / MODIFY / REPLACE edit modes (incl. the startup default selection). |
+| **nanodrop-printing** | [`nanodrop-printing/`](nanodrop-printing/SKILL.md) | Agent NanoDrop router: logical print sources, per-source print intents, one-group edits, plan-wide print settings. |
+| **nanodrop-dilutions** | [`nanodrop-dilutions/`](nanodrop-dilutions/SKILL.md) | Agent NanoDrop router: dilution factors and series edits, percentage mixtures, what cannot be made. |
+| **nanodrop-plan-settings** | [`nanodrop-plan-settings/`](nanodrop-plan-settings/SKILL.md) | Agent NanoDrop router: deck, vials, tips, liquid-handling switches, lab-owned fields, physical reports. |
+
+The four `nanodrop-*` skills (frontmatter `domain: dye_demo`, `agent: nanodrop`) are runtime procedures of the
+Agent NanoDrop dye demo: [`src/agents/dye_demo/skills.py`](../src/agents/dye_demo/skills.py) loads all of them, in
+their `order`, after the router's fixed output contract (`conversation.CORE_ROUTER_PROMPT`). Editing one changes how
+the router reads messages; Python still executes the edit modes and every physical check.
 
 ## How these relate to the AI agent
 

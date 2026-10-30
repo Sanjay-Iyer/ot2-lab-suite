@@ -181,7 +181,10 @@ def folder_run_configs(folder: Path) -> list[dict[str, Any]]:
     summary = json.loads((folder / "session.json").read_text(encoding="utf-8"))
     configs = []
     for run in summary.get("runs") or []:
-        path = folder / f"executed_config_run{run.get('run')}.yaml"
+        # the PlanSpec the run was compiled from; older folders have only the executed config
+        path = folder / f"plan_spec_run{run.get('run')}.yaml"
+        if not path.exists():
+            path = folder / f"executed_config_run{run.get('run')}.yaml"
         if run.get("exit_code") == 0 and path.exists():
             configs.append(normalize_loaded_config(yaml.safe_load(path.read_text(encoding="utf-8")) or {}))
     return configs

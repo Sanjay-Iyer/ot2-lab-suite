@@ -1,188 +1,125 @@
-"""Deterministic test suite for canonical paper placement architecture (Cases 1-8)."""
+"""Canonical paper placement (Cases 1-8) in the semantic pipeline: the PlanSpec keeps what the scientist asked for -
+drops, paper rows and columns, replicate counts, or the exact positions they dictated - and the compiled plan
+(compiler.py) has the one exact print map the run executes. Edits never generate a print map of their own."""
 from __future__ import annotations
 
 from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config
-from src.agents.dye_demo.plan import build_plan, print_map, explicit_paper_rows
+from src.agents.dye_demo.plan import explicit_paper_rows
 from src.agents.dye_demo.state import ExperimentState
 
 
 def create_state():
-    config = load_config(DEFAULT_CONFIG)
-    return ExperimentState(config)
+    return ExperimentState(load_config(DEFAULT_CONFIG))
+
+
+def propose(state, operations, request):
+    return state.propose_patch(operations, request=request, accepted=["made_not_printed"])
+
+
+def compiled(proposal, state):
+    state.apply(proposal, operator="Tester")
+    result = state.compile()
+    assert result.ok, result.errors
+    return result
 
 
 def test_case_1_drops_per_position_on_row_based_placement():
-    """CASE 1: Start from normal row-based placement. Then 'Put 1 drop on A1, 3 drops on A2, and 2 drops on C4.'
-    Expected: valid proposal, no rows/map conflict, print.paper_rows is cleared."""
+    """CASE 1: the normal row layout, then "1 drop on A1, 3 drops on B1 and 2 drops on C1": drops on those positions,
+    no print map in the plan, and the compiled map carries the counts. A position nothing prints on blocks only the
+    run, with the reason."""
     state = create_state()
-    # verify initial state has implicit paper rows (paper_rows field is None)
-    assert state.config["print"].get("paper_rows") is None
-    
-    # Propose explicit drop map
-    proposal = state.propose(
-        [{"path": "drops_at", "value": {"A1": 1, "A2": 3, "C4": 2}}],
-        request="Put 1 drop on A1, 3 drops on A2, and 2 drops on C4.",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
-    
+    proposal = propose(state, [{"path": "drops_at", "value": {"A1": 1, "B1": 3, "C1": 2}}],
+                       "Put 1 drop on A1, 3 drops on B1, and 2 drops on C1.")
     assert proposal.report.errors == []
-    # Verify print map became canonical
-    pm = print_map(proposal.after)
-    assert pm is not None
-    # Verify paper_rows was cleared (None) so there is no conflict
-    assert explicit_paper_rows(proposal.after) is None
+    assert proposal.after["print"]["drops_at"] == {"A1": 1, "B1": 3, "C1": 2}
+    assert proposal.after["print"].get("source_map") is None and explicit_paper_rows(proposal.after) is None
+    result = compiled(proposal, state)
+    assert result.source_map[1] == {"source": "B11", "positions": ["B1"], "drops": {"B1": 3}}
+    outside = propose(state, [{"path": "drops_at", "value": {"C4": 2}}], "2 drops on C4")
+    assert any("nothing prints there" in message for message in outside.requirements)
 
 
 def test_case_2_new_destination_and_drop_count_together():
-    """CASE 2: 'Take A11 and print 3 drops on B1.'
-    Expected: source=A11, destination=B1, drops=3 in one request."""
+    """CASE 2: "Take A11 and print 3 drops on B1": source, destination and drops in one request."""
     state = create_state()
-    proposal = state.propose(
-        [{"path": "print_map", "value": [{"source": "A11", "positions": ["B1"], "drops": {"B1": 3}}]}],
-        request="Take A11 and print 3 drops on B1.",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
+    proposal = propose(state, [{"path": "print_map", "value": [{"source": "A11", "positions": ["B1"],
+                                                                 "drops": {"B1": 3}}]}],
+                       "Take A11 and print 3 drops on B1.")
     assert proposal.report.errors == []
-    pm = print_map(proposal.after)
-    assert pm is not None
-    assert pm[0]["source"] == "A11"
-    assert pm[0]["positions"] == ["B1"]
-    assert pm[0]["drops"] == {"B1": 3}
-    assert explicit_paper_rows(proposal.after) is None
+    # A11 is where this run makes dilution 1: the dictated map prints that dilution, by reference
+    assert proposal.after["print"]["source_map"] == [{"source": "dilution:1", "positions": ["B1"], "drops": {"B1": 3}}]
+    assert compiled(proposal, state).source_map == [{"source": "A11", "positions": ["B1"], "drops": {"B1": 3}}]
 
 
 def test_case_3_exact_destinations_preserved():
-    """CASE 3: 'Print A11 on A3, C3, and E8.'
-    Expected: exact destinations preserved."""
+    """CASE 3: "Print A11 on A3, C3, and E8": the exact destinations."""
     state = create_state()
-    proposal = state.propose(
-        [{"path": "print_map", "value": [{"source": "A11", "positions": ["A3", "C3", "E8"]}]}],
-        request="Print A11 on A3, C3, and E8.",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
+    proposal = propose(state, [{"path": "print_map", "value": [{"source": "A11", "positions": ["A3", "C3", "E8"]}]}],
+                       "Print A11 on A3, C3, and E8.")
     assert proposal.report.errors == []
-    pm = print_map(proposal.after)
-    assert pm is not None
-    assert pm[0]["source"] == "A11"
-    assert pm[0]["positions"] == ["A3", "C3", "E8"]
-    assert explicit_paper_rows(proposal.after) is None
+    assert compiled(proposal, state).source_map == [{"source": "A11", "positions": ["A3", "C3", "E8"]}]
+    assert explicit_paper_rows(state.config) is None
 
 
 def test_case_4_replicates_expand_explicit_map():
-    """CASE 4: Start with explicit map. Then: '2 replicates for each spot'
-    Expected: canonical map expands, no competing row state."""
+    """CASE 4: a dictated map, then "2 replicates for each spot": the map's position stays and its second print goes
+    on the nearest free position."""
     state = create_state()
-    p1 = state.propose(
-        [{"path": "print_map", "value": [{"source": "A11", "positions": ["A3"]}]}],
-        request="Print A11 on A3.",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
-    state.apply(p1, operator="Tester")
-    
-    p2 = state.propose(
-        [{"path": "print.replicates", "value": 2}],
-        request="2 replicates for each spot",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
+    state.apply(propose(state, [{"path": "print_map", "value": [{"source": "A11", "positions": ["A3"]}]}],
+                        "Print A11 on A3."), operator="Tester")
+    p2 = propose(state, [{"path": "print.replicates", "value": 2}], "2 replicates for each spot")
     assert p2.report.errors == []
-    pm = print_map(p2.after)
-    assert pm is not None
-    assert len(pm[0]["positions"]) == 2
-    assert "A3" in pm[0]["positions"]
-    assert explicit_paper_rows(p2.after) is None
+    [entry] = p2.after["print"]["source_map"]
+    assert entry["source"] == "dilution:1" and len(entry["positions"]) == 2 and entry["positions"][0] == "A3"
+    assert compiled(p2, state).source_map[0]["positions"] == entry["positions"]
 
 
 def test_case_5_column_12_anchor():
-    """CASE 5: '3 replicates starting in column 12'
-    Expected: valid placement near column 12, no column-13 assumption."""
+    """CASE 5: "3 replicates starting in column 12": the PlanSpec says exactly that; the compiled run places them
+    from column 12 without ever needing a column 13."""
     state = create_state()
-    proposal = state.propose(
-        [{"path": "paper_columns", "value": [12], "mode": "anchor"}, {"path": "print.replicates", "value": 3}],
-        request="3 replicates starting in column 12",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
+    proposal = propose(state, [{"path": "paper_columns", "value": [12], "mode": "anchor"},
+                               {"path": "print.replicates", "value": 3}], "3 replicates starting in column 12")
     assert proposal.report.errors == []
-    plan = build_plan(proposal.after)
-    cols = [int(op.destination[1:]) for op in plan.operations if op.kind == "print"]
-    assert all(1 <= c <= 12 for c in cols)
-    assert max(cols) == 12
+    assert (proposal.after["print"]["paper_start_column"], proposal.after["print"]["replicates"]) == (12, 3)
+    assert proposal.after["print"].get("source_map") is None
+    result = compiled(proposal, state)
+    columns = [int(op.destination[1:]) for op in result.plan.operations if op.kind == "print"]
+    assert all(1 <= column <= 12 for column in columns) and max(columns) == 12 and len(columns) == 24
 
 
 def test_case_6_shorthand_replaces_explicit_map():
-    """CASE 6: After complex explicit-map edits: 'print column 4 rows 1 3 8'
-    Expected: new shorthand placement replaces/resolves old map cleanly."""
+    """CASE 6: a dictated map, then "print column 4 rows 1 3 8": the new placement replaces the map; the sample it
+    printed keeps printing."""
     state = create_state()
-    # Step 1: explicit map
-    p1 = state.propose(
-        [{"path": "print_map", "value": [{"source": "A11", "positions": ["A3", "C3", "E8"]}]}],
-        request="Print A11 on A3, C3, and E8.",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
-    state.apply(p1, operator="Tester")
-    assert print_map(state.config) is not None
-    
-    # Step 2: shorthand placement request "print column 4 rows 1 3 8"
-    p2 = state.propose(
-        [{"path": "paper_rows", "value": ["A", "C", "H"]}, {"path": "paper_columns", "value": [4], "mode": "exact"}],
-        request="print column 4 rows 1 3 8",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
+    state.apply(propose(state, [{"path": "print_map", "value": [{"source": "A11",
+                                                                 "positions": ["A3", "C3", "E8"]}]}],
+                        "Print A11 on A3, C3, and E8."), operator="Tester")
+    p2 = propose(state, [{"path": "paper_rows", "value": ["A", "C", "H"]},
+                         {"path": "paper_columns", "value": [4], "mode": "exact"}], "print column 4 rows 1 3 8")
     assert p2.report.errors == []
-    pm = print_map(p2.after)
-    assert pm is not None
-    # verify the explicit map now reflects rows A, C, H in column 4 (A4, C4, H4)
-    positions = [pos for entry in pm for pos in entry["positions"]]
-    assert sorted(positions) == ["A4", "C4", "H4"], f"pm was {pm}, changes were {p2.changes}"
-    assert explicit_paper_rows(p2.after) is None
+    assert p2.after["print"].get("source_map") is None
+    assert (p2.after["print"]["source"], p2.after["print"]["paper_rows"]) == (["dilution:1"], ["A", "C", "H"])
+    result = compiled(p2, state)
+    assert result.source_map == [{"source": "A11", "positions": ["A4", "C4", "H4"]}]
 
 
 def test_case_7_paper_vs_plate_column():
-    """CASE 7: 'print column 12 on paper'
-    Expected: paper placement changes, dilution plate column unchanged."""
+    """CASE 7: "print column 12 on paper": the paper placement changes, the dilution plate column does not."""
     state = create_state()
     initial_plate_col = state.config["dilution"]["plate_column"]
-    
-    proposal = state.propose(
-        [{"path": "paper_columns", "value": [12], "target": "paper"}],
-        request="print column 12 on paper",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
+    proposal = propose(state, [{"path": "paper_columns", "value": [12], "target": "paper"}], "print column 12 on paper")
     assert proposal.report.errors == []
     assert proposal.after["dilution"]["plate_column"] == initial_plate_col
-    assert proposal.after["print"]["paper_start_column"] == 12 or print_map(proposal.after) is not None
+    assert proposal.after["print"]["paper_start_column"] == 12
+    assert {position[1:] for entry in compiled(proposal, state).source_map for position in entry["positions"]} == {"12"}
 
 
 def test_case_8_no_replicates():
-    """CASE 8: 'no replicates'
-    Expected: one total copy per condition, canonical map shrinks correctly."""
+    """CASE 8: 3 replicates, then "no replicates": one copy per condition again."""
     state = create_state()
-    # start with 3 replicates
-    p1 = state.propose(
-        [{"path": "print.replicates", "value": 3}],
-        request="3 replicates",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
-    state.apply(p1, operator="Tester")
-    
-    p2 = state.propose(
-        [{"path": "print.replicates", "value": 1}],
-        request="no replicates",
-        accepted=["made_not_printed"],
-        semantic_only=True
-    )
-    assert p2.report.errors == []
-    pm = print_map(p2.after)
-    assert pm is not None
-    for entry in pm:
+    state.apply(propose(state, [{"path": "print.replicates", "value": 3}], "3 replicates"), operator="Tester")
+    p2 = propose(state, [{"path": "print.replicates", "op": "none"}], "no replicates")
+    assert p2.report.errors == [] and p2.after["print"]["replicates"] == 1
+    for entry in compiled(p2, state).source_map:
         assert len(entry["positions"]) == 1
-    assert explicit_paper_rows(p2.after) is None

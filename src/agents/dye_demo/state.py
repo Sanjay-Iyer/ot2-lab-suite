@@ -105,12 +105,23 @@ from src.agents.dye_demo.plan import (
     row_factors,
     steps_enabled,
 )
+from src.agents.dye_demo.compiler import CompiledPlan, compile_plan
+from src.agents.dye_demo.patches import (
+    NULLABLE_FIELDS,
+    PlanOperation,
+    apply_operations,
+    made_wells_named,
+    refer_to_made_wells,
+    relative_value,
+)
 from src.agents.dye_demo.validation import (
     DeckConflict,
     Report,
     deck_conflicts,
     free_slots,
+    hard_errors,
     recorded_liquid_errors,
+    run_requirements,
     validate,
 )
 
@@ -121,8 +132,7 @@ _VOLUME_PATHS = {"print.droplet_volume_ul", "dilution.total_volume_ul", "dilutio
                  "mixing.volume_ul"}
 _COUNT_PATHS = {"print.droplets_per_spot", "print.replicates", "mixing.reps", "print.paper_start_column",
                 "dilution.plate_column"}
-_NULLABLE = {"dilution.prepared_volume_ul", "materials.sample.label", "materials.solvent.label", "dilution.rows",
-             "print.source_map", "print.paper_rows"}
+_NULLABLE = set(NULLABLE_FIELDS)
 # Physical record of plate wells the scientist says already hold what they want to print (one confirmation: applying
 # the proposal that uses them records them, and later proposals do not ask again).
 SOURCES_PRESENT = "sources_present"
@@ -449,11 +459,6 @@ def merged_prepared(old: dict[str, Any] | None, new: dict[str, Any] | None) -> d
             "sources": {well: sources[well] for well in wells}}
 
 
-def _tidy(value: float) -> int | float:
-    value = round(float(value), 4)
-    return int(value) if value.is_integer() else value
-
-
 _NUMBER = r"(?:\d+(?:\.\d+)?|\.\d+)"
 _UNIT_LIST = re.compile(
     rf"(?<![\w.])({_NUMBER}(?:\s*(?:,\s*(?:and\s+|or\s+)?|\s+and\s+|\s+or\s+|\s*&\s*|\s*/\s*){_NUMBER})*)\s*"
@@ -505,10 +510,20 @@ class Proposal:
     replaces: int | None = None
     title: str = "PROPOSED PLAN"
     origin: str = ""
+    # The semantic pipeline (propose_patch): checked progressively - only hard errors keep it out, and what the plan
+    # still needs before it can run stays in `report` (validation.run_requirements) and blocks only a run.
+    progressive: bool = False
+    # Operations of the request that could not be applied, each with its reason (the others still apply).
+    failed: tuple[str, ...] = ()
 
     @property
     def empty(self) -> bool:
         return not self.changes and not self.physical
+
+    @property
+    def requirements(self) -> list[str]:
+        """What the resulting plan still needs before it can run (a progressive proposal may be applied without)."""
+        return [issue.message for issue in run_requirements(self.report)]
 
     @property
     def deck_changed(self) -> bool:
@@ -596,7 +611,13 @@ class ExperimentState:
         return fingerprint(lab_owned_view(self._config)) == self.lab_owned_fingerprint
 
     def validate(self) -> Report:
-        return validate(self._config, printed_positions=self.printed_positions)
+        """Every check of the current plan as a run would execute it (the compiled plan's report)."""
+        return self.compile().report
+
+    def compile(self) -> CompiledPlan:
+        """The current PlanSpec compiled for a run (compiler.py): the exact print map, operations, tips and every
+        check. Run preparation and the run itself use this, never the PlanSpec directly."""
+        return compile_plan(self._config, occupied=self.printed_positions)
 
     # ── proposals ────────────────────────────────────────────────────────────
 
@@ -606,7 +627,7 @@ class ExperimentState:
                 replaces: int | None = None, title: str = "PROPOSED PLAN", origin: str = "",
                 context: str = "", history: str = "", dry_run: bool = False, referents: Iterable[str] = (),
                 preserved: Iterable[str] = (), recent_paths: Iterable[str] = (), known_sources: Iterable[str] = (),
-                accepted: Iterable[str] = (), semantic_only: bool = False) -> Proposal:
+                accepted: Iterable[str] = ()) -> Proposal:
         """`request` is the scientist's own words for this request; values must come from them. `history` is their own
         words earlier in this conversation: a value found only there is accepted as carried over and shown for checking
         ("same thing but columns 4-6" keeps the rows and drops of the request it revises). `context` (the question half
@@ -623,8 +644,7 @@ class ExperimentState:
         before = self.config
         after = deepcopy(before)
         structured = [self._as_print_map(raw, before) for raw in self._drops(raw_changes, before)]
-        raw_changes = (structured if semantic_only else
-                       self._rows_as_selection(self._series_pairs(structured, before), before))
+        raw_changes = self._rows_as_selection(self._series_pairs(structured, before), before)
         restrict = tuple(restrict_paths or ())
         final_text = request.replace(superseded, " ") if superseded else request
         notes = list(notes)
@@ -677,8 +697,6 @@ class ExperimentState:
                 value = self._value_for(canonical, raw, current, normalize)
             except FieldError as exc:
                 raise ProposalRejected(f"{label}: {exc}", kind="invalid_value") from exc
-            if semantic_only and kind == "requested":
-                self._explicit_contradiction(canonical, value, raw, request)
             expected = raw.get("expected_before")
             if kind == "requested" and expected not in (None, ""):
                 try:
@@ -703,7 +721,7 @@ class ExperimentState:
                     del changes[canonical]
                     return
             if _same(current, value):
-                if kind == "requested" and checked is None and not semantic_only:
+                if kind == "requested" and checked is None:
                     # "Start tips at A10" answered with the current A1 is not "already set": the model contradicted
                     # the scientist. Only contradictions are raised; an echoed unchanged field is fine.
                     try:
@@ -714,9 +732,8 @@ class ExperimentState:
                 return
             verified, concern = checked if checked is not None else (True, "")
             if kind == "requested" and checked is None:
-                verified, concern = ((True, "") if semantic_only else
-                                     self._verify(canonical, label, value, raw, request, final_text, superseded, before,
-                                                  context=context, history=history))
+                verified, concern = self._verify(canonical, label, value, raw, request, final_text, superseded,
+                                                 before, context=context, history=history)
             set_path(after, actual, value)
             changes[canonical] = FieldChange(canonical, current, value, kind, str(raw.get("evidence") or ""),
                                              str(raw.get("why") or ""), verified, concern)
@@ -745,8 +762,7 @@ class ExperimentState:
                 continue
             try:
                 expanded, note, checked = self._expand_selection(raw, after, final_text, history,
-                                                                 factors_changed="dilution.factors" in changes,
-                                                                 semantic_only=semantic_only)
+                                                                 factors_changed="dilution.factors" in changes)
             except ProposalRejected as exc:
                 if not exc.path:
                     exc.path = selection
@@ -757,114 +773,15 @@ class ExperimentState:
                 add({"evidence": str(raw.get("evidence") or ""), **item}, checked)
         for item in self._placed_prints(before, after, changes):
             add(item, (True, ""))
-        if not semantic_only:
-            for item in self._destinations_kept(before, after, set(changes)):
-                add(item, (True, ""))
-        if semantic_only:
-            has_paper_rows = any(str(raw.get("path", "")).strip().lower() == "paper_rows" for raw in raw_changes) or "print.paper_rows" in changes
-            has_paper_cols = any(str(raw.get("path", "")).strip().lower() == "paper_columns" for raw in raw_changes) or "print.paper_start_column" in changes
-            if has_paper_rows and has_paper_cols and print_map(before) is not None:
-                set_path(after, resolve_path(after, "print.source_map"), None)
-            placement_requested = bool({"print.paper_rows", "print.paper_start_column", "print.replicates",
-                                        "print.source_map"} & set(changes)) or any(
-                str(raw.get("path", "")).strip().lower() in
-                {"paper_rows", "paper_columns", "print_map", "drops_at"} for raw in raw_changes)
-            if placement_requested and steps_enabled(after)[1]:
-                default_drops = int(after["print"].get("droplets_per_spot", 1))
-                if print_map(after) is None:
-                    # Resolve row/column/replicate shorthand once, before validation.
-                    # The map records the exact source, destination, volume and drops
-                    # that the current plan would print, in operation order.
-                    mapped: list[dict[str, Any]] = []
-                    for operation in build_plan(after).operations:
-                        if operation.kind != "print":
-                            continue
-                        key = (operation.source, operation.volume_ul, operation.droplets)
-                        entry = next((item for item in mapped if item["_key"] == key), None)
-                        if entry is None:
-                            entry = {"_key": key, "source": operation.source, "positions": [],
-                                     "volume_ul": operation.volume_ul}
-                            if operation.droplets != default_drops:
-                                entry["drops"] = {}
-                            mapped.append(entry)
-                        entry["positions"].append(operation.destination)
-                        if "drops" in entry:
-                            entry["drops"][operation.destination] = operation.droplets
-                    for entry in mapped:
-                        entry.pop("_key")
-                    if mapped:
-                        add({"path": "print.source_map", "value": mapped, "kind": "dependent",
-                             "why": "the requested paper placement is stored as exact print destinations"},
-                            (True, ""))
-                if print_map(after) is not None and explicit_paper_rows(after) is not None:
-                    add({"path": "print.paper_rows", "value": None, "kind": "dependent",
-                         "why": "the print map now names every paper destination"}, (True, ""))
-                if print_map(after) is not None and "print.replicates" not in changes:
-                    entries = print_map(after) or []
-                    counts = {len(entry["positions"]) for entry in entries}
-                    uniform_drops = all(len(set((entry.get("drops") or {}).get(position, default_drops)
-                                                for position in entry["positions"])) == 1 for entry in entries)
-                    if len(counts) == 1 and uniform_drops:
-                        add({"path": "print.replicates", "value": counts.pop(), "kind": "dependent",
-                             "why": "the explicit map determines the number of copies per condition"}, (True, ""))
-        physical = deepcopy(physical or {})
-        if "dilution.prepared_volume_ul" in changes and after["dilution"].get("prepared_volume_ul") is not None:
-            # A statement about this plan's prepared wells updates those wells only;
-            # it must not invalidate unrelated recorded volumes in the plate.
-            volume = float(after["dilution"]["prepared_volume_ul"])
-            volumes = deepcopy(physical.get(WELL_VOLUMES, self.physical.get(WELL_VOLUMES) or {}))
-            plan_for_volume = build_plan(after)
-            wells = {source.well for source in plan_for_volume.print_sources if not source.made_here}
-            wells.update(well.well for well in plan_for_volume.wells if not plan_for_volume.do_dilution)
-            for well in wells:
-                volumes[well] = {"volume_ul": volume, "plate_id": physical.get("plate_id", self.physical.get("plate_id", 1)),
-                                 "source": "operator stated prepared volume",
-                                 "timestamp_utc": datetime.now(timezone.utc).isoformat()}
-            if wells:
-                physical[WELL_VOLUMES] = volumes
-                if source in {"conversation", "llm-first"}:
-                    source = "print-only-assumption"
-        if physical.get("dilutions_prepared") in (PREPARED_FROM_PLAN, ASSUMED_FROM_PLAN):
-            # "The dilutions are already made ... their factors are 2x, 5x and 10x": record the wells and factors
-            # of the plan after this proposal's own changes, not of the plan before them.
-            resulting = build_plan(after)
-            series = resulting.wells
-            if not series and print_map(after) is not None:
-                # the reported dilutions printed through a print map: the record is the dilution series itself
-                unmapped = deepcopy(after)
-                unmapped["print"]["source_map"] = None
-                series = build_plan(unmapped).wells
-            # the other wells already recorded still hold what they held
-            physical["dilutions_prepared"] = merged_prepared(self.physical.get("dilutions_prepared"), {
-                "wells": [well.well for well in series], "factors": [well.factor for well in series],
-                "total_volume_ul": resulting.total_volume_ul,
-                "source": "assumed for print-only proposal; confirmed on approval"
-                          if physical["dilutions_prepared"] == ASSUMED_FROM_PLAN else "reported by the operator"})
-        if print_map(after) is not None and steps_enabled(after)[1] and source not in _NO_COLUMN_CHECK_SOURCES:
-            # A print map that prints from wells this run does not make: the scientist's statement that they hold the
-            # sample is recorded when this proposal is applied (that approval is the confirmation; nothing asks again).
-            recorded = set((self.physical.get(SOURCES_PRESENT) or {}))
-            prepared = self.physical.get("dilutions_prepared") or {}
-            if isinstance(prepared, dict):
-                recorded |= set(prepared.get("wells", []))
-            reported = physical.get("dilutions_prepared")              # recorded by this same proposal
-            if isinstance(reported, dict):
-                recorded |= set(reported.get("wells", []))
-            new = [item.well for item in build_plan(after).print_sources
-                   if not item.made_here and item.well not in recorded]
-            if new:
-                present = deepcopy(self.physical.get(SOURCES_PRESENT) or {})
-                present.update({well: {"source": "stated by the operator; recorded on approval"} for well in new})
-                physical[SOURCES_PRESENT] = present
-                if source in {"conversation", "llm-first"}:
-                    # like a print-only run's assumed dilutions: a statement about the plate, recorded only on approval
-                    source = "print-only-assumption"
+        for item in self._destinations_kept(before, after, set(changes)):
+            add(item, (True, ""))
+        physical, source = self._physical_record(after, set(changes), physical, source)
         proposal = Proposal(0 if dry_run else self._next_proposal_id, self.revision, request, tuple(changes.values()),
                             before, after, Report(), explanation, tuple(notes), source, physical, replaces, title, origin)
         # Checked before "already set": "print in paper columns 3 and 4" answered with values that are already set,
         # while the plan prints columns 1-2, is a contradiction, not nothing to do. A partial approval is checked only
         # when the changes the scientist kept move the printed columns.
-        if not semantic_only and source not in _NO_COLUMN_CHECK_SOURCES and (
+        if source not in _NO_COLUMN_CHECK_SOURCES and (
                 source != "partial-approval" or paper_columns_printed(before) != paper_columns_printed(after)):
             conflict = column_conflict(final_text, after)
             if conflict is not None:
@@ -910,6 +827,147 @@ class ExperimentState:
         if not dry_run:
             self._next_proposal_id += 1
         return proposal
+
+    def propose_patch(self, operations: Iterable[dict[str, Any] | PlanOperation], *, request: str,
+                      explanation: str = "", notes: Iterable[str] = (), source: str = "llm-first",
+                      physical: dict[str, Any] | None = None, replaces: int | None = None,
+                      title: str = "PROPOSED PLAN", origin: str = "", dry_run: bool = False,
+                      preserved: Iterable[str] = (), accepted: Iterable[str] = ()) -> Proposal:
+        """A proposal from semantic patch operations (the LLM-first pipeline): only what the request changes, applied
+        generically (patches.apply_operations) to the editable PlanSpec, then checked progressively.
+
+          * each operation is applied on its own: one that cannot be (a well that does not exist, a lab-owned field)
+            is listed in `failed` with its reason and the others still apply; when none applies, ProposalRejected;
+          * HARD invariants of the result keep the whole edit out (validation.HARD_CODES; a deck collision is asked
+            about as before);
+          * anything the plan still needs before it can run (tips, liquid depth, a print source that resolves, paper
+            rows for every printed sample, ...) is reported with the proposal and blocks only a run.
+        No print map is generated here: placement stays semantic until the plan is compiled (compiler.py)."""
+        before = self.config
+        operations = [item if isinstance(item, PlanOperation) else PlanOperation.from_raw(item) for item in operations]
+        startup = (self.snapshots[0]["config"].get("dilution") or {}).get("factors", [])
+        patch = apply_operations(before, operations, kept=preserved, occupied=self.printed_positions,
+                                 startup_factors=startup)
+        after = patch.after
+        named = made_wells_named(patch)
+        if named and "made_not_printed" not in set(accepted):
+            # a print source written as a plate well that the dilution step also fills, while the plan does not print
+            # every dilution it makes: is the scientist's own sample in that well? Asked, never assumed - making the
+            # dilutions would dispense into it. (A dilution reference is that dilution and is never asked about.)
+            plan = build_plan(after)
+            made = [well.well for well in plan.wells]
+            if not set(made) <= {source.well for source in plan.print_sources}:
+                names = ", ".join(named[:-1]) + f" and {named[-1]}" if len(named) > 1 else named[0]
+                plural = "s" if len(named) > 1 else ""
+                raise ProposalRejected(
+                    f"This plan would make all {len(made)} dilutions in plate column {plan.plate_column} "
+                    f"({positions_text(made, limit=len(made) + 1)}), which also fills plate well{plural} {names}, and "
+                    f"then print only from {names}.", kind="made_not_printed", before=before, after=after,
+                    question=f"Is your sample already in plate well{plural} {names}? Yes: skip making the dilutions "
+                             f"and print what is already there. No: make the {len(made)} dilutions first, then print "
+                             "the dilution made there.")
+        refer_to_made_wells(patch)          # the well is the dilution made there: print it by reference from now on
+        failed = tuple(f"Could not apply the {what[:1].lower() + what[1:]}: {why}" for what, why in patch.failed)
+        changes = tuple(FieldChange(change["path"], change["before"], change["after"], change["kind"],
+                                    change["evidence"], change["why"]) for change in patch.changes)
+        if not changes and not physical and patch.failed:
+            what = patch.failed[0][0]
+            path = next((canonical for canonical, (label, _) in EDITABLE_FIELDS.items() if label == what), "")
+            raise ProposalRejected(" ".join(failed), kind="invalid_value",
+                                   path=path if len(patch.failed) == 1 else "",
+                                   question=f"What {what[:1].lower() + what[1:]} do you want instead?"
+                                   if len(patch.failed) == 1 else "")
+        notes = list(notes) + patch.notes
+        if physical is None and changes and self.physical.get("dilutions_prepared") is None:
+            resulting = build_plan(after)
+            if resulting.do_print and not resulting.do_dilution and not resulting.mapped:
+                # printing the series without making it, nothing recorded: the samples are assumed to be in the plate
+                physical = {"dilutions_prepared": ASSUMED_FROM_PLAN}
+                source = "print-only-assumption" if source == "llm-first" else source
+                notes.append("I interpreted this as a print-only run using the existing prepared samples in the "
+                             "source plate.")
+        physical, source = self._physical_record(after, set(patch.paths), physical, source)
+        proposal = Proposal(0 if dry_run else self._next_proposal_id, self.revision, request, changes, before, after,
+                            Report(), explanation, tuple(notes), source, physical, replaces, title, origin,
+                            progressive=True, failed=failed)
+        if proposal.empty:
+            return proposal
+        conflicts = deck_conflicts(before, after)
+        if conflicts:
+            raise ProposalRejected("that deck change collides with labware already on the deck",
+                                   kind="deck_conflict", conflicts=conflicts, before=before, after=after)
+        new_paper = physical.get("paper_id", self.physical.get("paper_id")) != self.physical.get("paper_id")
+        report = validate(after, printed_positions=() if new_paper else self.printed_positions)
+        hard = hard_errors(report)
+        if hard:
+            raise ProposalRejected("that would not be a valid plan:\n- " + "\n- ".join(issue.message for issue in hard),
+                                   kind="invalid_plan", before=before, after=after)
+        proposal.report = report
+        if not dry_run:
+            self._next_proposal_id += 1
+        return proposal
+
+    def _physical_record(self, after: dict[str, Any], changed: set[str], physical: dict[str, Any] | None,
+                         source: str) -> tuple[dict[str, Any], str]:
+        """What applying a proposal records about the plate, besides the plan itself (Python's sample-location
+        bookkeeping): a stated prepared volume for the wells this plan prints from without making them, the wells and
+        factors of dilutions reported (or assumed) as already made, and the wells the plan prints a sample from that it
+        does not make. Returns the physical record and the proposal's source ("print-only-assumption" when it records
+        a statement about the plate)."""
+        physical = deepcopy(physical or {})
+        if "dilution.prepared_volume_ul" in changed and after["dilution"].get("prepared_volume_ul") is not None:
+            # A statement about this plan's prepared wells updates those wells only;
+            # it must not invalidate unrelated recorded volumes in the plate.
+            volume = float(after["dilution"]["prepared_volume_ul"])
+            volumes = deepcopy(physical.get(WELL_VOLUMES, self.physical.get(WELL_VOLUMES) or {}))
+            plan_for_volume = build_plan(after)
+            wells = {source.well for source in plan_for_volume.print_sources if not source.made_here}
+            wells.update(well.well for well in plan_for_volume.wells if not plan_for_volume.do_dilution)
+            for well in wells:
+                volumes[well] = {"volume_ul": volume, "plate_id": physical.get("plate_id", self.physical.get("plate_id", 1)),
+                                 "source": "operator stated prepared volume",
+                                 "timestamp_utc": datetime.now(timezone.utc).isoformat()}
+            if wells:
+                physical[WELL_VOLUMES] = volumes
+                if source in {"conversation", "llm-first"}:
+                    source = "print-only-assumption"
+        if physical.get("dilutions_prepared") in (PREPARED_FROM_PLAN, ASSUMED_FROM_PLAN):
+            # "The dilutions are already made ... their factors are 2x, 5x and 10x": record the wells and factors
+            # of the plan after this proposal's own changes, not of the plan before them.
+            resulting = build_plan(after)
+            series = resulting.wells
+            if not series and print_map(after) is not None:
+                # the reported dilutions printed through a print map: the record is the dilution series itself
+                unmapped = deepcopy(after)
+                unmapped["print"]["source_map"] = None
+                series = build_plan(unmapped).wells
+            # the other wells already recorded still hold what they held
+            physical["dilutions_prepared"] = merged_prepared(self.physical.get("dilutions_prepared"), {
+                "wells": [well.well for well in series], "factors": [well.factor for well in series],
+                "total_volume_ul": resulting.total_volume_ul,
+                "source": "assumed for print-only proposal; confirmed on approval"
+                          if physical["dilutions_prepared"] == ASSUMED_FROM_PLAN else "reported by the operator"})
+        printing = build_plan(after)
+        if printing.mapped and printing.do_print and source not in _NO_COLUMN_CHECK_SOURCES:
+            # A print map (dictated, or the semantic layout of print.source) that prints from wells this run does not
+            # make: the scientist's statement that they hold the sample is recorded when this proposal is applied (that
+            # approval is the confirmation; nothing asks again).
+            recorded = set((self.physical.get(SOURCES_PRESENT) or {}))
+            prepared = self.physical.get("dilutions_prepared") or {}
+            if isinstance(prepared, dict):
+                recorded |= set(prepared.get("wells", []))
+            reported = physical.get("dilutions_prepared")              # recorded by this same proposal
+            if isinstance(reported, dict):
+                recorded |= set(reported.get("wells", []))
+            new = [item.well for item in printing.print_sources if not item.made_here and item.well not in recorded]
+            if new:
+                present = deepcopy(self.physical.get(SOURCES_PRESENT) or {})
+                present.update({well: {"source": "stated by the operator; recorded on approval"} for well in new})
+                physical[SOURCES_PRESENT] = present
+                if source in {"conversation", "llm-first"}:
+                    # like a print-only run's assumed dilutions: a statement about the plate, recorded only on approval
+                    source = "print-only-assumption"
+        return physical, source
 
     @staticmethod
     def _as_print_map(raw: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
@@ -964,7 +1022,7 @@ class ExperimentState:
                                   "why": "the print map follows the dilutions it prints; their paper positions stay "
                                          "the same"})
         paper = explicit_paper_rows(after)
-        if paper is not None and "print.paper_rows" not in changed and not new.mapped \
+        if paper is not None and "print.paper_rows" not in changed and print_map(after) is None \
                 and len(paper) == len(old.rows) and len(new.rows) != len(old.rows):
             by_factor = {factor: row for (_, factor), row in zip(row_factors(old.rows, old.factors), paper)
                          if factor > 0}
@@ -1176,8 +1234,8 @@ class ExperimentState:
         return rows in (without, only)
 
     def _expand_selection(self, raw: dict[str, Any], config: dict[str, Any], text: str,
-                          history: str, *, factors_changed: bool = False,
-                          semantic_only: bool = False) -> tuple[list[dict[str, Any]], str, tuple[bool, str]]:
+                          history: str, *, factors_changed: bool = False
+                          ) -> tuple[list[dict[str, Any]], str, tuple[bool, str]]:
         """A row, paper-column or print-map selection as field changes, checked against the scientist's words."""
         path = str(raw.get("path", "")).strip().lower()
         grounding = getattr(self, "_grounding", {})
@@ -1234,10 +1292,7 @@ class ExperimentState:
                 what = f"paper position{'s' if len(items) > 1 else ''} {', '.join(items)}"
             else:
                 items = selected_columns(raw.get("value"))
-                if semantic_only and raw.get("target", "paper") != "paper":
-                    raise ProposalRejected("paper_columns needs target='paper'; use dilution.plate_column for the "
-                                           "source plate", kind="invalid_value", path="paper_columns")
-                if not semantic_only and column_side_unclear(
+                if column_side_unclear(
                         text, recent_paths=grounding.get("recent_paths", ()), config=self._config):
                     words = columns_words(items).replace("paper ", "")
                     raise ProposalRejected(
@@ -1250,12 +1305,7 @@ class ExperimentState:
                                                  or value_stated([columns[0], columns[-1]], words))
                 # one column without "only" says where the prints start, not how many (as the text's own column
                 # request reads it: columns.paper_column_mentions), so the replicate count stays
-                mode = str(raw.get("mode", "anchor" if len(items) == 1 else "exact")).lower()
-                if semantic_only and mode not in {"anchor", "exact"}:
-                    raise ProposalRejected("paper placement mode must be 'anchor' or 'exact'",
-                                           kind="invalid_value", path="paper_columns")
-                anchor = (len(items) == 1 and mode == "anchor") if semantic_only else \
-                    (len(items) == 1 and (items[0],) not in paper_column_request(text).exact)
+                anchor = len(items) == 1 and (items[0],) not in paper_column_request(text).exact
                 changes, note = expand_paper_columns(items, config, anchor=anchor)
                 what = columns_phrase(items)
         except SelectionError as exc:
@@ -1268,7 +1318,7 @@ class ExperimentState:
                 raise ProposalRejected(f"{exc}", kind="print_map", question=exc.question) from exc
             raise ProposalRejected(f"{exc} Nothing was changed.", kind="paper_layout" if path == "paper_columns"
                                    else "selection", question=exc.question) from exc
-        if semantic_only or stated(items, text):
+        if stated(items, text):
             return changes, note, (True, "")
         if history and stated(items, history):
             return changes, note, (False, CARRIED_OVER)
@@ -1294,58 +1344,16 @@ class ExperimentState:
 
     def _value_for(self, canonical: str, raw: dict[str, Any], current: Any, normalize) -> Any:
         op = str(raw.get("op") or "set").strip().lower()
-        if op == "none" and canonical == "print.replicates":
-            return 1
         if op == "set":
             if "value" not in raw:
                 raise FieldError("no value was given")
             if raw["value"] is None and canonical in _NULLABLE:
                 return None
             return normalize(raw["value"])
-        if current is None:
-            raise FieldError("it has no current value to work from")
-        if op in {"scale", "multiply"}:
-            factor = float(raw.get("factor"))
-            if factor <= 0:
-                raise FieldError("the scale factor must be positive")
-            if isinstance(current, list):
-                return normalize([_tidy(item * factor) for item in current])
-            return normalize(_tidy(float(current) * factor))
-        if op == "add":
-            amount = float(raw.get("amount"))
-            if isinstance(current, list):
-                raise FieldError("cannot add to a list of values")
-            return normalize(_tidy(float(current) + amount))
-        if op == "scale_each":
-            if canonical != "dilution.factors":
-                raise FieldError("scale_each only applies to the dilution factors")
-            factor = float(raw.get("factor"))
-            if factor <= 0:
-                raise FieldError("the scale factor must be positive")
-            return normalize([_tidy(item * factor) for item in current])
-        if op == "set_count":
-            if canonical != "dilution.factors":
-                raise FieldError("set_count only applies to the number of dilutions")
-            count = int(float(raw.get("count")))
-            factors = [float(item) for item in current]
-            if count < 1:
-                raise FieldError("at least one dilution is needed")
-            if count > 8:
-                raise FieldError(f"a series has 1 to 8 dilutions (one per row of a single plate column), so {count} "
-                                 "dilutions are not possible in one run")
-            if count <= len(factors):
-                return normalize([_tidy(item) for item in factors[:count]])
-            ratios = {round(b / a, 6) for a, b in zip(factors, factors[1:]) if a > 0}
-            if len(factors) >= 2 and len(ratios) == 1 and next(iter(ratios)) > 1:
-                ratio = next(iter(ratios))
-                while len(factors) < count:
-                    factors.append(factors[-1] * ratio)
-                return normalize([_tidy(item) for item in factors])
-            startup = [float(item) for item in (self.snapshots[0]["config"].get("dilution") or {}).get("factors", [])]
-            example = (" - for example " + ", ".join(fmt_factor(item) for item in startup[:count])
-                       + " (the start of the standard series)") if len(startup) >= count else ""
-            raise FieldError(f"I can't choose the extra dilution factors for you; say all {count} factors{example}")
-        raise FieldError(f"unknown change operation {op!r}")
+        # the relative operations: the same arithmetic as the semantic pipeline's patches (patches.relative_value)
+        params = {key: raw[key] for key in ("factor", "amount", "count") if raw.get(key) is not None}
+        startup = (self.snapshots[0]["config"].get("dilution") or {}).get("factors", [])
+        return relative_value(canonical, op, params, current, normalize, startup_factors=startup)
 
     def _verify(self, canonical: str, label: str, value: Any, raw: dict[str, Any], request: str, final_text: str,
                 superseded: str, before: dict[str, Any], *, context: str = "", history: str = "") -> tuple[bool, str]:
@@ -1431,45 +1439,6 @@ class ExperimentState:
         if carried:
             return False, CARRIED_OVER
         return verified, concern
-
-    @staticmethod
-    def _explicit_contradiction(canonical: str, value: Any, raw: dict[str, Any], request: str) -> None:
-        """Reject a direct conflict with an explicit scientist value, without requiring lexical support.
-
-        The absence of a token is never a reason to reject a structured LLM change.
-        """
-        if canonical == "print.replicates" and re.search(r"\bno\s+replicates?\b", request, re.I):
-            return  # the canonical one total print is what "no repeats" means
-        if canonical == "print.replicates":
-            match = re.search(r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
-                              r"(?:total\s+)?replicates?\b", request, re.I)
-            if match:
-                stated = numbers_in(match.group(1))
-                if len(stated) == 1 and float(value) not in stated:
-                    raise ProposalRejected(f"You asked for {match.group(1)} replicates, but the proposal used "
-                                           f"{value}.", kind="contradiction")
-        if canonical in _WELL_PATHS:
-            evidence = str(raw.get("evidence") or "")
-            if evidence and quoted_in(evidence, request):
-                names = well_tokens(evidence)
-                if len(names) == 1 and str(value).upper() not in names:
-                    raise ProposalRejected(f"You named {next(iter(names))}, but the proposal used {value}.",
-                                           kind="contradiction")
-        if canonical == "print.source_map" and value and re.search(r"\b(?:on|onto|at)\b", request, re.I):
-            named = well_tokens(request)
-            sources = {entry["source"] for entry in value}
-            destinations = {position for entry in value for position in entry["positions"]}
-            expected = named - sources
-            if expected and not expected <= destinations:
-                raise ProposalRejected("The paper positions in the proposal differ from the positions you named.",
-                                       kind="contradiction")
-        if canonical in _VOLUME_PATHS and value is not None:
-            volumes, _ = stated_volumes(request)
-            stated = {round(item[0], 6) for item in volumes}
-            proposed = value if isinstance(value, list) else [value]
-            if len(stated) == 1 and len(proposed) == 1 and round(float(proposed[0]), 6) not in stated:
-                raise ProposalRejected(f"You stated {next(iter(stated)):g} µL, but the proposal used "
-                                       f"{float(proposed[0]):g} µL.", kind="contradiction")
 
     def _earlier_value(self, canonical: str, value: Any) -> bool:
         """A value an earlier approved change of this session set for this field: restoring it ("the factors I asked
@@ -1687,9 +1656,10 @@ class ExperimentState:
         report = validate(after, printed_positions=() if proposal.physical.get("paper_id") !=
                           self.physical.get("paper_id") and "paper_id" in proposal.physical
                           else self.printed_positions)
-        if report.errors:
-            raise ProposalRejected("that would not be a valid run:\n- " + "\n- ".join(report.error_messages()),
-                                   kind="invalid_plan")
+        # a progressive proposal may leave the plan unfinished (it cannot run yet), never physically invalid
+        blocking = [issue.message for issue in (hard_errors(report) if proposal.progressive else report.errors)]
+        if blocking:
+            raise ProposalRejected("that would not be a valid run:\n- " + "\n- ".join(blocking), kind="invalid_plan")
         if fingerprint(lab_owned_view(after)) != self.lab_owned_fingerprint:
             raise ProposalRejected("lab-owned settings would change; nothing was applied", kind="lab_owned")
         self._config = after
@@ -1812,9 +1782,10 @@ class ExperimentState:
 
     def record_run(self, *, simulate: bool, exit_code: int, printed: Iterable[str],
                    tips_used: list[str], operator: str, prepared: dict[str, Any] | None = None,
-                   status: str | None = None, robot: dict[str, Any] | None = None) -> dict[str, Any]:
+                   status: str | None = None, robot: dict[str, Any] | None = None, plan=None) -> dict[str, Any]:
         """`status` is succeeded, failed, aborted (stopped part-way by the operator) or interrupted before start.
-        Only a run that succeeded on the real robot updates what is physically recorded (tips, wells, paper)."""
+        Only a run that succeeded on the real robot updates what is physically recorded (tips, wells, paper). `plan` is
+        the compiled plan the run carried out (default: the current plan)."""
         record = {
             "run": self.next_run,
             "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -1835,7 +1806,7 @@ class ExperimentState:
         if not simulate and exit_code == 0:
             self.printed_positions.update(printed)
             self.deck_changed_since_run = False
-            plan = build_plan(self._config)           # the plan this run carried out (the session runs the state)
+            plan = plan or build_plan(self._config, occupied=self.printed_positions)   # the plan this run carried out
             self.physical[WELL_VOLUMES] = self._volumes_after_run(plan, record["run"])
             if prepared:
                 self.physical["dilutions_prepared"] = merged_prepared(

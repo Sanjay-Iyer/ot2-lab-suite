@@ -95,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         first_request=args.request,
         llm_description="" if args.offline else Config.describe_llm_auth(),
         history_dir=HISTORY_DIR,
+        # the same semantic pipeline as the page; --offline keeps the typed commands only
+        llm_first=not args.offline,
     )
     llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=0))
     session = DemoSession(settings, load_config(source), llm=llm,

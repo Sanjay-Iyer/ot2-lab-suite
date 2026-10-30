@@ -216,6 +216,10 @@ SPARSE_ROWS = configured(dilution={"factors": [2, 5, 10], "rows": ["B", "D", "H"
 PAPER_ROWS = configured(dilution={"factors": [2, 5, 10], "rows": ["B", "D", "H"]}, print={"paper_rows": ["A", "B", "C"]})
 MAPPED = configured(dilution={"enabled": False}, print={"source_map": [{"source": "A11", "positions": ["A1", "B1", "C1"]}]})
 NO_MIXING = configured(mixing={"enabled": False})
+# the semantic print fields: what prints (by reference, and where it is now), exact paper columns, drops on positions
+SOURCE = configured(dilution={"factors": [2, 5, 10]}, print={"source": ["dilution:2"]})
+COLUMNS = configured(print={"columns": [1, 3, 5]})
+DROPS_AT = configured(print={"drops_at": {"B1": 3}})
 SWITCHES_OFF = configured(liquid_handling={"air_gap_ul": 0.0, "blow_out": False,
                                            "well_plate_shake": {**DEFAULT["liquid_handling"]["well_plate_shake"],
                                                                 "enabled": False}})
@@ -256,6 +260,11 @@ EDITABLE_ROWS = {
                          and squash("Well B11 D11 H11") in squash(s)),
     "print.source_map": (MAPPED, lambda s: value_of(s, "Print map") == "A11 → A1-C1 (3)"
                          and value_of(s, "Printed from") == "A11   (already in the plate)"),
+    "print.source": (SOURCE, lambda s: value_of(s, "Print source") == "dilution 2 (5×, now in B11)"
+                     and value_of(s, "Print map") == "B11 → B1 (1)"),
+    "print.columns": (COLUMNS, lambda s: value_of(s, "Paper columns") == "1 | 3 | 5"
+                      and value_of(s, "Paper positions") == "24   (from 8 plate wells)"),
+    "print.drops_at": (DROPS_AT, lambda s: value_of(s, "Drops per position") == "1   (B1: 3)"),
     "tips.start_tip": (CHANGED, lambda s: value_of(s, "Tip start") == "C1"),
     "tips.return_tips": (CHANGED, lambda s: value_of(s, "Used tips") == "returned to the rack (do not reuse them)"),
     "tips.policy": (CHANGED, lambda s: value_of(s, "Tip use") == "new tip every transfer"),

@@ -8,8 +8,8 @@ scientist cannot drift from what the robot will do.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass, field, replace
+from typing import Any, Iterable
 
 from src.agents.dye_demo.model import (
     EPSILON_UL,
@@ -19,9 +19,21 @@ from src.agents.dye_demo.model import (
     circle_area_mm2,
     is_off_deck,
     liquid_handling,
+    normalize_drops_at,
+    normalize_paper_column_list,
     normalize_source_map,
+    plate_well,
     slot_of,
     well_geometry,
+)
+from src.agents.dye_demo.references import (
+    DILUTION,
+    ResolvedSource,
+    UnresolvedRef,
+    dilution_outputs,
+    intent_parts,
+    normalize_sources,
+    resolve,
 )
 
 
@@ -104,10 +116,13 @@ class Plan:
     total_drops: int
     printed_fluid_ul: float
     vial_use_ul: dict[str, float]
-    mapped: bool = False                                   # printing follows print.source_map
+    mapped: bool = False                                   # printing follows a map (dictated or semantic, not the series)
     print_sources: list[PrintSource] = field(default_factory=list)
     # the paper row each series row prints on when there is no print map (print.paper_rows, or the same letters)
     paper_rows: list[str] = field(default_factory=list)
+    # why the semantic print fields cannot be laid out as asked (a reference that does not resolve, more samples than
+    # paper rows, no room left on the paper): validate() reports each one; they block a run, never an edit
+    print_issues: list[str] = field(default_factory=list)
 
     @property
     def print_positions(self) -> list[str]:
@@ -171,17 +186,220 @@ def paper_rows_of(config: dict[str, Any], rows: list[str]) -> list[str]:
 
 
 def print_map(config: dict[str, Any]) -> list[dict[str, Any]] | None:
-    """The explicit print map (print.source_map), or None when printing follows the dilution rows.
+    """The explicit print map (print.source_map) with every source a plate well, or None when printing follows the
+    dilution rows. A dilution reference in the map ("dilution:2") is resolved to the well that dilution is in now.
 
-    A malformed map gives [] (nothing printed from it): validate() names the problem.
+    A malformed map gives [] (nothing printed from it), and an entry whose reference does not resolve prints nothing:
+    validate() names the problem (map_problems).
     """
+    return _resolved_map(config)[0]
+
+
+def map_problems(config: dict[str, Any]) -> list[str]:
+    """Why entries of a dictated print map cannot print: references that do not resolve in this plan."""
+    return _resolved_map(config)[1]
+
+
+def _resolved_map(config: dict[str, Any]) -> tuple[list[dict[str, Any]] | None, list[str]]:
     raw = (config.get("print") or {}).get("source_map")
     if raw in (None, "", []):
-        return None
+        return None, []
     try:
-        return normalize_source_map(raw)
+        entries = normalize_source_map(raw)
     except FieldError:
+        return [], []
+    resolved, problems = [], []
+    for entry in entries:
+        try:
+            plate_well(entry["source"])
+            resolved.append(entry)
+            continue
+        except FieldError:
+            pass
+        try:
+            resolved.append({**entry, "source": resolve(entry["source"], config).well})
+        except (UnresolvedRef, FieldError) as exc:
+            problems.append(str(exc))
+    return resolved, problems
+
+
+def print_drops_at(config: dict[str, Any]) -> dict[str, int]:
+    """print.drops_at: drops on particular paper positions (every other position takes print.droplets_per_spot)."""
+    try:
+        return normalize_drops_at((config.get("print") or {}).get("drops_at")) or {}
+    except FieldError:
+        return {}
+
+
+def print_intents(config: dict[str, Any]) -> tuple[list[tuple[ResolvedSource, dict[str, Any]]], list[str]]:
+    """What prints, resolved to plate wells now, each with its own print intent (references.INTENT_FIELDS; {} when the
+    plan-wide settings apply), in print order - and why any source could not be resolved. print.source when it is set;
+    else every output of the dilution series (each dilution prints, the original demo layout)."""
+    raw = (config.get("print") or {}).get("source")
+    if raw in (None, "", []):
+        return [(output, {}) for output in dilution_outputs(config)], []
+    try:
+        intents = normalize_sources(raw) or []
+    except FieldError as exc:
+        return [], [str(exc)]
+    resolved, problems = [], []
+    for item in intents:
+        ref, fields = intent_parts(item)
+        try:
+            resolved.append((resolve(ref, config), fields))
+        except UnresolvedRef as exc:
+            problems.append(str(exc))
+    return resolved, problems
+
+
+def selected_sources(config: dict[str, Any]) -> tuple[list[ResolvedSource], list[str]]:
+    """The liquids the print step prints, resolved to plate wells, in print order (print_intents without the
+    intents)."""
+    intents, problems = print_intents(config)
+    return [source for source, _ in intents], problems
+
+
+def is_semantic_print(config: dict[str, Any]) -> bool:
+    """Printing the protocol's own series layout cannot express - only the compiled print map can (compiler.py): a
+    print source selection (print.source), exact paper columns (print.columns), one sample on several paper rows, or a
+    side-by-side layout that runs past the paper's edge (the extra prints go on free positions, placement.py). A
+    dictated print map is its own path."""
+    printing = config.get("print") or {}
+    if print_map(config) is not None:
+        return False
+    if any(printing.get(key) not in (None, "", [], {}) for key in ("source", "columns")):
+        return True
+    explicit = explicit_paper_rows(config)
+    if explicit is not None and len(explicit) != len(dilution_rows(config)):
+        return True
+    width = int(printing.get("paper_columns", 12) or 12)
+    try:
+        return any(int(spot["column"]) > width for spot in paper_layout(config, include_overflow=True))
+    except (TypeError, ValueError):
+        return False
+
+
+def _semantic_spots(config: dict[str, Any], issues: list[str], columns: Any = None) -> list[dict[str, Any]]:
+    """The spots one printed source takes on one paper row: side by side from print.paper_start_column, or exactly the
+    paper columns given (a source's own columns, else print.columns), each drop volume taking its share in order."""
+    printing = config.get("print") or {}
+    try:
+        columns = normalize_paper_column_list(columns if columns is not None else printing.get("columns"))
+    except FieldError as exc:
+        issues.append(str(exc))
         return []
+    if columns is None:
+        return paper_layout(config, include_overflow=True)
+    volumes = droplet_volumes(config) or [0.0]
+    if len(columns) % len(volumes):
+        issues.append(f"{len(columns)} paper columns cannot be shared by {len(volumes)} drop volumes; name "
+                      f"{len(volumes)} columns per replicate")
+    per_volume = len(columns) // len(volumes)
+    droplets = int(printing.get("droplets_per_spot", 1))
+    return [{"column": columns[index * per_volume + replicate], "volume_ul": volume, "droplets": droplets,
+             "replicate": replicate + 1}
+            for index, volume in enumerate(volumes) for replicate in range(per_volume)]
+
+
+def semantic_prints(config: dict[str, Any], *, occupied: Iterable[str] = ()
+                    ) -> tuple[list[tuple[ResolvedSource, str, float, int]], list[str]]:
+    """Every print of a semantic PlanSpec as (source, paper position, drop volume, drops), in print order, and the
+    problems that keep it from being laid out as asked. This is where print intents become exact positions.
+
+    Each source follows its own print intent where it has one, and the plan-wide settings where it is silent:
+      positions  exactly those paper positions (the scientist chose them);
+      rows       one print per listed paper row and spot column (its own columns, else the plan's spots);
+      count      that many prints per drop volume, placed on free positions: its home paper row first, side by side
+                 from the first paper column, then the nearest free positions (placement.py) - within its own rows
+                 and columns when it also gives them;
+      neither    the plan-wide layout: its home paper row (print.paper_rows paired in order with the sources that use
+                 them, every listed row for a single source, else the row with its well's letter) with the plan's spots.
+    Exact and row-based positions are fixed first; prints past the paper's edge and counted prints then go on free
+    positions, never on one in `occupied` (printed by an earlier live run) or one another source already has.
+    Drops: the source's own `drops`, else print.droplets_per_spot (print.drops_at still sets single positions)."""
+    from src.agents.dye_demo.placement import Need, PlacementError, allocate, allocate_side_by_side
+
+    printing = config.get("print") or {}
+    intents, issues = print_intents(config)
+    spots = _semantic_spots(config, issues)
+    volumes = droplet_volumes(config) or [0.0]
+    width = int(printing.get("paper_columns", 12) or 12)
+    start = min(max(int(printing.get("paper_start_column", 1) or 1), 1), width)
+    default_drops = int(printing.get("droplets_per_spot", 1) or 1)
+    # the plan-wide paper rows pair, in order, with the sources that do not say where they print themselves
+    explicit = explicit_paper_rows(config)
+    users = [index for index, (_, fields) in enumerate(intents) if not {"rows", "positions"} & set(fields)]
+    home: dict[int, list[str]] = {}
+    for index, (source, _) in enumerate(intents):
+        home[index] = [source.well[0]]
+    if explicit is not None and users:
+        if len(intents) == 1:
+            home[users[0]] = list(explicit)
+        else:
+            if len(explicit) != len(users) and not issues:
+                noun = "dilution" if all(intents[index][0].ref.kind == DILUTION for index in users) else "sample"
+                issues.append(f"{len(users)} {noun}{'s' if len(users) != 1 else ''} would print on {len(explicit)} "
+                              f"paper row{'s' if len(explicit) != 1 else ''} ({', '.join(explicit)}): each sample needs "
+                              "one paper row of its own (or print one sample on several rows)")
+            for index, row in zip(users, explicit):
+                home[index] = [row]
+            for index in users[len(explicit):]:
+                home[index] = []
+    groups = []                      # one per (source, paper row, drop volume); "count" groups are placed by count
+    for index, (source, fields) in enumerate(intents):
+        drops = int(fields.get("drops", default_drops))
+        if "positions" in fields:
+            if len(volumes) > 1:
+                issues.append(f"{source.well} prints at exact paper positions, which take one drop volume; the plan "
+                              f"has {len(volumes)}")
+            groups.append({"source": index, "row": "", "volume": volumes[0], "count": len(fields["positions"]),
+                           "positions": list(fields["positions"]), "drops": drops, "counted": False, "exact": True})
+            continue
+        if "count" in fields:
+            for volume in volumes:
+                groups.append({"source": index, "row": home[index][0] if home[index] else source.well[0],
+                               "volume": volume, "count": int(fields["count"]), "positions": [], "drops": drops,
+                               "counted": True, "exact": False, "rows": tuple(fields.get("rows", ())),
+                               "columns": tuple(fields.get("columns", ()))})
+            continue
+        own_spots = spots if "columns" not in fields else _semantic_spots(config, issues, fields["columns"])
+        for row in fields.get("rows") or home[index]:
+            for volume in volumes:
+                columns = [int(spot["column"]) for spot in own_spots if float(spot["volume_ul"]) == volume]
+                groups.append({"source": index, "row": row, "volume": volume, "count": len(columns),
+                               "positions": [f"{row}{column}" for column in columns if 1 <= column <= width],
+                               "drops": drops, "counted": False, "exact": False})
+    claimed: dict[str, str] = {}
+    for group in groups:
+        for position in group["positions"]:
+            well = intents[group["source"]][0].well
+            if position in claimed and claimed[position] != well:
+                issues.append(f"paper position {position} would be printed from both {claimed[position]} and {well}")
+            claimed.setdefault(position, well)
+    taken = set(occupied) | set(claimed)
+    reserved = {group["row"] for group in groups if group["row"]}
+    for counted in (False, True):
+        # first the fixed layouts that ran past the paper's edge, then the counted prints, on what is still free
+        for volume in volumes:
+            members = [group for group in groups if group["volume"] == volume and group["counted"] is counted
+                       and not group["exact"] and len(group["positions"]) < group["count"]]
+            if not members:
+                continue
+            needs = [Need(intents[group["source"]][0].well, group["count"], tuple(group["positions"]), group["row"],
+                          rows=group.get("rows", ()), columns=group.get("columns", ()), anchor_column=start)
+                     for group in members]
+            try:
+                placed = allocate_side_by_side(needs, taken, width=width) or allocate(needs, taken, width=width,
+                                                                                      reserved_rows=reserved)
+            except PlacementError as exc:
+                issues.append(str(exc))
+                continue
+            for group, positions in zip(members, placed):
+                group["positions"] = positions
+            taken.update(position for positions in placed for position in positions)
+    prints = [(intents[group["source"]][0], position, group["volume"], group["drops"]) for group in groups
+              for position in group["positions"]]
+    return prints, issues
 
 
 def row_factors(rows: list[str], factors: list[float]) -> list[tuple[str, float]]:
@@ -278,7 +496,21 @@ def mixes_dilutions(config: dict[str, Any]) -> bool:
 
 def build_operations(config: dict[str, Any], rows: list[str], factors: list[float],
                      spots: list[dict[str, Any]], do_dilution: bool,
-                     do_print: bool) -> list[Operation]:
+                     do_print: bool, *, prints: list[tuple[ResolvedSource, str, float, int]] | None = None
+                     ) -> list[Operation]:
+    """`prints`: the semantic print layout (semantic_prints), when the plan prints from it instead of the series or a
+    dictated map. print.drops_at sets the drops of the positions it names, whichever layout printed them."""
+    operations = _operations(config, rows, factors, spots, do_dilution, do_print, prints)
+    drops = print_drops_at(config)
+    if drops:
+        operations = [replace(op, droplets=drops[op.destination]) if op.kind == "print" and op.destination in drops
+                      else op for op in operations]
+    return operations
+
+
+def _operations(config: dict[str, Any], rows: list[str], factors: list[float], spots: list[dict[str, Any]],
+                do_dilution: bool, do_print: bool, prints: list[tuple[ResolvedSource, str, float, int]] | None
+                ) -> list[Operation]:
     dilution = config.get("dilution") or {}
     mixing = config.get("mixing") or {}
     policy = str((config.get("tips") or {}).get("policy", "per_liquid"))
@@ -315,7 +547,16 @@ def build_operations(config: dict[str, Any], rows: list[str], factors: list[floa
                         kind="mix", group=operations[-1].group, source=well, destination=well,
                         volume_ul=float(mixing.get("volume_ul", 0) or 0), factor=factor, reps=int(mixing["reps"]),
                     ))
-    if do_print:
+    if do_print and prints is not None:
+        # The semantic layout: each print names its source well (a reference resolved by semantic_prints) and its one
+        # paper position; one tip per source under per_liquid, as for a print map.
+        for source, position, volume, droplets in prints:
+            operations.append(Operation(
+                kind="print", group=tip_group(policy, f"print:{source.well}", f"print:{position}"), source=source.well,
+                destination=position, volume_ul=float(volume), factor=float(source.factor), droplets=int(droplets),
+                column=int(position[1:]),
+            ))
+    elif do_print:
         entries = print_map(config)
         if entries is not None:
             # An explicit map: each source well prints exactly its positions, in order. A source may feed any
@@ -361,31 +602,53 @@ def tip_groups(operations: list[Operation]) -> list[str]:
     return groups
 
 
-def build_plan(config: dict[str, Any]) -> Plan:
+def build_plan(config: dict[str, Any], *, occupied: Iterable[str] = ()) -> Plan:
+    """The deterministic plan of a configuration: every liquid movement in order, with its tip. A PlanSpec that prints
+    semantically (is_semantic_print: a source selection, exact columns, prints past the paper edge) is laid out here
+    from its references - the wells they resolve to now - so the plan, its checks and its rendering always show where
+    the liquids are; the compiler (compiler.py) lowers the same layout into the exact print map the protocol runs.
+    `occupied`: paper positions earlier live runs printed on, which extra prints placed past the edge avoid."""
     do_dilution, do_print = steps_enabled(config)
     dilution = config.get("dilution") or {}
     factors = factors_of(config)
     rows = dilution_rows(config)
     column = str(dilution.get("plate_column", ""))
     total = float(dilution.get("total_volume_ul", 0.0) or 0.0)
-    mapped = print_map(config) is not None
+    dictated = print_map(config) is not None
+    semantic = do_print and not dictated and is_semantic_print(config)
+    mapped = dictated or semantic
+    prints, issues = semantic_prints(config, occupied=occupied) if semantic else (None, [])
+    if dictated and do_print:
+        issues = map_problems(config)
     if do_dilution:
         # Making dilutions: one factor per series row (validate() requires the counts to agree).
         wells = [
             DilutionWell(row, f"{row}{column}", factor, total / factor, total - total / factor)
             for row, factor in zip(rows, factors) if factor > 0
         ]
-    elif mapped and do_print:
+    elif dictated and do_print:
         wells = []           # printing from the wells the map names; no dilution series is involved
     else:
-        # Printing the series rows that already hold liquid: a row the factor list does not cover prints too.
+        # Printing the series rows that already hold liquid: a row the factor list does not cover prints too. With a
+        # print source selection, only the dilutions it prints (a well holding the scientist's own sample is no
+        # dilution of this series).
+        printed = None
+        if semantic and (config.get("print") or {}).get("source") not in (None, "", []):
+            printed = {source.well for source in selected_sources(config)[0] if source.ref.kind == DILUTION}
         wells = [
             DilutionWell(row, f"{row}{column}", factor, total / factor if factor > 0 else 0.0,
                          total - total / factor if factor > 0 else 0.0)
-            for row, factor in row_factors(rows, factors)
+            for row, factor in row_factors(rows, factors) if printed is None or f"{row}{column}" in printed
         ]
     spots = [] if mapped else paper_layout(config)
-    operations = build_operations(config, rows, factors, spots, do_dilution, do_print)
+    operations = build_operations(config, rows, factors, spots, do_dilution, do_print, prints=prints)
+    if do_print:
+        drops = print_drops_at(config)
+        printed_positions = {op.destination for op in operations if op.kind == "print"}
+        unused = [position for position in drops if position not in printed_positions]
+        if unused:
+            issues = list(issues) + [f"drops are set for paper position{'s' if len(unused) > 1 else ''} "
+                                     f"{', '.join(unused)}, but nothing prints there"]
     groups = tip_groups(operations)
 
     start = str((config.get("tips") or {}).get("start_tip", "A1")).upper()
@@ -446,6 +709,7 @@ def build_plan(config: dict[str, Any]) -> Plan:
         vial_use_ul={role: round(volume, 2) for role, volume in vial_use.items()},
         mapped=mapped, print_sources=print_sources,
         paper_rows=[] if mapped else paper_rows_of(config, rows),
+        print_issues=list(issues) if do_print else [],
     )
 
 

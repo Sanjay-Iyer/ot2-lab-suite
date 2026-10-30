@@ -41,6 +41,7 @@ from src.agents.dye_demo.model import (
     well_geometry,
 )
 from src.agents.dye_demo.plan import Operation, Plan, build_plan, mixes_dilutions, paper_layout, transfer_limit
+from src.agents.dye_demo.references import describe_intent, dilution_outputs, intent_parts
 from src.agents.dye_demo.validation import DeckConflict, Report, free_slots, off_deck_blocker
 
 WIDTH = 72
@@ -273,12 +274,30 @@ def _drop_volumes(config: dict[str, Any]) -> str:
                  for volume, columns in by_volume.items())
 
 
+def _semantic_print_rows(config: dict[str, Any]) -> list[tuple[str, str]]:
+    """What the PlanSpec says about printing in its own terms - which liquids (by reference, and where each is now),
+    paper rows, exact paper columns - shown above the exact print map they lay out."""
+    printing = config.get("print") or {}
+    if printing.get("source_map") not in (None, "", []):
+        return []
+    rows = []
+    if printing.get("source") not in (None, "", []):
+        rows.append(("Print source", "; ".join(describe_intent(item, config) for item in printing["source"])))
+    if printing.get("paper_rows") not in (None, "", []):
+        rows.append(("Paper rows", pipes(printing["paper_rows"])))
+    if printing.get("columns") not in (None, "", []):
+        rows.append(("Paper columns", pipes(printing["columns"])))
+    return rows
+
+
 def _printing(config: dict[str, Any], plan: Plan) -> PlanSection:
     if not plan.do_print:
         return PlanSection("PRINTING", "SKIPPED - this run does not print")
     printing = config["print"]
     if plan.mapped:
         section = PlanSection("PRINTING", "in this run")
+        for label, value in _semantic_print_rows(config):
+            section.add(label, value)
         section.add("Print map", print_map_text(plan))
         section.add("Paper positions", f"{len(plan.print_positions)}   (from {_plural(len(plan.print_sources), 'plate well')})")
         section.add("Drop volume", pipes(dict.fromkeys(fmt_ul(op.volume_ul) for op in plan.operations
@@ -401,20 +420,22 @@ def _lab_owned(config: dict[str, Any]) -> PlanSection:
 
 
 def plan_model(config: dict[str, Any], *, prepared: dict[str, Any] | None = None,
-               record: bool = True) -> list[PlanSection]:
+               record: bool = True, occupied: Iterable[str] = ()) -> list[PlanSection]:
     """The plan a run of this configuration carries out, grouped by what the robot does: DILUTIONS, PRINTING, DECK,
     LIQUIDS, PIPETTING, LAB-OWNED PARAMETERS. `prepared` is the session's record of dilutions already in the plate;
-    `record=False` leaves that row out where no session record exists."""
-    plan = build_plan(config)
+    `record=False` leaves that row out where no session record exists. `occupied`: paper positions earlier live runs
+    printed on (prints placed past the paper edge avoid them, as the compiled run does)."""
+    plan = build_plan(config, occupied=occupied)
     return [_dilutions(config, plan, prepared, record), _printing(config, plan),
             PlanSection("DECK", items=list(_deck_items(config))), _liquids(config, plan), _pipetting(config, plan),
             _lab_owned(config)]
 
 
-def plan_sections(config: dict[str, Any], *, prepared: dict[str, Any] | None = None, record: bool = True) -> list[str]:
+def plan_sections(config: dict[str, Any], *, prepared: dict[str, Any] | None = None, record: bool = True,
+                  occupied: Iterable[str] = ()) -> list[str]:
     """The plan as terminal lines: sections separated by a blank line, the lab-owned parameters between rules."""
     lines: list[str] = []
-    for section in plan_model(config, prepared=prepared, record=record):
+    for section in plan_model(config, prepared=prepared, record=record, occupied=occupied):
         if section.title == LAB_OWNED_TITLE:
             lines += ["", THIN] + section.lines() + [THIN]
         else:
@@ -449,13 +470,14 @@ def render_column_conflict(reason: str, *, blocked: bool) -> str:
 
 def render_current_plan(config: dict[str, Any], report: Report, *, simulate: bool, operator: str = "",
                         trigger: str = "run", prepared: dict[str, Any] | None = None,
-                        notices: Sequence[str] = ()) -> str:
+                        notices: Sequence[str] = (), occupied: Iterable[str] = ()) -> str:
     """The CURRENT PLAN: what typing `run` carries out now, then how to run it. `notices` (physical moves still to
     make, for example) join the validation problems in the ATTENTION block right above the run instruction."""
     mode = "SIMULATION - nothing contacts the robot" if simulate else "LIVE - the real OT-2 will move"
     lines = _banner("CURRENT PLAN", mode + (f"   |   {operator}" if operator else "")) + [""]
     items = _report_items(report) + list(notices)
-    lines += plan_sections(config, prepared=prepared) + ["", attention(*items) if items else "All plan checks passed.", ""]
+    lines += plan_sections(config, prepared=prepared, occupied=occupied) + [
+        "", attention(*items) if items else "All plan checks passed.", ""]
     if report.errors:
         lines.append("Fix the problems above before running.")
     elif simulate:
@@ -468,8 +490,8 @@ def render_current_plan(config: dict[str, Any], report: Report, *, simulate: boo
 
 
 def render_run_banner(config: dict[str, Any], *, simulate: bool, operator: str, session_label: str,
-                      run_number: int) -> str:
-    plan = build_plan(config)
+                      run_number: int, occupied: Iterable[str] = ()) -> str:
+    plan = build_plan(config, occupied=occupied)
     columns = paper_columns_printed(config)
     if simulate:
         lines = _banner("STARTING SIMULATION", "building, then simulating every movement locally - no robot is contacted")
@@ -515,6 +537,8 @@ _CHANGE_NAMES = {
     "tips.policy": "tip use", "print.source_map": "print map", "mixing.enabled": "dilution mixing",
     "liquid_handling.air_gap_ul": "air gap", "liquid_handling.blow_out": "blow-out",
     "liquid_handling.well_plate_shake.enabled": "well shake",
+    "print.source": "print source", "print.columns": "paper columns", "print.drops_at": "drops per position",
+    "print.paper_rows": "paper rows",
 }
 
 
@@ -536,8 +560,11 @@ def format_value(path: str, value: Any) -> str:
     if path == "tips.policy":
         return {"single_tip": "one tip for entire run", "per_liquid": "one tip per liquid",
                 "new_tip_every_transfer": "new tip every transfer"}.get(str(value), str(value))
+    if path == "print.source" and value is None:
+        return "every dilution"
     if path == "print.source_map":
-        return pipes(f"{entry['source']} → {positions_text(entry['positions'])} ({len(entry['positions'])})"
+        return pipes(f"{str(entry['source']).replace('dilution:', 'dilution ')} → {positions_text(entry['positions'])} "
+                     f"({len(entry['positions'])})"
                      + ("" if not entry.get("drops") else " [" + ", ".join(
                          f"{position} ×{count}" for position, count in entry["drops"].items()) + " drops]")
                      for entry in value) if isinstance(value, list) else str(value)
@@ -545,8 +572,18 @@ def format_value(path: str, value: Any) -> str:
         return ON_OFF[value]
     if path == "liquid_handling.air_gap_ul":
         return fmt_ul(value) if float(value or 0) > 0 else "off"
-    if path in {"dilution.rows", "print.paper_rows"} and isinstance(value, (list, tuple)):
+    if path in {"dilution.rows", "print.paper_rows", "print.columns"} and isinstance(value, (list, tuple)):
         return ", ".join(str(item) for item in value)                   # "A, C, F", not "['A', 'C', 'F']"
+    if path == "print.source" and isinstance(value, (list, tuple)):
+        shown = []
+        for item in value:
+            ref, fields = intent_parts(item)
+            said = ", ".join(f"{key} {', '.join(map(str, field)) if isinstance(field, list) else field}"
+                             for key, field in fields.items())
+            shown.append(ref.replace("dilution:", "dilution ") + (f" ({said})" if said else ""))
+        return "; ".join(shown)
+    if path == "print.drops_at" and isinstance(value, dict):
+        return ", ".join(f"{position} ×{count}" for position, count in value.items())
     if isinstance(value, bool):
         return "yes" if value else "no"
     if path.endswith("_ul"):
@@ -599,10 +636,20 @@ def interpretation_lines(proposal: Any) -> list[str]:
             lines.append(f"dilutions in plate {rows_text(rows)} - plate wells {wells} ({factors})")
         else:
             lines.append(f"{len(rows)} dilution{'s' if len(rows) != 1 else ''}: {factors} (plate wells {wells})")
-    if {"print.paper_start_column", "print.replicates"} & set(paths) and plan.do_print:
+    if {"print.paper_start_column", "print.replicates", "print.columns"} & set(paths) and plan.do_print:
         lines.append(f"print {columns_phrase(paper_columns_printed(after))}")
+    if {"print.source", "print.paper_rows"} & set(paths) and plan.do_print and plan.mapped and "print.source_map" \
+            not in paths:
+        # what prints, said by reference and by the well it is in now ("print dilution 1 (now A10) on A1, C1, E1")
+        named = {output.well: f"dilution {output.ref.index}" for output in dilution_outputs(after)}
+        for source in plan.print_sources:
+            name = f"{named[source.well]} (now in {source.well})" if source.well in named else source.well
+            lines.append(f"print {name} on {_plural(len(source.positions), 'paper position')} "
+                         f"({positions_text(source.positions)})")
     shown = {"dilution.enabled", "print.enabled", "dilution.start_row", "dilution.factors", "print.paper_start_column",
-             "print.replicates", "print.source_map", "dilution.rows"}
+             "print.replicates", "print.source_map", "dilution.rows", "print.columns"}
+    if plan.mapped and plan.do_print:
+        shown.add("print.source")
     if plan.do_print:
         # said above: by the paper-row line, or - when a print map names every position and the explicit paper rows
         # were folded into it - by the print map lines ("paper rows: (not set)" would read as if they were lost)
@@ -629,7 +676,7 @@ def render_answer(answer: str) -> str:
 
 
 def _proposal_attention(proposal: Any) -> list[str]:
-    items: list[str] = []
+    items: list[str] = [f"NOT APPLIED - {reason}" for reason in getattr(proposal, "failed", ())]
     unverified = [change for change in proposal.changes if not change.verified
                   and change.concern not in {CARRIED_OVER, EARLIER_REVISION}]
     carried = [change for change in proposal.changes if not change.verified and change.concern == CARRIED_OVER]
@@ -669,6 +716,9 @@ def _proposal_attention(proposal: Any) -> list[str]:
         items.append("After you apply this, physically " + "; ".join(moves) + ".")
     if any(change.path.startswith("deck.") and is_off_deck(change.after) for change in proposal.changes):
         items.append(OFF_DECK_MEANING)
+    if getattr(proposal, "progressive", False) and proposal.report.errors:
+        items.append("You can apply this and keep building the plan; the run waits until the items below are "
+                     "settled.")
     return items + _report_items(proposal.report)
 
 
@@ -677,7 +727,7 @@ def proposal_attention_items(proposal: Any) -> list[str]:
     return _proposal_attention(proposal)
 
 
-def render_proposal(proposal: Any, *, prepared: dict[str, Any] | None = None) -> str:
+def render_proposal(proposal: Any, *, prepared: dict[str, Any] | None = None, occupied: Iterable[str] = ()) -> str:
     """The complete plan that exists if the scientist types yes. `prepared` is the prepared-dilutions record it keeps."""
     subtitle = ("record update only - the robot does not move - applied only after yes"
                 if proposal.title == "PHYSICAL STATE RECONCILIATION"
@@ -693,7 +743,7 @@ def render_proposal(proposal: Any, *, prepared: dict[str, Any] | None = None) ->
         names.append("physical record")
     if names:
         lines += _row("Changes", pipes(names))
-    lines += [""] + plan_sections(proposal.after, prepared=prepared)
+    lines += [""] + plan_sections(proposal.after, prepared=prepared, occupied=occupied)
     notes = list(proposal.notes) + [f"{_change_name(change)}: {change.why}" for change in proposal.changes
                                     if change.kind == "dependent" and change.why]
     if notes:
