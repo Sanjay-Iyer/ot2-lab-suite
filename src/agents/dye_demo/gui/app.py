@@ -315,10 +315,10 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                     status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
                     with ui.row().classes("items-center gap-1") as top_proposal_actions:
                         top_apply_button = ui.button("Apply", icon="check",
-                                                     on_click=lambda: adapter.submit_text("yes"),
+                                                     on_click=lambda: decide_shown_proposal(True),
                                                      color="positive").props("dense size=sm")
                         top_discard_button = ui.button("Discard", icon="close",
-                                                       on_click=lambda: adapter.submit_text("no"),
+                                                       on_click=lambda: decide_shown_proposal(False),
                                                        color="negative").props("outline dense size=sm")
                 top_proposal_actions.set_visibility(False)
                 with ui.column().classes("items-end gap-1"):
@@ -405,6 +405,12 @@ def build_page(adapter: DemoGuiAdapter) -> None:
             if snapshot.validation != "All plan checks passed.":
                 ui.label(snapshot.validation).classes("w-full whitespace-pre-wrap bg-amber-50 text-amber-900 p-3 rounded")
 
+    def decide_shown_proposal(apply: bool) -> None:
+        # the proposal and revision last drawn on this page, never whatever happens to be waiting by the time of the click
+        if last["plan"] is not None:
+            _, revision, proposal_id = last["plan"]
+            adapter.decide_proposal(apply, proposal_id, revision)
+
     @ui.refreshable
     def render_proposed() -> None:
         snapshot = adapter.snapshot()
@@ -423,9 +429,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
                         for item in snapshot.proposal_attention:
                             ui.label(item).classes("whitespace-pre-wrap")
                 with ui.row().classes("w-full justify-center gap-3 mt-3"):
-                    ui.button("Apply", icon="check", on_click=lambda: adapter.submit_text("yes"), color="positive")
-                    ui.button("Discard", icon="close", on_click=lambda: adapter.submit_text("no"), color="negative").props(
-                        "outline")
+                    ui.button("Apply", icon="check", color="positive",
+                              on_click=lambda: adapter.decide_proposal(True, snapshot.proposal_id, snapshot.revision))
+                    ui.button("Discard", icon="close", color="negative",
+                              on_click=lambda: adapter.decide_proposal(False, snapshot.proposal_id, snapshot.revision)
+                              ).props("outline")
 
     busy_note = "finish the current step first (answer the question, or apply or discard the proposal)."
 

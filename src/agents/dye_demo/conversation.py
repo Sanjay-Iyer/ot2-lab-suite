@@ -375,7 +375,9 @@ KINDS - every message is exactly one (the SKILL nanodrop-edit-semantics says how
 - undo: undo the last applied change(s) ("undo that", "go back to how it was before"); "revision": the revision to
   restore when the scientist names one (from APPLIED CHANGES), else omit it.
 - cancel: drop what is waiting (the proposal or your open question) without anything else ("never mind", "forget it").
-- approve / discard: only while a PROPOSAL WAITING FOR APPROVAL is shown, accepting or rejecting it as a whole.
+- approve: only while a PROPOSAL WAITING FOR APPROVAL is shown and the scientist accepts it as a whole. You cannot apply
+  it: Python keeps it waiting and asks for an explicit yes or the Apply button.
+- discard: only while a PROPOSAL WAITING FOR APPROVAL is shown and the scientist rejects it as a whole.
 - history: saved experiments from earlier sessions ("load my last experiment", "what did I run yesterday?") with
   "history".
 - clarification: ONLY when two readings would do materially different physical things and neither the conversation nor

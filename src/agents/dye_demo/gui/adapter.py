@@ -257,6 +257,13 @@ class DemoGuiAdapter:
         text = text.strip()
         return bool(text) and self._offer(text, shown=text)
 
+    def decide_proposal(self, apply: bool, proposal_id: int | None, revision: int | None) -> bool:
+        """Apply or Discard, for the proposal and revision the page was showing. False when no proposal is waiting."""
+        if proposal_id is None or revision is None:
+            return False
+        return self._offer(lambda: self.session.decide_from_button(apply, proposal_id, revision),
+                           shown="Apply" if apply else "Discard", states=("proposal",))
+
     def _request_run_confirmation(self) -> None:
         with self._lock:
             self._run_confirmation_requested = True

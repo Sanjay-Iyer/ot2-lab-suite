@@ -1,0 +1,22 @@
+Task 1.1 — executed evidence, HOME simulation-only, 2026-10-30
+Worktree: C:\code\opentrons_home\ot2-wt-phase1, branch codex/task-1-1-deterministic-approval, from 0129290.
+Interpreter: conda ai. No model, robot or physical calls: the router is scripted.
+
+1. New tests before the fix, confirming they detect the defect
+   python -B -m pytest tests/test_ai_dye_demo_approval.py -q
+   35 failed, 14 passed in 13.04s.
+
+2. New tests after the fix
+   python -B -m pytest tests/test_ai_dye_demo_approval.py -q
+   49 passed in 5.78s.
+
+3. Every demo test in the worktree (no pinned simulator there, so its 10 tests skip)
+   python -B -m pytest tests -q -k ai_dye_demo --ignore=tests/test_gemini.py
+   9 failed, 1294 passed, 10 skipped, 989 deselected in 196.10s.
+   All 9 failures are classified in Task 0.4 and none is new:
+     repeated_request_with_model_extra_001; test_drops_at_named_positions...;
+     test_decision_routes_carry_no_changes; test_an_aborted_live_run...; 3 SOP drop-count cases;
+     flaky test_discard_leaves_authoritative_state_unchanged; flaky test_the_page_opens_its_run_dialog...
+
+Not run: guarded disposable-checkout run (waits for Task 0.4's runner to be committed), pinned simulator
+tests, golden trace comparison (no motion code changed; rerun at Task 1.6), live model, physical robot.

@@ -14,8 +14,10 @@ THE SEMANTIC PIPELINE (settings.llm_first: the page, and the terminal whenever a
       -> RUN: compiler.compile_plan resolves references and lays out every print into the exact print map; every
          check runs on the compiled plan, and only the compiled config is executed
 
-Only the page's own controls (Apply/Discard, cancel, a yes/no to my own yes/no question) are read here without the
-model. The legacy reader below (llm_first off) is kept for the offline terminal and its regression tests.
+Only the operator's own decisions (an explicit yes or no to the waiting proposal, Apply/Discard, cancel, a yes/no to my
+own yes/no question) are read here without the model, and nothing the model returns can approve a proposal: its
+"approve" keeps the proposal waiting. The legacy reader below (llm_first off) is kept for the offline terminal and its
+regression tests.
 
 THE LEGACY READER
 
@@ -1114,20 +1116,18 @@ class DemoSession:
         The router (conversation.interpret) reads the message in context and returns a TurnInterpretation; Python acts
         on its kind. A question is answered and nothing else happens - it never passes through proposal or run checks.
         A plan change is a list of semantic patch operations (patches.py) proposed with ExperimentState.propose_patch.
-        Read here without the model are only the page's own controls: Apply / Discard ("yes" / "no" while a proposal
-        waits), cancel, and a yes/no answer to one of my own yes/no questions."""
+        Read here without the model are only the operator's own decisions: an explicit yes or no to the waiting
+        proposal, cancel, and a yes/no answer to one of my own yes/no questions."""
         lowered = " ".join(text.lower().split()).strip(" .!")
-        if self.pending is not None and lowered in {"yes", "y", "apply"}:
-            self._classify("confirmation")
-            self._apply_pending()
-            return
-        if self.pending is not None and lowered in {"no", "n", "discard"}:
-            self._classify("confirmation")
-            self._discard_pending("no")
-            return
         if lowered in {"cancel", "stop", "never mind"}:
             self._classify("cancel")
             self._cancel()
+            return
+        # The analysis recognizes an explicit decision on the waiting proposal and separates quoted or pasted reference
+        # material for the router; it decides nothing else.
+        analysis = analyze_turn(text, self._turn_context())
+        if self.pending is not None and self._explicit_decision(text, analysis):
+            self._classify("confirmation", analysis)
             return
         if self.clarifying is not None and self.clarifying.ambiguity is not None \
                 and self.clarifying.ambiguity.yes_no and lowered in {"yes", "no"}:
@@ -1138,8 +1138,6 @@ class DemoSession:
             self._classify("confirmation")
             self._answer_safety(lowered in {"no", "n"}, [], original=text)     # yes: the sample is already there
             return
-        # The analysis only separates quoted or pasted reference material for the router; it decides nothing.
-        analysis = analyze_turn(text, self._turn_context())
         self._classify("llm_first", analysis)
         result = self._interpret(text, analysis)
         if result is None:
@@ -1160,13 +1158,18 @@ class DemoSession:
                 self.clarifying = None  # superseded optional planning question
             self._request_gui_run()
             return
-        if kind in {conversation.APPROVE, conversation.DISCARD}:
-            if kind == conversation.APPROVE and self.pending is not None:
-                self._apply_pending()
-            elif kind == conversation.DISCARD and self.pending is not None:
-                self._discard_pending("model-interpreted discard")
-            else:
-                self.say("agent> No proposal is waiting for that decision.")
+        if kind in {conversation.APPROVE, conversation.DISCARD} and self.pending is None:
+            self.say("agent> No proposal is waiting for that decision.")
+            return
+        if kind == conversation.APPROVE:
+            # The model's reading is never authorization: only the operator's explicit yes or Apply changes the plan.
+            self.say(f"agent> Nothing was applied: proposal #{self.pending.id} is still waiting. Type yes or press Apply "
+                     "to apply it, or tell me what to change.")
+            self.log.write("model_approval_refused", proposal=self.pending.id, message=text)
+            self._event("noop", reason="model approval is not authorization")
+            return
+        if kind == conversation.DISCARD:
+            self._discard_pending("model-interpreted discard")
             return
         if kind == conversation.CANCEL:
             self._cancel()
@@ -3176,34 +3179,62 @@ class DemoSession:
 
     # ── a proposal is waiting ────────────────────────────────────────────────
 
-    def _with_pending(self, text: str, analysis: TurnAnalysis) -> None:
+    def _explicit_decision(self, text: str, analysis: TurnAnalysis) -> bool:
+        """The operator's explicit yes or no to the waiting proposal, read by code and never by a model. True when this
+        message was such a decision, whether or not it applied anything."""
         proposal = self.pending
         assert proposal is not None
-        kind = analysis.kind
-        if kind == "confirmation":
+        if analysis.kind == "confirmation":
             named = analysis.details.get("proposal_id")
             if analysis.confirmation == "yes" and named is not None and named != proposal.id:
                 self.say(f"agent> That approves proposal #{named}, but proposal #{proposal.id} is the one waiting, so "
                          f"nothing was applied. Type yes to apply proposal #{proposal.id} or no to discard it.")
                 self._event("noop", reason="approval named another proposal")
-                return
+                return True
             if analysis.confirmation == "yes":
                 self._apply_pending()
             else:
                 self._discard_pending("no")
-            return
+            return True
         approved_with_request = analysis.details.get("approval_with_request")
-        if approved_with_request is not None:
-            if approved_with_request == proposal.id and not analysis.actionable and not analysis.facts \
-                    and not analysis.informational and not analysis.details.get("undo") and "?" not in text:
-                self._apply_pending()            # "Yes, I approve proposal #1. Thanks." - only courtesy words around it
-                return
-            if analysis.details.get("unsupported"):
-                self.say("agent> " + " ".join(dict.fromkeys(analysis.details["unsupported"])))
-            self.say(f"agent> Your message approves proposal #{approved_with_request} and also asks for something else. "
-                     f"Nothing was applied yet: proposal #{proposal.id} is still waiting. Type yes to apply it first, "
-                     "then send the next request.")
-            self._event("noop", reason="approval together with another request")
+        if approved_with_request is None:
+            return False
+        if approved_with_request == proposal.id and not analysis.actionable and not analysis.facts \
+                and not analysis.informational and not analysis.details.get("undo") and "?" not in text:
+            self._apply_pending()            # "Yes, I approve proposal #1. Thanks." - only courtesy words around it
+            return True
+        if analysis.details.get("unsupported"):
+            self.say("agent> " + " ".join(dict.fromkeys(analysis.details["unsupported"])))
+        self.say(f"agent> Your message approves proposal #{approved_with_request} and also asks for something else. "
+                 f"Nothing was applied yet: proposal #{proposal.id} is still waiting. Type yes to apply it first, "
+                 "then send the next request.")
+        self._event("noop", reason="approval together with another request")
+        return True
+
+    def decide_from_button(self, apply: bool, proposal_id: int, revision: int) -> None:
+        """The page's Apply or Discard, for the exact proposal and revision on screen. The same turn record and code path
+        as typing yes or no. The GUI calls this on the worker thread that owns ``run()``."""
+        self.log.write("gui_proposal_button", action="apply" if apply else "discard", proposal=proposal_id,
+                       revision=revision)
+        pending = self.pending
+        if pending is None or pending.id != proposal_id or pending.base_revision != revision \
+                or self.state.revision != revision:
+            self.say(f"agent> Nothing was {'applied' if apply else 'discarded'}: the proposal on screen is out of date. "
+                     "Check the plan now shown, then choose again.")
+            self.log.write("gui_proposal_button_stale", proposal=proposal_id, revision=revision,
+                           pending=pending.id if pending else None, current_revision=self.state.revision)
+            return
+        self._from_button = True
+        try:
+            self._handle("yes" if apply else "no")
+        finally:
+            self._from_button = False
+
+    def _with_pending(self, text: str, analysis: TurnAnalysis) -> None:
+        proposal = self.pending
+        assert proposal is not None
+        kind = analysis.kind
+        if self._explicit_decision(text, analysis):
             return
         if kind == "uncertain":
             self.say(f"agent> That is not a clear yes, so nothing was applied. Type yes to apply proposal "
