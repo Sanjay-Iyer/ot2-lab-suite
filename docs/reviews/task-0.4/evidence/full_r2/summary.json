@@ -1,0 +1,1144 @@
+{
+  "source": "C:\\code\\opentrons_home\\ot2-lab-suite",
+  "checkout": "C:\\code\\opentrons_home\\ot2-lab-suite\\.test_tmp\\b04-985f12ba\\repo",
+  "python": "C:\\Users\\iyer95\\miniconda3\\envs\\ai\\python.exe",
+  "command": [
+    "C:\\Users\\iyer95\\miniconda3\\envs\\ai\\python.exe",
+    "-B",
+    "-c",
+    "import sitecustomize; assert sitecustomize.GUARD_ACTIVE; import pytest,sys; sys.exit(pytest.main(sys.argv[1:]))",
+    "tests",
+    "-q",
+    "-p",
+    "baseline_plugin",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp",
+    "C:\\code\\opentrons_home\\ot2-lab-suite\\.test_tmp\\b04-985f12ba\\pytest",
+    "--junitxml",
+    "C:\\code\\opentrons_home\\ot2-lab-suite\\.test_tmp\\b04-985f12ba\\junit.xml"
+  ],
+  "exit_code": 1,
+  "work_auth_fixture": false,
+  "protected_files": 8547,
+  "protected_changed": [],
+  "git_status_changed": [],
+  "tests_with_guard_blocks": [
+    "tests/test_ai_dye_demo_audit_fixes.py::test_the_liquid_record_is_what_the_protocol_draws",
+    "tests/test_ai_dye_demo_audit_fixes.py::test_the_real_simulator_puts_each_factor_in_its_named_well",
+    "tests/test_ai_dye_demo_print_intents.py::test_15_unequal_counts_compile_and_run_in_the_simulator",
+    "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[explicit_6_4]",
+    "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[one_source_ten_prints]",
+    "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[sparse_rows_B_D_H]",
+    "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[a12_add_2]",
+    "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[series_at_edge_2_replicates]",
+    "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ABC_to_ACE]",
+    "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ACE_to_ABC]",
+    "tests/test_ai_dye_demo_semantic_pipeline.py::test_compiled_combined_plan_runs_in_the_opentrons_simulator",
+    "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes",
+    "tests/test_offline_baseline_hygiene.py::test_baseline_guard_hook_is_live_for_real_sockets_and_processes",
+    "tests/test_ot2_ssh.py::test_diagnostic_only_runs_harmless_echo_and_does_not_log_key_contents",
+    "tests/test_ot2_ssh.py::test_missing_identity_fails_before_connection",
+    "tests/test_robot_http_tools.py::test_vial_print_http_builds_nonlive_runner_command",
+    "tests/test_robot_http_tools.py::test_vial_print_http_refuses_without_passing_simulation",
+    "tests/test_run_p300_single_nozzle_smoke_test.py::test_execute_flag_is_required_for_http_path",
+    "tests/test_run_p300_smoke_test.py::test_execute_flag_is_required_for_http_path",
+    "tests/test_run_smoke_test.py::test_execute_flag_is_required_for_http_path",
+    "tests/test_sers_agent_architecture.py::test_preflight_blocks_live_execution_on_this_machine",
+    "tests/test_sers_provenance.py::test_a_completed_run_records_its_outcome",
+    "tests/test_sers_provenance.py::test_a_failed_simulation_is_recorded_rather_than_hidden",
+    "tests/test_sers_provenance.py::test_a_failed_tool_call_is_recorded_as_a_failure_not_dropped",
+    "tests/test_sers_provenance.py::test_a_finished_session_reconstructs_the_whole_story",
+    "tests/test_sers_provenance.py::test_a_revision_carries_its_reason_hashes_and_a_structured_diff",
+    "tests/test_sers_provenance.py::test_a_second_agent_over_the_same_record_appends_rather_than_restarting",
+    "tests/test_sers_provenance.py::test_a_write_failure_degrades_the_session_loudly_and_blocks_the_robot",
+    "tests/test_sers_provenance.py::test_each_snapshot_is_a_complete_experiment_not_a_diff",
+    "tests/test_sers_provenance.py::test_editing_after_simulation_is_logged_and_preserves_the_old_simulation",
+    "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it",
+    "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_nothing_is_recording_it",
+    "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete",
+    "tests/test_sers_provenance.py::test_metadata_records_software_and_model_provenance_without_inventing_it",
+    "tests/test_sers_provenance.py::test_no_credential_reaches_the_record",
+    "tests/test_sers_provenance.py::test_plan_approval_quotes_the_researchers_last_message",
+    "tests/test_sers_provenance.py::test_refusing_a_robot_call_is_recorded_with_what_was_refused",
+    "tests/test_sers_provenance.py::test_revalidating_an_unchanged_experiment_invents_no_revision_history",
+    "tests/test_sers_provenance.py::test_revision_movement_is_recorded_against_each_tool_call",
+    "tests/test_sers_provenance.py::test_the_exporter_reports_a_tampered_artifact",
+    "tests/test_sers_provenance.py::test_the_final_experiment_is_the_exact_structured_state_that_was_resolved",
+    "tests/test_sers_provenance.py::test_the_full_original_text_is_kept_not_a_summary",
+    "tests/test_sers_provenance.py::test_the_human_readable_transcript_is_generated_beside_the_canonical_jsonl",
+    "tests/test_sers_provenance.py::test_the_manifest_maps_every_artifact_to_a_hash_that_matches",
+    "tests/test_sers_provenance.py::test_the_manual_runner_records_a_full_session_without_any_agent",
+    "tests/test_sers_provenance.py::test_the_operators_own_approval_words_are_persisted_with_the_hash",
+    "tests/test_sers_provenance.py::test_the_resolved_plan_is_saved_per_revision_in_machine_readable_form",
+    "tests/test_sers_provenance.py::test_the_si_export_copies_the_record_and_its_manifest_still_resolves",
+    "tests/test_sers_provenance.py::test_the_simulated_protocol_is_persisted_and_carries_the_resolved_hash",
+    "tests/test_sers_provenance.py::test_the_simulation_report_records_the_hashes_it_was_bound_to",
+    "tests/test_sers_provenance.py::test_three_revisions_produce_three_immutable_snapshots",
+    "tests/test_sers_provenance.py::test_tool_arguments_and_results_are_both_persisted",
+    "tests/test_sers_provenance.py::test_two_physical_runs_create_two_records_rather_than_overwriting_one",
+    "tests/test_sers_provenance.py::test_validation_detail_is_persisted_per_revision",
+    "tests/test_vial_print_agent.py::test_offline_pipeline_build_validate_cv"
+  ],
+  "protected_roots": [
+    "configs/workflows/user",
+    "robot_data",
+    "experiment_history",
+    "raman",
+    "runs",
+    "vision_runs",
+    "vision/raw",
+    "vision_tests/raw"
+  ],
+  "protection_limits": "Tracked paths plus selected ignored science/config/history roots, re-enumerated after run. Excludes cache dirs __pycache__/.pytest_tmp*, links, .venv, .env and unlisted external files; full recovery is Task0.2 backup.",
+  "guard_processes": [
+    {
+      "pid": 12028,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 12736,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[a12_add_2] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[a12_add_2] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[a12_add_2] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 14624,
+      "blocked": {
+        "shell-or-positional-process": 6,
+        "socket.gethostbyname": 20,
+        "socket.getaddrinfo": 2,
+        "external-process": 102,
+        "socket.connect": 1,
+        "socket.sendto": 1,
+        "socket.sendmsg": 1,
+        "unreviewed-python-child": 1,
+        "unguarded-python-child": 2
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": ""
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": ""
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": ""
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.46.57",
+          "test": ""
+        },
+        {
+          "kind": "socket.getaddrinfo",
+          "detail": "192.0.2.1",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_hook_is_live_for_real_sockets_and_processes (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['ping', '192.0.2.1']",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_hook_is_live_for_real_sockets_and_processes (call)"
+        },
+        {
+          "kind": "socket.connect",
+          "detail": "('192.0.2.1', 31950)",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "socket.sendto",
+          "detail": "('224.0.0.251', 5353)",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "socket.sendmsg",
+          "detail": "('192.0.2.1', 5353)",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "socket.getaddrinfo",
+          "detail": "robot.invalid",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['ssh', 'robot.invalid']",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['gcloud', 'auth', 'print-access-token']",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "unreviewed-python-child",
+          "detail": "['python.exe', 'C:\\\\code\\\\opentrons_home\\\\ot2-lab-suite\\\\.test_tmp\\\\b04-985f12ba\\\\repo\\\\scripts\\\\run_vial_print_robot.py']",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "unguarded-python-child",
+          "detail": "['python.exe', '-I', '-c', 'pass']",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "unguarded-python-child",
+          "detail": "['python.exe', '-c', 'pass']",
+          "test": "tests/test_offline_baseline_hygiene.py::test_baseline_guard_denies_external_network_and_unguarded_processes (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.46.57",
+          "test": "tests/test_ot2_ssh.py::test_missing_identity_fails_before_connection (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.46.57",
+          "test": "tests/test_ot2_ssh.py::test_diagnostic_only_runs_harmless_echo_and_does_not_log_key_contents (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.46.57",
+          "test": "tests/test_robot_http_tools.py::test_vial_print_http_refuses_without_passing_simulation (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.46.57",
+          "test": "tests/test_robot_http_tools.py::test_vial_print_http_builds_nonlive_runner_command (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "192.0.2.10",
+          "test": "tests/test_run_p300_single_nozzle_smoke_test.py::test_execute_flag_is_required_for_http_path (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "192.0.2.10",
+          "test": "tests/test_run_p300_smoke_test.py::test_execute_flag_is_required_for_http_path (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "192.0.2.10",
+          "test": "tests/test_run_smoke_test.py::test_execute_flag_is_required_for_http_path (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "OT2CEP20220929R02.local",
+          "test": "tests/test_sers_agent_architecture.py::test_preflight_blocks_live_execution_on_this_machine (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.252.252",
+          "test": "tests/test_sers_agent_architecture.py::test_preflight_blocks_live_execution_on_this_machine (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "OT2CEP20220929R02.local",
+          "test": "tests/test_sers_agent_architecture.py::test_preflight_blocks_live_execution_on_this_machine (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.252.252",
+          "test": "tests/test_sers_agent_architecture.py::test_preflight_blocks_live_execution_on_this_machine (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['arp', '-a']",
+          "test": "tests/test_sers_agent_architecture.py::test_preflight_blocks_live_execution_on_this_machine (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it (setup)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it (setup)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it (setup)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_sers_provenance.py::test_every_conversational_turn_survives_the_process_that_produced_it (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_second_agent_over_the_same_record_appends_rather_than_restarting (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_second_agent_over_the_same_record_appends_rather_than_restarting (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_second_agent_over_the_same_record_appends_rather_than_restarting (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_full_original_text_is_kept_not_a_summary (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_full_original_text_is_kept_not_a_summary (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_full_original_text_is_kept_not_a_summary (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_tool_arguments_and_results_are_both_persisted (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_tool_arguments_and_results_are_both_persisted (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_tool_arguments_and_results_are_both_persisted (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_failed_tool_call_is_recorded_as_a_failure_not_dropped (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_failed_tool_call_is_recorded_as_a_failure_not_dropped (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_failed_tool_call_is_recorded_as_a_failure_not_dropped (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_revision_movement_is_recorded_against_each_tool_call (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_revision_movement_is_recorded_against_each_tool_call (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_revision_movement_is_recorded_against_each_tool_call (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_three_revisions_produce_three_immutable_snapshots (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_three_revisions_produce_three_immutable_snapshots (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_three_revisions_produce_three_immutable_snapshots (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_each_snapshot_is_a_complete_experiment_not_a_diff (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_each_snapshot_is_a_complete_experiment_not_a_diff (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_each_snapshot_is_a_complete_experiment_not_a_diff (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_revision_carries_its_reason_hashes_and_a_structured_diff (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_revision_carries_its_reason_hashes_and_a_structured_diff (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_revision_carries_its_reason_hashes_and_a_structured_diff (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_revalidating_an_unchanged_experiment_invents_no_revision_history (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_revalidating_an_unchanged_experiment_invents_no_revision_history (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_revalidating_an_unchanged_experiment_invents_no_revision_history (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_resolved_plan_is_saved_per_revision_in_machine_readable_form (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_resolved_plan_is_saved_per_revision_in_machine_readable_form (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_resolved_plan_is_saved_per_revision_in_machine_readable_form (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_validation_detail_is_persisted_per_revision (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_validation_detail_is_persisted_per_revision (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_validation_detail_is_persisted_per_revision (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_simulation_report_records_the_hashes_it_was_bound_to (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_simulation_report_records_the_hashes_it_was_bound_to (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_simulation_report_records_the_hashes_it_was_bound_to (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_simulated_protocol_is_persisted_and_carries_the_resolved_hash (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_simulated_protocol_is_persisted_and_carries_the_resolved_hash (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_simulated_protocol_is_persisted_and_carries_the_resolved_hash (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_editing_after_simulation_is_logged_and_preserves_the_old_simulation (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_editing_after_simulation_is_logged_and_preserves_the_old_simulation (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_editing_after_simulation_is_logged_and_preserves_the_old_simulation (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_failed_simulation_is_recorded_rather_than_hidden (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_failed_simulation_is_recorded_rather_than_hidden (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_failed_simulation_is_recorded_rather_than_hidden (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_operators_own_approval_words_are_persisted_with_the_hash (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_operators_own_approval_words_are_persisted_with_the_hash (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_operators_own_approval_words_are_persisted_with_the_hash (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_plan_approval_quotes_the_researchers_last_message (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_plan_approval_quotes_the_researchers_last_message (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_plan_approval_quotes_the_researchers_last_message (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_refusing_a_robot_call_is_recorded_with_what_was_refused (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_refusing_a_robot_call_is_recorded_with_what_was_refused (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_refusing_a_robot_call_is_recorded_with_what_was_refused (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_metadata_records_software_and_model_provenance_without_inventing_it (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_metadata_records_software_and_model_provenance_without_inventing_it (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_metadata_records_software_and_model_provenance_without_inventing_it (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_manifest_maps_every_artifact_to_a_hash_that_matches (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_manifest_maps_every_artifact_to_a_hash_that_matches (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_manifest_maps_every_artifact_to_a_hash_that_matches (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_final_experiment_is_the_exact_structured_state_that_was_resolved (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_final_experiment_is_the_exact_structured_state_that_was_resolved (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_final_experiment_is_the_exact_structured_state_that_was_resolved (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_human_readable_transcript_is_generated_beside_the_canonical_jsonl (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_human_readable_transcript_is_generated_beside_the_canonical_jsonl (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_human_readable_transcript_is_generated_beside_the_canonical_jsonl (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_manual_runner_records_a_full_session_without_any_agent (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_manual_runner_records_a_full_session_without_any_agent (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_manual_runner_records_a_full_session_without_any_agent (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_si_export_copies_the_record_and_its_manifest_still_resolves (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_si_export_copies_the_record_and_its_manifest_still_resolves (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_si_export_copies_the_record_and_its_manifest_still_resolves (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_exporter_reports_a_tampered_artifact (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_the_exporter_reports_a_tampered_artifact (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_the_exporter_reports_a_tampered_artifact (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_no_credential_reaches_the_record (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_no_credential_reaches_the_record (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_no_credential_reaches_the_record (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_two_physical_runs_create_two_records_rather_than_overwriting_one (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_two_physical_runs_create_two_records_rather_than_overwriting_one (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_two_physical_runs_create_two_records_rather_than_overwriting_one (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_completed_run_records_its_outcome (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_completed_run_records_its_outcome (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_completed_run_records_its_outcome (setup)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "OT2CEP20220929R02.local",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_nothing_is_recording_it (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.252.252",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_nothing_is_recording_it (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "OT2CEP20220929R02.local",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_nothing_is_recording_it (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.252.252",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_nothing_is_recording_it (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['arp', '-a']",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_nothing_is_recording_it (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (setup)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "OT2CEP20220929R02.local",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.252.252",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "OT2CEP20220929R02.local",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (call)"
+        },
+        {
+          "kind": "socket.gethostbyname",
+          "detail": "169.254.252.252",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['arp', '-a']",
+          "test": "tests/test_sers_provenance.py::test_live_execution_is_blocked_when_the_record_is_incomplete (call)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_write_failure_degrades_the_session_loudly_and_blocks_the_robot (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_write_failure_degrades_the_session_loudly_and_blocks_the_robot (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_write_failure_degrades_the_session_loudly_and_blocks_the_robot (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_finished_session_reconstructs_the_whole_story (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'rev-parse', '--abbrev-ref', 'HEAD']",
+          "test": "tests/test_sers_provenance.py::test_a_finished_session_reconstructs_the_whole_story (setup)"
+        },
+        {
+          "kind": "external-process",
+          "detail": "['git', 'status', '--porcelain']",
+          "test": "tests/test_sers_provenance.py::test_a_finished_session_reconstructs_the_whole_story (setup)"
+        }
+      ]
+    },
+    {
+      "pid": 21208,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_semantic_pipeline.py::test_compiled_combined_plan_runs_in_the_opentrons_simulator (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_semantic_pipeline.py::test_compiled_combined_plan_runs_in_the_opentrons_simulator (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_semantic_pipeline.py::test_compiled_combined_plan_runs_in_the_opentrons_simulator (call)"
+        }
+      ]
+    },
+    {
+      "pid": 22872,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 23424,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_vial_print_agent.py::test_offline_pipeline_build_validate_cv (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_vial_print_agent.py::test_offline_pipeline_build_validate_cv (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_vial_print_agent.py::test_offline_pipeline_build_validate_cv (call)"
+        }
+      ]
+    },
+    {
+      "pid": 25756,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_print_intents.py::test_15_unequal_counts_compile_and_run_in_the_simulator (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_print_intents.py::test_15_unequal_counts_compile_and_run_in_the_simulator (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_print_intents.py::test_15_unequal_counts_compile_and_run_in_the_simulator (call)"
+        }
+      ]
+    },
+    {
+      "pid": 26080,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[explicit_6_4] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[explicit_6_4] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[explicit_6_4] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 29624,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 30272,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[series_at_edge_2_replicates] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[series_at_edge_2_replicates] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_replicate_placement.py::test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions[series_at_edge_2_replicates] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 30796,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 33960,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_audit_fixes.py::test_the_liquid_record_is_what_the_protocol_draws (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_audit_fixes.py::test_the_liquid_record_is_what_the_protocol_draws (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_audit_fixes.py::test_the_liquid_record_is_what_the_protocol_draws (call)"
+        }
+      ]
+    },
+    {
+      "pid": 36452,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 36512,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 37212,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 37420,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 37464,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 37840,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 38128,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_audit_fixes.py::test_the_real_simulator_puts_each_factor_in_its_named_well (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_audit_fixes.py::test_the_real_simulator_puts_each_factor_in_its_named_well (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_audit_fixes.py::test_the_real_simulator_puts_each_factor_in_its_named_well (call)"
+        }
+      ]
+    },
+    {
+      "pid": 38324,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[sparse_rows_B_D_H] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[sparse_rows_B_D_H] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[sparse_rows_B_D_H] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 38524,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 38572,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 4332,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 4652,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[one_source_ten_prints] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[one_source_ten_prints] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_print_map.py::test_opentrons_simulator_prints_exactly_the_plan[one_source_ten_prints] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 6408,
+      "blocked": {},
+      "records": []
+    },
+    {
+      "pid": 6800,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ABC_to_ACE] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ABC_to_ACE] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ABC_to_ACE] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 6912,
+      "blocked": {
+        "shell-or-positional-process": 3
+      },
+      "records": [
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "ver",
+          "test": "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ACE_to_ABC] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "command /c ver",
+          "test": "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ACE_to_ABC] (call)"
+        },
+        {
+          "kind": "shell-or-positional-process",
+          "detail": "cmd /c ver",
+          "test": "tests/test_ai_dye_demo_row_independence.py::test_the_real_simulator_executes_the_independent_rows[ACE_to_ABC] (call)"
+        }
+      ]
+    },
+    {
+      "pid": 8844,
+      "blocked": {},
+      "records": []
+    }
+  ],
+  "limitations": "Reviewed Python code guards, not OS egress enforcement. No WORK or physical validation."
+}

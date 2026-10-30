@@ -1,0 +1,46 @@
+Task 0.4 — executed evidence, HOME simulation-only, 2026-10-30
+Interpreter: C:\Users\iyer95\miniconda3\envs\ai\python.exe (Python 3.11.15), CONDA_DEFAULT_ENV=ai.
+Every run: disposable worktree under .test_tmp, guarded, no model/robot/physical calls.
+
+1. Previous coordinator, collection only
+   run_baseline.py --collect-only tests   -> .test_tmp/b04-d8c76501
+   2255 tests collected in 26.82s. tests/test_gemini.py collected with no model call.
+
+2. Previous coordinator, full run, before runner correction
+   run_baseline.py tests                  -> .test_tmp/b04-a684f20b
+   36 failed, 2204 passed, 15 skipped in 320.99s; protected_changed [].
+   Superseded: checkout lacked visualization photos and pinned simulator.
+
+3. Current coordinator, full run after runner correction
+   python -B docs/reviews/task-0.4/run_baseline.py tests -> .test_tmp/b04-aaa3820f
+   25 failed, 2225 passed, 5 skipped, 17 warnings in 427.14s.
+   exit_code 1, protected_files 8547, protected_changed [].
+   Failure list and classification: baseline_report.md.
+
+4. Auth-gated tests with a fake Vertex project (model factories still blocked)
+   run_baseline.py --work-auth-fixture tests/test_robot_automation.py -> .test_tmp/b04-1ffda337
+   9 passed in 9.65s; exit_code 0; protected_changed [].
+
+5. Flake detection, three repeats of the page tests
+   run_baseline.py tests/test_ai_dye_demo_gui.py
+   b04-12f195d3: 2 failed, 49 passed in 20.81s
+     test_discard_leaves_authoritative_state_unchanged
+     test_the_page_opens_its_run_dialog_for_a_chat_run_and_stays_runnable_after_each_run
+   b04-28dc8903: 51 passed in 15.50s
+   b04-f1963807: 1 failed, 50 passed in 15.84s
+     test_the_page_opens_its_run_dialog_for_a_chat_run_and_stays_runnable_after_each_run
+   protected_changed [] in all three.
+
+6. Full run after reviewer corrections (AUTHORITATIVE)
+   python -B docs/reviews/task-0.4/run_baseline.py --evidence docs/reviews/task-0.4/evidence/full_r2 tests
+     -> .test_tmp/b04-985f12ba
+   25 failed, 2227 passed, 5 skipped, 17 warnings in 483.15s.
+   exit_code 1, protected_files 8547, protected_changed [], git_status_changed [].
+   55 tests touched a guard block; listed in evidence/full_r2/summary.json.
+
+7. Experiment 01 difference without the 50-item display limit
+   Read-only probe, output in experiment_01_uncapped_diff.txt: 64 differences, all
+   destination.z_mm static=0.5 config=1.1; setup differences [], action counts 187 and 187.
+
+Not run: Raman's separate suite, any live Gemini or Vertex request, WORK environment,
+physical OT-2. tests/test_gemini.py --connect was not run.

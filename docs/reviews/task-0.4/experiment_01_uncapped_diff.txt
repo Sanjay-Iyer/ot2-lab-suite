@@ -1,0 +1,6 @@
+Experiment 01: configs/experiments/01_printing_standard.yaml versus experiment_01/ground_truth/static_canonical_trace.json
+Display limit removed in this read-only probe; application code unchanged.
+physical differences: 64
+    64  destination.z_mm: static=0.5 config=1.1
+setup differences: []
+action counts: 187 187

@@ -1,0 +1,20 @@
+Task 0.5 — executed evidence, HOME simulation-only, 2026-10-30
+Interpreter: C:\Users\iyer95\miniconda3\envs\ai\python.exe. Run from the repo folder with
+PYTHONDONTWRITEBYTECODE=1 and no model or robot access. Base commit 0129290.
+
+1. Generate traces with pinned analysis
+   python -B -m tests.golden_traces.generate --update --analysis
+   Exit 0 in 2m07s. 20 cases, 0 analysis errors. Motion commands per case: 24 to 431.
+   Pinned simulator: .venv/ot2-api-2.15-py310 (Python 3.10.20, Opentrons 7.0.2, Pydantic 1.8.2).
+
+2. Fast tier
+   python -B -m pytest tests/test_nanodrop_golden_traces.py -q -k "not pinned_analysis"
+   67 passed, 2 deselected in 7.27s.
+
+3. Slow tier, re-running Opentrons analysis on two plans
+   python -B -m pytest tests/test_nanodrop_golden_traces.py -q -k "pinned_analysis"
+   2 passed, 67 deselected in 15.42s (8.81s default_eight_dilutions, 6.35s per_source_counts_and_rows).
+
+Not run: guarded disposable-checkout run of these tests, which needs Task 0.4's commit first because
+the runner copies tracked files. Live robot, physical run, model calls.
+Physical motion, liquid behavior, tip state and paper height: WORK VALIDATION PENDING.

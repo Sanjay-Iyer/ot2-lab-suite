@@ -1,0 +1,221 @@
+diff --git a/pytest.ini b/pytest.ini
+index 90439c4..ac884a4 100644
+--- a/pytest.ini
++++ b/pytest.ini
+@@ -2,5 +2,5 @@
+ # Collect only the real test suite. Archived/experimental trees contain modules
+ # that exit or import hardware at import time and must never be collected.
+ testpaths = tests
+-norecursedirs = archive .git __pycache__ src/protocols/generated src/printing src/agents/archive vision_tests/raw
++norecursedirs = archive .git .test_tmp .venv __pycache__ src/protocols/generated src/printing src/agents/archive vision_tests/raw
+ addopts = -ra
+diff --git a/tests/test_gemini.py b/tests/test_gemini.py
+index 95d41f1..2f15e6e 100644
+--- a/tests/test_gemini.py
++++ b/tests/test_gemini.py
+@@ -1,35 +1,38 @@
+-import os
+-import sys
+-from pathlib import Path
++"""Manual connectivity probe; module import and pytest collection are offline.
+ 
+-# Test execution should use `python -m pytest tests`
++Explicit network opt-in: python tests/test_gemini.py --connect
++"""
++from __future__ import annotations
+ 
+ 
+-try:
++def main() -> int:
++    import argparse
++    import sys
++    from pathlib import Path
++
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--connect", action="store_true", help="Send one model request")
++    if not parser.parse_args().connect:
++        parser.error("The manual model probe requires --connect")
++    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+     from src.core.config import Config
+     from src.utils.limits_per_minute import RateLimitGuard
+     from langchain_core.messages import HumanMessage
+     
+-    print("--- Environment Check ---")
+-    print(f"Using Model: {Config.GEMINI_MODEL}")
+-    
+-    # Initialize Rate Limit Guard (Testing mode)
+     rate_guard = RateLimitGuard(enabled=True)
+     
+     # Initialize LLM via Factory
+-    print("Initializing Resilient LLM Factory...")
+     llm = Config.get_llm(temperature=0)
+     
+-    print("\n--- Sending Rate-Limited Test Prompt ---")
+-    
+     # Using the guard's wrapper to protect the call
+     response = rate_guard.invoke_with_limit(
+         llm, 
+         [HumanMessage(content="Hello! Please reply with 'Gemini is online and limited!' and nothing else.")]
+     )
+     
+-    print(f"\n[RESPONSE]: {response.content}")
+-    
+-except Exception as e:
+-    print(f"\n[ERROR]: {str(e)}")
+-    sys.exit(1)
++    print(response.content)
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/test_preflight.py b/tests/test_preflight.py
+index bc2d53e..724148b 100644
+--- a/tests/test_preflight.py
++++ b/tests/test_preflight.py
+@@ -3,20 +3,17 @@ import pathlib
+ import os
+ import shutil
+ import json
++import tempfile
+ from src.utils.preflight import PreflightEngine, Finding
+ 
+ class TestPreflight(unittest.TestCase):
+     @classmethod
+     def setUpClass(cls):
+-        cls.test_dir = pathlib.Path("tests/preflight_fixtures")
+-        cls.test_dir.mkdir(parents=True, exist_ok=True)
++        cls.temporary = tempfile.TemporaryDirectory(prefix="ot2-preflight-test-")
++        cls.addClassCleanup(cls.temporary.cleanup)
++        cls.test_dir = pathlib.Path(cls.temporary.name)
+         cls.engine = PreflightEngine()
+ 
+-    @classmethod
+-    def tearDownClass(cls):
+-        if cls.test_dir.exists():
+-            shutil.rmtree(cls.test_dir)
+-
+     def create_fixture(self, name, content):
+         path = self.test_dir / name
+         with open(path, "w", encoding="utf-8", newline="") as f:
+diff --git a/tests/test_robot_automation.py b/tests/test_robot_automation.py
+index 8e86388..21589dc 100644
+--- a/tests/test_robot_automation.py
++++ b/tests/test_robot_automation.py
+@@ -4,6 +4,9 @@ from pathlib import Path
+ import json
+ import shutil
+ import os
++import sys
++import tempfile
++from src.agents import tools as robot_tools
+ from src.agents.tools import (
+     check_robot_connection, 
+     deploy_protocol_to_robot, 
+@@ -17,29 +20,29 @@ from src.utils.paths import SIMULATION_RECORDS_PATH, DEPLOY_BASE_DIR
+ class TestRobotAutomation(unittest.TestCase):
+ 
+     def setUp(self):
+-        # Ensure clean state for each test
+-        if SIMULATION_RECORDS_PATH.exists():
+-            SIMULATION_RECORDS_PATH.unlink()
+-        if DEPLOY_BASE_DIR.exists():
+-            shutil.rmtree(DEPLOY_BASE_DIR)
+-        DEPLOY_BASE_DIR.mkdir(parents=True, exist_ok=True)
++        temporary = tempfile.TemporaryDirectory(prefix="ot2-automation-test-")
++        self.addCleanup(temporary.cleanup)
++        root = Path(temporary.name)
++        # Patch test aliases and the module that consumes the paths.
++        for module in (sys.modules[__name__], robot_tools):
++            for name, path in (("SIMULATION_RECORDS_PATH", root / "simulations.json"),
++                               ("DEPLOY_BASE_DIR", root / "deploy")):
++                patcher = patch.object(module, name, path)
++                patcher.start()
++                self.addCleanup(patcher.stop)
++        host = patch.object(robot_tools, "resolve_host", return_value="robot.test")
++        host.start()
++        self.addCleanup(host.stop)
++        DEPLOY_BASE_DIR.mkdir()
+         
+         # Create a dummy protocol file
+-        self.dummy_protocol = Path("dummy_protocol.py")
++        self.dummy_protocol = root / "dummy_protocol.py"
+         self.dummy_protocol.write_text("metadata = {'apiLevel': '2.15'}\ndef run(ctx): pass")
+         self.dummy_hash = "f5f5f5f5" # Mocked later
+-        self.dummy_key = Path(".test_tmp") / "robot_automation" / "dummy_key"
++        self.dummy_key = root / "dummy_key"
+         self.dummy_key.parent.mkdir(parents=True, exist_ok=True)
+         self.dummy_key.write_text("test fixture", encoding="utf-8")
+ 
+-    def tearDown(self):
+-        if self.dummy_protocol.exists():
+-            self.dummy_protocol.unlink()
+-        if SIMULATION_RECORDS_PATH.exists():
+-            SIMULATION_RECORDS_PATH.unlink()
+-        if self.dummy_key.exists():
+-            self.dummy_key.unlink()
+-
+     @patch("subprocess.run")
+     def test_check_robot_connection_success(self, mock_run):
+         # Mock successful SSH checks
+diff --git a/tests/test_vial_print_agent.py b/tests/test_vial_print_agent.py
+index 34e4d31..44a6ea8 100644
+--- a/tests/test_vial_print_agent.py
++++ b/tests/test_vial_print_agent.py
+@@ -16,6 +16,7 @@ No live LLM and no robot connection. Two tiers:
+ from __future__ import annotations
+ 
+ import copy
++import os
+ import sys
+ from pathlib import Path
+ 
+@@ -158,7 +159,9 @@ def test_color_plate_column_knobs_update_named_series(default_cfg, default_folds
+     assert by_name["blue"]["destination_column"] == "8"
+ 
+ 
+-def test_save_and_load_vial_print_template(default_cfg, default_folds):
++def test_save_and_load_vial_print_template(default_cfg, default_folds, tmp_path, monkeypatch):
++    monkeypatch.setattr(vpt, "TEMPLATE_DIR", tmp_path)
++    monkeypatch.setattr(vpt, "PROJECT_ROOT", tmp_path)
+     name = "pytest_orange12_blue8_template"
+     path = vpt.TEMPLATE_DIR / f"{name}.yaml"
+     cfg, _ = vpt._apply_params(
+@@ -261,8 +264,8 @@ def test_sanitize_chat_history_drops_empty_and_non_chat_messages():
+     ]
+ 
+ 
+-def test_log_block_appends_readable_log():
+-    path = REPO_ROOT / "robot_data" / "data" / "logs" / "agents" / "test_log_block.log"
++def test_log_block_appends_readable_log(tmp_path):
++    path = tmp_path / "test_log_block.log"
+     try:
+         if path.exists():
+             path.unlink()
+@@ -282,11 +285,15 @@ def test_log_block_appends_readable_log():
+ # ════════════════════════════════════════════════════════════════════════════════
+ 
+ def _opentrons_available() -> bool:
+-    return (vpt.BUILD_SCRIPT.exists() and vpt.VALIDATE_SCRIPT.exists()
++    # Legacy tools write shared _latest/user YAML/simulation records. Opt in
++    # only inside an explicitly marked disposable checkout.
++    return (os.environ.get("OT2_RUN_ISOLATED_PIPELINE") == "1"
++            and (REPO_ROOT / ".ot2-disposable-baseline").is_file()
++            and vpt.BUILD_SCRIPT.exists() and vpt.VALIDATE_SCRIPT.exists()
+             and vpt.CV_SCRIPT.exists())
+ 
+ 
+-@pytest.mark.skipif(not _opentrons_available(), reason="pipeline scripts missing")
++@pytest.mark.skipif(not _opentrons_available(), reason="requires explicit disposable-checkout offline pipeline")
+ def test_offline_pipeline_build_validate_cv():
+     """End-to-end: load -> update -> build -> validate(--config) -> CV, all green.
+ 
+@@ -317,7 +324,7 @@ def test_offline_pipeline_build_validate_cv():
+     assert "CV PASS" in cv_out, cv_out
+ 
+ 
+-@pytest.mark.skipif(not _opentrons_available(), reason="pipeline scripts missing")
++@pytest.mark.skipif(not _opentrons_available(), reason="requires explicit disposable-checkout offline pipeline")
+ def test_user_yaml_matches_working_config():
+     """The built user YAML reflects the conversational edits (4 dilutions)."""
+     vpt.load_vial_print_defaults.invoke({})
