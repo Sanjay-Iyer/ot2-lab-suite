@@ -1,0 +1,32 @@
+{
+  "baseline_commit": "1a4fd19a6b42c99bef639ca432a8b3d89a39ff37",
+  "baseline_commit_subject": "before big update",
+  "scope": "Git-tracked and nonignored untracked files; docs/reviews/ excluded; ignored artifacts inventoried by path only",
+  "files": 1196,
+  "tracked": 1196,
+  "untracked": 0,
+  "classifications": {
+    "active": 134,
+    "generated": 50,
+    "historical": 157,
+    "shared": 855
+  },
+  "archive_assessments": {
+    "after_replacement_review": 14,
+    "existing_historical": 86,
+    "not_proposed": 975,
+    "record_retention_review": 121
+  },
+  "reference_edges": 6363,
+  "reference_kinds": {
+    "python_import": 1113,
+    "python_path_literal": 167,
+    "python_unique_filename_literal": 310,
+    "text_path_reference": 1992,
+    "text_unique_filename": 2781
+  },
+  "ignored_artifact_paths": 990,
+  "inspection_issues": 0,
+  "no_runtime_modules_imported": true,
+  "no_tests_or_simulations_run": true
+}

@@ -1,0 +1,41 @@
+Task 0.1 evidence verification — HOME, read-only application inspection
+Baseline HEAD: 1a4fd19a6b42c99bef639ca432a8b3d89a39ff37
+Task branch: codex/task-0-1-repository-inventory
+
+Executed:
+  git status --short
+Before task: no output (clean). After task additions: ?? docs/reviews/
+
+Executed:
+  git switch -c codex/task-0-1-repository-inventory
+Initial sandbox invocation could not create .git refs; repeated with approved
+filesystem escalation and succeeded. No application files changed.
+
+Executed:
+  python -B docs/reviews/task-0.1/generate_inventory.py
+Exit 0. 1,196 tracked file records; 0 pre-existing nonignored untracked source;
+6,363 static reference edges; 990 ignored/local artifact path entries;
+0 parse/read errors in in-scope inventory. All inspected hashes unchanged.
+Python emitted an existing SyntaxWarning for an invalid escape in
+raman/exp3_timeseries_report.py:1268. The source was parsed, not imported, and
+not changed. This is not a failed application test or physical observation.
+
+Executed:
+  python -B docs/reviews/task-0.1/verify_inventory.py
+Exit 0. 1,196 records/6,363 references consistent; inventoried hashes match;
+no tracked application/config/protocol changes. Rerun after final corrections.
+
+Executed:
+  git diff --check
+Exit 0. No tracked changes. New review files are untracked, so this command
+alone is not whitespace validation of their contents.
+
+The generator/verifier use the system Python standard library only. No repo
+module was imported. These are static inventory checks, not OT-2 simulation or
+validation commands. Later OT-2 simulation/validation must use the ai environment.
+
+Not run: pytest collection or application tests; Opentrons simulation; protocol
+builds; GUI launches; LLM/provider checks; robot discovery/HTTP/SSH; deployment;
+live motion; archival/deletion; backup/restore; commit/tag or WORK qualification.
+
+Final R2 corrections: generator rerun exited 0; 134 active, 855 shared, 157 historical, 50 generated; file/reference/retention counts unchanged. Verifier rerun exited 0. The three independent R1 and cross-review reports are included in R2; final verdicts are separate acceptance records.

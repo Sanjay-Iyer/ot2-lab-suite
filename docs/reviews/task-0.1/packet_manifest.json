@@ -1,0 +1,102 @@
+{
+  "revision": "R2",
+  "packet_sha256": "59970b5e084d4d7054a79e0e84624ec6475f808b04cde706573b93c879b83bc4",
+  "baseline_commit": "1a4fd19a6b42c99bef639ca432a8b3d89a39ff37",
+  "files": [
+    {
+      "path": "docs/reviews/README.md",
+      "sha256": "b61619eeee085d5d82197c98df27c54e643d5692a634ed0f075a724b9715ae03",
+      "bytes": 1275
+    },
+    {
+      "path": "docs/reviews/master_implementation_plan.md",
+      "sha256": "0309dc59cea394fce44d5559ce06c02e35cfd9cb3fafcf69b51f6b57f9c2935b",
+      "bytes": 55654
+    },
+    {
+      "path": "docs/reviews/task-0.1/task.md",
+      "sha256": "f6cb7593f180967fd9f82c0c6d55fbfdd04027bfe554e0c159fa6496060dce6f",
+      "bytes": 2727
+    },
+    {
+      "path": "docs/reviews/task-0.1/implementation.md",
+      "sha256": "690b34d4f836e8797ddaa997fff541e9bd9dc2a51e5525c38efb58273768c2fb",
+      "bytes": 1928
+    },
+    {
+      "path": "docs/reviews/task-0.1/inventory.md",
+      "sha256": "a023a0bb700bcbbebf1f7f877829d73b7198fdff30f5f55ec05cc00eeab20ba9",
+      "bytes": 13630
+    },
+    {
+      "path": "docs/reviews/task-0.1/archive_assessment.md",
+      "sha256": "59c747968918dfc6befe5f357c18b35f70d5491966b6d44964ee26830d572637",
+      "bytes": 7163
+    },
+    {
+      "path": "docs/reviews/task-0.1/generate_inventory.py",
+      "sha256": "356eeed5a099d64bab994293ff30fb07dc3cfa4f84972079d552dbe4840c4818",
+      "bytes": 15085
+    },
+    {
+      "path": "docs/reviews/task-0.1/verify_inventory.py",
+      "sha256": "683b98517ddd2ef15611459a1390d0b9a3eefa39dcc63976cc101ffe8a684829",
+      "bytes": 2680
+    },
+    {
+      "path": "docs/reviews/task-0.1/files.csv",
+      "sha256": "fd4f627f0e02a90218b2c46fb37b48c9789b1ed1298bd2f65e66a4ad0de1becc",
+      "bytes": 446563
+    },
+    {
+      "path": "docs/reviews/task-0.1/references.csv",
+      "sha256": "e4c837de7a68e1a0c6af6dd11be1813369703d8cee3ad04c51cc270d31c54afe",
+      "bytes": 654730
+    },
+    {
+      "path": "docs/reviews/task-0.1/summary.json",
+      "sha256": "cd5d4aeb15c438fb872a00e6490a043a53bb26ce145e597db240f68af920ffad",
+      "bytes": 957
+    },
+    {
+      "path": "docs/reviews/task-0.1/inspection_issues.json",
+      "sha256": "a5338d955b09046ec0b16f3a9625b7955c763aae07dc722e474e6078745f932f",
+      "bytes": 4
+    },
+    {
+      "path": "docs/reviews/task-0.1/local_artifacts.json",
+      "sha256": "017dc542b36a7cce85e05b277d31a4d3501ec1a480368f87e3ed8120acaf2e41",
+      "bytes": 69847
+    },
+    {
+      "path": "docs/reviews/task-0.1/tests.txt",
+      "sha256": "900715b3596d2f6daf3578fc1795cc7e0744c4313bd2817f84fa2cf6a3369bc8",
+      "bytes": 2198
+    },
+    {
+      "path": "docs/reviews/task-0.1/architecture_review.md",
+      "sha256": "175a995424a47795acd468f3691a263f5b6b62fb4c79f0fe73456e7be01f209b",
+      "bytes": 1883
+    },
+    {
+      "path": "docs/reviews/task-0.1/hardware_review.md",
+      "sha256": "2cb12588c8c8679745b0b7f7fdad99e0b329cfff9fc4f9f1c061e468c3330ef3",
+      "bytes": 1845
+    },
+    {
+      "path": "docs/reviews/task-0.1/verification_review.md",
+      "sha256": "e730f1968e64717b79c09fbfcc84b229383a5d11127b95bf736fa5c872491202",
+      "bytes": 1819
+    },
+    {
+      "path": "docs/reviews/task-0.1/cross_review.md",
+      "sha256": "53f03aca57d9bc20891f540efbea092439c8d4622e49ecd6077b83848f580a98",
+      "bytes": 1393
+    },
+    {
+      "path": "docs/reviews/task-0.1/implementation.diff",
+      "sha256": "055b9f8a00d17c46247205157b83686cdad2c318b8bbf3d381d74d8c38fa4298",
+      "bytes": 112807
+    }
+  ]
+}
