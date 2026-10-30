@@ -1,0 +1,34 @@
+{
+  "revision": "R2",
+  "files": [
+    {
+      "path": "docs/reviews/task-0.3/home_evidence.json",
+      "sha256": "013a0b18658b0b3e4db84adcb67764ea0331c4806a112261826b7b345602d36f"
+    },
+    {
+      "path": "docs/reviews/task-0.3/implementation.md",
+      "sha256": "d18ed29678e6354447ead2d47cfa03b1035a16e12d903c84d53807de022ebfa2"
+    },
+    {
+      "path": "docs/reviews/task-0.3/settings_evidence.py",
+      "sha256": "19188da3f8a39791d13a4cd0f895e4d2023818e11dbbb243756958a6cca98649"
+    },
+    {
+      "path": "docs/reviews/task-0.3/task.md",
+      "sha256": "f1543e4b66b5e80399d7ab298df4307ff8e23c563d3b480ea920245874124974"
+    },
+    {
+      "path": "docs/reviews/task-0.3/test_settings_evidence.py",
+      "sha256": "f74e12fb8524b0c8b13c2bf4e39892fed900d9b576cafcd35b7d81f9be0b34e1"
+    },
+    {
+      "path": "docs/reviews/task-0.3/tests.txt",
+      "sha256": "2c907c4ca340f8f5f748918b6d89ef4dfe1e0465623829dfc3ff150718c9d30d"
+    },
+    {
+      "path": "docs/reviews/task-0.3/work_preservation.md",
+      "sha256": "d8a59fb0dfa8338e94ac3c649fc042964d6ead6be2f79b311de8f2a49b07e38a"
+    }
+  ],
+  "aggregate_sha256": "07ab7986a4c8aa6ff7ba316b586bad39d3e799311f75f136c325c6aa5a83b8e3"
+}

@@ -1,0 +1,31 @@
+Task 0.3 — executed evidence, HOME simulation-only, 2026-10-30
+
+Initial standard-library fixture run with system Python in the Windows sandbox:
+  python -B docs\reviews\task-0.3\test_settings_evidence.py
+  Exit 1: sandbox temporary-directory WinError 5; fixtures never reached checks.
+  No application, SDK, credentials or network used. Retried outside sandbox under
+  standing local-development authorization, in conda ai.
+
+  conda activate ai
+  python -B docs\reviews\task-0.3\test_settings_evidence.py
+  Exit 0; 5 tests PASS (0.174 seconds).
+  Checks: secret canary excluded from serialized report/stdout; config changes,
+  missing/additions; role/root/schema mismatches; metadata-only imports;
+  unknown role refusal and missing known settings root.
+
+  python -B docs\reviews\task-0.3\settings_evidence.py collect --role HOME --root C:\code\opentrons_home\ot2-lab-suite --output docs\reviews\task-0.3\home_evidence.json
+  Exit 0; 402 nonsecret settings files, 0 inspection issues.
+  ai interpreter Python 3.11.15; package versions in home_evidence.json belong
+  only to that interpreter, not WORK or the pinned simulator.
+
+No runtime tests, model calls, robot discovery/transport or physical execution.
+Actual WORK collection/private backup/reconciliation: WORK VALIDATION PENDING.
+
+R2 after independent review corrections:
+  conda activate ai
+  python -B docs\reviews\task-0.3\test_settings_evidence.py
+  Exit 0; 6 tests PASS. Added intermediate-src reparse-point non-traversal and
+  nested password-directory canary coverage. Shared dir/file exclusions.
+  python -B docs\reviews\task-0.3\settings_evidence.py compare docs\reviews\task-0.3\home_evidence.json docs\reviews\task-0.3\home_evidence.json
+  Exit 0; changed/missing/added/issues empty; environment_changed false.
+  Original inventory SHA comparison: all1196 original tracked files unchanged.
