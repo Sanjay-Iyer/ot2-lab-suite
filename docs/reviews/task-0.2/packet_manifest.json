@@ -1,0 +1,52 @@
+{
+  "revision": "R1",
+  "packet_sha256": "b6cbe6289722738512daf6a059db9c857c63743fa41d0a3e557f2c75c614233e",
+  "baseline_commit": "f8cfc5dd07e5220fd90b1d3bad68a62abf7b8452",
+  "files": [
+    {
+      "path": "docs/reviews/PROCESS.md",
+      "bytes": 1451,
+      "sha256": "ae950b5e09d7081b11082b15d0f2c1b308e574d5f025decc25806bdacb70e458"
+    },
+    {
+      "path": "docs/reviews/README.md",
+      "bytes": 1475,
+      "sha256": "619532d1feede3da063782fd54fba044bbfbb3c7e646846c9bd753bbdfb8de6b"
+    },
+    {
+      "path": "docs/reviews/task-0.2/cache_access_allowlist.json",
+      "bytes": 3497,
+      "sha256": "282fc27121df4306d79e7b5f48d6c6264a0e5c24531ccdfceb20a029f081beae"
+    },
+    {
+      "path": "docs/reviews/task-0.2/implementation.md",
+      "bytes": 1934,
+      "sha256": "b6f1bf94b5d2f4f099f665d4253bb674e9050277595ac1cb79a5590bf5d12499"
+    },
+    {
+      "path": "docs/reviews/task-0.2/preservation.json",
+      "bytes": 2131,
+      "sha256": "5fcaf7879142c659440793d37c59e071d182087341455fb0efd0171f72f93d02"
+    },
+    {
+      "path": "docs/reviews/task-0.2/preserve.py",
+      "bytes": 7864,
+      "sha256": "693f63dcc10931d5c1b010387a0112bb2afb84e9c6cc0a6a44f5c8df5e1090c8"
+    },
+    {
+      "path": "docs/reviews/task-0.2/recovery.md",
+      "bytes": 2437,
+      "sha256": "57ebc123026a9e3e6d2863be28c4c22c8e7c1bc0c2f4aa4723c581b024c62e33"
+    },
+    {
+      "path": "docs/reviews/task-0.2/task.md",
+      "bytes": 1344,
+      "sha256": "2ba629070c197fa3aed3b18ee0ecd2088c5a9f3b48a872273700cb34fe58f4a3"
+    },
+    {
+      "path": "docs/reviews/task-0.2/tests.txt",
+      "bytes": 2235,
+      "sha256": "645e6e42605241a53fd91379891fdea422fbf57cfd1044b6ea71ddafa79a6f5e"
+    }
+  ]
+}

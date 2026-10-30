@@ -1,0 +1,42 @@
+Task0.2 actual commands/results (HOME preservation, no OT-2 operations)
+
+git branch codex/pre-redesign-baseline 1a4fd19a6b42c99bef639ca432a8b3d89a39ff37
+git tag codex-pre-redesign-20261030 1a4fd19a6b42c99bef639ca432a8b3d89a39ff37
+git add -- docs/reviews
+git commit -m 'docs: record reviewed Task 0.1 repository inventory'
+Succeeded; commit f8cfc5d. Only 21 reviewed inventory/document files committed.
+
+git switch -c codex/task-0-2-preservation
+Succeeded. No remote operations.
+
+Read-only filesystem census:
+82 inaccessible paths, all in exact known test-scratch locations (76 .test_tmp,
+6 Raman pytest scratch). Exact allowlist recorded; no source ACLs changed.
+
+Created NEW backup directories with explicit protected Windows ACLs (owner,
+SYSTEM, administrators); icacls reported success. Paths are in recovery.md.
+
+python -B docs/reviews/task-0.2/preserve.py create <first-private-destination>
+Exit1: safely stopped on .test_tmp/audit2/test_four_clover_golden_requescurrent
+directory symlink. Incomplete attempt retained, not advertised as recoverable.
+
+After both reviewers checked exact allowlist and metadata-only scratch-link
+handling, executed:
+python -B docs/reviews/task-0.2/preserve.py create <private-v2-destination>
+Exit0. Final result: 28,177 files / 1,535,588,463 source bytes, full extraction and
+digest comparison PASS; Git bundle local clone + fsck PASS, recovered HEAD f8cfc5d.
+82 exact inaccessible scratch paths excluded; 94 scratch links metadata-only.
+
+Post-completion aggregate/coverage verification:
+All 1,217 currently tracked paths occur in the working archive. All 1,196 original
+source inventory digests remain unchanged. Both .env and local launch settings,
+user configs, scientific data and installed environments occur in the snapshot.
+No secret values or secret-file digests were printed or committed.
+
+Windows Get-Acl verification:
+Protected=True; Principals=3 (owner/SYSTEM/admin); Unexpected=0.
+No source ACL changes. Aggregate results are in preservation.json; detailed
+private manifest is outside the checkout and must not be committed.
+
+No pytest, app imports, simulations, builds, provider/model calls, robot discovery,
+HTTP/SSH, physical execution, credential alteration, data deletion or push.
