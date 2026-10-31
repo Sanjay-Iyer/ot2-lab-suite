@@ -46,7 +46,7 @@ def test_redo_renders_as_a_live_api_215_protocol():
 
 
 def test_named_robot_runner_registers_the_redo_script():
-    import scripts.run_printing_experiment_robot as runner
+    import scripts.experiments.run_printing_experiment_robot as runner
 
     assert runner.WORKFLOWS["dye-e11-redo-paper5-e1"] == (
         "standard",

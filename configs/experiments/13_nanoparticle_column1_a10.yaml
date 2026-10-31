@@ -17,7 +17,7 @@
 # One layer only, so no inter-layer drying delay ever fires and the whole run
 # is continuous.
 #
-#   python scripts/run_printing_experiment_robot.py nanoparticle-column1
+#   python scripts/experiments/run_printing_experiment_robot.py nanoparticle-column1
 #
 # Runs on the physically validated V1 standard executor
 # (src/protocols/printing/01_print_from_vial.py).

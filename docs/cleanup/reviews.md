@@ -62,3 +62,24 @@ Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Python
 checked all 19 archived source diffs, runtime/test consumers and 787-module old
 import/path scan. Laboratory independently checked 3,026 scientific/data/settings
 files and all parsed configs. No required corrections remain.
+
+## C1b — manual and optional experiment scripts (PASS/PASS)
+
+Starting commit `4fb7dff`. Moved 20 scripts to `scripts/manual/` and
+`scripts/experiments/`; top-level Python scripts 29 → 9. Preserved originals in
+external `C1b-manual-experiments` (20 SHA/CRC verified). Exact mapping and affected
+files: `.test_tmp/C1b-map.json` and `.test_tmp/C1b-map.changes.json`.
+
+Only source roots, imports, command/resource paths and prose changed. The original
+one-well settings/protocol and all optional operations are preserved. Updated
+existing tests and documentation consumers, including file-based numeric imports.
+Focused tests **41 passed in5.53s**; one-well offline preview and standard-print
+summary exited0. Additional imports/roots20 and offline clover/SERS plans are
+recorded in `.test_tmp/C1b-imports.json`. Shared builder/validator/runner remain
+top-level until the final script batch. No physical/model/network main executed.
+
+Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Python
+inspected all 20 moved scripts, 19 nonmoved Python consumers and 357 maintained
+modules for stale executable references. Lab independently verified 393 parsed
+YAML values and 3,026 protected scientific/data/settings files. No corrections
+remain; optional methods are retained with unchanged operations.

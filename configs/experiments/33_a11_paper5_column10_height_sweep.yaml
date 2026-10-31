@@ -78,11 +78,11 @@
 #
 # SIMULATION LAPTOP (local build + simulation only; no robot contact):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/33_a11_paper5_column10_height_sweep.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/33_a11_paper5_column10_height_sweep.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py a11-paper5-column10-height-sweep --live
+#   python scripts/experiments/run_printing_experiment_robot.py a11-paper5-column10-height-sweep --live
 #
 # Physical execution requires the real robot laptop and explicit readiness
 # confirmation. Creating or locally simulating this config does not run it live.

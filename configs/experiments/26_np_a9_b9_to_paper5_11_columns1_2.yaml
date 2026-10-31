@@ -9,11 +9,11 @@
 #
 # SIMULATION LAPTOP (local build + simulation only; no robot contact):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/26_np_a9_b9_to_paper5_11_columns1_2.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/26_np_a9_b9_to_paper5_11_columns1_2.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py np-a9-b9-paper5-11 --live
+#   python scripts/experiments/run_printing_experiment_robot.py np-a9-b9-paper5-11 --live
 # Script 27 prints the column-11 dye dilutions on top of these spots.
 #
 # loaded_volume_ul is a planning assumption PER source well, not a measurement.

@@ -10,7 +10,7 @@
 #   src/protocols/printing/01b_print_from_plate.py  <- regenerated, then simulated
 #
 # Build + validate + simulate (nothing touches the robot):
-#   python scripts/build_print_from_plate.py
+#   python scripts/manual/build_print_from_plate.py
 #
 # This path needs no agent, no LLM, no skill and no approval workflow.
 

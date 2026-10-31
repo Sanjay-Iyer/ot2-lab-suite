@@ -18,7 +18,7 @@
 #
 # Single layer, so no inter-layer drying delay ever fires.
 #
-#   python scripts/run_printing_experiment_robot.py b10-column2-top3
+#   python scripts/experiments/run_printing_experiment_robot.py b10-column2-top3
 #
 # ---------------------------------------------------------------------------
 # TIP: this run starts at C1. Run 13 uses tip A1 and run 14 uses tip B1, and

@@ -10,7 +10,7 @@
 #
 # Dilution only -- this never prints. Run a printing workflow afterwards.
 #
-#   python scripts/run_printing_experiment_robot.py topup-b11
+#   python scripts/experiments/run_printing_experiment_robot.py topup-b11
 #
 # ---------------------------------------------------------------------------
 # CHECK THE LEVEL FIRST. This ADDS 100 uL to whatever B11 already holds; the

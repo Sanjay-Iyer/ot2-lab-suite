@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 REPO = Path(__file__).resolve().parent.parent
-RUNNER_PATH = REPO / "scripts" / "run_smoke_test.py"
+RUNNER_PATH = REPO / "scripts" / "manual" / "run_smoke_test.py"
 PROTOCOL_PATH = REPO / "src" / "protocols" / "generated" / "smoke_test.py"
 
 

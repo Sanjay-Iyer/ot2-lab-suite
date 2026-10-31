@@ -35,8 +35,8 @@ from src.sers_engine.provenance.export import (  # noqa: E402
 def _print_sessions() -> int:
     rows = list_sessions()
     if not rows:
-        print("No recorded sessions yet. Run scripts/sers_agent.py or")
-        print("scripts/run_sers_experiment.py to create one.")
+        print("No recorded sessions yet. Run scripts/experiments/sers_agent.py or")
+        print("scripts/experiments/run_sers_experiment.py to create one.")
         return 1
     print(f"{'SESSION':10}  {'CREATED':26}  {'MODE':13}  {'REV':>3}  {'RUNS':>4}  EXPERIMENT")
     for row in rows:

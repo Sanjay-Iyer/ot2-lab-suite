@@ -181,7 +181,7 @@ Names in **bold** are the labels used in proposals.
 | **Drops per paper position** | Drops dispensed onto ONE position (never more positions) | `Stack two drops on each position.` | 1–20 | Particular positions can take their own count: `3 drops on A2 and 2 on B5.` |
 | **Air gap after each vial aspiration** | Air taken after the liquid, dispensed with it | `No air gap.` / `Use a 2 µL air gap.` | 0 (off) – 5 µL | Counts toward the P20's 20 µL, so each transfer carries 19 µL at 1 µL. |
 | **Blow-out after each plate dispense** | Empties the tip after every dispense into the plate | `Turn off blowout.` | on / off | |
-| **Shake after dispense (96-well plate)** | Droplet-release motion after every plate dispense and mix | `Turn off shaking.` | on / off | The touch-tip motion of scripts/test_single_dilution_c12.py. Plate wells only. |
+| **Shake after dispense (96-well plate)** | Droplet-release motion after every plate dispense and mix | `Turn off shaking.` | on / off | The touch-tip motion of scripts/manual/test_single_dilution_c12.py. Plate wells only. |
 | **Total replicates** | Total printed copies of each condition | `Print each condition three times.` | whole number ≥ 1 | `No replicates` means one print per condition. |
 | **First paper column** | Anchor for automatic paper placement | `Start printing at paper column 12.` | 1–12 | The allocator uses other free positions if more copies are needed. |
 | **Starting tip** | First tip this run picks up | `Start from tip C4.` | A1–H12 | Tips are used in column order. |

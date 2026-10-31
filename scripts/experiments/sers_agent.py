@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Conversational SERS experiment agent.
 
-    python scripts/sers_agent.py                     # full session
-    python scripts/sers_agent.py --simulation-only   # no robot tools at all
-    python scripts/sers_agent.py --check             # verify LLM auth and exit
-    python scripts/sers_agent.py "make 30x and 50x NP dilutions..."
+    python scripts/experiments/sers_agent.py                     # full session
+    python scripts/experiments/sers_agent.py --simulation-only   # no robot tools at all
+    python scripts/experiments/sers_agent.py --check             # verify LLM auth and exit
+    python scripts/experiments/sers_agent.py "make 30x and 50x NP dilutions..."
 
 Talk to it in plain English. It proposes a workflow, you revise it, it
 simulates, and only after two explicit approvals can it start the robot.
 
-The deterministic path never needs this script: scripts/run_sers_experiment.py
+The deterministic path never needs this script: scripts/experiments/run_sers_experiment.py
 runs a hand-written YAML config with no LLM involved.
 """
 
@@ -20,7 +20,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         close_session(record, status="agent_start_failed")
         print(f"Could not start the agent: {type(exc).__name__}: {exc}")
-        print("Check LLM auth with: python scripts/sers_agent.py --check")
+        print("Check LLM auth with: python scripts/experiments/sers_agent.py --check")
         return 1
 
     if args.message:

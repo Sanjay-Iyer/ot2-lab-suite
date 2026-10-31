@@ -16,7 +16,7 @@ from typing import Any, Sequence
 import requests
 
 if __name__ == "__main__" and not __package__:
-    repo = Path(__file__).resolve().parent.parent
+    repo = Path(__file__).resolve().parent.parent.parent
     sys.path.insert(0, str(repo))
 
 from src.lab.robot_connection import (
@@ -27,7 +27,7 @@ from src.lab.robot_connection import (
 )
 
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "smoke_test.py"
 DEFAULT_LABWARE = REPO / "labware" / "corning_96_wellplate_360ul_custom.json"
 HEADERS = {"opentrons-version": "*"}

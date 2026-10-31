@@ -3,14 +3,16 @@
 
 Run only on the real robot laptop after checking the physical deck:
     conda activate llm
-    python scripts/test_single_dilution_c12.py
+    python scripts/manual/test_single_dilution_c12.py
 
 This host script creates a self-contained API 2.15 protocol in a temporary file,
 uploads it with the repo's custom labware definitions, and monitors the run.
-It never imports Agent NanoDrop or uses its GUI, LLM, or YAML workflow.
+It never imports Agent NanoDrop or uses its GUI or LLM. Settings are loaded from
+configs/checks/single_dilution.yaml; --preview is an offline configuration check.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import pprint
@@ -18,78 +20,39 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import yaml
 
-# =============================================
-# QUICK TEST SETTINGS — EDIT THESE IF NEEDED
-# =============================================
-DESTINATION_WELL = "C12"       # 96-well plate in slot 4
-FINAL_VOLUME_UL = 100.0
-DILUTION_FACTOR = 2.0          # dye = final / factor; water = remainder
 
-ASPIRATE_HEIGHT_MM = 0.3      # plate aspiration while mixing; vial heights stay at 4 mm
-DISPENSE_HEIGHT_MM = 0.3      # plate destination, above well bottom
-MIX_HEIGHT_MM = 0.3           # plate mix dispense position
-AIR_GAP_UL = 1.0               # after every vial aspiration; counts toward P20 capacity
-BLOW_OUT = True
-TOUCH_TIP = True
-MIX_VOLUME_UL = 15.0
-MIX_REPETITIONS = 2
-ASPIRATE_RATE = 3.0            # existing dye-demo P20 rate, uL/s
-DISPENSE_RATE = 3.0
-RETURN_TIP = True             # one A1 tip for water, dye, and mix; may carry liquid between sources
-
-WATER_SOURCE_WELL = "A1"      # slot-7 vial rack; existing dye-demo source
-DYE_SOURCE_WELL = "A2"        # slot-7 vial rack; existing dye-demo source
-WATER_VIAL_HEIGHT_MM = 4.0   # keep vial geometry separate from plate test heights
-DYE_VIAL_HEIGHT_MM = 4.0
-START_TIP = "A1"              # existing dye-demo P20 tip rack in slot 9
-
+# Existing physical P20 and plate bounds. Experimental settings live in YAML.
 P20_MAX_UL = 20.0
 P20_MIN_UL = 1.0
-MAX_WELL_FILL_UL = 340.0     # existing dye-demo safety limit
+MAX_WELL_FILL_UL = 340.0
 
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 
-def _config() -> dict:
-    return {
-        "deck": {
-            "plate": {"slot": 4, "load_name": "corning_96_wellplate_360ul_custom",
-                      "namespace": "custom_beta", "version": 1},
-            "tuberack": {"slot": 7, "load_name": "tuberack_3dprint_20ml_8vials_v2",
-                         "namespace": "custom_beta", "version": 1},
-            "tiprack": {"slot": 9, "load_name": "opentrons_96_tiprack_20ul"},
-        },
-        "pipette": {"name": "p20_single_gen2", "mount": "left"},
-        "destination_well": DESTINATION_WELL,
-        "final_volume_ul": FINAL_VOLUME_UL,
-        "dilution_factor": DILUTION_FACTOR,
-        "water_source": WATER_SOURCE_WELL,
-        "dye_source": DYE_SOURCE_WELL,
-        "water_vial_height_mm": WATER_VIAL_HEIGHT_MM,
-        "dye_vial_height_mm": DYE_VIAL_HEIGHT_MM,
-        "aspirate_height_mm": ASPIRATE_HEIGHT_MM,
-        "dispense_height_mm": DISPENSE_HEIGHT_MM,
-        "mix_height_mm": MIX_HEIGHT_MM,
-        "air_gap_ul": AIR_GAP_UL,
-        "blow_out": BLOW_OUT,
-        "touch_tip": TOUCH_TIP,
-        "mix_volume_ul": MIX_VOLUME_UL,
-        "mix_repetitions": MIX_REPETITIONS,
-        "aspirate_rate": ASPIRATE_RATE,
-        "dispense_rate": DISPENSE_RATE,
-        "return_tip": RETURN_TIP,
-        "start_tip": START_TIP,
-        "p20_max_ul": P20_MAX_UL,
-        "p20_min_ul": P20_MIN_UL,
-        "max_well_fill_ul": MAX_WELL_FILL_UL,
-    }
+DEFAULT_CONFIG = REPO / "configs" / "checks" / "single_dilution.yaml"
+
+
+def _config(path: Path = DEFAULT_CONFIG) -> dict:
+    path = Path(path)
+    path = path if path.is_absolute() else REPO / path
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise ValueError("single-dilution YAML must be a mapping")
+    return config
 
 
 def _check_settings(config: dict) -> tuple[float, float, float]:
+    if not P20_MIN_UL <= config["p20_min_ul"] <= config["p20_max_ul"] <= P20_MAX_UL:
+        raise ValueError("configured working range exceeds the existing P20 bounds")
+    if not 0 < config["max_well_fill_ul"] <= MAX_WELL_FILL_UL:
+        raise ValueError("configured fill limit exceeds the existing plate bound")
+    if not math.isfinite(float(config["dilution_factor"])) or config["dilution_factor"] < 1:
+        raise ValueError("dilution_factor must be finite and at least 1")
     dye = config["final_volume_ul"] / config["dilution_factor"]
     water = config["final_volume_ul"] - dye
     gap = config["air_gap_ul"]
@@ -101,25 +64,26 @@ def _check_settings(config: dict) -> tuple[float, float, float]:
         raise ValueError("air gap leaves less than the P20 minimum liquid volume")
     if not 0 < config["mix_volume_ul"] <= P20_MAX_UL or config["mix_repetitions"] < 1:
         raise ValueError("mix settings are outside the P20 range")
-    if not 0 < config["final_volume_ul"] <= MAX_WELL_FILL_UL:
+    if not 0 < config["final_volume_ul"] <= config["max_well_fill_ul"]:
         raise ValueError("final volume exceeds the existing dye-demo well-fill limit")
-    if DESTINATION_WELL not in {f"{row}{column}" for row in "ABCDEFGH" for column in range(1, 13)}:
+    if config["destination_well"] not in {f"{row}{column}" for row in "ABCDEFGH" for column in range(1, 13)}:
         raise ValueError("destination must be a 96-well plate position")
-    plate_def = json.loads((REPO / "labware" / "corning_96_wellplate_360ul_custom.json").read_text(encoding="utf-8"))
-    well = plate_def["wells"][DESTINATION_WELL]
+    plate_name = config["deck"]["plate"]["load_name"]
+    plate_def = json.loads((REPO / "labware" / f"{plate_name}.json").read_text(encoding="utf-8"))
+    well = plate_def["wells"][config["destination_well"]]
     depth = float(well["depth"])
-    for height in (ASPIRATE_HEIGHT_MM, DISPENSE_HEIGHT_MM, MIX_HEIGHT_MM):
+    for height in (config["aspirate_height_mm"], config["dispense_height_mm"], config["mix_height_mm"]):
         if not 0 < height < depth:
             raise ValueError("plate test heights must be above 0 and below the well depth")
     area = math.pi * (float(well["diameter"]) / 2) ** 2
-    minimum_for_mix = MIX_VOLUME_UL + max(ASPIRATE_HEIGHT_MM, MIX_HEIGHT_MM) * area
-    if FINAL_VOLUME_UL < minimum_for_mix:
+    minimum_for_mix = config["mix_volume_ul"] + max(config["aspirate_height_mm"], config["mix_height_mm"]) * area
+    if config["final_volume_ul"] < minimum_for_mix:
         raise ValueError(f"mix would draw air: this geometry needs {minimum_for_mix:.2f} uL")
     return dye, water, minimum_for_mix
 
 
 PROTOCOL_TEMPLATE = '''\
-"""Generated one-well dye dilution; edit scripts/test_single_dilution_c12.py on the work laptop."""
+"""Generated one-well dye dilution; edit configs/checks/single_dilution.yaml on the work laptop."""
 import math
 from opentrons import protocol_api
 
@@ -198,12 +162,23 @@ def run(protocol: protocol_api.ProtocolContext):
 '''
 
 
-def main() -> int:
-    config = _config()
-    dye, water, mix_minimum = _check_settings(config)
-    print(f"Single dilution: {dye:g} uL dye + {water:g} uL water -> slot 4 {DESTINATION_WELL}")
-    print(f"Slot 7 vials: water {WATER_SOURCE_WELL}, dye {DYE_SOURCE_WELL}; slot 9 P20 tips: {START_TIP}")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    parser.add_argument("--preview", action="store_true", help="Check YAML and show volumes without contacting the robot")
+    args = parser.parse_args(argv)
+    try:
+        config = _config(Path(args.config))
+        dye, water, mix_minimum = _check_settings(config)
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return 2
+    print(f"Single dilution: {dye:g} uL dye + {water:g} uL water -> {config['destination_well']}")
+    print(f"Vials: water {config['water_source']}, dye {config['dye_source']}; first tip: {config['start_tip']}")
     print(f"Mix geometry requires at least {mix_minimum:.2f} uL in the destination well.")
+    if args.preview:
+        print("Preview only; no robot connection.")
+        return 0
     if input("Confirm robot is physically ready for LIVE liquid handling (type LIVE): ").strip() != "LIVE":
         print("Cancelled before robot connection.")
         return 1

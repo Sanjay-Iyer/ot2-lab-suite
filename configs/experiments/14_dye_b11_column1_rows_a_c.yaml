@@ -22,7 +22,7 @@
 #
 # Single layer, so no inter-layer drying delay ever fires.
 #
-#   python scripts/run_printing_experiment_robot.py dye-column1-top3
+#   python scripts/experiments/run_printing_experiment_robot.py dye-column1-top3
 #
 # ---------------------------------------------------------------------------
 # RUN THIS AFTER 13 AND 15, NOT BEFORE. Every position it prints has already

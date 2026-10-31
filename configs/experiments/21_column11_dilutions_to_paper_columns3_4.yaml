@@ -17,11 +17,11 @@
 #
 # SIMULATION LAPTOP (build + local simulation only):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/21_column11_dilutions_to_paper_columns3_4.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/21_column11_dilutions_to_paper_columns3_4.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py column11-paper-columns3-4 --robot-ip 169.254.46.57 --live
+#   python scripts/experiments/run_printing_experiment_robot.py column11-paper-columns3-4 --robot-ip 169.254.46.57 --live
 #
 # Script 20 uses and returns tip A4. This script therefore starts at B4 and
 # assigns one dedicated tip to each of the eight source wells. In rack order

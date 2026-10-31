@@ -12,7 +12,7 @@ run_vial_print_robot.py. The robot server supplies the *deck configuration*, so
 engine-era protocols (apiLevel >= 2.14, e.g. 2.28) load labware without the
 `AreaNotInDeckConfigurationError` you get from bare `opentrons_execute`. It needs NO
 SSH for the run itself. (Only add SSH/SCP if you must pull files back — see the
-optional block at the bottom and scripts/run_droplet_error_check.py.)
+optional block at the bottom and scripts/experiments/run_droplet_error_check.py.)
 
 CHECKLIST when adapting:
   1. Set DEFAULT_PROTOCOL to your protocol file (the exact file you upload).

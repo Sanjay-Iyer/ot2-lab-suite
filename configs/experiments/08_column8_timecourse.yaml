@@ -17,7 +17,7 @@
 # There is NO trailing delay after the last layer.
 # Total run time is a little over 2 hours.
 #
-#   python scripts/run_printing_experiment_robot.py column8-timecourse
+#   python scripts/experiments/run_printing_experiment_robot.py column8-timecourse
 #
 # Runs on the physically validated V1 standard executor
 # (src/protocols/printing/01_print_from_vial.py).

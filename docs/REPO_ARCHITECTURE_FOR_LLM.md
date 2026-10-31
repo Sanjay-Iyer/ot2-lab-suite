@@ -446,7 +446,7 @@ run and then uses `scp -O -r` to pull the run's images into:
 Related utilities include:
 
 - `scripts/maintenance/pull_vision_images.py` for a direct timestamped folder pull;
-- `scripts/test_ot2_camera_capture.py` for SSH → camera `curl` → SCP → image
+- `scripts/manual/test_ot2_camera_capture.py` for SSH → camera `curl` → SCP → image
   validation diagnostics;
 - `scripts/maintenance/pull_ot2_images.py` and `vision/` for the larger image-transfer,
   inventory, and validation workflow.

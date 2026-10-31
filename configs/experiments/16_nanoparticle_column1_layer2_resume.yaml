@@ -30,7 +30,7 @@
 # then the whole pass rests for inter_layer_delay_s so the deposit can dry.
 # E2 drops out after layer 4; F2 continues alone from layer 5 to layer 10.
 #
-#   python scripts/run_printing_experiment_robot.py nanoparticle-column1-layer2
+#   python scripts/experiments/run_printing_experiment_robot.py nanoparticle-column1-layer2
 #
 # ---------------------------------------------------------------------------
 # RUN TIME: 9 layers means 8 inter-layer waits of 1.5 hours each, plus the

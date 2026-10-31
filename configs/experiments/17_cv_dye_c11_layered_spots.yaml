@@ -22,7 +22,7 @@
 # Single layer, so no inter-layer delay ever fires -- the only wait is the
 # two-hour hold at the start.
 #
-#   python scripts/run_printing_experiment_robot.py cv-dye-layered-spots
+#   python scripts/experiments/run_printing_experiment_robot.py cv-dye-layered-spots
 #
 # ---------------------------------------------------------------------------
 # RUN THIS IMMEDIATELY AFTER 16 FINISHES. The two-hour hold is built in as

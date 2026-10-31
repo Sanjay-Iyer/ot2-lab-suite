@@ -9,10 +9,10 @@
 #   src/protocols/printing/02_printing_four_clover.py  <- regenerated, then simulated
 #
 # Build + validate + simulate (nothing touches the robot):
-#   python scripts/run_printing_workflow.py four-clover
+#   python scripts/manual/run_printing_workflow.py four-clover
 #
 # Resolved coordinates only, no simulation:
-#   python scripts/run_printing_workflow.py four-clover --summary
+#   python scripts/manual/run_printing_workflow.py four-clover --summary
 #
 # This path needs no agent, no LLM, no skill and no approval workflow.
 #

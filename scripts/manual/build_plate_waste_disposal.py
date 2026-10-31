@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-scripts/build_plate_waste_disposal.py
+scripts/manual/build_plate_waste_disposal.py
 =====================================
 Turn configs/workflows/defaults/plate_waste_disposal.yaml into a robot-ready copy of
 src/protocols/plate_waste_disposal.py with the YAML embedded as the CONFIG dict, then
 simulate it. This is how the YAML reaches the OT-2 (the robot can't read the repo).
 
   conda activate ai
-  python scripts/build_plate_waste_disposal.py
-  python scripts/build_plate_waste_disposal.py --config my.yaml --no-sim
+  python scripts/manual/build_plate_waste_disposal.py
+  python scripts/manual/build_plate_waste_disposal.py --config my.yaml --no-sim
 
 Pipeline: load YAML -> embed CONFIG (between the markers in the base protocol) +
 write run_modes into the DEFAULT_* flags -> generate into src/protocols/generated/
@@ -27,7 +27,7 @@ from pathlib import Path
 
 import yaml
 
-REPO          = Path(__file__).resolve().parent.parent
+REPO          = Path(__file__).resolve().parent.parent.parent
 BASE_PROTOCOL = REPO / "src" / "protocols" / "plate_waste_disposal.py"
 GENERATED_DIR = REPO / "src" / "protocols" / "generated"
 LABWARE       = REPO / "labware"

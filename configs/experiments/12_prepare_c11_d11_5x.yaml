@@ -11,7 +11,7 @@
 #
 # This prepares the two source wells used by 10_column9_timecourse.yaml.
 #
-#   python scripts/run_printing_experiment_robot.py prepare-c11-d11 --live
+#   python scripts/experiments/run_printing_experiment_robot.py prepare-c11-d11 --live
 #
 # Before a live run, C11 and D11 must be empty: the robot cannot detect their
 # starting volumes, and each BRAND well has a 350 uL capacity.

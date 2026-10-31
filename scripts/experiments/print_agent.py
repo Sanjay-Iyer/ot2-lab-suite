@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Conversational printing agent: plain language -> YAML config -> real OT-2 run.
 
-    python scripts/print_agent.py
+    python scripts/experiments/print_agent.py
 
 The agent NEVER writes or edits deterministic Python. It only produces a YAML
 configuration for one of the existing printing workflows, shows you the
 interpreted plan, and -- after you confirm -- hands off to the existing runner
-(scripts/run_printing_experiment_robot.py), which rebuilds the protocol fresh
+(scripts/experiments/run_printing_experiment_robot.py), which rebuilds the protocol fresh
 from that YAML and uploads/plays/monitors it over the existing HTTP path.
 
     you: Print from vial A1. One drop at A1, B1, C1. Three drops at A2, B2, C2.
@@ -24,7 +24,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
@@ -35,7 +35,7 @@ from src.printing.source_config import SOURCE_TYPES
 GENERATED_DIR = REPO / "configs" / "generated"
 STANDARD_OUT = GENERATED_DIR / "agent_print.yaml"
 CLOVER_OUT = GENERATED_DIR / "agent_clover.yaml"
-RUNNER = REPO / "scripts" / "run_printing_experiment_robot.py"
+RUNNER = REPO / "scripts" / "experiments" / "run_printing_experiment_robot.py"
 MACHINE_PROFILE = "configs/machines/ot2_standard_printing_p20_v1.yaml"
 
 SYSTEM_PROMPT = f"""You turn a scientist's plain-language printing request into ONE JSON

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/run_droplet_error_check.py
+scripts/experiments/run_droplet_error_check.py
 ==================================
 Terminal runner for src/protocols/printing_droplet_error_check.py.
 
@@ -9,10 +9,10 @@ which is the reliable transport for engine-era protocols (the robot server suppl
 deck configuration, so no AreaNotInDeckConfigurationError). The only addition is a final
 SCP step to pull this run's before/after images back to the laptop.
 
-  python scripts/run_droplet_error_check.py --live --paper-column 1 --replicates 3
-  python scripts/run_droplet_error_check.py --live --paper-column 5 \
+  python scripts/experiments/run_droplet_error_check.py --live --paper-column 1 --replicates 3
+  python scripts/experiments/run_droplet_error_check.py --live --paper-column 5 \
       --dispense-z 1.0 --droplet-ul 25 --air-gap-ul 0 --label lowgap
-  python scripts/run_droplet_error_check.py  # dry run (no liquid/images)
+  python scripts/experiments/run_droplet_error_check.py  # dry run (no liquid/images)
 
 Image pull uses the OT-2 key (ROBOT_SSH_KEY_PATH / ~/.ssh/id_rsa_opentrons); the run
 itself uses the HTTP API and needs no SSH.
@@ -32,7 +32,7 @@ from typing import Any
 import requests
 
 if __name__ == "__main__" and not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.core.config import Config
 from src.lab.robot_connection import (
@@ -44,7 +44,7 @@ from src.lab.robot_connection import (
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 from src.utils.ot2_ssh import OT2SSHSettings
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "printing_droplet_error_check.py"
 # Must match CONFIG["camera"]["robot_image_dir"] in the protocol.
 REMOTE_VISION_BASE = "/data/vision/droplet_error_check"

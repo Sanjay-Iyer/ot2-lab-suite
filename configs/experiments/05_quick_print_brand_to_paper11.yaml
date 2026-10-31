@@ -4,7 +4,7 @@
 # this is the fast "did it print?" check.
 #
 # Real run (rebuilds fresh from this file, then uploads + plays):
-#   python scripts/run_printing_experiment_robot.py quick-print
+#   python scripts/experiments/run_printing_experiment_robot.py quick-print
 #
 # Runs on the physically validated V1 standard executor
 # (src/protocols/printing/01_print_from_vial.py).

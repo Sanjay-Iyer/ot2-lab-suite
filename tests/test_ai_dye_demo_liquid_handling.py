@@ -1,7 +1,7 @@
 """Liquid handling of Agent NanoDrop: the configurable plate heights, the air gap, blow-out and the well-plate shake,
 mixing after each dilution (never before printing), and drops per paper position.
 
-The dilution sequence is the one physically tested by scripts/test_single_dilution_c12.py: aspirate at the vial, air
+The dilution sequence is the one physically tested by scripts/manual/test_single_dilution_c12.py: aspirate at the vial, air
 gap, dispense liquid + gap low in the plate well, blow out there, then touch_tip on that well (the "shake"). The protocol
 runs on the recording fake OT-2; the plan, the validator and the protocol read the same liquid_handling values.
 Simulation only.

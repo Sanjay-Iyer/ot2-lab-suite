@@ -17,7 +17,7 @@ validator and the protocol read the same values; older plans are migrated on loa
 | `well_plate_shake.radius / v_offset_mm / speed_mm_s / cycles` | 1.0 / −1.0 mm / 60 mm/s / 1 | config file |
 | `print.z_mm` (paper release height, independent of the plate) | 1.1 mm | config file |
 
-The dilution sequence is the one physically tested by `scripts/test_single_dilution_c12.py`: aspirate at the vial, air
+The dilution sequence is the one physically tested by `scripts/manual/test_single_dilution_c12.py`: aspirate at the vial, air
 gap, dispense liquid + gap at the plate height, blow out there, then `touch_tip` on that plate well (the "shake": the
 script's only post-dispense motion, Opentrons' default geometry). Each dilution is mixed once its dye is in (reps ×
 aspirate at the aspirate height / dispense at the mix height, then blow-out and shake), with the tip that just

@@ -104,11 +104,11 @@ conda run -n AI python src/protocols/printing_demo_protocol.py --config configs/
 ### 4. Run camera diagnostics
 To test the host-to-robot connection and camera status without running a full experiment, run:
 ```bash
-conda run -n AI python scripts/test_ot2_camera_capture.py
+conda run -n AI python scripts/manual/test_ot2_camera_capture.py
 ```
 Or run a mock test locally:
 ```bash
-conda run -n AI python scripts/test_ot2_camera_capture.py --mock
+conda run -n AI python scripts/manual/test_ot2_camera_capture.py --mock
 ```
 
 ---

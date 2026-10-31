@@ -2,7 +2,7 @@
 """
 Run the column-1 build-up and its CV dye finish as ONE command.
 
-    python scripts/run_column1_layers_then_dye.py --live
+    python scripts/experiments/run_column1_layers_then_dye.py --live
 
 Two protocols, played back to back on the robot, with nothing for you to do in
 between:
@@ -34,7 +34,7 @@ sleeps, the terminal closes, or the network drops, the robot will still finish
 protocol 1 on its own, but protocol 2 WILL NOT BE STARTED. Recover by running
 the dye step by hand:
 
-    python scripts/run_printing_experiment_robot.py cv-dye-layered-spots --live
+    python scripts/experiments/run_printing_experiment_robot.py cv-dye-layered-spots --live
 
 Disable sleep on the laptop before starting, or run the two steps separately if
 you would rather not depend on an unattended connection.
@@ -42,8 +42,8 @@ you would rather not depend on an unattended connection.
 If protocol 1 does not succeed, protocol 2 is not uploaded at all.
 --------------------------------------------------------------------------
 
-    python scripts/run_column1_layers_then_dye.py --live
-    python scripts/run_column1_layers_then_dye.py --no-start   # rehearse step 1
+    python scripts/experiments/run_column1_layers_then_dye.py --live
+    python scripts/experiments/run_column1_layers_then_dye.py --no-start   # rehearse step 1
 """
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ import sys
 from pathlib import Path
 
 if __name__ == "__main__" and not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.lab.robot_connection import (
     add_robot_host_arguments,
@@ -74,7 +74,7 @@ from src.printing.print_from_vial.builder import (
 )
 from src.printing.print_from_vial.loader import load_print_from_vial_config
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 
 #: (label, config) in the order they are played. Step 2 carries its own
 #: two-hour hold, so there is no waiting to do here.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Manual fallback entry point for the two OT-2 printing workflows.
 
-    python scripts/run_printing_workflow.py standard
-    python scripts/run_printing_workflow.py four-clover
-    python scripts/run_printing_workflow.py both
+    python scripts/manual/run_printing_workflow.py standard
+    python scripts/manual/run_printing_workflow.py four-clover
+    python scripts/manual/run_printing_workflow.py both
 
 Each run takes a hand-edited YAML, validates it, resolves it deterministically,
 prints a human-readable summary, writes the upload-ready protocol, and simulates
@@ -36,7 +36,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

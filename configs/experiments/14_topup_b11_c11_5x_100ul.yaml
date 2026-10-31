@@ -13,7 +13,7 @@
 #
 # Dilution only -- this never prints. Run a printing workflow afterwards.
 #
-#   python scripts/run_printing_experiment_robot.py topup-b11 \
+#   python scripts/experiments/run_printing_experiment_robot.py topup-b11 \
 #       --config configs/experiments/14_topup_b11_c11_5x_100ul.yaml
 #
 # ---------------------------------------------------------------------------

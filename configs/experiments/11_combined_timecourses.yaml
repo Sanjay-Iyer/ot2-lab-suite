@@ -16,7 +16,7 @@
 # Total: 49 deposits / 245 uL per paper; 98 deposits / 490 uL overall.
 # There is no trailing delay after layer 20: 19 one-hour waits total.
 #
-#   python scripts/run_printing_experiment_robot.py combined-timecourses
+#   python scripts/experiments/run_printing_experiment_robot.py combined-timecourses
 # =============================================================================
 
 machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml

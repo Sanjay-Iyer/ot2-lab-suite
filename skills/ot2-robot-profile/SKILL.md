@@ -68,7 +68,7 @@ the feature.
 
 | Protocol apiLevel | How to run on this robot |
 |-------------------|--------------------------|
-| ≤ 2.15 | `python scripts/run_smoke_test.py --local-protocol <file> --remote-protocol /var/lib/opentrons/user_storage/ot2_runs/<file>` (SSH + `opentrons_execute`), or the App |
+| ≤ 2.15 | `python scripts/manual/run_smoke_test.py --local-protocol <file> --remote-protocol /var/lib/opentrons/user_storage/ot2_runs/<file>` (SSH + `opentrons_execute`), or the App |
 | ≥ 2.16 | **Opentrons App**: import the custom labware JSONs, import the `.py`, press Run |
 
 ## Custom labware — two separate installs

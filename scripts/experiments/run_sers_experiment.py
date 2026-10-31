@@ -9,9 +9,9 @@ both config formats.
   sers-experiment/v1          a hand-written low-level execution config
                               (configs/sers_cv_titration_demo.yaml)
 
-    python scripts/run_sers_experiment.py --config configs/experiments/sers_exp1_np_cv.yaml
-    python scripts/run_sers_experiment.py --config <path> --plan       # review only
-    python scripts/run_sers_experiment.py --config <path> --live --confirm-robot-ready
+    python scripts/experiments/run_sers_experiment.py --config configs/experiments/sers_exp1_np_cv.yaml
+    python scripts/experiments/run_sers_experiment.py --config <path> --plan       # review only
+    python scripts/experiments/run_sers_experiment.py --config <path> --live --confirm-robot-ready
 
 --live uploads the emitted protocol over the robot's HTTP API and plays it.
 Every gate in src/sers_engine/execution.py must pass first.
@@ -28,7 +28,7 @@ from typing import Any
 
 import yaml
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

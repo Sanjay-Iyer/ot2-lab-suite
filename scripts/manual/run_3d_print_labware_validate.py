@@ -18,7 +18,7 @@ from typing import Any
 import requests
 
 if __name__ == "__main__" and not __package__:
-    repo = Path(__file__).resolve().parent.parent
+    repo = Path(__file__).resolve().parent.parent.parent
     sys.path.insert(0, str(repo))
 
 from src.lab.robot_connection import (
@@ -29,7 +29,7 @@ from src.lab.robot_connection import (
 )
 
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "3d_print_labware_validate.py"
 HEADERS = {"opentrons-version": "*"}
 TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}

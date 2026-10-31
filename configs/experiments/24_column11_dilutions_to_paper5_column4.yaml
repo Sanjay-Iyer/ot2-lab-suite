@@ -15,11 +15,11 @@
 #
 # SIMULATION LAPTOP (build + local simulation only):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/24_column11_dilutions_to_paper5_column4.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/24_column11_dilutions_to_paper5_column4.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py column11-paper5-column4 --robot-ip 169.254.46.57 --live
+#   python scripts/experiments/run_printing_experiment_robot.py column11-paper5-column4 --robot-ip 169.254.46.57 --live
 #
 # This split pair assumes script 22 used tip B5 and combined script 23 was NOT
 # run. It starts at C5 and dedicates one tip to each source: C5, D5, E5, F5,

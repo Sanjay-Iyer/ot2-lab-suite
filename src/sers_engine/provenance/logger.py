@@ -1151,7 +1151,7 @@ def live_execution_readiness(session: Any) -> tuple[bool, str]:
         return False, (
             "no provenance session is recording this experiment; live execution is "
             "blocked because the run could not be reconstructed afterwards. Run it "
-            "through scripts/sers_agent.py or scripts/run_sers_experiment.py."
+            "through scripts/experiments/sers_agent.py or scripts/experiments/run_sers_experiment.py."
         )
     ok, missing = recorder.live_readiness(session)
     if ok:

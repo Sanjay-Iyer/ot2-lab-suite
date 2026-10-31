@@ -9,7 +9,7 @@
 #   src/protocols/generated/01_print_from_vial_latest.py  <- uploaded to the OT-2
 #
 # Real run (rebuilds fresh from this file, then uploads + plays):
-#   python scripts/run_printing_experiment_robot.py print-from-corning-plate
+#   python scripts/experiments/run_printing_experiment_robot.py print-from-corning-plate
 
 # Laboratory-owned paper/tiprack geometry, calibrated heights, and the validated
 # print-release air handling (including the anti-drip air gap on EVERY cycle).

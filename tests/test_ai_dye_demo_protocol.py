@@ -89,7 +89,7 @@ def test_protocol_motion_matches_the_plan_shown_to_the_operator(protocol_module,
 
 
 def test_every_dilution_transfer_follows_the_c12_sequence(protocol_module, config):
-    # scripts/test_single_dilution_c12.py (physically tested): aspirate at the vial, air gap, dispense liquid + gap low
+    # scripts/manual/test_single_dilution_c12.py (physically tested): aspirate at the vial, air gap, dispense liquid + gap low
     # in the well, blow out there, then the droplet-release shake (touch_tip) on that plate well
     log = run_protocol(protocol_module, config).log
     lh = liquid_handling(config)

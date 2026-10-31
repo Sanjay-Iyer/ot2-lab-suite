@@ -16,11 +16,11 @@
 #
 # SIMULATION LAPTOP (build + local simulation only):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/25_column11_dilutions_to_paper5_column3.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/25_column11_dilutions_to_paper5_column3.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py column11-paper5-column3 --robot-ip 169.254.46.57 --live
+#   python scripts/experiments/run_printing_experiment_robot.py column11-paper5-column3 --robot-ip 169.254.46.57 --live
 #
 # Script 24 finishes at B6. This script starts at C6 and dedicates one tip to
 # each source: C6, D6, E6, F6, G6, H6, A7, and B7.

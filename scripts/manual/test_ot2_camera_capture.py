@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-scripts/test_ot2_camera_capture.py
+scripts/manual/test_ot2_camera_capture.py
 ==================================
 Diagnostic script to test the camera capture pipeline:
 SSH into robot -> curl camera endpoint -> save image -> SCP image back -> validate with Pillow
 
 Usage::
 
-    python scripts/test_ot2_camera_capture.py
-    python scripts/test_ot2_camera_capture.py --mock
+    python scripts/manual/test_ot2_camera_capture.py
+    python scripts/manual/test_ot2_camera_capture.py --mock
 """
 
 import sys
@@ -18,7 +18,7 @@ from pathlib import Path
 from datetime import datetime
 
 # Ensure project root is in path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 

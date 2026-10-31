@@ -159,7 +159,7 @@ ssh @OPTS root@$IP "opentrons_execute $REMOTE/generated_dilution.py"
 
 ```bash
 # Local smoke-test simulation (no robot connection)
-python scripts/run_smoke_test.py --simulate
+python scripts/manual/run_smoke_test.py --simulate
 
 # Bulk-deploy the staging directory contents to the robot
 python -m scripts.maintenance.deploy

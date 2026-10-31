@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simulate or explicitly execute the P300-only dry-motion smoke test."""
+"""Simulate or explicitly execute the API-2.28 P300 single-nozzle test."""
 from __future__ import annotations
 
 import argparse
@@ -16,7 +16,7 @@ from typing import Any, Sequence
 import requests
 
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 if __name__ == "__main__" and not __package__:
     sys.path.insert(0, str(REPO))
 
@@ -28,9 +28,16 @@ from src.lab.robot_connection import (
 )
 
 DEFAULT_PROTOCOL = (
-    REPO / "src" / "protocols" / "generated" / "p300_smoke_test.py"
+    REPO
+    / "src"
+    / "protocols"
+    / "generated"
+    / "p300_single_nozzle_smoke_test.py"
 )
-DEFAULT_LABWARE = REPO / "labware" / "corning_96_wellplate_360ul_custom.json"
+DEFAULT_LABWARE = (
+    REPO / "labware" / "tuberack_3dprint_20ml_8vials_v2.json",
+    REPO / "labware" / "corning_96_wellplate_360ul_custom.json",
+)
 HEADERS = {"opentrons-version": "*"}
 TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 _SIMULATOR_SHIM = (
@@ -40,10 +47,11 @@ _SIMULATOR_SHIM = (
 )
 _SIMULATION_ERROR_RE = re.compile(
     r"Traceback \(most recent call last\)|RuntimeError|LabwareNotFoundError|"
-    r"ProtocolCommandFailedError|InvalidProtocolData|KeyError|AttributeError",
+    r"ProtocolCommandFailedError|InvalidProtocolData|KeyError|AttributeError|"
+    r"PartialTipMovementNotAllowedError",
     re.IGNORECASE,
 )
-_SIMULATION_SUCCESS_TEXT = "P300 dry-motion smoke test complete"
+_SIMULATION_SUCCESS_TEXT = "P300 single-nozzle dry-motion smoke test complete"
 
 
 def _api_url(robot_ip: str, path: str) -> str:
@@ -72,17 +80,31 @@ def _request_json(
     return payload
 
 
-def _upload_protocol(robot_ip: str, protocol_path: Path, labware_path: Path) -> str:
+def _upload_protocol(
+    robot_ip: str,
+    protocol_path: Path,
+    labware_paths: Sequence[Path],
+) -> str:
     with ExitStack() as stack:
         protocol_file = stack.enter_context(protocol_path.open("rb"))
-        labware_file = stack.enter_context(labware_path.open("rb"))
+        files: list[tuple[str, tuple[str, Any, str]]] = [
+            (
+                "files",
+                (protocol_path.name, protocol_file, "text/x-python"),
+            )
+        ]
+        for labware_path in labware_paths:
+            labware_file = stack.enter_context(labware_path.open("rb"))
+            files.append(
+                (
+                    "files",
+                    (labware_path.name, labware_file, "application/json"),
+                )
+            )
         response = requests.post(
             _api_url(robot_ip, "/protocols"),
             headers=HEADERS,
-            files=[
-                ("files", (protocol_path.name, protocol_file, "text/x-python")),
-                ("files", (labware_path.name, labware_file, "application/json")),
-            ],
+            files=files,
             timeout=120,
         )
     try:
@@ -97,23 +119,21 @@ def _upload_protocol(robot_ip: str, protocol_path: Path, labware_path: Path) -> 
     protocol_id = payload.get("data", {}).get("id")
     if not protocol_id:
         raise RuntimeError(
-            f"Upload response did not include data.id:\n{json.dumps(payload, indent=2)}"
+            f"Upload response did not include data.id:\n"
+            f"{json.dumps(payload, indent=2)}"
         )
     return str(protocol_id)
 
 
-def simulate_protocol(protocol_path: Path, labware_path: Path) -> int:
-    """Run only the local Opentrons simulator; this function never uses the network."""
-    command = [
-        sys.executable,
-        "-B",
-        "-c",
-        _SIMULATOR_SHIM,
-        "-L",
-        str(labware_path.parent),
-        str(protocol_path),
-    ]
-    print("Local P300 simulation only (no robot connection).")
+def simulate_protocol(protocol_path: Path, labware_paths: Sequence[Path]) -> int:
+    """Run locally with no robot connection."""
+    labware_dirs = sorted({str(path.parent) for path in labware_paths})
+    command = [sys.executable, "-B", "-c", _SIMULATOR_SHIM]
+    for labware_dir in labware_dirs:
+        command.extend(["-L", labware_dir])
+    command.append(str(protocol_path))
+
+    print("Local API-2.28 simulation only (no robot connection).")
     print(f"Protocol: {protocol_path}")
     result = subprocess.run(
         command,
@@ -132,33 +152,37 @@ def simulate_protocol(protocol_path: Path, labware_path: Path) -> int:
         or _SIMULATION_ERROR_RE.search(output)
         or _SIMULATION_SUCCESS_TEXT not in output
     ):
-        print("P300 local simulation FAILED.", file=sys.stderr)
+        print("P300 single-nozzle local simulation FAILED.", file=sys.stderr)
         return 1
-    print("P300 local simulation PASSED.")
+    print("P300 single-nozzle local simulation PASSED.")
     return 0
 
 
 def execute_protocol(
     robot_ip: str,
     protocol_path: Path,
-    labware_path: Path,
+    labware_paths: Sequence[Path],
     poll_seconds: float,
 ) -> int:
-    """Upload, start, and monitor the test. Call only after explicit --execute."""
+    """Upload, start, and monitor through the robot HTTP API."""
     os.environ["NO_PROXY"] = (
         f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
     )
-    print("PHYSICAL P300 DRY-MOTION TEST")
+    print("PHYSICAL P300 SINGLE-NOZZLE DRY-MOTION TEST")
     print(
-        "Confirm: empty plate in slot 4; paper holder in slot 5; "
-        "eight 300 uL tips at slot 8 A1-H1."
+        "Confirm deck: vial rack 7; 300 uL tips 8; empty plate 4; "
+        "paper holder 5; right mount p300_multi_gen2."
     )
     print(
-        "No liquid should be present. Stop the robot immediately if any labware "
-        "or tip is misaligned."
+        "Only tip H1 in slot 8 is required. No liquid. Keep slots 1, 2, 3, "
+        "and 6 clear for the idle-nozzle envelope."
+    )
+    print(
+        "Stop immediately if more than one tip engages or any nozzle/tip "
+        "approaches labware unexpectedly."
     )
 
-    protocol_id = _upload_protocol(robot_ip, protocol_path, labware_path)
+    protocol_id = _upload_protocol(robot_ip, protocol_path, labware_paths)
     run_payload = _request_json(
         "POST",
         robot_ip,
@@ -192,7 +216,10 @@ def execute_protocol(
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="P300-only dry-motion smoke test (local simulation by default)."
+        description=(
+            "API-2.28 P300 multi single-nozzle dry-motion test "
+            "(local simulation by default)."
+        )
     )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
@@ -203,11 +230,16 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     mode.add_argument(
         "--execute",
         action="store_true",
-        help="Explicitly upload and run physical dry motion through the OT-2 HTTP API.",
+        help="Explicitly upload and run physical motion through HTTP.",
     )
     add_robot_host_arguments(parser)
     parser.add_argument("--protocol", default=str(DEFAULT_PROTOCOL))
-    parser.add_argument("--labware", default=str(DEFAULT_LABWARE))
+    parser.add_argument(
+        "--labware",
+        action="append",
+        default=None,
+        help="Custom labware JSON to upload; repeat for multiple files.",
+    )
     parser.add_argument("--poll-seconds", type=float, default=2.0)
     return parser.parse_args(argv)
 
@@ -215,13 +247,17 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     protocol_path = Path(args.protocol).resolve()
-    labware_path = Path(args.labware).resolve()
+    labware_paths = tuple(
+        Path(path).resolve()
+        for path in (args.labware if args.labware else DEFAULT_LABWARE)
+    )
     if not protocol_path.is_file():
         raise FileNotFoundError(f"Protocol not found: {protocol_path}")
-    if not labware_path.is_file():
-        raise FileNotFoundError(
-            f"Custom labware definition not found: {labware_path}"
-        )
+    for labware_path in labware_paths:
+        if not labware_path.is_file():
+            raise FileNotFoundError(
+                f"Custom labware definition not found: {labware_path}"
+            )
 
     if args.execute:
         robot_host = resolve_host(args.robot_host)
@@ -229,10 +265,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return execute_protocol(
             robot_host,
             protocol_path,
-            labware_path,
+            labware_paths,
             args.poll_seconds,
         )
-    return simulate_protocol(protocol_path, labware_path)
+    return simulate_protocol(protocol_path, labware_paths)
 
 
 if __name__ == "__main__":

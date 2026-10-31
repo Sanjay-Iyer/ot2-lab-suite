@@ -32,7 +32,7 @@
 #
 # REAL ROBOT LAPTOP (after review and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py consolidate-b11-c11 --live
+#   python scripts/experiments/run_printing_experiment_robot.py consolidate-b11-c11 --live
 #
 # No --robot-host: resolve_host() walks OT2_ROBOT_HOST -> mDNS
 # (OT2CEP20220929R02.local) -> cached -> discovery, which tracks the robot's

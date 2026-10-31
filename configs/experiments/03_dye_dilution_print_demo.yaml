@@ -8,7 +8,7 @@
 #   src/protocols/generated/03_dye_dilution_print_demo_latest.py  <- uploaded
 #
 # Real run (rebuilds fresh from this file, then uploads + plays):
-#   python scripts/run_printing_experiment_robot.py dye-demo
+#   python scripts/experiments/run_printing_experiment_robot.py dye-demo
 
 # Laboratory-owned pipette, paper labware identity, tiprack, and the validated
 # print-release air handling. Deck slots below override where things sit today.

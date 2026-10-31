@@ -1,7 +1,7 @@
 # TEMPLATE - GENERAL CLOVER PAPER PRINT
 #
 # Copy this, edit it, and run:
-#   python scripts/run_printing_experiment_robot.py clover-print --config <your.yaml>
+#   python scripts/experiments/run_printing_experiment_robot.py clover-print --config <your.yaml>
 #
 # Printing only. Reuses the physically validated four-droplet clover geometry.
 #

@@ -9,7 +9,7 @@
 #   src/protocols/generated/01_print_from_vial_latest.py  <- uploaded
 #
 # Real run (rebuilds fresh from this file, then uploads + plays):
-#   python scripts/run_printing_experiment_robot.py single-spot
+#   python scripts/experiments/run_printing_experiment_robot.py single-spot
 #
 # Runs on the existing standard printing executor
 # (src/protocols/printing/01_print_from_vial.py). Its layer-major loop is what

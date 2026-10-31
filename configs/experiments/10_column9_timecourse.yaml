@@ -17,7 +17,7 @@
 # There is NO trailing delay after layer 20. With 19 one-hour inter-layer waits,
 # total run time is a little over 19 hours.
 #
-#   python scripts/run_printing_experiment_robot.py column9-timecourse
+#   python scripts/experiments/run_printing_experiment_robot.py column9-timecourse
 #
 # Runs on the physically validated V1 standard executor
 # (src/protocols/printing/01_print_from_vial.py).

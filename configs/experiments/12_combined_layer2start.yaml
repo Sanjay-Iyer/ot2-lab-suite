@@ -14,7 +14,7 @@
 #
 # Waiting: one initial one-hour hold, then 18 one-hour inter-layer waits.
 #
-#   python scripts/run_printing_experiment_robot.py combined_layer2start
+#   python scripts/experiments/run_printing_experiment_robot.py combined_layer2start
 # =============================================================================
 
 machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml

@@ -36,7 +36,7 @@ CLOVER_CONFIG = REPO / "configs" / "experiments" / "02_printing_four_clover.yaml
 CLOVER_EXECUTOR = REPO / "src" / "protocols" / "printing" / "02_printing_four_clover.py"
 VALIDATED_CLOVER = REPO / "src" / "protocols" / "printing" / "12_four_clover_paper_print.py"
 PAPER_LABWARE = REPO / "labware" / "paper_print_96_flat.json"
-RUNNER = REPO / "scripts" / "run_printing_workflow.py"
+RUNNER = REPO / "scripts" / "manual" / "run_printing_workflow.py"
 
 CONFIG_END = "# <<< CONFIG END <<<"
 

@@ -553,7 +553,7 @@ def test_the_manual_runner_records_a_full_session_without_any_agent(tmp_path, mo
     set_active_session(None)
     monkeypatch.setattr("src.sers_engine.provenance.logger.SESSIONS_ROOT", tmp_path)
 
-    import scripts.run_sers_experiment as runner
+    import scripts.experiments.run_sers_experiment as runner
 
     config = Path("configs/experiments/sers_exp1_np_cv.yaml")
     assert config.is_file(), "the reference intent config is missing"

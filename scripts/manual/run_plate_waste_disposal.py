@@ -6,14 +6,14 @@ Uses the robot HTTP API (not opentrons_execute), which is required for this
 apiLevel 2.28 protocol. By default it creates a DRY RUN. Pass --live to run the
 real liquid-handling waste removal.
 
-  python scripts/run_plate_waste_disposal.py                   # dry run
-  python scripts/run_plate_waste_disposal.py --live            # real run
-  python scripts/run_plate_waste_disposal.py --live --skip-build
+  python scripts/manual/run_plate_waste_disposal.py                   # dry run
+  python scripts/manual/run_plate_waste_disposal.py --live            # real run
+  python scripts/manual/run_plate_waste_disposal.py --live --skip-build
 
 Select which plate columns to empty and which rack vial collects the waste
 (otherwise the protocol's config defaults apply):
 
-  python scripts/run_plate_waste_disposal.py --live \
+  python scripts/manual/run_plate_waste_disposal.py --live \
       --source-columns 9,11 --waste-vial A4
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ from typing import Any
 import requests
 
 if __name__ == "__main__" and not __package__:
-    repo = Path(__file__).resolve().parent.parent
+    repo = Path(__file__).resolve().parent.parent.parent
     sys.path.insert(0, str(repo))
 
 from src.core.config import Config
@@ -43,7 +43,7 @@ from src.lab.robot_connection import (
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "plate_waste_disposal_latest.py"
 HEADERS = {"opentrons-version": "*"}
 TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
@@ -167,7 +167,7 @@ def main() -> int:
         protocol_path = Path(args.protocol).resolve()
         if not args.skip_build:
             run_log.event("local_step", label="build + simulate")
-            _run_local_step([sys.executable, "scripts/build_plate_waste_disposal.py"], "build + simulate")
+            _run_local_step([sys.executable, "scripts/manual/build_plate_waste_disposal.py"], "build + simulate")
         if not protocol_path.exists():
             raise FileNotFoundError(f"Generated protocol not found: {protocol_path}")
 

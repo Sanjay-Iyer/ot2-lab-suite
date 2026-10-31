@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Conversational experiment agent: plain language -> YAML -> real OT-2.
 
-    python scripts/experiment_agent.py
+    python scripts/experiments/experiment_agent.py
 
 One agent, three deterministic workflows:
 
@@ -13,7 +13,7 @@ The agent NEVER writes or edits deterministic Python. It starts from the
 templates in configs/templates/, applies what you ask for across the whole
 conversation, writes configs/generated/current_*.yaml, shows the resolved plan,
 and only after you type "yes" hands off to the existing robot runner
-(scripts/run_printing_experiment_robot.py), which rebuilds the protocol fresh
+(scripts/experiments/run_printing_experiment_robot.py), which rebuilds the protocol fresh
 from that YAML and uploads/plays/monitors it.
 
 Uses the repository's existing LLM connection (src.core.config.Config.get_llm),
@@ -29,7 +29,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
@@ -37,7 +37,7 @@ import yaml
 
 TEMPLATES = REPO / "configs" / "templates"
 GENERATED = REPO / "configs" / "generated"
-RUNNER = REPO / "scripts" / "run_printing_experiment_robot.py"
+RUNNER = REPO / "scripts" / "experiments" / "run_printing_experiment_robot.py"
 
 WORKFLOWS = {
     "dilution": {

@@ -85,7 +85,7 @@ mixing: {enabled: true, reps: 2, volume_ul: 15.0}
 # --- physical liquid handling ------------------------------------------------------
 # Tune these here on the work laptop, then restart the GUI. The plan, the validator
 # and the protocol all read these same values. Heights are mm above the well bottom.
-# Sequence per vial transfer (scripts/test_single_dilution_c12.py, physically tested):
+# Sequence per vial transfer (scripts/manual/test_single_dilution_c12.py, physically tested):
 # aspirate from the vial -> air gap -> dispense liquid + gap at plate_dispense_height_mm
 # -> blow-out there -> well shake.
 liquid_handling:
@@ -95,7 +95,7 @@ liquid_handling:
   air_gap_ul: 1.0                 # after each vial aspiration; 0 = off; counts toward the P20's 20 uL
   blow_out: true                  # after every plate dispense and after mixing
   # Droplet release after every plate dispense and after mixing: the touch-tip
-  # motion of scripts/test_single_dilution_c12.py (Opentrons touch_tip with its
+  # motion of scripts/manual/test_single_dilution_c12.py (Opentrons touch_tip with its
   # default geometry). 96-well plate only - never the vial rack, paper or tip rack.
   well_plate_shake:
     enabled: true

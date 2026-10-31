@@ -25,7 +25,7 @@
 # Nothing can touch the column-1 print, the round-1 clovers, or each other.
 #
 # Real run:
-#   python scripts/run_printing_experiment_robot.py three-clovers
+#   python scripts/experiments/run_printing_experiment_robot.py three-clovers
 # =============================================================================
 
 protocol_version: 18            # validated four-clover executor

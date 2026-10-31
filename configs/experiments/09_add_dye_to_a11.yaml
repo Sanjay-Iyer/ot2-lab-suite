@@ -5,7 +5,7 @@
 # printing -- it just moves dye into A11 so the 5x dilutions have stock to draw
 # from.
 #
-#   python scripts/run_printing_experiment_robot.py add-dye
+#   python scripts/experiments/run_printing_experiment_robot.py add-dye
 #
 # ---------------------------------------------------------------------------
 # Moves 100 uL as 7 pulls: six of 15 uL then a final 10 uL. This ADDS to whatever

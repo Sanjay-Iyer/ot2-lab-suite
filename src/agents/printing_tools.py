@@ -1026,7 +1026,7 @@ def simulate_four_clover_experiment(experiment_config: FourCloverProposalV1) -> 
     Simulation is local and read-only: it proves the plan is physically
     executable. It does not produce an upload-ready artifact and does not reach
     READY_FOR_EXECUTION - a human does that with
-    ``scripts/run_printing_workflow.py``.
+    ``scripts/manual/run_printing_workflow.py``.
     """
     job, _ = _validated_clover_config(experiment_config)
     plan = resolve_clover_job(job)

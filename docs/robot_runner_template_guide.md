@@ -5,7 +5,7 @@ How to build a terminal runner for any OT-2 protocol, the way that **works every
 The reference template is [`scripts/developer/run_robot_template.py`](../scripts/developer/run_robot_template.py).
 The canonical working examples are
 [`scripts/run_vial_print_robot.py`](../scripts/run_vial_print_robot.py) and
-[`scripts/run_droplet_error_check.py`](../scripts/run_droplet_error_check.py).
+[`scripts/experiments/run_droplet_error_check.py`](../scripts/experiments/run_droplet_error_check.py).
 
 ---
 
@@ -101,7 +101,7 @@ successful run, and use the **OT-2 key** — not the default `~/.ssh/id_rsa`:
 - options: `-o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa -o BatchMode=yes -i <key>`
 - **always** `scp -O` (the OT-2 dropbear server needs the legacy SCP protocol)
 
-See `_pull_images()` in [`run_droplet_error_check.py`](../scripts/run_droplet_error_check.py)
+See `_pull_images()` in [`run_droplet_error_check.py`](../scripts/experiments/run_droplet_error_check.py)
 for the exact, working block. (Manual check the key works:
 `ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa -i
 C:\Users\<you>\.ssh\id_rsa_opentrons root@OT2CEP20220929R02.local`.)

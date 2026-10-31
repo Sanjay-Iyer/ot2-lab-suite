@@ -556,7 +556,7 @@ def execute_sers_workflow(config_dict: dict[str, Any], live: bool = False) -> di
             "config_hash": digest,
             "errors": [
                 "Live robot motion is not available through this legacy tool. Use the "
-                "agent's guarded execution path, or scripts/run_sers_experiment.py "
+                "agent's guarded execution path, or scripts/experiments/run_sers_experiment.py "
                 "--live from the verified real-robot execution host."
             ],
         }

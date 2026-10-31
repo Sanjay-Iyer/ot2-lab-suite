@@ -66,7 +66,7 @@ def test_slot5_scripts_render_as_live_api_215_protocols():
 
 
 def test_named_robot_runner_registers_both_slot5_scripts():
-    import scripts.run_printing_experiment_robot as runner
+    import scripts.experiments.run_printing_experiment_robot as runner
 
     assert runner.WORKFLOWS["a10-paper5-column3"] == (
         "standard",

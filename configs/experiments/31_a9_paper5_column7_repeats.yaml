@@ -67,11 +67,11 @@
 #
 # SIMULATION LAPTOP (local build + simulation only; no robot contact):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/31_a9_paper5_column7_repeats.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/31_a9_paper5_column7_repeats.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py a9-paper5-column7-repeats --live
+#   python scripts/experiments/run_printing_experiment_robot.py a9-paper5-column7-repeats --live
 #
 # Physical execution requires the real robot laptop and explicit readiness
 # confirmation. Creating or locally simulating this config does not run it live.

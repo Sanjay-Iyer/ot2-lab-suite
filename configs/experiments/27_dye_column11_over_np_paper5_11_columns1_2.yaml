@@ -25,13 +25,13 @@
 #
 # SIMULATION LAPTOP (local build + simulation only; no robot contact):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/27_dye_column11_over_np_paper5_11_columns1_2.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/27_dye_column11_over_np_paper5_11_columns1_2.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py np-a9-b9-paper5-11 --live
+#   python scripts/experiments/run_printing_experiment_robot.py np-a9-b9-paper5-11 --live
 #   ...let the nanoparticle spots dry, then:
-#   python scripts/run_printing_experiment_robot.py dye-column11-over-np-paper5-11 --live
+#   python scripts/experiments/run_printing_experiment_robot.py dye-column11-over-np-paper5-11 --live
 #
 # loaded_volume_ul is a planning assumption PER dilution well, not a
 # measurement. Column 11 was already drawn from by scripts 23-25, so top the

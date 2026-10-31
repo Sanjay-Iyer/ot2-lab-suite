@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Version 11 conversational experiment agent.
 
-    python scripts/11_experiment_agent.py                 (work laptop: Vertex)
-    python scripts/11_experiment_agent.py --offline       (home laptop: no cloud)
-    python scripts/11_experiment_agent.py --dry-run       (never call the runner)
+    python scripts/experiments/11_experiment_agent.py                 (work laptop: Vertex)
+    python scripts/experiments/11_experiment_agent.py --offline       (home laptop: no cloud)
+    python scripts/experiments/11_experiment_agent.py --dry-run       (never call the runner)
 
 One agent, three deterministic Version 11 workflows:
 
@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
@@ -42,7 +42,7 @@ import yaml
 from src.printing.v11.agent_core import WORKFLOWS, AgentError, ExperimentState
 from src.printing.v11.labware import LABWARE, V11ConfigError
 
-RUNNER = REPO / "scripts" / "run_printing_experiment_robot.py"
+RUNNER = REPO / "scripts" / "experiments" / "run_printing_experiment_robot.py"
 
 BANNER = """
 ============================================================

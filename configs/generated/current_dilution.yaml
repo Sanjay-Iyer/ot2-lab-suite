@@ -1,7 +1,7 @@
 # CURRENT WORKING CONFIG (seeded from the template) - GENERAL DILUTION
 #
 # Copy this, edit it, and run:
-#   python scripts/run_printing_experiment_robot.py dilution --config <your.yaml>
+#   python scripts/experiments/run_printing_experiment_robot.py dilution --config <your.yaml>
 #
 # Dilution only. This never prints. Run a printing workflow separately afterwards.
 

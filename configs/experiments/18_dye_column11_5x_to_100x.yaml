@@ -22,7 +22,7 @@
 #
 # REAL ROBOT LAPTOP (after review and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py dye-column11-dilutions --robot-ip 169.254.46.57 --live
+#   python scripts/experiments/run_printing_experiment_robot.py dye-column11-dilutions --robot-ip 169.254.46.57 --live
 #
 # Before running, A11:H11 must all be empty. The robot cannot detect their
 # starting volumes. The BRAND wells have a 350 uL physical capacity.

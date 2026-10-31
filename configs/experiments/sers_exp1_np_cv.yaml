@@ -1,7 +1,7 @@
 # Experiment 1 - nanoparticle dilutions printed, dried, then overprinted with CV.
 #
 # This is the human-authored path: edit this file and run it with
-#   python scripts/run_sers_experiment.py --config configs/experiments/sers_exp1_np_cv.yaml
+#   python scripts/experiments/run_sers_experiment.py --config configs/experiments/sers_exp1_np_cv.yaml
 # No LLM is involved. The conversational agent writes files in exactly this
 # format, so anything it produces can be inspected, edited, and re-run by hand.
 #

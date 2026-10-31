@@ -11,11 +11,11 @@
 #
 # SIMULATION LAPTOP (build + local simulation only):
 #   conda activate ai
-#   python scripts/build_print_from_vial.py --config configs/experiments/22_a10_to_paper5_column3.yaml
+#   python scripts/manual/build_print_from_vial.py --config configs/experiments/22_a10_to_paper5_column3.yaml
 #
 # REAL ROBOT LAPTOP (after review, commit/push, and pull):
 #   conda activate llm
-#   python scripts/run_printing_experiment_robot.py a10-paper5-column3 --robot-ip 169.254.46.57 --live
+#   python scripts/experiments/run_printing_experiment_robot.py a10-paper5-column3 --robot-ip 169.254.46.57 --live
 #
 # This pair assumes scripts 20 and 21 were run first with the same tip rack.
 # Their last assigned tip is A5, so this script starts at clean tip B5. If the

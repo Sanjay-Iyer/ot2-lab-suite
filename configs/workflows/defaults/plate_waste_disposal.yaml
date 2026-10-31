@@ -7,7 +7,7 @@
 # Edit this file, then build a robot-ready protocol with the YAML embedded:
 #
 #   conda activate ai
-#   python scripts/build_plate_waste_disposal.py
+#   python scripts/manual/build_plate_waste_disposal.py
 #
 # The builder embeds this YAML into a generated copy of
 # src/protocols/plate_waste_disposal.py and simulates it.

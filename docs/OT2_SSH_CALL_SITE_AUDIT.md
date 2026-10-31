@@ -17,10 +17,10 @@ not disable host-key checking.
 | `scripts/maintenance/deploy.py` | `deploy_labware()` | Remote mkdir, SCP upload, remote verify | Centralized |
 | `scripts/maintenance/sync_robot.py` | `sync_from_robot()` | Recursive SCP downloads | Centralized |
 | `scripts/maintenance/pull_vision_images.py` | `main()` | Recursive image SCP download | Centralized |
-| `scripts/run_droplet_error_check.py` | `_pull_images()` | Recursive image SCP download | Centralized |
+| `scripts/experiments/run_droplet_error_check.py` | `_pull_images()` | Recursive image SCP download | Centralized |
 | `scripts/run_vial_print_robot.py` | `_prepare_remote_image_dir()` | Remote image-directory preparation | Centralized |
 | `scripts/run_vial_print_robot.py` | `_pull_images()` | Recursive image SCP download | Centralized |
-| `scripts/test_ot2_camera_capture.py` | `run_diagnostics()` | Remote capture, SCP download, cleanup | Centralized |
+| `scripts/manual/test_ot2_camera_capture.py` | `run_diagnostics()` | Remote capture, SCP download, cleanup | Centralized |
 | `vision/capture_ot2_images.py` | `build_ssh_command()` / `capture_images()` | Remote camera capture | Centralized |
 | `vision/transfer_ot2_images.py` | `build_scp_command()` / `transfer_images()` | Recursive image SCP download | Centralized |
 | `vision/transfer_images.py` | `check_connectivity()` | Harmless remote echo | Centralized |
@@ -39,8 +39,8 @@ The following nearby paths were inspected and intentionally left as HTTP-only:
 |---|---|
 | `src/agents/robot_http_tools.py` | Invokes HTTP runner scripts; it does not construct SSH/SCP commands |
 | `scripts/developer/run_robot_template.py` | HTTP API template; optional SCP guidance now points to centralized examples |
-| `scripts/run_smoke_test.py` | HTTP API physical dry-motion runner; no SSH/SCP command |
-| `scripts/run_plate_waste_disposal.py` | HTTP API runner |
+| `scripts/manual/run_smoke_test.py` | HTTP API physical dry-motion runner; no SSH/SCP command |
+| `scripts/manual/run_plate_waste_disposal.py` | HTTP API runner |
 | OT-2 protocol `curl` calls | Robot-local HTTP camera calls, unrelated to laptop SSH authentication |
 
 Tracked documentation examples were updated to use the explicit identity and

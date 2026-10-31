@@ -13,15 +13,15 @@ This is not a new robot connection or transport. It reuses, unchanged:
     PLAN/actions shape, not just the CONFIG/deck shape).
 
 What this script adds is only the front half: BUILD ONLY. It regenerates the
-requested Experiment-01 workflow from its YAML (via scripts/run_printing_workflow.py,
+requested Experiment-01 workflow from its YAML (via scripts/manual/run_printing_workflow.py,
 the existing no-agent builder) and hands the resulting upload artifact to that
 existing HTTP execution path. It never invokes opentrons.simulate -- the robot is
 the executor. For a local simulation, use the standalone builder instead:
-    python scripts/run_printing_workflow.py four-clover
+    python scripts/manual/run_printing_workflow.py four-clover
 Nothing here talks to the robot except through the functions above.
 
-    python scripts/run_printing_experiment_robot.py four-clover
-    python scripts/run_printing_experiment_robot.py standard --live
+    python scripts/experiments/run_printing_experiment_robot.py four-clover
+    python scripts/experiments/run_printing_experiment_robot.py standard --live
 
 Safety -- READ BEFORE YOU RUN THIS:
   - The four-clover executor has a real dry_run gate (configs/experiments/
@@ -40,7 +40,7 @@ import sys
 from pathlib import Path
 
 if __name__ == "__main__" and not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.lab.robot_connection import (
     add_robot_host_arguments,
@@ -49,7 +49,7 @@ from src.lab.robot_connection import (
 )
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 
-import scripts.run_printing_workflow as workflow
+import scripts.manual.run_printing_workflow as workflow
 from scripts.run_vial_print_robot import (
     _create_run,
     _monitor,
@@ -90,7 +90,7 @@ from src.printing.v11.dilution_builder import (
     build_dilution_protocol as v11_build_dilution,
 )
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 
 #: workflow name -> (family, default config). All rebuild fresh from the YAML.
 WORKFLOWS = {
