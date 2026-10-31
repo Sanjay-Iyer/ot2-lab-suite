@@ -7,9 +7,9 @@ from pathlib import Path
 
 import yaml
 
-import scripts.run_vial_print_robot as runner
-from scripts.build_vial_dilution_print import validate_v3
-from scripts.validate_vial_print import (
+import scripts.manual.run_vial_print_robot as runner
+from scripts.manual.build_vial_dilution_print import validate_v3
+from scripts.manual.validate_vial_print import (
     _expected_v3_dilution_cycles,
     _protocol_api_level,
     _v3_static_problems,

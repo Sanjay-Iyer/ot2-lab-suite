@@ -46,7 +46,7 @@ Set-Location C:\code\opentrons_home\ot2-lab-suite
 python -m src.printing.cli --help
 ```
 
-Never run `scripts/run_vial_print_robot.py`, pass `--live`, or contact the robot
+Never run `scripts/manual/run_vial_print_robot.py`, pass `--live`, or contact the robot
 from this laptop. A local simulation with motion exercised is classified:
 
 ```text
@@ -150,8 +150,8 @@ After the architecture CLI has validated and simulated the unpatched registered
 config, rebuild its tracked `*_latest.py` from the committed safe YAML:
 
 ```powershell
-python scripts\build_vial_dilution_print.py --config configs\printing\complementary_bp_print_v10a.yaml --no-sim
-python scripts\build_vial_dilution_print.py --config configs\printing\four_clover_spacing_v13.yaml --no-sim
+python scripts\manual\build_vial_dilution_print.py --config configs\printing\complementary_bp_print_v10a.yaml --no-sim
+python scripts\manual\build_vial_dilution_print.py --config configs\printing\four_clover_spacing_v13.yaml --no-sim
 git diff --check
 git diff -- configs\printing src\protocols\generated
 git status --short
@@ -214,19 +214,19 @@ Runner preflight/simulation is not a substitute for architecture validation.
 ```powershell
 # WORK LAPTOP ONLY — phase 1: validate, build/simulate/upload, but DO NOT press play.
 python -m src.printing.cli validate --family standard --workflow complementary_bp_v10a
-python scripts\run_vial_print_robot.py --config configs\printing\complementary_bp_print_v10a.yaml --live --no-start --no-pull-images
+python scripts\manual\run_vial_print_robot.py --config configs\printing\complementary_bp_print_v10a.yaml --live --no-start --no-pull-images
 Get-FileHash src\protocols\generated\complementary_bp_print_v10a_latest.py -Algorithm SHA256
 
 # Compare the exact hash, complete the physical checklist, and explicitly confirm.
 # Phase 2 starts live liquid motion without changing that artifact.
-python scripts\run_vial_print_robot.py --config configs\printing\complementary_bp_print_v10a.yaml --live --skip-build --skip-validate
+python scripts\manual\run_vial_print_robot.py --config configs\printing\complementary_bp_print_v10a.yaml --live --skip-build --skip-validate
 
 # Four-clover equivalent, also WORK LAPTOP ONLY.
 python -m src.printing.cli validate --family design --workflow four_clover_spacing --design four_clover
-python scripts\run_vial_print_robot.py --config configs\printing\four_clover_spacing_v13.yaml --live --no-start --no-pull-images
+python scripts\manual\run_vial_print_robot.py --config configs\printing\four_clover_spacing_v13.yaml --live --no-start --no-pull-images
 Get-FileHash src\protocols\generated\four_clover_spacing_v13_latest.py -Algorithm SHA256
 # After hash review and explicit physical confirmation:
-python scripts\run_vial_print_robot.py --config configs\printing\four_clover_spacing_v13.yaml --live --skip-build --skip-validate
+python scripts\manual\run_vial_print_robot.py --config configs\printing\four_clover_spacing_v13.yaml --live --skip-build --skip-validate
 ```
 
 `--skip-build --skip-validate` is used above only to preserve the exact hash produced
@@ -235,9 +235,9 @@ The live build temporarily leaves tracked latest code with `DEFAULT_DRY_RUN=Fals
 Do not commit it. After the physical run, restore the safe latest artifact:
 
 ```powershell
-python scripts\build_vial_dilution_print.py --config configs\printing\complementary_bp_print_v10a.yaml --set-dry-run true --no-sim
+python scripts\manual\build_vial_dilution_print.py --config configs\printing\complementary_bp_print_v10a.yaml --set-dry-run true --no-sim
 # Or, after the four-clover run:
-python scripts\build_vial_dilution_print.py --config configs\printing\four_clover_spacing_v13.yaml --set-dry-run true --no-sim
+python scripts\manual\build_vial_dilution_print.py --config configs\printing\four_clover_spacing_v13.yaml --set-dry-run true --no-sim
 git diff --check
 git status --short
 ```
@@ -250,7 +250,7 @@ git status --short
 | Unknown parameter | Run `describe`; workflow patch models reject extra fields instead of deep-merging them. |
 | Validation reports bounds/spacing/capacity/source error | Correct the request or YAML. Do not persuade the agent to ignore deterministic validation. |
 | Simulation PASS but no motion appears | Use `src.printing.cli simulate`; it builds a temporary forced-motion artifact. A committed config with `dry_run:true` may otherwise exercise only preflight. |
-| Config changed but latest protocol did not | Re-run `scripts/build_vial_dilution_print.py --config <exact-yaml> --no-sim`, then inspect the generated diff. |
+| Config changed but latest protocol did not | Re-run `scripts/manual/build_vial_dilution_print.py --config <exact-yaml> --no-sim`, then inspect the generated diff. |
 | Missing/malformed runner config | Fix the supplied YAML. The runner intentionally refuses rather than falling back to version 1. |
 | Robot not found on work laptop | Check Ethernet, then run `python scripts/maintenance/find_robot.py --check`; use the resolved config/mDNS result. |
 | SSH public-key failure | Confirm `ROBOT_SSH_KEY_PATH` points to `id_rsa_opentrons`, then run `python scripts/maintenance/check_ot2_ssh.py --legacy-rsa`. |

@@ -26,7 +26,7 @@ ROBOT_PROTOCOLS: dict[str, RobotProtocol] = {
             "Builds a dilution series from water/food coloring vials, then prints "
             "an 8-channel droplet column onto paper."
         ),
-        runner_script=PROJECT_ROOT / "scripts" / "run_vial_print_robot.py",
+        runner_script=PROJECT_ROOT / "scripts" / "manual" / "run_vial_print_robot.py",
         protocol_path=GENERATED_PROTOCOL_DIR / "vial_dilution_print_latest.py",
         runner_transport="http_api",
         exposed_to_agent=True,

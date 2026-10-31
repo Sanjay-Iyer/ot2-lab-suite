@@ -63,7 +63,7 @@ from typing import Any, Callable, Iterable
 
 import yaml
 
-from src.agents.dye_demo import conversation, experiment_memory, render
+from src.agents.dye_demo import conversation, memory as experiment_memory, render
 from src.agents.dye_demo.columns import (
     COLUMN_KINDS,
     column_answer,
@@ -136,7 +136,7 @@ from src.agents.dye_demo.model import (
     resolve_path,
     set_path,
 )
-from src.agents.dye_demo.compiler import compile_plan
+from src.agents.dye_demo.tools import compile_plan
 from src.agents.dye_demo.patches import LIST_FIELDS
 from src.agents.dye_demo.plan import build_plan, print_map
 from src.agents.dye_demo.skills import loaded_skills
@@ -156,7 +156,7 @@ from src.agents.dye_demo.state import (
 from src.agents.dye_demo.validation import free_slots
 
 PINNED_SIMULATOR = REPO / ".venv" / "ot2-api-2.15-py310" / "python.exe"
-# Exit codes shared with scripts/run_vial_print_robot.py (keep the two in sync).
+# Exit codes shared with scripts/manual/run_vial_print_robot.py (keep the two in sync).
 RUN_ABORTED_EXIT_CODE = 130          # interrupted after the robot run was started: a stop was requested from the OT-2
 RUN_NOT_STARTED_EXIT_CODE = 4        # interrupted before the robot run was started: nothing ran on the OT-2
 QUIT_WORDS = {"quit", "exit", "q"}
@@ -326,7 +326,7 @@ class SubprocessExecutor:
 
     def command(self, config_path: Path, simulate: bool, status_file: Path | None = None,
                 stop_file: Path | None = None) -> list[str]:
-        script = "scripts/build_vial_dilution_print.py" if simulate else "scripts/run_vial_print_robot.py"
+        script = "scripts/manual/build_vial_dilution_print.py" if simulate else "scripts/manual/run_vial_print_robot.py"
         command = [sys.executable, script, "--config", str(config_path)]
         if not simulate:
             command.append("--live")

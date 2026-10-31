@@ -7,7 +7,7 @@ stem; the suffix names the pipette variant. Understandable without reading the P
 Build any of them with:
 
 ```bash
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.<variant>.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.<variant>.yaml
 ```
 
 ## BP v3: robot API 7.0.2 / Protocol API 2.15
@@ -30,8 +30,8 @@ different path, set `OT2_API_2_15_PYTHON` to its `python.exe`.
 
 ```powershell
 conda activate ai
-python scripts\build_vial_dilution_print.py --config configs\printing\bp_20260723_v3.yaml
-python scripts\validate_vial_print.py --config configs\printing\bp_20260723_v3.yaml
+python scripts\manual\build_vial_dilution_print.py --config configs\printing\bp_20260723_v3.yaml
+python scripts\manual\validate_vial_print.py --config configs\printing\bp_20260723_v3.yaml
 ```
 
 The second command fetches `/health` and requires the generated API level to

@@ -36,12 +36,12 @@ deterministic validation
         v
 protocol generation
   src/printing/artifacts.py::build_prepared_artifact
-  scripts/build_vial_dilution_print.py::build_source
+  scripts/manual/build_vial_dilution_print.py::build_source
         |
         v
 exact-motion local simulation
   src/printing/artifacts.py::simulate_prepared_request
-  scripts/build_vial_dilution_print.py::simulate
+  scripts/manual/build_vial_dilution_print.py::simulate
   src/protocols/printing/09_plate_well_direct_paper_print_v9.py::run
   src/protocols/printing/09_plate_well_direct_paper_print_v9.py::_preflight
   src/protocols/printing/09_plate_well_direct_paper_print_v9.py::_print_paper
@@ -88,12 +88,12 @@ geometry and deterministic validation
         v
 protocol generation
   src/printing/artifacts.py::build_prepared_artifact
-  scripts/build_vial_dilution_print.py::build_source
+  scripts/manual/build_vial_dilution_print.py::build_source
         |
         v
 exact-motion local simulation
   src/printing/artifacts.py::simulate_prepared_request
-  scripts/build_vial_dilution_print.py::simulate
+  scripts/manual/build_vial_dilution_print.py::simulate
   src/protocols/printing/12_four_clover_paper_print.py::run
   src/protocols/printing/12_four_clover_paper_print.py::_preflight
   src/protocols/printing/12_four_clover_paper_print.py::_print_clovers

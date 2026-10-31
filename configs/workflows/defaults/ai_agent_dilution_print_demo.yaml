@@ -9,7 +9,7 @@
 #        |  applied only after the operator types yes (src/agents/dye_demo/)
 #        v
 #   configs/workflows/user/ai_dye_demo_<timestamp>.yaml
-#        |  scripts/build_vial_dilution_print.py (embeds YAML, simulates)
+#        |  scripts/manual/build_vial_dilution_print.py (embeds YAML, simulates)
 #        v
 #   src/protocols/generated/ai_agent_dilution_print_demo_latest.py  <- uploaded
 #

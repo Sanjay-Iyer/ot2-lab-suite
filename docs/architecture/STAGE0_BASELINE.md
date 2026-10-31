@@ -61,7 +61,7 @@ one actually being iterated.
 
 ## Printing workflows — the real registry is an integer table
 
-`scripts/build_vial_dilution_print.py::PROTOCOL_VERSIONS` maps `int -> (base protocol,
+`scripts/manual/build_vial_dilution_print.py::PROTOCOL_VERSIONS` maps `int -> (base protocol,
 generated stem)`. This, not `src/core/workflows/registry.py`, is what actually runs.
 
 | id | base protocol | generated stem | family |
@@ -138,7 +138,7 @@ Filenames must equal the internal `loadName`.
 - **Config drift found:** `.env` carries `ROBOT_IP=169.254.46.57` while
   `configs/robot.yaml` records `discovered.ip: 169.254.252.252`. Two different addresses
   in two places; `AGENTS.md` says `configs/robot.yaml` is authoritative.
-- **Transports:** HTTP API (`scripts/run_vial_print_robot.py`, `robot_http_tools.py`) is
+- **Transports:** HTTP API (`scripts/manual/run_vial_print_robot.py`, `robot_http_tools.py`) is
   the standard for runs; SSH/SCP (`src/utils/ot2_ssh.py`, `src/agents/tools.py`) is used
   by the older deploy/execute path.
 

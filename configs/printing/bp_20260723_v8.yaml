@@ -14,8 +14,8 @@
 #   with a 5 min drying rest after every pass except the last.
 #
 # Build + run:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v8.yaml
-#   python scripts/run_vial_print_robot.py --config configs/printing/bp_20260723_v8.yaml --live
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723_v8.yaml
+#   python scripts/manual/run_vial_print_robot.py --config configs/printing/bp_20260723_v8.yaml --live
 # =============================================================================
 protocol_version: 8
 

@@ -11,9 +11,9 @@ start, a few middle steps, and the end, and a CV script logs a reviewable verdic
 | File | Role |
 |------|------|
 | [`configs/workflows/defaults/vial_dilution_print.yaml`](../configs/workflows/defaults/vial_dilution_print.yaml) | **The config — edit this.** All knobs + defaults |
-| [`scripts/build_vial_dilution_print.py`](../scripts/build_vial_dilution_print.py) | Builds a robot-ready protocol from the YAML, then simulates |
+| [`scripts/manual/build_vial_dilution_print.py`](../scripts/manual/build_vial_dilution_print.py) | Builds a robot-ready protocol from the YAML, then simulates |
 | [`src/protocols/printing/01_vial_dilution_paper_print.py`](../src/protocols/printing/01_vial_dilution_paper_print.py) | The protocol template (embedded `CONFIG` + pre-flight + camera capture) |
-| [`scripts/validate_vial_print.py`](../scripts/validate_vial_print.py) | Multi-case simulation gate (asserts on output text) |
+| [`scripts/manual/validate_vial_print.py`](../scripts/manual/validate_vial_print.py) | Multi-case simulation gate (asserts on output text) |
 | [`vision_tests/scripts/verify_print_droplets.py`](../vision_tests/scripts/verify_print_droplets.py) | CV droplet count/colour/shape → CV log |
 | [`vision_tests/lib.py`](../vision_tests/lib.py) | Shared classical-CV pipeline |
 | [`labware/tuberack_3dprint_20ml_8vials_v2.json`](../labware/tuberack_3dprint_20ml_8vials_v2.json) | The vial rack definition |
@@ -28,7 +28,7 @@ Edit the YAML, then build a robot-ready protocol with the config embedded:
 
 ```powershell
 conda activate ai
-python scripts\build_vial_dilution_print.py        # validate -> embed -> simulate
+python scripts\manual\build_vial_dilution_print.py        # validate -> embed -> simulate
 ```
 
 The builder validates the YAML, writes
@@ -197,13 +197,13 @@ conda activate ai
 python scripts\maintenance\generate_labware.py configs\labware\tuberack_3dprint_20ml_8vials_v2.yaml
 
 # 1. BUILD from the YAML config (edit the YAML first): validate -> embed CONFIG -> simulate
-python scripts\build_vial_dilution_print.py
+python scripts\manual\build_vial_dilution_print.py
 
 # 1b. (alt) simulate the template with its default CONFIG directly
 python src\protocols\simulate_protocol.py src\protocols\printing\01_vial_dilution_paper_print.py
 
 # 2. ROBUST multi-case gate — the source of truth. Expect: ALL CASES PASSED
-python scripts\validate_vial_print.py
+python scripts\manual\validate_vial_print.py
 
 # 3. CV log end-to-end (synthesizes a droplet image — no camera needed here)
 python vision_tests\scripts\verify_print_droplets.py --mock --expect 8                    # PASS
@@ -241,18 +241,18 @@ trends light→dark down the column).
 1. **Deploy the labware** (once): `python -m scripts.maintenance.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json`
    (and import the Corning plate + tip rack via the App if not already present).
 2. **Confirm the robot supports API 2.28.** If not, see the apiLevel note above.
-3. **Build from your YAML** (`python scripts/build_vial_dilution_print.py`) and run the
-   generated file with `scripts/run_vial_print_robot.py`, which uses the robot HTTP API.
+3. **Build from your YAML** (`python scripts/manual/build_vial_dilution_print.py`) and run the
+   generated file with `scripts/manual/run_vial_print_robot.py`, which uses the robot HTTP API.
    Do not use bare `opentrons_execute` for this API 2.28 protocol; it does not provide
    the deck configuration this protocol needs. Start with the terminal dry run, then
    run live:
 
    ```powershell
-   python scripts\run_vial_print_robot.py
-   python scripts\run_vial_print_robot.py --live
+   python scripts\manual\run_vial_print_robot.py
+   python scripts\manual\run_vial_print_robot.py --live
    ```
 
-4. **Pull images & run CV:** `scripts/run_vial_print_robot.py` automatically pulls
+4. **Pull images & run CV:** `scripts/manual/run_vial_print_robot.py` automatically pulls
    `/data/vision/vial_dilution_print` back to
    `vision_runs/vial_dilution_print/run_YYYYMMDD_HHMMSS/` after a live started run
    (disable with `--no-pull-images`). Then run the CV check on one printed

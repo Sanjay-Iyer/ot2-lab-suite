@@ -17,7 +17,7 @@ from copy import deepcopy
 
 import pytest
 
-import scripts.run_vial_print_robot as runner
+import scripts.manual.run_vial_print_robot as runner
 from src.agents.dye_demo import render
 from src.agents.dye_demo.model import (
     DEFAULT_CONFIG,

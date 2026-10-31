@@ -3,7 +3,7 @@ src/core/workflow_config.py
 ===========================
 The single authoritative build-time entry point that turns a workflow YAML into the
 internal CONFIG the flagship protocol executes, running ALL shared validators along
-the way. Used by scripts/build_vial_dilution_print.py so the build script does not
+the way. Used by scripts/manual/build_vial_dilution_print.py so the build script does not
 reimplement any validation rule (Part 4: "one authoritative implementation per rule").
 
 It accepts two shapes:

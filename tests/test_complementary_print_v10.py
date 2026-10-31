@@ -107,8 +107,8 @@ def test_v10bv2_prints_dmmp_once_everywhere_without_delays():
 
 
 def test_builder_and_runner_register_both_variants():
-    from scripts.build_vial_dilution_print import PROTOCOL_VERSIONS
-    import scripts.run_vial_print_robot as runner
+    from scripts.manual.build_vial_dilution_print import PROTOCOL_VERSIONS
+    import scripts.manual.run_vial_print_robot as runner
 
     assert PROTOCOL_VERSIONS[10] == (PROTOCOL, "complementary_bp_print_v10a")
     assert PROTOCOL_VERSIONS[11] == (PROTOCOL, "complementary_dmmp_print_v10b")

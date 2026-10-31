@@ -9,7 +9,7 @@
 #   * no paper-destination overlap (P300 -> cols 1-4, P20 -> cols 5-8)
 #
 # Build + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
 
 deck:
   tuberack:     {slot: 7}

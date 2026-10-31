@@ -12,7 +12,7 @@
 # pre-fill the plate by hand.
 #
 # Build + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p20_only.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p20_only.yaml
 
 deck:
   tuberack:     {slot: 7}

@@ -91,8 +91,8 @@ edit YAML  →  build (embeds CONFIG + simulates)  →  validate (run-mode matri
 ```
 
 ```bash
-python scripts/build_vial_dilution_print.py        # → SIMULATION OK
-python scripts/validate_vial_print.py              # → ALL CASES PASSED
+python scripts/manual/build_vial_dilution_print.py        # → SIMULATION OK
+python scripts/manual/validate_vial_print.py              # → ALL CASES PASSED
 python vision_tests/scripts/verify_print_droplets.py --mock --expect 8
 ```
 

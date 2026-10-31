@@ -11,7 +11,7 @@
 #
 # v6 is embedded verbatim (self-validating; it does not go through the dilution
 # normalizer). Build (dry-run by default) + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v6.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723_v6.yaml
 
 protocol_version: 6
 

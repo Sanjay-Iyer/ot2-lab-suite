@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from scripts.build_vial_dilution_print import PROTOCOL_VERSIONS
-from scripts import run_vial_print_robot as robot_runner
+from scripts.manual.build_vial_dilution_print import PROTOCOL_VERSIONS
+from scripts.manual import run_vial_print_robot as robot_runner
 from src.printing.compiler import apply_workflow_patch
 from src.printing.config import REPO_ROOT, load_printing_config
 from src.printing.designs import get_design, list_designs

@@ -24,7 +24,7 @@ Nothing here is a new execution path. The chosen position is written into
 configs/generated/alignment_print.yaml, loaded through the same
 print-from-vial loader every other printing experiment uses, built by the same
 builder, and handed to the same HTTP upload / create-run / play / monitor cycle
-in scripts/run_vial_print_robot.py. The robot is the executor.
+in scripts/manual/run_vial_print_robot.py. The robot is the executor.
 
     python scripts/manual/run_alignment_print.py --row D --column 2 --live
     python scripts/manual/run_alignment_print.py --row A --column 1 --dry-run
@@ -48,7 +48,7 @@ from src.lab.robot_connection import (
 )
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 
-from scripts.run_vial_print_robot import (
+from scripts.manual.run_vial_print_robot import (
     _create_run,
     _monitor,
     _play_run,

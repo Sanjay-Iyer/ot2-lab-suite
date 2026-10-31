@@ -9,7 +9,7 @@
 #
 # v4 is embedded verbatim (it does not go through the dilution normalizer), so this
 # file IS the protocol CONFIG. Build (dry-run by default) + simulate under API 2.15:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v4.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723_v4.yaml
 
 protocol_version: 4
 

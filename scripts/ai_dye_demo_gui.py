@@ -6,7 +6,7 @@
 
 Both commands serve the same page (same buttons, labels, chat and plan views); --simulate only swaps the execution
 backend underneath for the local build + Opentrons simulator. Launching never contacts the robot. The OT-2 is found and checked only when Run on OT-2 is pressed. The run then takes
-the terminal demo's robot path (scripts/run_vial_print_robot.py: build + simulate, upload over the HTTP API, start,
+the terminal demo's robot path (scripts/manual/run_vial_print_robot.py: build + simulate, upload over the HTTP API, start,
 monitor), and the page's Stop button stops it the way Ctrl-C does in the terminal.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ if str(REPO) not in sys.path:
 
 from nicegui import app, ui  # noqa: E402
 
-from src.agents.dye_demo.experiment_memory import HISTORY_DIR  # noqa: E402
+from src.agents.dye_demo.memory import HISTORY_DIR  # noqa: E402
 from src.agents.dye_demo.gui.adapter import DemoGuiAdapter  # noqa: E402
 from src.agents.dye_demo.gui.app import build_page  # noqa: E402
 from src.agents.dye_demo.llm import LLMClient  # noqa: E402
@@ -40,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="Rehearsal without a robot: the run button builds and simulates only.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG.relative_to(REPO)),
                         help="Starting YAML; a timestamped working copy is created.")
+    parser.add_argument("--temperature", type=float, default=0, help="LLM temperature (default: 0).")
     parser.add_argument("--operator", default=None,
                         help="Who is running the experiment (otherwise asked in the chat).")
     parser.add_argument("--session-label", default="NiceGUI",
@@ -90,7 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.simulate:
         print(f"SIMULATION: '{RUN_ON_OT2}' builds and simulates the protocol on this laptop; the OT-2 is never "
               "contacted.", flush=True)
-    llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=0))
+    llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=args.temperature))
     executor = SubprocessExecutor(robot_host=args.robot_host)
     session = DemoSession(settings, load_config(source), llm=llm, executor=executor)
     adapter = DemoGuiAdapter(session)

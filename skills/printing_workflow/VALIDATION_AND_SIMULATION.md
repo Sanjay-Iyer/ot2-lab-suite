@@ -30,7 +30,7 @@ field, requested value, the mounted pipettes/loaded labware, and a correction, e
 
 ## Build + simulate
 ```bash
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
 # add --no-sim to validate + generate only
 ```
 Pipeline: load YAML → `workflow_config.normalize_and_validate` (shared validators) →
@@ -40,7 +40,7 @@ deck-slot check → (legacy only) structural `validate()` → embed CONFIG → g
 ## Interpreting simulation output (exact criteria)
 `opentrons.simulate` **exits 0 even on runtime errors**, so the verifier scans the output
 text. A build is `SIMULATION OK` iff `returncode == 0` AND no line matches the error
-regex (`scripts/build_vial_dilution_print.py`):
+regex (`scripts/manual/build_vial_dilution_print.py`):
 ```
 Traceback (most recent call last) | RuntimeError | LabwareNotFoundError |
 ProtocolCommandFailedError | InvalidProtocolData | KeyError | AttributeError
@@ -55,7 +55,7 @@ Normal informational lines ("robot_settings.json not found. Loading defaults",
 "Configure pipette … NozzleLayout", mock-photo lines) are NOT failures.
 
 ## Multi-mode matrix
-`scripts/validate_vial_print.py` runs the generated protocol through dry_run /
+`scripts/manual/validate_vial_print.py` runs the generated protocol through dry_run /
 dilution_only / print_only / full_run and checks expected/forbidden phrases; a
 deliberately corrupted labware case must FAIL. `ALL CASES PASSED` = green.
 

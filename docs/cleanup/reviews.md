@@ -83,3 +83,24 @@ inspected all 20 moved scripts, 19 nonmoved Python consumers and 357 maintained
 modules for stale executable references. Lab independently verified 393 parsed
 YAML values and 3,026 protected scientific/data/settings files. No corrections
 remain; optional methods are retained with unchanged operations.
+
+## C1c — shared tooling and final script index (PASS/PASS)
+
+Starting commit `94d6894`. Moved builder/validator/runner to `scripts/manual/`;
+top-level Python scripts 9 → 6. External `C1c-shared-tooling` preserves three
+originals. Mapping/change list `.test_tmp/C1c-map*.json`. Updated library imports,
+session subprocess dispatch, validator/build commands, registry runner paths,
+tests, operator instructions and current docs. Script index now describes six
+primary launchers and four functional groups; no duplicate wrappers retained.
+
+`python -B docs/cleanup/checks.py`: all seven checks PASS, evidence
+`.test_tmp/cleanup-checks-0c1df8b2c4`. Added two focused dispatch-path assertions
+(construct commands only; no live execution). Both pinned simulations, terminal,
+GUI loopback, offline config and WORK-profile preview pass. Physical protocol
+logic/parameters are unchanged; no credentials or robot connection values edited.
+
+Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Python
+compared prior-dirty consumers to the actual C0 working snapshot, confirmed only
+cleanup path replacements, and scanned 357 maintained modules for all 42 moves.
+Lab independently reconfirmed 393 YAML value pairs and 3,026 scientific byte pairs.
+Focused tests: **43 passed in7.50s**. No required corrections remain.

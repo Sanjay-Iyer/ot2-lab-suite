@@ -184,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     from src.lab.robot_connection import connection_summary, resolve_host, verify_host
-    from scripts import run_vial_print_robot as robot_runner
+    from scripts.manual import run_vial_print_robot as robot_runner
 
     with TemporaryDirectory(prefix="ot2_single_dilution_") as temp_dir:
         protocol_file = Path(temp_dir) / "single_dilution_c12_protocol.py"

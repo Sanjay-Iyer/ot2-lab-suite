@@ -7,14 +7,14 @@ these make a robot connection (deployment lives in
 
 ---
 
-## 1. `scripts/build_vial_dilution_print.py` — the builder/compiler
+## 1. `scripts/manual/build_vial_dilution_print.py` — the builder/compiler
 
 Turns the workflow YAML into a robot-ready protocol and simulates it.
 
 ```bash
-python scripts/build_vial_dilution_print.py
-python scripts/build_vial_dilution_print.py --config configs/workflows/user/my_run.yaml
-python scripts/build_vial_dilution_print.py --no-sim
+python scripts/manual/build_vial_dilution_print.py
+python scripts/manual/build_vial_dilution_print.py --config configs/workflows/user/my_run.yaml
+python scripts/manual/build_vial_dilution_print.py --no-sim
 ```
 
 | Argument | Type | Default | Meaning |
@@ -57,14 +57,14 @@ config-not-found, validation failure, or simulation failure.
 
 ---
 
-## 2. `scripts/validate_vial_print.py` — the run-mode matrix gate
+## 2. `scripts/manual/validate_vial_print.py` — the run-mode matrix gate
 
 Simulates the **generated** protocol (falls back to the base template) under five
 run modes and asserts each behaves correctly. This is the real pass/fail gate.
 
 ```bash
-python scripts/validate_vial_print.py
-python scripts/validate_vial_print.py --config configs/workflows/user/my_run.yaml
+python scripts/manual/validate_vial_print.py
+python scripts/manual/validate_vial_print.py --config configs/workflows/user/my_run.yaml
 ```
 
 | Argument | Type | Default | Meaning |
@@ -200,7 +200,7 @@ Anything else (fold strengths, total volume, mix reps, columns, slots) goes thro
 runs the builder, records a PASS in `simulations.json`), `validate_vial_print_matrix`
 (runs the matrix with `--config`), `verify_print_droplets_mock`. Robot deploy/execute
 are reused unchanged from `src/agents/tools.py` (lab laptop only, behind `RUN ROBOT`).
-For live vial-print runs, `scripts/run_vial_print_robot.py` pulls robot-side camera
+For live vial-print runs, `scripts/manual/run_vial_print_robot.py` pulls robot-side camera
 images from `/data/vision/vial_dilution_print` into
 `vision_runs/vial_dilution_print/run_YYYYMMDD_HHMMSS/` automatically after the run
 reaches a terminal status. Use `--no-pull-images` only when you explicitly want to
@@ -214,10 +214,10 @@ Offline tests: `tests/test_vial_print_agent.py`.
 
 ```bash
 # Full local gate, dev laptop
-python scripts/build_vial_dilution_print.py        \
-  && python scripts/validate_vial_print.py          \
+python scripts/manual/build_vial_dilution_print.py        \
+  && python scripts/manual/validate_vial_print.py          \
   && python vision_tests/scripts/verify_print_droplets.py --mock --expect 8
 
 # Rebuild from a one-off user config without simulating
-python scripts/build_vial_dilution_print.py --config configs/workflows/user/run42.yaml --no-sim
+python scripts/manual/build_vial_dilution_print.py --config configs/workflows/user/run42.yaml --no-sim
 ```

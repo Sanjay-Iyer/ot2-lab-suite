@@ -18,8 +18,8 @@ not disable host-key checking.
 | `scripts/maintenance/sync_robot.py` | `sync_from_robot()` | Recursive SCP downloads | Centralized |
 | `scripts/maintenance/pull_vision_images.py` | `main()` | Recursive image SCP download | Centralized |
 | `scripts/experiments/run_droplet_error_check.py` | `_pull_images()` | Recursive image SCP download | Centralized |
-| `scripts/run_vial_print_robot.py` | `_prepare_remote_image_dir()` | Remote image-directory preparation | Centralized |
-| `scripts/run_vial_print_robot.py` | `_pull_images()` | Recursive image SCP download | Centralized |
+| `scripts/manual/run_vial_print_robot.py` | `_prepare_remote_image_dir()` | Remote image-directory preparation | Centralized |
+| `scripts/manual/run_vial_print_robot.py` | `_pull_images()` | Recursive image SCP download | Centralized |
 | `scripts/manual/test_ot2_camera_capture.py` | `run_diagnostics()` | Remote capture, SCP download, cleanup | Centralized |
 | `vision/capture_ot2_images.py` | `build_ssh_command()` / `capture_images()` | Remote camera capture | Centralized |
 | `vision/transfer_ot2_images.py` | `build_scp_command()` / `transfer_images()` | Recursive image SCP download | Centralized |

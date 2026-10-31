@@ -25,7 +25,7 @@ produces the intended order. This script simply plays them in sequence.
 
 This is not a new execution path: each protocol is built by the same builder and
 uploaded through the same HTTP upload / create-run / play / monitor cycle in
-scripts/run_vial_print_robot.py that every other printing run uses.
+scripts/manual/run_vial_print_robot.py that every other printing run uses.
 
 --------------------------------------------------------------------------
 THIS SCRIPT MUST STAY RUNNING FOR THE WHOLE SEQUENCE -- about 14 hours. It
@@ -61,7 +61,7 @@ from src.lab.robot_connection import (
 )
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 
-from scripts.run_vial_print_robot import (
+from scripts.manual.run_vial_print_robot import (
     _create_run,
     _monitor,
     _play_run,

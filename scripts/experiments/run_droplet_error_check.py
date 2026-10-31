@@ -4,7 +4,7 @@ scripts/experiments/run_droplet_error_check.py
 ==================================
 Terminal runner for src/protocols/printing_droplet_error_check.py.
 
-Built on the SAME HTTP-API pattern as scripts/run_vial_print_robot.py (port 31950),
+Built on the SAME HTTP-API pattern as scripts/manual/run_vial_print_robot.py (port 31950),
 which is the reliable transport for engine-era protocols (the robot server supplies the
 deck configuration, so no AreaNotInDeckConfigurationError). The only addition is a final
 SCP step to pull this run's before/after images back to the laptop.

@@ -29,8 +29,8 @@ This skill is the ground truth for that pipeline. For its sub-topics see:
 | Generated, robot-ready copies | `src/protocols/generated/vial_dilution_print_latest.py` (+ timestamped) |
 | Vial labware (explicit geometry) | [`labware/tuberack_3dprint_20ml_8vials_v2.json`](../../labware/tuberack_3dprint_20ml_8vials_v2.json) |
 | Plate / paper labware | `labware/corning_96_wellplate_360ul_custom.json` |
-| Builder | [`scripts/build_vial_dilution_print.py`](../../scripts/build_vial_dilution_print.py) |
-| Run-mode matrix validator | [`scripts/validate_vial_print.py`](../../scripts/validate_vial_print.py) |
+| Builder | [`scripts/manual/build_vial_dilution_print.py`](../../scripts/manual/build_vial_dilution_print.py) |
+| Run-mode matrix validator | [`scripts/manual/validate_vial_print.py`](../../scripts/manual/validate_vial_print.py) |
 | Droplet CV verifier | [`vision_tests/scripts/verify_print_droplets.py`](../../vision_tests/scripts/verify_print_droplets.py) |
 | Unit/regression tests | [`tests/test_vial_print.py`](../../tests/test_vial_print.py) |
 
@@ -38,10 +38,10 @@ This skill is the ground truth for that pipeline. For its sub-topics see:
 
 ```
 1. Edit configs/workflows/defaults/vial_dilution_print.yaml      (or pass --config)
-2. python scripts/build_vial_dilution_print.py                   build → embed CONFIG → simulate
-3. python scripts/validate_vial_print.py                         5-case run-mode matrix gate
+2. python scripts/manual/build_vial_dilution_print.py                   build → embed CONFIG → simulate
+3. python scripts/manual/validate_vial_print.py                         5-case run-mode matrix gate
 4. python vision_tests/scripts/verify_print_droplets.py --mock   CV sanity (8-droplet gradient)
-5. (lab laptop) python scripts/run_vial_print_robot.py --live     HTTP API terminal run
+5. (lab laptop) python scripts/manual/run_vial_print_robot.py --live     HTTP API terminal run
 ```
 
 Steps 2–4 run from the **conda `ai`** environment (has `opentrons`, `numpy`,

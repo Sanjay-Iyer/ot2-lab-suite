@@ -4,7 +4,7 @@ How to build a terminal runner for any OT-2 protocol, the way that **works every
 
 The reference template is [`scripts/developer/run_robot_template.py`](../scripts/developer/run_robot_template.py).
 The canonical working examples are
-[`scripts/run_vial_print_robot.py`](../scripts/run_vial_print_robot.py) and
+[`scripts/manual/run_vial_print_robot.py`](../scripts/manual/run_vial_print_robot.py) and
 [`scripts/experiments/run_droplet_error_check.py`](../scripts/experiments/run_droplet_error_check.py).
 
 ---

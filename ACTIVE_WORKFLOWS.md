@@ -40,8 +40,8 @@ live run (which commits material), and is the step that proves tip pickup/return
 offsets, and the P20's reach into the 55 mm vials.
 
 Printing behaviour is identical in both. v2 exists because the P300 is inaccurate below
-~20 µL, which biases the most dilute points of a series. `scripts/validate_vial_print.py`
-and `scripts/run_vial_print_robot.py` both read `protocol_version` from `--config` and
+~20 µL, which biases the most dilute points of a series. `scripts/manual/validate_vial_print.py`
+and `scripts/manual/run_vial_print_robot.py` both read `protocol_version` from `--config` and
 target the matching artifact.
 
 ### Experiment configs
@@ -62,11 +62,11 @@ target the matching artifact.
 ### Builder / validator / simulation
 ```bash
 # build (validate → embed → generate → simulate) — pick any of the three configs
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
 # validate + generate only (no simulation)
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml --no-sim
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml --no-sim
 # multi-mode matrix over the generated protocol
-python scripts/validate_vial_print.py
+python scripts/manual/validate_vial_print.py
 ```
 - Shared validators (one authoritative rule each): `src/core/pipette_selection.py`,
   `src/core/print_groups.py`, `src/core/materials.py`, `src/core/workflow_config.py`.
@@ -159,7 +159,7 @@ diameter for this ink/paper pair has never been measured, so tighten only with d
 ### Builder / plotter / tests
 ```bash
 # build: validate -> embed -> generate -> simulate (dry run)
-python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_v12.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/four_clover_v12.yaml
 # offline layout map + coordinate report (no robot, reads the same YAML)
 python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
 # geometry unit tests (no OT-2, no simulation)

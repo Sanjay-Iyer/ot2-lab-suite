@@ -58,7 +58,7 @@ P20 and P300 tip state is fully independent (separate instruments + separate rac
 See [VALIDATION_AND_SIMULATION.md](VALIDATION_AND_SIMULATION.md). Short version:
 ```bash
 # build + validate + simulate (uses the `ai` conda env with the numpy.trapz shim)
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
 python -m pytest            # full unit suite (run from repo root)
 ```
 Validation is authoritative in `src/core/*` (build script never re-implements a rule).

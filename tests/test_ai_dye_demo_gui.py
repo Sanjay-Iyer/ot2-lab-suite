@@ -994,7 +994,7 @@ def test_simulate_launcher_serves_the_real_page_labels_and_only_ever_simulates(t
         assert page.run()                                        # the page's "Run on OT-2" button path
         wait_for(lambda: commands and page.waiting == "idle" and not page.running)
         [command] = commands
-        assert "scripts/build_vial_dilution_print.py" in command and "--live" not in command
+        assert "scripts/manual/build_vial_dilution_print.py" in command and "--live" not in command
         assert not any("run_vial_print_robot" in str(part) for part in command)
         assert created["session"].state.runs[-1]["mode"] == "SIMULATION"
         assert page.snapshot().status == "RUN COMPLETE"

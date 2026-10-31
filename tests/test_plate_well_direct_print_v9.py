@@ -50,8 +50,8 @@ def test_default_volume_and_source_budget():
 
 
 def test_v9_is_registered_with_builder_and_runner():
-    from scripts.build_vial_dilution_print import PROTOCOL_VERSIONS
-    import scripts.run_vial_print_robot as runner
+    from scripts.manual.build_vial_dilution_print import PROTOCOL_VERSIONS
+    import scripts.manual.run_vial_print_robot as runner
 
     base_protocol, generated_stem = PROTOCOL_VERSIONS[9]
     assert base_protocol == PROTOCOL

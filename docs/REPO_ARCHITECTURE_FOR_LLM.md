@@ -218,7 +218,7 @@ YAML
   -> simulate the generated artifact
 ```
 
-For vial printing, `scripts/build_vial_dilution_print.py`:
+For vial printing, `scripts/manual/build_vial_dilution_print.py`:
 
 1. Loads a chosen YAML file.
 2. Removes `run_modes` from the dictionary that will become `CONFIG`.
@@ -287,7 +287,7 @@ the earlier approval.
 
 ### 6.3 Vial run-mode matrix
 
-`scripts/validate_vial_print.py` does not trust the simulator's exit code alone.
+`scripts/manual/validate_vial_print.py` does not trust the simulator's exit code alone.
 It renders and simulates five cases, then scans the actual output:
 
 | Case | Expected behavior |
@@ -395,7 +395,7 @@ used by the Opentrons App may also need to be imported into the App's store.
 
 ### 7.4 HTTP API mechanics
 
-`scripts/run_vial_print_robot.py` communicates with the robot server at port
+`scripts/manual/run_vial_print_robot.py` communicates with the robot server at port
 `31950` and sends the `opentrons-version: *` header:
 
 1. optionally build and locally validate;
@@ -422,7 +422,7 @@ The specialized agent has already created a timestamped user YAML, embedded that
 exact plan, simulated it, and run its matrix. Its HTTP tool therefore launches:
 
 ```text
-scripts/run_vial_print_robot.py --skip-build --skip-validate ...
+scripts/manual/run_vial_print_robot.py --skip-build --skip-validate ...
 ```
 
 This prevents the runner from silently rebuilding from the committed default and

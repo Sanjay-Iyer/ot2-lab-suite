@@ -55,8 +55,8 @@ from src.printing.workflows.registry import builder_protocol_versions
 WORKFLOW_NAME    = "vial_dilution_print"
 DEFAULT_YAML     = DEFAULT_WORKFLOW_CONFIG_DIR / f"{WORKFLOW_NAME}.yaml"
 TEMPLATE_DIR     = TEMPLATE_WORKFLOW_CONFIG_DIR / WORKFLOW_NAME
-BUILD_SCRIPT     = PROJECT_ROOT / "scripts" / "build_vial_dilution_print.py"
-VALIDATE_SCRIPT  = PROJECT_ROOT / "scripts" / "validate_vial_print.py"
+BUILD_SCRIPT     = PROJECT_ROOT / "scripts" / "manual" / "build_vial_dilution_print.py"
+VALIDATE_SCRIPT  = PROJECT_ROOT / "scripts" / "manual" / "validate_vial_print.py"
 CV_SCRIPT        = PROJECT_ROOT / "vision_tests" / "scripts" / "verify_print_droplets.py"
 GENERATED_LATEST = GENERATED_PROTOCOL_DIR / f"{WORKFLOW_NAME}_latest.py"
 
@@ -632,7 +632,7 @@ def build_vial_print_protocol() -> str:
     """Build a robot-ready protocol from the current working config and simulate it.
 
     Writes the working config to a timestamped user YAML, runs
-    scripts/build_vial_dilution_print.py (which embeds the YAML as CONFIG and runs
+    scripts/manual/build_vial_dilution_print.py (which embeds the YAML as CONFIG and runs
     the Opentrons simulator), and reports SIMULATION OK / FAILED. On success it
     records a PASS in simulations.json for the generated artifact so a later robot
     run is permitted. Returns the generated protocol path and SHA256.
@@ -679,7 +679,7 @@ def build_vial_print_protocol() -> str:
 def validate_vial_print_matrix() -> str:
     """Run the 5-case run-mode matrix gate on the generated protocol.
 
-    Runs scripts/validate_vial_print.py against the last-built user config so the
+    Runs scripts/manual/validate_vial_print.py against the last-built user config so the
     full_run / dry_run / dilution_only / print_only / wrong_labware cases assert
     against the current parameters. Returns ALL CASES PASSED or the per-case
     failures. Call build_vial_print_protocol first.

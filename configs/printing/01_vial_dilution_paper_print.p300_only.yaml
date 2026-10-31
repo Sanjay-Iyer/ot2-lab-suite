@@ -6,7 +6,7 @@
 # historical flagship behaviour in the new, fully-configuration-driven schema.
 #
 # Build + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p300_only.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p300_only.yaml
 # Everything below is readable without opening the Python — see docs/printing/.
 
 # --- Deck: which slot holds each item -----------------------------------------

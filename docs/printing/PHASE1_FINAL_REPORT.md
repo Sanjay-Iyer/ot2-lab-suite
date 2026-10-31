@@ -34,9 +34,9 @@ build-time validation, examples, tests, simulation, focused organization, and LL
   group-based print dispatch (`column_8up`→P300, `single_spot`→P20); mixing decoupled;
   tip reuse/return per pipette; preflight made schema-tolerant; dead print-branch code
   removed; imaging consolidated to one before + one after.
-- `scripts/build_vial_dilution_print.py` — calls `normalize_and_validate` (shared
+- `scripts/manual/build_vial_dilution_print.py` — calls `normalize_and_validate` (shared
   validators) + deck-slot check; legacy structural validator kept for legacy configs.
-- `scripts/validate_vial_print.py` — expected-text markers updated to the new comments.
+- `scripts/manual/validate_vial_print.py` — expected-text markers updated to the new comments.
 - `configs/constraints/pipette_constraints.yaml` — added `p300_multi_gen2`, `p20_multi_gen2`.
 - `tests/test_vial_print_agent.py` — droplet 18→30 µL (sub-20 µL on P300 now correctly rejected).
 - `skills/README.md` — added the `printing_workflow` skill.
@@ -52,7 +52,7 @@ filename==loadName rule preserved). Physical relocation of `src/`/`protocols/` i
 ## 4. Production protocol & behaviors
 
 **Primary protocol:** `src/protocols/printing/01_vial_dilution_paper_print.py` (robot entry point; runs from
-embedded CONFIG). Built from YAML by `scripts/build_vial_dilution_print.py`.
+embedded CONFIG). Built from YAML by `scripts/manual/build_vial_dilution_print.py`.
 
 **Pipette selection:** at build time, `select_pipette` picks the smallest-capacity mounted
 pipette covering the volume — ≤20 µL → `p20_single_gen2`, >20 µL → `p300_multi_gen2` —

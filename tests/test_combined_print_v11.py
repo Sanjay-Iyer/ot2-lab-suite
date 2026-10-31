@@ -56,8 +56,8 @@ def test_combined_plan_uses_20_minute_delay_and_separate_tips():
 
 
 def test_combined_v11_is_registered_with_builder_and_runner():
-    from scripts.build_vial_dilution_print import PROTOCOL_VERSIONS
-    import scripts.run_vial_print_robot as runner
+    from scripts.manual.build_vial_dilution_print import PROTOCOL_VERSIONS
+    import scripts.manual.run_vial_print_robot as runner
 
     assert PROTOCOL_VERSIONS[12] == (PROTOCOL, "combined_bp_dmmp_print_v11")
     assert runner._PROTOCOL_BY_VERSION[12].name == "combined_bp_dmmp_print_v11_latest.py"

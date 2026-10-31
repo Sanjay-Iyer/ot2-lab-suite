@@ -6,7 +6,7 @@ hash that a passing simulation produced.
 
 Transport is the repository's standard HTTP API runner pattern (port 31950,
 upload -> create run -> play -> poll), the same one used by
-``scripts/run_vial_print_robot.py``.  No SSH is involved.
+``scripts/manual/run_vial_print_robot.py``.  No SSH is involved.
 """
 
 from __future__ import annotations

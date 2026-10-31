@@ -41,7 +41,7 @@ LABWARE = REPO / "labware"
 def _numpy_trapz_shim() -> None:
     """opentrons_shared_data still imports numpy.trapz, removed in numpy 2.
 
-    Same shim scripts/build_vial_dilution_print.py applies before simulating. It
+    Same shim scripts/manual/build_vial_dilution_print.py applies before simulating. It
     has to run before the protocol module is imported, because that module pulls
     in opentrons at import time.
     """

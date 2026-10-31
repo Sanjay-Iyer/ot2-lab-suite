@@ -7,7 +7,7 @@ This is not a new robot connection or transport. It reuses, unchanged:
   - src.lab.robot_connection  (mDNS/ARP discovery, /health check, host resolution
     -- exactly what `python scripts/maintenance/find_robot.py --check` exercises)
   - the upload / create-run / play / monitor HTTP-API cycle already implemented
-    in scripts/run_vial_print_robot.py (`_upload_protocol`, `_create_run`,
+    in scripts/manual/run_vial_print_robot.py (`_upload_protocol`, `_create_run`,
     `_play_run`, `_monitor`, `_report_run_error`), including its custom-labware
     upload step (generalized in that file to also read the standard executor's
     PLAN/actions shape, not just the CONFIG/deck shape).
@@ -50,7 +50,7 @@ from src.lab.robot_connection import (
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 import scripts.manual.run_printing_workflow as workflow
-from scripts.run_vial_print_robot import (
+from scripts.manual.run_vial_print_robot import (
     _create_run,
     _monitor,
     _play_run,

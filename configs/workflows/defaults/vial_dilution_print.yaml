@@ -5,7 +5,7 @@
 # robot-ready protocol with the YAML embedded:
 #
 #   conda activate ai
-#   python scripts/build_vial_dilution_print.py --config configs/workflows/defaults/vial_dilution_print.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/workflows/defaults/vial_dilution_print.yaml
 #
 # The builder validates this file, embeds it into a generated copy of
 # src/protocols/printing/01_vial_dilution_paper_print.py, and simulates it. See

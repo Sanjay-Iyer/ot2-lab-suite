@@ -21,9 +21,9 @@ OT-2, camera, or fixtures. Do not mark any step complete from the home computer.
 4. **Verify custom labware loads:** build + simulate all three configs and confirm
    `SIMULATION OK`:
    ```
-   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p20_only.yaml
-   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p300_only.yaml
-   python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+   python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p20_only.yaml
+   python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.p300_only.yaml
+   python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
    ```
 5. **Verify deck slots** match the physical setup: tuberack=7, plate=4, paper=5,
    tiprack_p300=9, tiprack_p20=2. Slots 1 and 6 **must be empty** (P300 partial-tip envelope).
@@ -39,7 +39,7 @@ OT-2, camera, or fixtures. Do not mark any step complete from the home computer.
 Protocol v2 (`configs/printing/*_v2.yaml`, `protocol_version: 2`) replaces the manual dry
 sweep in step 9 with a built-in bring-up mode driven by the same config as the real run:
 ```
-python scripts/run_vial_print_robot.py --config configs/printing/bp_20260723_v2.yaml --pipette-check
+python scripts/manual/run_vial_print_robot.py --config configs/printing/bp_20260723_v2.yaml --pipette-check
 ```
 It picks up and returns **every** tip the config uses on **both** mounts (P300 setup tips,
 each 8-tip print block, every P20 dilution and print tip) and visits each vial at

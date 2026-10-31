@@ -105,7 +105,7 @@ volume within the selected pipette's range · requested pipette mounted · `layo
 channel count · enough tips for the assigned wells/blocks · duplicate paper
 destinations · overlapping dilution wells (unless intended) · missing source/dest ·
 per-fold/stock transfer ≤ source available volume. This extends the existing
-`scripts/build_vial_dilution_print.py::validate()` and reuses the constraint data.
+`scripts/manual/build_vial_dilution_print.py::validate()` and reuses the constraint data.
 
 ## Tip reuse / return (preserved)
 

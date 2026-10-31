@@ -24,7 +24,7 @@ Before running OT-2 commands, identify the laptop role.
 - For the vial dilution print workflow, the real-laptop live command is:
 
 ```powershell
-python scripts\run_vial_print_robot.py --live --skip-build --skip-validate
+python scripts\manual\run_vial_print_robot.py --live --skip-build --skip-validate
 ```
 
 - Only use `--skip-build --skip-validate` when `src/protocols/generated/vial_dilution_print_latest.py` has already been rebuilt, reviewed, committed, pushed, and pulled onto the real robot laptop.

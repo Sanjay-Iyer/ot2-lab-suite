@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-import scripts.run_vial_print_robot as runner
+import scripts.manual.run_vial_print_robot as runner
 from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config
 from src.agents.dye_demo.session import (
     RUN_ABORTED_EXIT_CODE,

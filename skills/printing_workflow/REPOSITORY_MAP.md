@@ -5,7 +5,7 @@ Quick reference for an LLM working inside `skills/`:
 
 ## Entry points & services
 - **Protocol:** `src/protocols/printing/01_vial_dilution_paper_print.py` (embedded CONFIG; robot entry point)
-- **Build:** `scripts/build_vial_dilution_print.py` (YAML → validate → embed → simulate)
+- **Build:** `scripts/manual/build_vial_dilution_print.py` (YAML → validate → embed → simulate)
 - **Selection:** `src/core/pipette_selection.py` (volume → pipette)
 - **Groups:** `src/core/print_groups.py` (schema + layout/destination validation + migration)
 - **Materials:** `src/core/materials.py` (vials + volume accounting + filename==loadName)

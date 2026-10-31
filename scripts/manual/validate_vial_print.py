@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/validate_vial_print.py
+scripts/manual/validate_vial_print.py
 ==============================
 Run the generated (or base) vial_dilution_print protocol through the Opentrons
 simulator under several run modes and assert each behaves correctly.
@@ -26,8 +26,8 @@ Generated dynamically from the workflow YAML so that changing destination_column
 the factor list never silently breaks the validator.
 
 USAGE (from the env that has opentrons + numpy, e.g. conda env `ai`):
-    python scripts/validate_vial_print.py
-    python scripts/validate_vial_print.py --config configs/workflows/user/my_run.yaml
+    python scripts/manual/validate_vial_print.py
+    python scripts/manual/validate_vial_print.py --config configs/workflows/user/my_run.yaml
 
 Pass --config with the same YAML used to build the generated protocol so a custom
 factor list / destination column is validated against its own expectations rather
@@ -48,7 +48,7 @@ from pathlib import Path
 
 import yaml
 
-REPO      = Path(__file__).resolve().parent.parent
+REPO      = Path(__file__).resolve().parent.parent.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
@@ -663,7 +663,7 @@ def main() -> int:
             f"WARNING: Generated protocol not found at "
             f"{generated.relative_to(REPO)}; "
             f"falling back to base template: {PROTOCOL.relative_to(REPO)}\n"
-            f"  Run 'python scripts/build_vial_dilution_print.py "
+            f"  Run 'python scripts/manual/build_vial_dilution_print.py "
             f"--config {workflow_yaml}' first."
         )
 

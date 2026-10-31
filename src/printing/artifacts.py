@@ -9,7 +9,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from scripts.build_vial_dilution_print import build_source, simulate
 from src.utils.paths import SIMULATION_RECORDS_PATH
 
 from .compiler import apply_workflow_patch
@@ -21,6 +20,18 @@ from .workflows import ResolvedPrintingRequest, resolve_printing_request
 
 
 ARTIFACT_DIR = REPO_ROOT / ".test_tmp" / "printing-artifacts"
+
+
+def build_source(base_text: str, cfg: dict, run_modes: dict) -> str:
+    # The builder imports the printing registry. Resolve this reverse dependency
+    # only when called, so standalone CLI imports do not form a cycle.
+    from scripts.manual.build_vial_dilution_print import build_source as build
+    return build(base_text, cfg, run_modes)
+
+
+def simulate(path: Path, python_executable: str | None = None) -> tuple:
+    from scripts.manual.build_vial_dilution_print import simulate as run_simulator
+    return run_simulator(path, python_executable)
 
 
 class ArtifactModel(BaseModel):

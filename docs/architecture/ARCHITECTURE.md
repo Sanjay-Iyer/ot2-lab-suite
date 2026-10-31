@@ -239,7 +239,7 @@ The safe dry-run latest is rebuilt afterward. See `docs/OT2_PRINTING_GUIDE.md`.
 | Validation | `src/printing/validation.py` plus delegated production protocol resolvers |
 | Workflows/designs | `src/printing/workflows/`, `src/printing/designs/` |
 | Provenance/simulation | `src/printing/artifacts.py` |
-| Historical build/run | `scripts/build_vial_dilution_print.py`, `scripts/run_vial_print_robot.py` |
+| Historical build/run | `scripts/manual/build_vial_dilution_print.py`, `scripts/manual/run_vial_print_robot.py` |
 | Config discovery | `configs/printing/INDEX.md`; existing YAML paths remain in place |
 
 The architecture is additive. It does not rewrite stable protocol motion logic or move

@@ -4,7 +4,7 @@
 # are touched. The P20 mixes each source well and prints 5 uL onto paper column 6.
 #
 # Build (dry-run by default) + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v7.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723_v7.yaml
 
 protocol_version: 7
 

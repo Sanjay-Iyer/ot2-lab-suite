@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-scripts/build_vial_dilution_print.py
+scripts/manual/build_vial_dilution_print.py
 ====================================
 Turn configs/workflows/defaults/vial_dilution_print.yaml into a robot-ready copy of
 src/protocols/printing/01_vial_dilution_paper_print.py with the YAML embedded as the CONFIG dict, then
 simulate it. This is how the YAML reaches the OT-2 (the robot can't read the repo).
 
   conda activate ai
-  python scripts/build_vial_dilution_print.py
-  python scripts/build_vial_dilution_print.py --config my.yaml --no-sim
+  python scripts/manual/build_vial_dilution_print.py
+  python scripts/manual/build_vial_dilution_print.py --config my.yaml --no-sim
 
 Pipeline: load YAML -> validate -> embed CONFIG (between the markers in the base
 protocol) + write run_modes into the DEFAULT_* flags -> generate into
@@ -31,7 +31,7 @@ from typing import Optional
 
 import yaml
 
-REPO          = Path(__file__).resolve().parent.parent
+REPO          = Path(__file__).resolve().parent.parent.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

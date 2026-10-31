@@ -17,7 +17,7 @@
 #       paper col 5 :  5 uL  x3 droplets  P20  <- stacked on the SAME spot
 #
 # Build + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v2.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723_v2.yaml
 
 protocol_version: 2           # -> src/protocols/printing/02_vial_dilution_paper_print_p20_dilution.py
 

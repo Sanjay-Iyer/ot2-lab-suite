@@ -29,8 +29,8 @@ Workflow 01 has several run modes. Build and simulate the selected configuration
 validate **every mode at once** against that same configuration:
 
 ```powershell
-python scripts\build_vial_dilution_print.py --config configs\printing\01_vial_dilution_paper_print.mixed.yaml
-python scripts\validate_vial_print.py --config configs\printing\01_vial_dilution_paper_print.mixed.yaml
+python scripts\manual\build_vial_dilution_print.py --config configs\printing\01_vial_dilution_paper_print.mixed.yaml
+python scripts\manual\validate_vial_print.py --config configs\printing\01_vial_dilution_paper_print.mixed.yaml
 ```
 
 It runs each flag combination through the simulator and **asserts on the output

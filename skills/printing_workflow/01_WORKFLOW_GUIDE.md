@@ -29,7 +29,7 @@ production workflow. Everything in this family shares the `01_` number.
 
 ## Build / validate / simulate
 ```bash
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
 python -m pytest tests/printing/
 ```
 `SIMULATION OK` = pass. Failure interpretation + exact criteria:

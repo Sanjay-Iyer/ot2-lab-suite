@@ -30,7 +30,7 @@ page; typing `run` in the chat is refused. It then:
    press Run on OT-2 again once it is connected;
 2. asks the terminal demo's safety questions when they apply (deck changed, print
    without dilutions, previous run did not finish), with Yes/No buttons;
-3. runs the terminal demo's robot path unchanged (`scripts/run_vial_print_robot.py
+3. runs the terminal demo's robot path unchanged (`scripts/manual/run_vial_print_robot.py
    --live`: build + simulate, upload over the HTTP API, start, monitor). Its output
    streams into ROBOT RUNNER OUTPUT and the server window.
 

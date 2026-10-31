@@ -97,3 +97,12 @@ def test_manual_build_imports_in_a_fresh_process(script, tmp_path):
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert (tmp_path / "artifact/protocol.py").is_file()
+
+
+@pytest.mark.parametrize("simulate", [True, False])
+def test_session_dispatch_uses_existing_relocated_scripts(simulate):
+    from src.agents.dye_demo.session import SubprocessExecutor
+    command = SubprocessExecutor().command(DEFAULT_CONFIG, simulate)
+    assert (REPO / command[1]).is_file()
+    assert command[1].startswith("scripts/manual/")
+    assert ("--live" in command) == (not simulate)

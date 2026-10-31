@@ -17,7 +17,7 @@
 # that spot receives volume_ul * N. Set it to 1 for a normal single droplet.
 #
 # Build + simulate:
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723.yaml
 
 deck:
   tiprack_p300: {slot: 8}     # 300 uL tips  (P300 multi)

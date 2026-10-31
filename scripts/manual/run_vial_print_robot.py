@@ -34,7 +34,7 @@ import requests
 import yaml
 
 if __name__ == "__main__" and not __package__:
-    repo = Path(__file__).resolve().parent.parent
+    repo = Path(__file__).resolve().parent.parent.parent
     sys.path.insert(0, str(repo))
 
 from src.core.config import Config
@@ -54,11 +54,11 @@ from src.printing.workflows.registry import (
 )
 
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 GENERATED_PROTOCOL_DIR = REPO / "src" / "protocols" / "generated"
 
 # Markers the builder writes around the embedded CONFIG dict (keep in sync with
-# scripts/build_vial_dilution_print.py).
+# scripts/manual/build_vial_dilution_print.py).
 CONFIG_START_SENTINEL = "# >>> CONFIG START >>>"
 CONFIG_END_SENTINEL   = "# <<< CONFIG END <<<"
 # Exact generated artifact per version, derived from the same registry as the builder.
@@ -858,7 +858,7 @@ def main() -> int:
              "Default: that script's own default config. Without this, a rebuild would "
              "silently regenerate the protocol from the DEFAULT config.")
     parser.add_argument("--skip-build", action="store_true", help="Do not rebuild the generated protocol first.")
-    parser.add_argument("--skip-validate", action="store_true", help="Do not run scripts/validate_vial_print.py first.")
+    parser.add_argument("--skip-validate", action="store_true", help="Do not run scripts/manual/validate_vial_print.py first.")
     parser.add_argument(
         "--simulator-python", default=None,
         help="v3 isolated simulator Python containing opentrons==7.0.2. Default: "
@@ -923,7 +923,7 @@ def main() -> int:
         _check_stop(stop_file)
         if not args.skip_build:
             run_log.event("local_step", label="build + simulate")
-            build_cmd = [sys.executable, "scripts/build_vial_dilution_print.py"]
+            build_cmd = [sys.executable, "scripts/manual/build_vial_dilution_print.py"]
             if args.config:
                 build_cmd += ["--config", args.config]
             if args.simulator_python:
@@ -946,7 +946,7 @@ def main() -> int:
             print(f"[validate matrix] skipped for v{version} (build+simulate is the check)")
         elif not args.skip_validate:
             run_log.event("local_step", label="validate matrix")
-            validate_cmd = [sys.executable, "scripts/validate_vial_print.py"]
+            validate_cmd = [sys.executable, "scripts/manual/validate_vial_print.py"]
             if args.config:
                 validate_cmd += ["--config", args.config]
             if args.simulator_python:

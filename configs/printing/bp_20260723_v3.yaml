@@ -9,7 +9,7 @@
 #   - one full 8-tip-column pickup for mixing plate column 11 only
 #
 # Safe local build (defaults to dry-run mode):
-#   python scripts/build_vial_dilution_print.py --config configs/printing/bp_20260723_v3.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/bp_20260723_v3.yaml
 
 protocol_version: 3
 

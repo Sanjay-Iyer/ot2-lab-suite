@@ -21,8 +21,8 @@ one before image + one after image
 | Protocol (entry point) | `src/protocols/printing/01_vial_dilution_paper_print.py` |
 | Configs | `configs/printing/01_vial_dilution_paper_print.{p20_only,p300_only,mixed}.yaml` |
 | Legacy config (auto-migrated) | `configs/workflows/defaults/vial_dilution_print.yaml` |
-| Builder | `scripts/build_vial_dilution_print.py` |
-| Multi-mode validator | `scripts/validate_vial_print.py` |
+| Builder | `scripts/manual/build_vial_dilution_print.py` |
+| Multi-mode validator | `scripts/manual/validate_vial_print.py` |
 | Shared validators | `src/core/{pipette_selection,print_groups,materials,workflow_config}.py` |
 | Labware manifest | `labware/printing/01_vial_dilution_paper_print.labware.md` |
 | Tests | `tests/printing/` |
@@ -31,7 +31,7 @@ one before image + one after image
 ## Quick start (home computer — simulation only)
 ```bash
 # build + validate + simulate one of the three configs
-python scripts/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
+python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_vial_dilution_paper_print.mixed.yaml
 # unit tests
 python -m pytest tests/printing/
 ```

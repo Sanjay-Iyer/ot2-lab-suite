@@ -97,7 +97,7 @@ def run_vial_print_robot_http(
     no_start: bool = False,
     poll_seconds: float = 5.0,
 ) -> str:
-    """Run the vial-dilution-print protocol through scripts/run_vial_print_robot.py.
+    """Run the vial-dilution-print protocol through scripts/manual/run_vial_print_robot.py.
 
     Safety:
     - Agent tools cannot authorize live liquid handling; live=True is refused.

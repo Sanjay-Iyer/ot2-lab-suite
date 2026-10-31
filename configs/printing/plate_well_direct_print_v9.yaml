@@ -17,7 +17,7 @@
 #
 # Simulation-only build on this laptop:
 #   conda activate ai
-#   python scripts/build_vial_dilution_print.py --config configs/printing/plate_well_direct_print_v9.yaml
+#   python scripts/manual/build_vial_dilution_print.py --config configs/printing/plate_well_direct_print_v9.yaml
 
 protocol_version: 9
 
