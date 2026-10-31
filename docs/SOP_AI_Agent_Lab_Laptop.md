@@ -15,12 +15,12 @@
 - [ ] `.env` file is present in project root with real credentials
 - [ ] SSH key path in `.env` matches actual key location on this machine
 - [ ] OT-2 is powered on and network-connected to this laptop
-- [ ] `python scripts/find_robot.py --check` passes
+- [ ] `python scripts/maintenance/find_robot.py --check` passes
 
 Verify with:
 ```bash
-python scripts/find_robot.py --check
-python scripts/check_ot2_ssh.py --identity-file <key_path> --legacy-rsa
+python scripts/maintenance/find_robot.py --check
+python scripts/maintenance/check_ot2_ssh.py --identity-file <key_path> --legacy-rsa
 ```
 
 ---
@@ -232,10 +232,10 @@ Type natural language. The agent handles all tool calls internally.
 
 ### "SSH unreachable at the discovered robot host"
 - Verify the OT-2 is on and the USB/Ethernet cable is connected
-- Run: `python scripts/find_robot.py --check`
+- Run: `python scripts/maintenance/find_robot.py --check`
 - Check `ROBOT_SSH_KEY_PATH` in `.env` points to the actual key file
 - Set `ROBOT_SSH_IDENTITIES_ONLY=true` and `ROBOT_SSH_LEGACY_RSA=true` for the older OT-2 server
-- Run `python scripts/check_ot2_ssh.py --legacy-rsa` for a motion-free authentication diagnosis
+- Run `python scripts/maintenance/check_ot2_ssh.py --legacy-rsa` for a motion-free authentication diagnosis
 
 ### "ROBOT_SSH_KEY_PATH is missing"
 - Open `.env` and confirm `ROBOT_SSH_KEY_PATH=` has a real path (not blank)

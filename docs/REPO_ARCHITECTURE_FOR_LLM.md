@@ -346,7 +346,7 @@ Current guarded SSH/SCP code uses:
 Conceptually, the manual low-API sequence is:
 
 ```powershell
-$IP = python scripts\find_robot.py --quiet
+$IP = python scripts\maintenance\find_robot.py --quiet
 $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $REMOTE = "/var/lib/opentrons/user_storage/ot2_runs"
 $OPTS = @(
@@ -383,7 +383,7 @@ diagnostics, and host-key-change handling.
 
 ### 7.3 Custom labware deployment
 
-`python -m scripts.deploy --labware <definition.json>` reads `namespace`,
+`python -m scripts.maintenance.deploy --labware <definition.json>` reads `namespace`,
 `parameters.loadName`, and `version` from the JSON. It creates and verifies:
 
 ```text
@@ -412,7 +412,7 @@ The default is a dry run. `--live` changes `dry_run` to false and permits liquid
 motion, so it is allowed only on the real robot laptop after explicit readiness
 confirmation.
 
-The reusable pattern lives in `scripts/run_robot_template.py`. Other examples
+The reusable pattern lives in `scripts/developer/run_robot_template.py`. Other examples
 are `run_plate_waste_disposal.py`, `run_droplet_error_check.py`, and
 `run_3d_print_labware_validate.py`.
 
@@ -445,10 +445,10 @@ run and then uses `scp -O -r` to pull the run's images into:
 
 Related utilities include:
 
-- `scripts/pull_vision_images.py` for a direct timestamped folder pull;
+- `scripts/maintenance/pull_vision_images.py` for a direct timestamped folder pull;
 - `scripts/test_ot2_camera_capture.py` for SSH → camera `curl` → SCP → image
   validation diagnostics;
-- `scripts/pull_ot2_images.py` and `vision/` for the larger image-transfer,
+- `scripts/maintenance/pull_ot2_images.py` and `vision/` for the larger image-transfer,
   inventory, and validation workflow.
 
 ### 8.2 Two CV analysis paths

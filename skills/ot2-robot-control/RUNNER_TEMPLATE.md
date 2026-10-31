@@ -1,7 +1,7 @@
 # Runner Template — build every robot runner like this
 
 **Standard pattern for any OT-2 protocol runner.** Use it whenever the user asks for a
-new "run X on the robot" script. Template file: [`scripts/run_robot_template.py`](../../scripts/run_robot_template.py).
+new "run X on the robot" script. Template file: [`scripts/developer/run_robot_template.py`](../../scripts/developer/run_robot_template.py).
 Full guide: [`docs/robot_runner_template_guide.md`](../../docs/robot_runner_template_guide.md).
 
 ## The rule
@@ -12,7 +12,7 @@ The run needs **no SSH**. Proven examples: `run_vial_print_robot.py`,
 `run_droplet_error_check.py`.
 
 ## Recipe
-1. Copy `scripts/run_robot_template.py` → `scripts/run_<protocol>.py`.
+1. Copy `scripts/developer/run_robot_template.py` → `scripts/run_<protocol>.py`.
 2. Set `DEFAULT_PROTOCOL` to the uploaded file.
 3. In the protocol, expose knobs as **runtime parameters** via `add_parameters()`
    (apiLevel ≥ 2.18); read them in `run()` from `protocol.params`.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/pull_vision_images.py
+scripts/maintenance/pull_vision_images.py
 =============================
 Pull a robot-side vision folder (camera images) down to the laptop, into a timestamped
 local folder so each pull is preserved (the robot overwrites same-named files each run).
@@ -8,11 +8,11 @@ local folder so each pull is preserved (the robot overwrites same-named files ea
 Standalone — run it any time AFTER a robot run to grab that run's images.
 
   # default: pull the vial-print images
-  python scripts/pull_vision_images.py
+  python scripts/maintenance/pull_vision_images.py
 
   # any other vision folder on the robot
-  python scripts/pull_vision_images.py --remote-dir /data/vision/droplet_error_check
-  python scripts/pull_vision_images.py --label run3
+  python scripts/maintenance/pull_vision_images.py --remote-dir /data/vision/droplet_error_check
+  python scripts/maintenance/pull_vision_images.py --label run3
 
 Uses the OT-2 key (--ssh-key > .env ROBOT_SSH_KEY_PATH > ~/.ssh/id_rsa_opentrons),
 BatchMode (no password prompt), and `scp -O` (required by the OT-2's SSH server).
@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 if __name__ == "__main__" and not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.core.config import Config
 from src.lab.robot_connection import (
@@ -37,7 +37,7 @@ from src.lab.robot_connection import (
 from src.utils.robot_run_log import RobotRunLog, repo_relative
 from src.utils.ot2_ssh import OT2SSHSettings
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 DEFAULT_SSH_KEY = Path.home() / ".ssh" / "id_rsa_opentrons"
 DEFAULT_REMOTE_DIR = "/data/vision/vial_dilution_print"
 LOCAL_BASE = REPO / "vision_runs"

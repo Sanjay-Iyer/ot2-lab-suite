@@ -1,7 +1,7 @@
 # Shared four-clover layout. Edit THIS file to move clovers or change spacing;
 # four_clover_v12.yaml (and any future source/material variant) points at it, so
 # there is exactly one source of truth for geometry. The layout plotter reads the
-# same file: scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
+# same file: scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
 #
 # ---------------------------------------------------------------------------
 # TERMINOLOGY -- read this before changing numbers

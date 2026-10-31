@@ -1,11 +1,11 @@
 """
-scripts/generate_labware.py
+scripts/maintenance/generate_labware.py
 ===========================
 CLI for generating Opentrons custom labware definition JSON (schemaVersion 2)
 from a YAML config — what the Opentrons Labware Creator web tool produces, but
 parametric and reproducible.
 
-    python scripts/generate_labware.py configs/labware/my_plate.yaml
+    python scripts/maintenance/generate_labware.py configs/labware/my_plate.yaml
 
 The engine lives in ``src/labware/``:
 
@@ -44,7 +44,7 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
@@ -199,7 +199,7 @@ def build_from_config(
 
 def main(argv: List[str]) -> int:
     parser = argparse.ArgumentParser(
-        prog="python scripts/generate_labware.py",
+        prog="python scripts/maintenance/generate_labware.py",
         description="Generate Opentrons custom labware JSON from YAML config(s).",
         epilog="Each YAML defines one labware — see configs/labware/_template.yaml.",
     )

@@ -6,7 +6,7 @@ slightly **smaller outer rectangle**; the vial cavities are unchanged.
 
 - Definition: [`labware/tuberack_3dprint_20ml_8vials_v2.json`](../labware/tuberack_3dprint_20ml_8vials_v2.json)
 - Reproducible source: [`configs/labware/tuberack_3dprint_20ml_8vials_v2.yaml`](../configs/labware/tuberack_3dprint_20ml_8vials_v2.yaml)
-- Generator: [`scripts/generate_labware.py`](../scripts/generate_labware.py)
+- Generator: [`scripts/maintenance/generate_labware.py`](../scripts/maintenance/generate_labware.py)
 
 ---
 
@@ -56,7 +56,7 @@ The JSON is generated from the YAML so geometry is version-controlled, not hand-
 
 ```powershell
 conda activate ai
-python scripts\generate_labware.py configs\labware\tuberack_3dprint_20ml_8vials_v2.yaml
+python scripts\maintenance\generate_labware.py configs\labware\tuberack_3dprint_20ml_8vials_v2.yaml
 # -> Wrote labware/tuberack_3dprint_20ml_8vials_v2.json
 ```
 
@@ -83,9 +83,9 @@ Use the deploy helper (reads namespace/loadName/version from the JSON):
 
 ```powershell
 # preview the destination, touch nothing
-python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json --dry-run
+python -m scripts.maintenance.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json --dry-run
 # real upload (lab laptop, SSH key present)
-python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json
+python -m scripts.maintenance.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json
 ```
 Lands at `…/custom_beta/tuberack_3dprint_20ml_8vials_v2/1.json`. **Alternatively**
 import the JSON via the Opentrons App (Labware → Import).

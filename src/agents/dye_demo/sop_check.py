@@ -9,7 +9,7 @@ docs/ai_dye_demo/user_testing/expected/. The configuration used by each run the 
   * keeps every lab-owned setting of the SOP's starting configuration; and
   * produces the expected plan: dilution wells and factors, FROM/TO print steps with drops, transfers and tips.
 
-scripts/check_ai_dye_demo_sop.py applies this to a finished session folder. The tests replay scripted user paths
+scripts/developer/check_ai_dye_demo_sop.py applies this to a finished session folder. The tests replay scripted user paths
 through the real DemoSession and apply it to every run. Nothing here contacts a robot.
 """
 from __future__ import annotations

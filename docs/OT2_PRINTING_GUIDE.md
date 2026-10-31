@@ -182,8 +182,8 @@ documentation. On the instrument-connected laptop run:
 
 ```powershell
 conda activate llm
-python scripts\find_robot.py --check
-python scripts\check_ot2_ssh.py --legacy-rsa
+python scripts\maintenance\find_robot.py --check
+python scripts\maintenance\check_ot2_ssh.py --legacy-rsa
 ```
 
 SSH uses the dedicated `id_rsa_opentrons` key resolved from
@@ -252,8 +252,8 @@ git status --short
 | Simulation PASS but no motion appears | Use `src.printing.cli simulate`; it builds a temporary forced-motion artifact. A committed config with `dry_run:true` may otherwise exercise only preflight. |
 | Config changed but latest protocol did not | Re-run `scripts/build_vial_dilution_print.py --config <exact-yaml> --no-sim`, then inspect the generated diff. |
 | Missing/malformed runner config | Fix the supplied YAML. The runner intentionally refuses rather than falling back to version 1. |
-| Robot not found on work laptop | Check Ethernet, then run `python scripts/find_robot.py --check`; use the resolved config/mDNS result. |
-| SSH public-key failure | Confirm `ROBOT_SSH_KEY_PATH` points to `id_rsa_opentrons`, then run `python scripts/check_ot2_ssh.py --legacy-rsa`. |
+| Robot not found on work laptop | Check Ethernet, then run `python scripts/maintenance/find_robot.py --check`; use the resolved config/mDNS result. |
+| SSH public-key failure | Confirm `ROBOT_SSH_KEY_PATH` points to `id_rsa_opentrons`, then run `python scripts/maintenance/check_ot2_ssh.py --legacy-rsa`. |
 | API incompatibility | Do not lower protocol requirements blindly. Select a compatible workflow/transport and review `configs/robot.yaml`. |
 
 ## Adding a new coordinate design

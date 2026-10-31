@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Version 11 agent test harness - no GCloud, no robot.
 
-    python scripts/11_test_agent_configs.py
-    python scripts/11_test_agent_configs.py --only standard_print
-    python scripts/11_test_agent_configs.py --case std_18_state_persists_across_turns
-    python scripts/11_test_agent_configs.py --rules      (also exercise the offline
+    python scripts/developer/11_test_agent_configs.py
+    python scripts/developer/11_test_agent_configs.py --only standard_print
+    python scripts/developer/11_test_agent_configs.py --case std_18_state_persists_across_turns
+    python scripts/developer/11_test_agent_configs.py --rules      (also exercise the offline
                                                           English parser)
 
 Drives src/printing/v11/agent_core.ExperimentState with the structured intents in
@@ -21,7 +21,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

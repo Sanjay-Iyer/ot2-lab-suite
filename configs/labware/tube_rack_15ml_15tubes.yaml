@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────────
 # 15 × 15 mL Falcon conical tubes in a 3 × 5 rack
 # ──────────────────────────────────────────────────────────────────
-#     python scripts/generate_labware.py configs/labware/tube_rack_15ml_15tubes.yaml
+#     python scripts/maintenance/generate_labware.py configs/labware/tube_rack_15ml_15tubes.yaml
 #
 # Geometry is taken from Opentrons' own published definition
 # (opentrons_15_tuberack_falcon_15ml_conical, schema 2, v1) rather than

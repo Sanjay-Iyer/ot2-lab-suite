@@ -22,7 +22,7 @@ This document represents the final validation pass across the four targeted hard
 
 **Diagnostic Verification:**
 ```powershell
-python -m scripts.check_connectivity
+python -m scripts.maintenance.check_connectivity
 ```
 *(Executed cleanly; successfully parsed `.env`, masked keys, checked DNS, and rejected SSH gracefully due to the intentional absence of a configured key path).*
 
@@ -46,7 +46,7 @@ python -m scripts.check_connectivity
 *   **Import Hygiene:**
     *   Destructive `sys.path.append` manipulations have been systematically stripped from all scripts and agents.
 *   **Execution Standardization:**
-    *   Direct script execution (e.g., `python scripts/deploy.py`) is blocked dynamically via `if __name__ == "__main__" and not __package__:`, guiding the user natively to standard module invocation (`python -m scripts.deploy`).
+    *   Direct script execution (e.g., `python scripts/maintenance/deploy.py`) is blocked dynamically via `if __name__ == "__main__" and not __package__:`, guiding the user natively to standard module invocation (`python -m scripts.maintenance.deploy`).
 *   **Documentation:**
     *   The `docs/README_USAGE.md` was created to serve as the singular source of truth for canonical PowerShell operational commands.
 

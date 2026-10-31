@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-scripts/pull_ot2_images.py
+scripts/maintenance/pull_ot2_images.py
 ==========================
 CLI entry-point for the OT-2 image-pull workflow.
 
@@ -18,11 +18,11 @@ Examples
 --------
 ::
 
-    python scripts/pull_ot2_images.py
-    python scripts/pull_ot2_images.py --dry-run
-    python scripts/pull_ot2_images.py --overwrite
-    python scripts/pull_ot2_images.py --remote-dir /data/runs
-    python scripts/pull_ot2_images.py --output-dir C:\\data\\custom_output
+    python scripts/maintenance/pull_ot2_images.py
+    python scripts/maintenance/pull_ot2_images.py --dry-run
+    python scripts/maintenance/pull_ot2_images.py --overwrite
+    python scripts/maintenance/pull_ot2_images.py --remote-dir /data/runs
+    python scripts/maintenance/pull_ot2_images.py --output-dir C:\\data\\custom_output
 """
 
 import argparse
@@ -32,9 +32,9 @@ from datetime import datetime
 from pathlib import Path
 
 # Ensure the project root is on sys.path so ``vision`` is importable
-# when running as ``python scripts/pull_ot2_images.py``.
+# when running as ``python scripts/maintenance/pull_ot2_images.py``.
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent
+_PROJECT_ROOT = _SCRIPT_DIR.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 

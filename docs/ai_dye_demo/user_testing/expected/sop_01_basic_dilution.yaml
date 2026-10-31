@@ -1,6 +1,6 @@
 # Expected final state of user-test SOP 1 (basic dilution).
 # Administrator material: the machine-readable half of SOP_TESTER_ANSWER_KEY.md. Checked by
-# src/agents/dye_demo/sop_check.py (scripts/check_ai_dye_demo_sop.py, tests/test_ai_dye_demo_user_test_sops.py).
+# src/agents/dye_demo/sop_check.py (scripts/developer/check_ai_dye_demo_sop.py, tests/test_ai_dye_demo_user_test_sops.py).
 #
 #   settings  every conversation-editable setting and the value the run must use
 #   choices   settings the tester may choose (one_of / between / at_or_after)

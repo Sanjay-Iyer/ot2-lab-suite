@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    C:\\Users\\iyer95\\miniconda3\\envs\\ai\\python.exe scripts/export_experiment_01_config_ground_truth.py
+    C:\\Users\\iyer95\\miniconda3\\envs\\ai\\python.exe scripts/developer/export_experiment_01_config_ground_truth.py
 
 This writes only under ``experiment_01/ground_truth/`` and ``experiment_01/comparison/``.
 It never contacts a robot; pass ``--simulate`` to additionally build and locally
@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

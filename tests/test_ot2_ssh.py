@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts import check_ot2_ssh
+from scripts.maintenance import check_ot2_ssh
 from src.utils.ot2_ssh import (
     IDENTITIES_ONLY_OPTION,
     LEGACY_RSA_OPTION,

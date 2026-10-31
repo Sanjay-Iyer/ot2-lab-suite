@@ -161,11 +161,11 @@ diameter for this ink/paper pair has never been measured, so tighten only with d
 # build: validate -> embed -> generate -> simulate (dry run)
 python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_v12.yaml
 # offline layout map + coordinate report (no robot, reads the same YAML)
-python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
+python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
 # geometry unit tests (no OT-2, no simulation)
 python -m pytest tests/test_four_clover_geometry_v12.py
 ```
-`scripts/plot_four_clover_layout.py` imports the protocol's own resolvers, so a plot
+`scripts/developer/plot_four_clover_layout.py` imports the protocol's own resolvers, so a plot
 can never disagree with what the robot will do.
 
 ### Validation status

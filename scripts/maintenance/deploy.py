@@ -6,7 +6,7 @@ from pathlib import Path
 
 if __name__ == "__main__" and not __package__:
     print("ERROR: This script must be run as a module from the project root.")
-    print("Command: python -m scripts.deploy")
+    print("Command: python -m scripts.maintenance.deploy")
     sys.exit(1)
 
 from src.core.config import Config

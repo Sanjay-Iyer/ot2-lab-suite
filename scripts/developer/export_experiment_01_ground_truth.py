@@ -16,7 +16,7 @@ import numpy as np
 np.trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
 
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 PROTOCOL = REPO / "src" / "protocols" / "printing" / "01_printing_standard_ground_truth.py"

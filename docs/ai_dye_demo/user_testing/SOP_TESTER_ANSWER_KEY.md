@@ -6,7 +6,7 @@ Companion files:
 
 - machine-readable final states: [expected/](expected/);
 - SOP 5 starting configuration: `configs\workflows\user_test_sops\ai_dye_demo_sop05_start.yaml`;
-- scorer: `scripts\check_ai_dye_demo_sop.py`.
+- scorer: `scripts\developer\check_ai_dye_demo_sop.py`.
 
 All values below come from the demo's own plan code (`src/agents/dye_demo/plan.py`) and were checked in simulation
 (section 7).
@@ -31,7 +31,7 @@ and refreshes `..._latest.py`, as every simulation of this demo does.
 ## 2. Scoring
 
 ```powershell
-python scripts\check_ai_dye_demo_sop.py --sop 1 --session runs\ai_dye_demo\20260911_101500
+python scripts\developer\check_ai_dye_demo_sop.py --sop 1 --session runs\ai_dye_demo\20260911_101500
 ```
 
 - **PASS** means every requirement is met (exit code 0). The scorer checks the last successful run of the session (the

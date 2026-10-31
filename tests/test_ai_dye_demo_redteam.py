@@ -223,7 +223,7 @@ def test_recording_model_paces_calls_waits_out_rate_limits_and_stops_on_daily_qu
 
 
 def _cli():
-    spec = importlib.util.spec_from_file_location("ai_dye_demo_redteam", REPO / "scripts" / "ai_dye_demo_redteam.py")
+    spec = importlib.util.spec_from_file_location("ai_dye_demo_redteam", REPO / "scripts" / "developer" / "ai_dye_demo_redteam.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

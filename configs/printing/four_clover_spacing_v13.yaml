@@ -2,7 +2,7 @@
 # No air chase (tested, not helping) -- just low height + blow_out doing the work.
 #
 #   python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_spacing_v13.yaml
-#   python scripts/plot_four_clover_layout.py  --config configs/printing/four_clover_spacing_v13.yaml
+#   python scripts/developer/plot_four_clover_layout.py  --config configs/printing/four_clover_spacing_v13.yaml
 protocol_version: 18
 protocol_label: v13-spacing
 destination_config: configs/printing/four_clover_spacing_v13_locations.yaml

@@ -5,7 +5,7 @@ from pathlib import Path
 
 if __name__ == "__main__" and not __package__:
     print("ERROR: This script must be run as a module from the project root.")
-    print("Command: python -m scripts.sync_robot")
+    print("Command: python -m scripts.maintenance.sync_robot")
     sys.exit(1)
 
 from src.core.config import Config

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/run_robot_template.py  —  TEMPLATE, do not run as-is
+scripts/developer/run_robot_template.py  —  TEMPLATE, do not run as-is
 ============================================================
 Copy this file to scripts/run_<your_protocol>.py and fill in the >>> CUSTOMIZE <<<
 spots. This is the standard, reliable way to run an OT-2 protocol from the lab laptop.
@@ -37,7 +37,7 @@ from typing import Any
 import requests
 
 if __name__ == "__main__" and not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.lab.robot_connection import (
     add_robot_host_arguments,
@@ -46,7 +46,7 @@ from src.lab.robot_connection import (
     resolve_host,
 )
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 # >>> CUSTOMIZE <<< the protocol file this runner uploads.
 DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "your_protocol.py"
 HEADERS = {"opentrons-version": "*"}

@@ -31,5 +31,5 @@
 After making the changes, I will run the following to verify:
 ```powershell
 python -m pytest tests/test_config.py tests/test_dependency_hygiene.py
-python -m scripts.audit_paths
+python -m scripts.developer.audit_paths
 ```

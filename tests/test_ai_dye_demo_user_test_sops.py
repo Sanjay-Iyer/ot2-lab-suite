@@ -192,7 +192,7 @@ def test_the_scorer_reads_a_finished_session_folder(tmp_path, capsys):
                           executor=lambda config_path, simulate, log: 0, input_fn=read, output_fn=lambda text: None)
     assert session.run() == 0 and (folder / "executed_config_run1.yaml").is_file()
 
-    spec = importlib.util.spec_from_file_location("check_ai_dye_demo_sop", REPO / "scripts" / "check_ai_dye_demo_sop.py")
+    spec = importlib.util.spec_from_file_location("check_ai_dye_demo_sop", REPO / "scripts" / "developer" / "check_ai_dye_demo_sop.py")
     scorer = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(scorer)
     assert scorer.main(["--sop", "1", "--session", str(folder)]) == 0

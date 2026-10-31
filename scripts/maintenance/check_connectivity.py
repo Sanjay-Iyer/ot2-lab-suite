@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 import requests
 from pathlib import Path
 
-# Run this script using `python -m scripts.check_connectivity` from the project root.
+# Run this script using `python -m scripts.maintenance.check_connectivity` from the project root.
 
 
 from src.core.config import Config
@@ -152,7 +152,7 @@ def main():
                 print("\nTroubleshooting Commands:")
                 legacy = " --legacy-rsa" if settings.legacy_rsa else " --no-legacy-rsa"
                 print(
-                    f"  python scripts/check_ot2_ssh.py --robot-host {robot_ip} "
+                    f"  python scripts/maintenance/check_ot2_ssh.py --robot-host {robot_ip} "
                     f"--identity-file \"{key_path_val}\"{legacy}"
                 )
         except Exception as e:

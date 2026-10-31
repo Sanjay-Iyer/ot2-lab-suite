@@ -121,7 +121,7 @@ and edits a *user* YAML copy — the rules below still apply in full. See
   (the robot runs Linux, the laptops run Windows). No hardcoded `C:\…` or rigid
   `/home/…` paths in shared logic. The only absolute path allowed is the robot-side
   `camera.robot_image_dir` — a config-driven POSIX path used solely on the robot,
-  behind an `is_simulating()` guard. `scripts/audit_paths.py` enforces this.
+  behind an `is_simulating()` guard. `scripts/developer/audit_paths.py` enforces this.
 - **Zero magic values in execution logic.** Well names, row letters, volumes, and
   operational constants come from config or are derived from loaded labware — never
   hardcoded in the motion code.

@@ -10,7 +10,7 @@
 #   expect:       dotted paths checked against the RESOLVED config
 #   expect_resolved_targets / expect_error / expect_tip_count: special checks
 #
-# Run:  python scripts/11_test_agent_configs.py
+# Run:  python scripts/developer/11_test_agent_configs.py
 # =============================================================================
 
 standard_print:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 # --- Configuration ---
 # Discover root relative to this script
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Patterns to flag (Absolute and Suspicious Relative)
 # We use patterns that require a slash NOT followed by n, t, r (escape sequences) or whitespace

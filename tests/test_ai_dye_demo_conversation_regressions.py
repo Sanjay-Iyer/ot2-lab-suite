@@ -1,7 +1,7 @@
 """Replays every conversation in tests/conversation_regressions/ through the real DemoSession.
 
 Each YAML file is a minimal conversation that once broke a conversational invariant
-(found by scripts/ai_dye_demo_redteam.py or by hand). Messages carry the ground-truth label
+(found by scripts/developer/ai_dye_demo_redteam.py or by hand). Messages carry the ground-truth label
 the invariants check, and optionally the model replies recorded when the failure was found,
 so the replay is deterministic without a model. Simulation only: the session's executor is
 a recording function.

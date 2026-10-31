@@ -56,14 +56,14 @@ Resolved in [`src/core/config.py`](../../src/core/config.py) as
 
 Every "run X on the robot" script is built the same way (HTTP API, port 31950 — the
 transport that supplies the deck config and just works). Copy
-[`scripts/run_robot_template.py`](../../scripts/run_robot_template.py) and follow
+[`scripts/developer/run_robot_template.py`](../../scripts/developer/run_robot_template.py) and follow
 [`RUNNER_TEMPLATE.md`](RUNNER_TEMPLATE.md) / [`docs/robot_runner_template_guide.md`](../../docs/robot_runner_template_guide.md).
 Proven examples: `run_vial_print_robot.py`, `run_droplet_error_check.py`.
 
 ## Step 0 — Always check connectivity first
 
 ```bash
-python -m scripts.check_connectivity
+python -m scripts.maintenance.check_connectivity
 ```
 
 This runs a 6-part diagnostic: config loaded, Gemini DNS/auth, **OT-2 reachable
@@ -74,10 +74,10 @@ Quick manual checks:
 
 ```powershell
 # Is the robot reachable?
-python scripts\find_robot.py --check
+python scripts\maintenance\find_robot.py --check
 
 # Does passwordless SSH work? (BatchMode = no interactive prompts)
-python scripts\check_ot2_ssh.py `
+python scripts\maintenance\check_ot2_ssh.py `
   --identity-file "$env:ROBOT_SSH_KEY_PATH" --legacy-rsa
 ```
 
@@ -125,7 +125,7 @@ All commands use **non-interactive BatchMode** SSH with the key. Remote paths ar
 
 ```powershell
 # Set once for the session (PowerShell)
-$IP  = python scripts\find_robot.py --quiet
+$IP  = python scripts\maintenance\find_robot.py --quiet
 $KEY = "$env:USERPROFILE\.ssh\id_rsa_opentrons"
 $REMOTE = "/var/lib/opentrons/user_storage/ot2_runs"
 $OPTS = @(
@@ -162,20 +162,20 @@ ssh @OPTS root@$IP "opentrons_execute $REMOTE/generated_dilution.py"
 python scripts/run_smoke_test.py --simulate
 
 # Bulk-deploy the staging directory contents to the robot
-python -m scripts.deploy
+python -m scripts.maintenance.deploy
 
 # Deploy ONE custom labware JSON to the robot's custom_definitions store
 # (reads namespace/loadName/version from the JSON; --dry-run previews the path)
-python -m scripts.deploy --labware labware/<load_name>.json
+python -m scripts.maintenance.deploy --labware labware/<load_name>.json
 
 # Pull config / labware / pipettes / logs back FROM the robot
-python -m scripts.sync_robot
+python -m scripts.maintenance.sync_robot
 ```
 
 > **Custom labware path.** `opentrons_execute` resolves
 > `load_labware(name, namespace=, version=)` from
 > `/data/labware/v2/custom_definitions/<namespace>/<loadName>/<version>.json`
-> (the on-robot filename is the **version**, e.g. `1.json`). `scripts.deploy
+> (the on-robot filename is the **version**, e.g. `1.json`). `scripts.maintenance.deploy
 > --labware` puts it there; the Opentrons App's Labware Import writes to the same
 > place. Neither the bulk `deploy` nor `sync_robot` manage this path.
 
@@ -185,7 +185,7 @@ python -m scripts.sync_robot
 |---------|-------------|-----|
 | `Connection timed out` / port 22 unreachable | Robot off, cable unplugged, wrong IP | Power-cycle, check cable, verify `ROBOT_IP` |
 | `Permission denied (publickey)` | Wrong/missing key, key not on robot | Check `ROBOT_SSH_KEY_PATH`; confirm key is in robot `authorized_keys` |
-| `Permission denied (publickey)` on system v1.15.1 | Modern client disabled `ssh-rsa` | Set `ROBOT_SSH_LEGACY_RSA=true`; run `scripts/check_ot2_ssh.py --legacy-rsa` |
+| `Permission denied (publickey)` on system v1.15.1 | Modern client disabled `ssh-rsa` | Set `ROBOT_SSH_LEGACY_RSA=true`; run `scripts/maintenance/check_ot2_ssh.py --legacy-rsa` |
 | SCP hangs or `subsystem request failed` | Missing `-O` flag | Add `-O` to the `scp` command |
 | `ROBOT_SSH_KEY_PATH is missing` | `.env` blank | Set the key path in `.env` |
 | `opentrons_execute: not found` | Robot software issue | SSH in and check `which opentrons_execute` |

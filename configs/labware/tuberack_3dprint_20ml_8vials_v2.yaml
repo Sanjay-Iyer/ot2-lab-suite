@@ -3,7 +3,7 @@
 # ──────────────────────────────────────────────────────────────────
 # Generates labware/tuberack_3dprint_20ml_8vials_v2.json.
 #
-#     python scripts/generate_labware.py configs/labware/tuberack_3dprint_20ml_8vials_v2.yaml
+#     python scripts/maintenance/generate_labware.py configs/labware/tuberack_3dprint_20ml_8vials_v2.yaml
 #
 # v2 vs v1: the printed rack's OUTER footprint shrank from 127.76 × 85.48 mm
 # to 127 × 85 mm (a "smaller rectangle"). The vial cavities are unchanged in

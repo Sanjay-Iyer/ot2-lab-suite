@@ -26,19 +26,19 @@ Give a tester one SOP and the User Guide.
 | [SOP_TESTER_ANSWER_KEY.md](SOP_TESTER_ANSWER_KEY.md) | Exact final states, plans, likely mistakes, expected agent behaviour, pass/fail rules, and how the SOPs were validated |
 | [expected/](expected/) | Machine-readable expected final state of every SOP |
 | `configs\workflows\user_test_sops\ai_dye_demo_sop05_start.yaml` | SOP 5 starting configuration (the tip rack starts in slot 8) |
-| `scripts\check_ai_dye_demo_sop.py` | Scores a finished session folder against an SOP |
+| `scripts\developer\check_ai_dye_demo_sop.py` | Scores a finished session folder against an SOP |
 
 Score a session:
 
 ```powershell
-python scripts\check_ai_dye_demo_sop.py --sop 3 --session runs\ai_dye_demo\20260911_101500
+python scripts\developer\check_ai_dye_demo_sop.py --sop 3 --session runs\ai_dye_demo\20260911_101500
 ```
 
 Validation, run on this laptop without a robot:
 
 ```powershell
 python -m pytest tests\test_ai_dye_demo_user_test_sops.py -q
-python scripts\ai_dye_demo_redteam.py --simulate-states
+python scripts\developer\ai_dye_demo_redteam.py --simulate-states
 ```
 
 The test file replays scripted user paths for every SOP (clean, confused, change of mind, questions, and several changes

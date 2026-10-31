@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-scripts/plot_four_clover_layout.py
+scripts/developer/plot_four_clover_layout.py
 ==================================
 Offline map of a four-clover layout: paper boundary, the 96 well centers, each
 clover center, its four droplet coordinates and its label. Nothing here talks to
 a robot -- run it before uploading anything.
 
   conda activate ai
-  python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
-  python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml --out layout.png
-  python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml --text-only
+  python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
+  python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml --out layout.png
+  python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml --text-only
 
 There is ONE source of truth for geometry: this script imports the resolver
 functions out of src/protocols/printing/12_four_clover_paper_print.py and feeds
@@ -30,7 +30,7 @@ from pathlib import Path
 
 import yaml
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parent.parent.parent
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

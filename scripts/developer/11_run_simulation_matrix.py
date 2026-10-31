@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Version 11 Opentrons simulation matrix - home laptop, no robot.
 
-    python scripts/11_run_simulation_matrix.py
-    python scripts/11_run_simulation_matrix.py --only clover_print
-    python scripts/11_run_simulation_matrix.py --case clv_sep_3mm --verbose
-    python scripts/11_run_simulation_matrix.py --random 40 --seed 11
+    python scripts/developer/11_run_simulation_matrix.py
+    python scripts/developer/11_run_simulation_matrix.py --only clover_print
+    python scripts/developer/11_run_simulation_matrix.py --case clv_sep_3mm --verbose
+    python scripts/developer/11_run_simulation_matrix.py --random 40 --seed 11
 
 For every case in configs/tests/11_simulation_matrix.yaml:
 
@@ -25,7 +25,7 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

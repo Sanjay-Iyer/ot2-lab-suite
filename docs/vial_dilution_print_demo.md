@@ -194,7 +194,7 @@ note `requirements.txt` still pins `opentrons<9.0`, which is stale vs the workin
 conda activate ai
 
 # 0. (re)generate the v2 labware JSON from its YAML
-python scripts\generate_labware.py configs\labware\tuberack_3dprint_20ml_8vials_v2.yaml
+python scripts\maintenance\generate_labware.py configs\labware\tuberack_3dprint_20ml_8vials_v2.yaml
 
 # 1. BUILD from the YAML config (edit the YAML first): validate -> embed CONFIG -> simulate
 python scripts\build_vial_dilution_print.py
@@ -238,7 +238,7 @@ trends light→dark down the column).
 
 ## 4. Run it on the real robot (lab laptop)
 
-1. **Deploy the labware** (once): `python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json`
+1. **Deploy the labware** (once): `python -m scripts.maintenance.deploy --labware labware\tuberack_3dprint_20ml_8vials_v2.json`
    (and import the Corning plate + tip rack via the App if not already present).
 2. **Confirm the robot supports API 2.28.** If not, see the apiLevel note above.
 3. **Build from your YAML** (`python scripts/build_vial_dilution_print.py`) and run the

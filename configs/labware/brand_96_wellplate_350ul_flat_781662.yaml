@@ -7,7 +7,7 @@
 # X1/Xn/Y1/Yn well-center reference coordinates. No dimension here was
 # measured or estimated -- it is manufacturer-published.
 #
-#     python scripts/generate_labware.py configs/labware/brand_96_wellplate_350ul_flat_781662.yaml
+#     python scripts/maintenance/generate_labware.py configs/labware/brand_96_wellplate_350ul_flat_781662.yaml
 # ──────────────────────────────────────────────────────────────────
 
 load_name: brand_96_wellplate_350ul_flat_781662

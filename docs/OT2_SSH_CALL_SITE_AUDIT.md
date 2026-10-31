@@ -10,13 +10,13 @@ not disable host-key checking.
 
 | File | Call path | Operation | Status |
 |---|---|---|---|
-| `scripts/check_ot2_ssh.py` | `main()` | Harmless authentication `echo` | Centralized; new diagnostic |
-| `scripts/check_connectivity.py` | `main()` | Batch authentication check | Centralized |
-| `scripts/check_connectivity.py` | `check_robot_calibration_paths()` | Remote calibration inspection | Centralized |
-| `scripts/deploy.py` | `deploy()` | Remote mkdir and recursive SCP upload | Centralized |
-| `scripts/deploy.py` | `deploy_labware()` | Remote mkdir, SCP upload, remote verify | Centralized |
-| `scripts/sync_robot.py` | `sync_from_robot()` | Recursive SCP downloads | Centralized |
-| `scripts/pull_vision_images.py` | `main()` | Recursive image SCP download | Centralized |
+| `scripts/maintenance/check_ot2_ssh.py` | `main()` | Harmless authentication `echo` | Centralized; new diagnostic |
+| `scripts/maintenance/check_connectivity.py` | `main()` | Batch authentication check | Centralized |
+| `scripts/maintenance/check_connectivity.py` | `check_robot_calibration_paths()` | Remote calibration inspection | Centralized |
+| `scripts/maintenance/deploy.py` | `deploy()` | Remote mkdir and recursive SCP upload | Centralized |
+| `scripts/maintenance/deploy.py` | `deploy_labware()` | Remote mkdir, SCP upload, remote verify | Centralized |
+| `scripts/maintenance/sync_robot.py` | `sync_from_robot()` | Recursive SCP downloads | Centralized |
+| `scripts/maintenance/pull_vision_images.py` | `main()` | Recursive image SCP download | Centralized |
 | `scripts/run_droplet_error_check.py` | `_pull_images()` | Recursive image SCP download | Centralized |
 | `scripts/run_vial_print_robot.py` | `_prepare_remote_image_dir()` | Remote image-directory preparation | Centralized |
 | `scripts/run_vial_print_robot.py` | `_pull_images()` | Recursive image SCP download | Centralized |
@@ -38,7 +38,7 @@ The following nearby paths were inspected and intentionally left as HTTP-only:
 | File/path | Reason |
 |---|---|
 | `src/agents/robot_http_tools.py` | Invokes HTTP runner scripts; it does not construct SSH/SCP commands |
-| `scripts/run_robot_template.py` | HTTP API template; optional SCP guidance now points to centralized examples |
+| `scripts/developer/run_robot_template.py` | HTTP API template; optional SCP guidance now points to centralized examples |
 | `scripts/run_smoke_test.py` | HTTP API physical dry-motion runner; no SSH/SCP command |
 | `scripts/run_plate_waste_disposal.py` | HTTP API runner |
 | OT-2 protocol `curl` calls | Robot-local HTTP camera calls, unrelated to laptop SSH authentication |

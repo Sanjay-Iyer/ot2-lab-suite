@@ -5,7 +5,7 @@
 # 8-channel pipette can address whole columns. Well coordinates match the
 # standard 9 mm SBS pitch.
 #
-#     python scripts/generate_labware.py configs/labware/corning_96_wellplate_360ul.yaml
+#     python scripts/maintenance/generate_labware.py configs/labware/corning_96_wellplate_360ul.yaml
 # ──────────────────────────────────────────────────────────────────
 
 load_name: corning_96_wellplate_360ul_custom

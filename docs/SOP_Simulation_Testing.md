@@ -75,12 +75,12 @@ Before running Phase 3 or 4, confirm **every item** on this list:
 - [ ] **Phase 2 passed** — AI agent reported `SIMULATION PASSED`
 - [ ] **OT-2 is powered on** and the status light is solid blue
 - [ ] **Ethernet cable** is connected between your laptop and the OT-2
-- [ ] **Robot discovery passes**: `python scripts/find_robot.py --check`
+- [ ] **Robot discovery passes**: `python scripts/maintenance/find_robot.py --check`
 - [ ] **SSH private key exists** on disk at the path you configured
 - [ ] **SSH key path is set** in `.env`: `ROBOT_SSH_KEY_PATH=<path to your private key>`
 - [ ] **Connectivity check passes** — run this and confirm SSH is reachable:
   ```powershell
-  python -m scripts.check_connectivity
+  python -m scripts.maintenance.check_connectivity
   ```
   You should see `PASS` for both the socket check (port 22) and the SSH BatchMode check.
 - [ ] **Correct labware is physically loaded** on the OT-2 deck in the slots matching your protocol configuration

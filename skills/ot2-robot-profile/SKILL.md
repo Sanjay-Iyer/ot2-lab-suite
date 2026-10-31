@@ -77,7 +77,7 @@ Custom labware lives in **two** places and you may need both:
 
 1. **For `opentrons_execute` (SSH runs):** deploy to the robot's definition store —
    ```bash
-   python -m scripts.deploy --labware labware/<load_name>.json
+   python -m scripts.maintenance.deploy --labware labware/<load_name>.json
    ```
    lands at `/data/labware/v2/custom_definitions/<namespace>/<loadName>/<version>.json`.
 2. **For the Opentrons App:** import each JSON via the App's **Labware → Import**
@@ -117,7 +117,7 @@ Verified-good layout for the vial-dilution-print demo: vial rack **slot 7**, pla
   `PubkeyAcceptedAlgorithms=+ssh-rsa` when `ROBOT_SSH_LEGACY_RSA=true`. SCP to
   the robot also needs `-O` (legacy protocol; Dropbear has no SFTP). Host-key
   checking remains enabled.
-- Verify the whole link with `python -m scripts.check_connectivity` (expect every
+- Verify the whole link with `python -m scripts.maintenance.check_connectivity` (expect every
   step PASS before deploying).
 
 ## New-protocol checklist

@@ -20,7 +20,7 @@ Before running OT-2 commands, identify the laptop role.
 - Live OT-2 runs are allowed only on the real robot laptop.
 - Before any live run, require explicit user confirmation that the robot is physically ready and that the command should run live.
 - Resolve the OT-2 through `configs/robot.yaml`; run
-  `python scripts/find_robot.py --check` when discovery fails.
+  `python scripts/maintenance/find_robot.py --check` when discovery fails.
 - For the vial dilution print workflow, the real-laptop live command is:
 
 ```powershell

@@ -36,7 +36,7 @@ from src.utils.paths import LABWARE_CONFIG_DIR, LABWARE_OUTPUT_DIR, PROJECT_ROOT
 
 # Import generator internals so we don't shell-out
 sys.path.insert(0, str(PROJECT_ROOT))
-from scripts.generate_labware import LabwareSpec, make_labware, spec_from_yaml, _SPEC_FIELDS
+from scripts.maintenance.generate_labware import LabwareSpec, make_labware, spec_from_yaml, _SPEC_FIELDS
 from src.labware.builder import LabwareOutputExistsError, read_labware_json
 from src.labware.families import get_family, list_families
 from src.labware.geometry import generate_rectangular_grid

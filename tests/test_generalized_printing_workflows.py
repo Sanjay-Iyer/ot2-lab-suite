@@ -12,7 +12,7 @@ What this file guards:
 
 Nothing here needs an LLM and nothing here contacts a robot. The live
 natural-language reproduction lives in
-``scripts/reproduce_ground_truth_from_language.py``.
+``scripts/developer/reproduce_ground_truth_from_language.py``.
 """
 from __future__ import annotations
 

@@ -7,12 +7,12 @@ invariants check the authoritative experiment state; nothing here asks a model w
 the demo behaved correctly. The session is given a recording function as its executor, so
 no subprocess, protocol execution or robot connection can happen.
 
-    python scripts/ai_dye_demo_redteam.py                                    # 300 scripted conversations
-    python scripts/ai_dye_demo_redteam.py --conversations 1000 --chaos 0,0.35,0.7
-    python scripts/ai_dye_demo_redteam.py --interpreter gemini --conversations 20 --max-model-calls 400
-    python scripts/ai_dye_demo_redteam.py --user-agent gemini --judge --conversations 4
-    python scripts/ai_dye_demo_redteam.py --replay tests/conversation_regressions/<case>.yaml
-    python scripts/ai_dye_demo_redteam.py --simulate-states     # pinned local opentrons simulator, SOP and red-team states
+    python scripts/developer/ai_dye_demo_redteam.py                                    # 300 scripted conversations
+    python scripts/developer/ai_dye_demo_redteam.py --conversations 1000 --chaos 0,0.35,0.7
+    python scripts/developer/ai_dye_demo_redteam.py --interpreter gemini --conversations 20 --max-model-calls 400
+    python scripts/developer/ai_dye_demo_redteam.py --user-agent gemini --judge --conversations 4
+    python scripts/developer/ai_dye_demo_redteam.py --replay tests/conversation_regressions/<case>.yaml
+    python scripts/developer/ai_dye_demo_redteam.py --simulate-states     # pinned local opentrons simulator, SOP and red-team states
 
 --chaos is the probability that the scripted interpreter corrupts a reply the way a real
 model could (leaking hypothetical text, unrelated extra changes, wrong units, wrong labware,
@@ -35,7 +35,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

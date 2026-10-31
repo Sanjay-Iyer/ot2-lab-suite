@@ -56,12 +56,12 @@ explicit and auditable.
 | Physical state | reports become reconciliation proposals; prepared-dilution records drive skip-step prerequisites; an unrecorded report blocks runs | `session.py::_reconcile`, `state.py::_check_prerequisites` |
 | Runs | never from `start over`, `go back`, `start printing`, or a go-ahead right after a hypothetical | `language.py::wants_to_run`, `session.py::_dispatch` |
 | Audit | `turns.jsonl`: per-turn classification, state fingerprint and revision before/after, events | `session.py::_handle` |
-| Red team | 13 personas, 20 attack goals, 41 message generators, a corrupting interpreter (12 corruption modes) and Gemini, a Gemini user agent and judge, 24 deterministic invariants, replay, minimization, regression export | `scripts/ai_dye_demo_redteam.py`, `src/agents/dye_demo/redteam/` |
+| Red team | 13 personas, 20 attack goals, 41 message generators, a corrupting interpreter (12 corruption modes) and Gemini, a Gemini user agent and judge, 24 deterministic invariants, replay, minimization, regression export | `scripts/developer/ai_dye_demo_redteam.py`, `src/agents/dye_demo/redteam/` |
 
 ## User-test SOPs
 
 [user_testing/](user_testing/README.md) holds five SOPs of increasing difficulty that give a tester an experimental
-objective instead of commands, a User Guide, and an administrator answer key. `scripts/check_ai_dye_demo_sop.py`
+objective instead of commands, a User Guide, and an administrator answer key. `scripts/developer/check_ai_dye_demo_sop.py`
 scores a session against the SOP's expected state (`src/agents/dye_demo/sop_check.py`).
 
 Writing and validating the SOPs exposed gaps in the conversation layer, fixed with regression tests in
@@ -120,7 +120,7 @@ the fake OT-2.
 ```powershell
 conda activate ai
 python -m pytest tests/test_ai_dye_demo.py tests/test_ai_dye_demo_session.py tests/test_ai_dye_demo_protocol.py tests/test_ai_dye_demo_intent.py tests/test_ai_dye_demo_robustness.py tests/test_ai_dye_demo_conversation_regressions.py tests/test_ai_dye_demo_redteam.py tests/test_ai_dye_demo_user_test_sops.py tests/test_ai_dye_demo_intent_to_plan.py tests/test_ai_dye_demo_robot_abort.py tests/test_ai_dye_demo_plan_rendering.py -q
-python scripts/ai_dye_demo_redteam.py --conversations 300
+python scripts/developer/ai_dye_demo_redteam.py --conversations 300
 ```
 
 - `test_ai_dye_demo.py`: guard rails, deck, tips, FROM/TO, language, parsing.

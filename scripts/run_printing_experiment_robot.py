@@ -5,7 +5,7 @@ OT-2, over the SAME validated execution path as the vial-dilution demo.
 
 This is not a new robot connection or transport. It reuses, unchanged:
   - src.lab.robot_connection  (mDNS/ARP discovery, /health check, host resolution
-    -- exactly what `python scripts/find_robot.py --check` exercises)
+    -- exactly what `python scripts/maintenance/find_robot.py --check` exercises)
   - the upload / create-run / play / monitor HTTP-API cycle already implemented
     in scripts/run_vial_print_robot.py (`_upload_protocol`, `_create_run`,
     `_play_run`, `_monitor`, `_report_run_error`), including its custom-labware

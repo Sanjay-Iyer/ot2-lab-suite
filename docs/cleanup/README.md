@@ -23,7 +23,7 @@ Earlier verified preservation snapshots remain independently available under
 | Phase | Status |
 | --- | --- |
 | C0 baseline and inventory | PASS/PASS; external snapshot verified |
-| C1 scripts | Pending |
+| C1 scripts | C1a PASS/PASS; 48 → 29 top-level scripts; remaining groups pending |
 | C2 agent families | Pending |
 | C3 protocols/configs | Pending |
 | C4 generated artifacts/caches | Pending |

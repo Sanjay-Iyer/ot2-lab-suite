@@ -23,10 +23,10 @@ config_path = USER_CONFIG_DIR / "my_config.yaml"
 - `PROTOCOL_DIR`: `src/protocols/`
 - `GENERATED_PROTOCOL_DIR`: `src/protocols/generated/`
 
-## Audit Tool: `scripts/audit_paths.py`
+## Audit Tool: `scripts/developer/audit_paths.py`
 Run this tool to ensure no hardcoded paths are introduced:
 ```powershell
-python -m scripts.audit_paths
+python -m scripts.developer.audit_paths
 ```
 
 ## Portability:

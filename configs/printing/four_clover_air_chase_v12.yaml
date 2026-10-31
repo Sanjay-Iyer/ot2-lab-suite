@@ -8,7 +8,7 @@
 #   BUILD (dry run):
 #     python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_air_chase_v12.yaml
 #   PLOT:
-#     python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_air_chase_v12.yaml
+#     python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_air_chase_v12.yaml
 protocol_version: 16            # own builder ID -> four_clover_air_chase_v12_latest.py
 protocol_label: v12-airchase
 destination_config: configs/printing/four_clover_air_chase_locations.yaml

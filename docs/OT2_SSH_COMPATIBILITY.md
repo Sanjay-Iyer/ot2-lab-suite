@@ -34,7 +34,7 @@ This command performs only `echo OT2_SSH_OK`; it causes no robot motion and
 does not modify robot files:
 
 ```powershell
-python scripts\check_ot2_ssh.py `
+python scripts\maintenance\check_ot2_ssh.py `
   --robot-host OT2CEP20220929R02.local `
   --identity-file "$env:USERPROFILE\.ssh\id_rsa_opentrons" `
   --legacy-rsa

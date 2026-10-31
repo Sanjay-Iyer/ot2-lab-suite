@@ -1,6 +1,6 @@
 # Conversational red-team strategy
 
-`scripts/ai_dye_demo_redteam.py` simulates people talking to the demo and checks, after every turn,
+`scripts/developer/ai_dye_demo_redteam.py` simulates people talking to the demo and checks, after every turn,
 that messy language never produced a messy experiment. It runs the demo's own conversation logic
 (`src/agents/dye_demo/session.py`) with a recording executor. **Simulation only**: no robot connection. Conversations
 start no subprocess and execute no protocol (a test in `tests/test_ai_dye_demo_redteam.py` fails if they could); only
@@ -26,12 +26,12 @@ Code: `src/agents/dye_demo/redteam/` (`scenarios.py`, `interpreter.py`, `invaria
 
 ```powershell
 conda activate ai
-python scripts/ai_dye_demo_redteam.py                                   # 300 scripted conversations
-python scripts/ai_dye_demo_redteam.py --conversations 2000 --seed 101 --chaos 0,0.35,0.7
-python scripts/ai_dye_demo_redteam.py --interpreter gemini --conversations 40 --max-model-calls 400
-python scripts/ai_dye_demo_redteam.py --user-agent gemini --judge --conversations 4 --max-model-calls 300
-python scripts/ai_dye_demo_redteam.py --replay tests/conversation_regressions/go_ahead_after_hypothetical_001.yaml
-python scripts/ai_dye_demo_redteam.py --simulate-states
+python scripts/developer/ai_dye_demo_redteam.py                                   # 300 scripted conversations
+python scripts/developer/ai_dye_demo_redteam.py --conversations 2000 --seed 101 --chaos 0,0.35,0.7
+python scripts/developer/ai_dye_demo_redteam.py --interpreter gemini --conversations 40 --max-model-calls 400
+python scripts/developer/ai_dye_demo_redteam.py --user-agent gemini --judge --conversations 4 --max-model-calls 300
+python scripts/developer/ai_dye_demo_redteam.py --replay tests/conversation_regressions/go_ahead_after_hypothetical_001.yaml
+python scripts/developer/ai_dye_demo_redteam.py --simulate-states
 ```
 
 `--simulate-states` replays representative conversations (the SOP 1 and SOP 2 procedure, OFF DECK, rollback, multi-change,

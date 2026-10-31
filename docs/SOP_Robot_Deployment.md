@@ -122,8 +122,8 @@ Run the built-in diagnostic from the project root:
 ```powershell
 conda activate llm
 cd C:\code\opentrons_home\ot2-lab-suite
-python -m scripts.check_connectivity
-python scripts\check_ot2_ssh.py --legacy-rsa
+python -m scripts.maintenance.check_connectivity
+python scripts\maintenance\check_ot2_ssh.py --legacy-rsa
 ```
 
 ### What Each Section Should Show
@@ -162,10 +162,10 @@ fails with `Labware "<name>" not found ... namespace "custom_beta"`.
 
 ```powershell
 # Reads namespace/loadName/version from the JSON, makes the nested dir, copies + verifies
-python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v1.json
+python -m scripts.maintenance.deploy --labware labware\tuberack_3dprint_20ml_8vials_v1.json
 
 # Preview the destination only (no SSH/SCP)
-python -m scripts.deploy --labware labware\tuberack_3dprint_20ml_8vials_v1.json --dry-run
+python -m scripts.maintenance.deploy --labware labware\tuberack_3dprint_20ml_8vials_v1.json --dry-run
 ```
 
 Lands at `/data/labware/v2/custom_definitions/<namespace>/<loadName>/<version>.json`

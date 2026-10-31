@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Ask the Printing Agent to rebuild a validated experiment from plain language.
 
-    python scripts/reproduce_ground_truth_from_language.py standard
-    python scripts/reproduce_ground_truth_from_language.py four-clover
-    python scripts/reproduce_ground_truth_from_language.py both
+    python scripts/developer/reproduce_ground_truth_from_language.py standard
+    python scripts/developer/reproduce_ground_truth_from_language.py four-clover
+    python scripts/developer/reproduce_ground_truth_from_language.py both
 
 The agent is given only a natural-language request, the generalized template, the
 registered machine profile, its skill, and its tools. It is NOT given the
@@ -25,7 +25,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
@@ -124,7 +124,7 @@ def _save(path: Path, config: dict) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     header = (
         "# AI-GENERATED CONFIGURATION - not a hand-validated ground truth.\n"
-        "# Produced by scripts/reproduce_ground_truth_from_language.py from a\n"
+        "# Produced by scripts/developer/reproduce_ground_truth_from_language.py from a\n"
         "# natural-language request alone. Review it before any physical run.\n"
     )
     path.write_text(

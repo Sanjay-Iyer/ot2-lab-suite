@@ -144,6 +144,6 @@ This warning message refers to a legacy filepath. On modern OT-2 software versio
 
 Therefore, a warning about `/data/deck_calibration.json` being missing should not be treated as proof that the robot has no calibration. As long as `/data/robot/deck_calibration.json` is present on the robot's filesystem, the calibration settings are active. To inspect this, run the connectivity diagnostics script:
 ```bash
-conda run -n AI python -m scripts.check_connectivity
+conda run -n AI python -m scripts.maintenance.check_connectivity
 ```
 It will run checks for legacy and current calibration paths and report their timestamps and directory contents.

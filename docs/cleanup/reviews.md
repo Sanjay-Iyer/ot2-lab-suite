@@ -33,3 +33,32 @@ cross-review **PASS**. Python checked the full ZIP digest, exact 9,230 safe memb
 38 critical pairs and the 43-ref bundle; laboratory checked 586 critical scientific
 pairs and current traversal/link metadata. Both approved only this cleanup-docs
 checkpoint. No prior experimental implementation is implicitly accepted.
+
+## C1a — leaf script grouping (PASS/PASS)
+
+Starting commit `3839c36`. Moved 19 maintenance/developer scripts according to
+inventory.csv; top-level Python scripts 48 → 29. External batch
+`C1a-leaf-scripts` preserves all 19 originals with verified SHA/CRC. Changed-file
+list: `.test_tmp/C1a-map.changes.json`; mapping `.test_tmp/C1a-map.json`.
+
+Repaired root discovery, direct/module commands, library imports and file-based
+test imports. Deployment/sync remain module-only. Connection-check mains were
+not executed. `configs/robot.yaml` bytes are unchanged; its historical header
+comment is retained. Other config edits are command-path documentation only.
+
+Checks: 19 moved module imports and root checks PASS; four help-only launch
+checks PASS (`.test_tmp/C1a-imports.json`); existing mocked SSH tests **9 passed**
+in17.48s; V11 offline case `std_18_state_persists_across_turns` **1/1 passed**.
+No shared builder/runner relocation or experimental method change in this batch.
+
+Reviewer correction: fixed the current printing SOP to use module-only
+`python -m scripts.maintenance.sync_robot`. Old script strings inside immutable
+protocol/generated docstrings remain historical comments. Preservation recheck:
+393 parsed existing YAML values identical; one pre-existing invalid parameter
+reference remains unchanged; all config changes are command paths, and 33
+maintained printing protocol/labware/image files are byte-identical.
+
+Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Python
+checked all 19 archived source diffs, runtime/test consumers and 787-module old
+import/path scan. Laboratory independently checked 3,026 scientific/data/settings
+files and all parsed configs. No required corrections remain.

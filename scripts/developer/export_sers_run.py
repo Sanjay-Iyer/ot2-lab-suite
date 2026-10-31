@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Export one SERS experiment session as a Supporting Information package.
 
-    python scripts/export_sers_run.py --list
-    python scripts/export_sers_run.py --session <session-id>
-    python scripts/export_sers_run.py --session <session-id> --zip
-    python scripts/export_sers_run.py --session <session-id> --out C:/si/exp1
-    python scripts/export_sers_run.py --session <session-id> --verify-only
+    python scripts/developer/export_sers_run.py --list
+    python scripts/developer/export_sers_run.py --session <session-id>
+    python scripts/developer/export_sers_run.py --session <session-id> --zip
+    python scripts/developer/export_sers_run.py --session <session-id> --out C:/si/exp1
+    python scripts/developer/export_sers_run.py --session <session-id> --verify-only
 
 The export is a copy with a generated README.md explaining every file. The
 original session directory is never modified, and no credential of any kind is
@@ -19,7 +19,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

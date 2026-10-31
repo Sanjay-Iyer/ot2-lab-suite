@@ -354,7 +354,7 @@ python scripts\ai_dye_demo.py --simulate
 Conversational red-team testing (simulated users against the same conversation logic, simulation only):
 
 ```powershell
-python scripts\ai_dye_demo_redteam.py --conversations 300
+python scripts\developer\ai_dye_demo_redteam.py --conversations 300
 ```
 
 See [ai_dye_demo/red_team_strategy.md](ai_dye_demo/red_team_strategy.md).
@@ -365,7 +365,7 @@ After checking the deck, tips, liquids, labware, pipette and paper:
 
 ```powershell
 conda activate llm
-python scripts\find_robot.py --check
+python scripts\maintenance\find_robot.py --check
 python scripts\ai_dye_demo.py --session-label "Demo 2"
 ```
 

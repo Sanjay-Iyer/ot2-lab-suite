@@ -4,7 +4,7 @@
 # 12 clovers x 4 droplets x 1 layer = 48 deposits, 240 uL BP.
 #
 #   python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_grid_v12.yaml
-#   python scripts/plot_four_clover_layout.py  --config configs/printing/four_clover_grid_v12.yaml
+#   python scripts/developer/plot_four_clover_layout.py  --config configs/printing/four_clover_grid_v12.yaml
 protocol_version: 17            # own builder ID -> four_clover_grid_v12_latest.py
 protocol_label: v12-grid
 destination_config: configs/printing/four_clover_grid_locations.yaml

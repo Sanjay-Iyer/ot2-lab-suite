@@ -2,7 +2,7 @@
 
 ## 1. Summary of Issues
 - Scripts and tests use fragile `sys.path.append` hacks to resolve absolute imports.
-- Direct execution (`python scripts/deploy.py`) is causing `ModuleNotFoundError` outside of the hacked environments.
+- Direct execution (`python scripts/maintenance/deploy.py`) is causing `ModuleNotFoundError` outside of the hacked environments.
 - Network state confusion (Stale DNS/VPN) makes troubleshooting Gemini/Opentrons connectivity difficult.
 - Lack of centralized documentation on how to properly invoke agents, tests, and scripts natively.
 
@@ -16,9 +16,9 @@ Remove all manual `sys.path.append` modifications from:
 - `src/agents/run_stress_tests.py`
 - `src/agents/main.py`
 - `src/agents/check_models.py`
-- `scripts/sync_robot.py`
-- `scripts/deploy.py`
-- `scripts/check_connectivity.py`
+- `scripts/maintenance/sync_robot.py`
+- `scripts/maintenance/deploy.py`
+- `scripts/maintenance/check_connectivity.py`
 
 *(Note: These will all require `python -m` to be run natively from the project root).*
 
@@ -34,14 +34,14 @@ Remove all manual `sys.path.append` modifications from:
 - Provide standard powershell commands for starting the environment and running core routines in a new `docs/README_USAGE.md` (or append to existing docs):
   - Agent Launch: `python -m src.agents.main ...`
   - Tests: `python -m pytest tests`
-  - Validation: `python -m scripts.audit_paths`
-  - Diagnostics: `python -m scripts.check_connectivity`
+  - Validation: `python -m scripts.developer.audit_paths`
+  - Diagnostics: `python -m scripts.maintenance.check_connectivity`
 - Add a "Stale DNS/VPN Troubleshooting" section as requested.
 
 ## 3. Verification Plan
 
 ### Automated Verification
 - Run `python -m pytest tests` to ensure test execution still functions without `sys.path` hacks.
-- Run `python -m scripts.check_connectivity` to review the new diagnostic output.
-- Run `python -m scripts.audit_paths` to prove no pathing errors exist.
+- Run `python -m scripts.maintenance.check_connectivity` to review the new diagnostic output.
+- Run `python -m scripts.developer.audit_paths` to prove no pathing errors exist.
 - Run `python -m src.agents.main "Configure a standard printing run and run a simulation"` to ensure the agent executes correctly via module invocation.

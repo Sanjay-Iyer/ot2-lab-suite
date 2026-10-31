@@ -390,7 +390,7 @@ def resolve_host(cli_override: str | None = None, allow_discovery: bool = True) 
             result = discover_robot()
         except RuntimeError as exc:
             raise RuntimeError(
-                f"{exc}\nRun 'python scripts/find_robot.py --check' for diagnostics."
+                f"{exc}\nRun 'python scripts/maintenance/find_robot.py --check' for diagnostics."
             ) from exc
         write_discovery(result["ip"], result["method"], result["health"])
         host = mdns if result["method"] == "mdns" else result["ip"]
@@ -399,7 +399,7 @@ def resolve_host(cli_override: str | None = None, allow_discovery: bool = True) 
 
     raise RuntimeError(
         "No configured robot host verified. "
-        "Run 'python scripts/find_robot.py --check' for diagnostics."
+        "Run 'python scripts/maintenance/find_robot.py --check' for diagnostics."
     )
 
 

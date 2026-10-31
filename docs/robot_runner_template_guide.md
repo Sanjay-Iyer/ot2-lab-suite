@@ -2,7 +2,7 @@
 
 How to build a terminal runner for any OT-2 protocol, the way that **works every time**.
 
-The reference template is [`scripts/run_robot_template.py`](../scripts/run_robot_template.py).
+The reference template is [`scripts/developer/run_robot_template.py`](../scripts/developer/run_robot_template.py).
 The canonical working examples are
 [`scripts/run_vial_print_robot.py`](../scripts/run_vial_print_robot.py) and
 [`scripts/run_droplet_error_check.py`](../scripts/run_droplet_error_check.py).
@@ -45,7 +45,7 @@ You only customize **`main()`**: the protocol path, the runtime parameters, and 
 
 ## Step-by-step: adapt the template
 
-1. **Copy it:** `scripts/run_robot_template.py` → `scripts/run_<your_protocol>.py`.
+1. **Copy it:** `scripts/developer/run_robot_template.py` → `scripts/run_<your_protocol>.py`.
 
 2. **Point `DEFAULT_PROTOCOL`** at the exact file you upload
    (e.g. `src/protocols/<your_protocol>.py`, or the generated `_latest.py` if it's built).

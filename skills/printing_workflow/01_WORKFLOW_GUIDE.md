@@ -9,7 +9,7 @@ production workflow. Everything in this family shares the `01_` number.
 | Change what/where is printed, volumes, pipettes, materials | a **config** `configs/printing/01_vial_dilution_paper_print.{p20_only,p300_only,mixed}.yaml` (copy the closest one) |
 | Change motion logic / dispatch | the protocol `src/protocols/printing/01_vial_dilution_paper_print.py` (NOT the embedded `CONFIG` block, NOT generated files) |
 | Change a validation rule | the ONE authoritative module in `src/core/` (`pipette_selection`, `print_groups`, `materials`, `workflow_config`) — never duplicate a rule |
-| Add a labware definition | source YAML in `configs/labware/`, then `scripts/generate_labware.py` (keep filename == loadName) |
+| Add a labware definition | source YAML in `configs/labware/`, then `scripts/maintenance/generate_labware.py` (keep filename == loadName) |
 
 ## Key facts an LLM needs
 - **Materials → vials:** `materials:` maps a name → `{role, labware, vial, initial_volume_ul}`.

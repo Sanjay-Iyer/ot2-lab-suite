@@ -1,6 +1,6 @@
 # OT-2 Lab Suite - Execution Guide
 
-To ensure reliable execution, avoid running python scripts directly (e.g. `python scripts/deploy.py`). Instead, always use module-style execution from the project root. This guarantees that internal imports and paths resolve correctly.
+To ensure reliable execution, avoid running python scripts directly (e.g. `python scripts/maintenance/deploy.py`). Instead, always use module-style execution from the project root. This guarantees that internal imports and paths resolve correctly.
 
 ## Standard PowerShell Commands
 
@@ -17,12 +17,12 @@ python -m pytest tests
 
 ### 3. Run Path & Security Audit
 ```powershell
-python -m scripts.audit_paths
+python -m scripts.developer.audit_paths
 ```
 
 ### 4. Run Connectivity & Proxy Diagnostics
 ```powershell
-python -m scripts.check_connectivity
+python -m scripts.maintenance.check_connectivity
 ```
 
 ### 5. Launch the Agent

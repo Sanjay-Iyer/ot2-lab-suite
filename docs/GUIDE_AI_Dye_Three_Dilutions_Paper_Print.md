@@ -118,12 +118,12 @@ On the configured robot computer, from its copy of the repository:
 ```powershell
 cd C:\path\to\ot2-lab-suite
 conda activate llm
-python scripts\find_robot.py --check
+python scripts\maintenance\find_robot.py --check
 python scripts\ai_dye_demo.py
 ```
 
 The robot address normally comes from `configs\robot.yaml`. If discovery fails,
-correct that configuration and repeat `python scripts\find_robot.py --check`.
+correct that configuration and repeat `python scripts\maintenance\find_robot.py --check`.
 Use `--robot-host` only when a lab administrator directs you to override the
 configured host.
 

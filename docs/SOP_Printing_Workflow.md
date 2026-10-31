@@ -14,7 +14,7 @@ This document provides the standard operating procedure for running the **Nanopa
 ### Robot Connectivity
 - Connect the OT-2 via Ethernet.
 - Ensure `configs/robot.yaml` contains the correct robot identity.
-- Verify discovery: `python scripts/find_robot.py --check`.
+- Verify discovery: `python scripts/maintenance/find_robot.py --check`.
 
 ---
 
@@ -88,7 +88,7 @@ Physical execution requires a strict confirmation protocol.
 1.  **Sync Logs**:
     Pull the physical run logs and calibration data back to your PC for analysis:
     ```powershell
-    python scripts/sync_robot.py
+python -m scripts.maintenance.sync_robot
     ```
 
 2.  **Cleanup**:

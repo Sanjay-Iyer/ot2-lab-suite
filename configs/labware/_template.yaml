@@ -3,11 +3,11 @@
 # ──────────────────────────────────────────────────────────────────
 # Copy this file, rename it, and edit the values. Then run:
 #
-#     python scripts/generate_labware.py configs/labware/your_file.yaml
+#     python scripts/maintenance/generate_labware.py configs/labware/your_file.yaml
 #
 # Output JSON is written to  labware/<load_name>.json  (override with
 # output_dir below). Every key here maps 1:1 to a field in LabwareSpec
-# in scripts/generate_labware.py. Unknown keys are REJECTED (typo guard).
+# in scripts/maintenance/generate_labware.py. Unknown keys are REJECTED (typo guard).
 #
 # Values shown are the script DEFAULTS — you only need to override the
 # ones that differ for your part. The handful marked REQUIRED have no

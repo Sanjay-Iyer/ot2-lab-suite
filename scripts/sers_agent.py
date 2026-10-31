@@ -131,7 +131,7 @@ def _handle_command(command: str, agent: SERSExperimentAgent) -> bool:
         record.write_manifest()
         print(f"  session id      {record.session_id}")
         print(f"  record          {record.directory}")
-        print(f"  export with     python scripts/export_sers_run.py --session {record.session_id}")
+        print(f"  export with     python scripts/developer/export_sers_run.py --session {record.session_id}")
         if record.degraded:
             for reason in record.degraded_reasons:
                 print(f"  INCOMPLETE      {reason}")
@@ -245,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         close_session(record, status="closed")
         print(f"  record  {record.directory}")
-        print(f"  export  python scripts/export_sers_run.py --session {record.session_id}")
+        print(f"  export  python scripts/developer/export_sers_run.py --session {record.session_id}")
 
 
 if __name__ == "__main__":

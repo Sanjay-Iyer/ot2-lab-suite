@@ -40,7 +40,7 @@ No robot connection required — runs on the dev laptop or the lab laptop.
 | — validation layers | [`validation.py`](../../src/labware/validation.py) |
 | — template inheritance | [`templates.py`](../../src/labware/templates.py) |
 | — family registry | [`families.py`](../../src/labware/families.py) |
-| CLI | [`scripts/generate_labware.py`](../../scripts/generate_labware.py) |
+| CLI | [`scripts/maintenance/generate_labware.py`](../../scripts/maintenance/generate_labware.py) |
 | Agent tools | [`src/agents/labware_tools.py`](../../src/agents/labware_tools.py) |
 | Specialized agent | [`src/agents/custom_labware_agent.py`](../../src/agents/custom_labware_agent.py) |
 | YAML configs (inputs) | `configs/labware/*.yaml` |
@@ -100,11 +100,11 @@ The general agent (`python -m src.agents.main`) has the same labware tools.
 ## Path B — manual CLI
 
 ```bash
-python scripts/generate_labware.py configs/labware/my_plate.yaml
+python scripts/maintenance/generate_labware.py configs/labware/my_plate.yaml
 ```
 
 ```bash
-python scripts/generate_labware.py --dry-run configs/labware/my_plate.yaml
+python scripts/maintenance/generate_labware.py --dry-run configs/labware/my_plate.yaml
 ```
 
 `--dry-run` builds and validates but writes nothing. `--overwrite` is required
@@ -212,8 +212,8 @@ and the regression baselines — do not overwrite them.
   Deploy it there with the helper (reads namespace/loadName/version from the JSON,
   creates the nested dir, copies to `<version>.json`, and verifies):
   ```bash
-  python -m scripts.deploy --labware labware/<load_name>.json            # lab laptop
-  python -m scripts.deploy --labware labware/<load_name>.json --dry-run  # preview path
+  python -m scripts.maintenance.deploy --labware labware/<load_name>.json            # lab laptop
+  python -m scripts.maintenance.deploy --labware labware/<load_name>.json --dry-run  # preview path
   ```
   See [ot2-robot-control](../ot2-robot-control/SKILL.md).
 - **Workflow validation:** register new labware in

@@ -6,7 +6,7 @@
 # Creator before this pipeline existed). Regenerating from this config
 # reproduces that file exactly — tests/test_labware_baseline.py asserts it.
 #
-#     python scripts/generate_labware.py configs/labware/paper_print_96_flat.yaml
+#     python scripts/maintenance/generate_labware.py configs/labware/paper_print_96_flat.yaml
 #
 # NOTE: generation refuses to overwrite labware/paper_print_96_flat.json.
 # It is the golden reference for the whole labware subsystem. To make a

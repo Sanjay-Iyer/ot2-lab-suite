@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Score a user-test SOP session of the AI dye demo against the SOP's expected final state.
 
-    python scripts/check_ai_dye_demo_sop.py --sop 3 --session runs/ai_dye_demo/20260911_101500
-    python scripts/check_ai_dye_demo_sop.py --sop 4 --config first_run.yaml --config second_run.yaml
+    python scripts/developer/check_ai_dye_demo_sop.py --sop 3 --session runs/ai_dye_demo/20260911_101500
+    python scripts/developer/check_ai_dye_demo_sop.py --sop 4 --config first_run.yaml --config second_run.yaml
 
 --session reads the executed configuration of every successful run in that session folder (session.json and
 executed_config_runN.yaml) and checks the last run(s) the SOP requires, in order. --config checks YAML files instead,
@@ -18,7 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

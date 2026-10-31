@@ -163,7 +163,7 @@ def _readme(session_dir: Path, metadata: dict[str, Any], manifest: dict[str, Any
     lines = [
         f"# SERS experiment record — {metadata.get('experiment_name') or 'session'}",
         "",
-        "Supporting Information export produced by `scripts/export_sers_run.py`.",
+        "Supporting Information export produced by `scripts/developer/export_sers_run.py`.",
         "It is a copy; the original session directory was not modified.",
         "",
         "## Identity",

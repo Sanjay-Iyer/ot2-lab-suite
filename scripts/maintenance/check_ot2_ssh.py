@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 if __name__ == "__main__" and not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from src.core.config import Config
 from src.lab.robot_connection import (

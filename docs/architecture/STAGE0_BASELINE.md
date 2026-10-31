@@ -100,7 +100,7 @@ cheaply or deterministically before simulation.
 The good news: the four-clover geometry engine is essentially pure. `_geometry_from_spec`,
 `_capacity_errors`, `_boundary_violations`, `_distance_report` and `_piston_load` take
 plain arguments; `_resolve_clovers(well_xy)` and `_paper_bounds(well_xy, well_names)` take
-a `well_xy` callable and read module-global `CONFIG`. `scripts/plot_four_clover_layout.py`
+a `well_xy` callable and read module-global `CONFIG`. `scripts/developer/plot_four_clover_layout.py`
 and `tests/test_four_clover_*.py` already exercise them headlessly by importing the
 protocol module by file path and assigning `module.CONFIG`. **That is the reuse hook.**
 

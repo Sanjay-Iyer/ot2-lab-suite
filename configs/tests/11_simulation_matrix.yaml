@@ -13,7 +13,7 @@
 #   tip_pickups       pick_up_tip count
 #   aspirates         aspirate count (includes air_gap on some API versions)
 #
-# Run:  python scripts/11_run_simulation_matrix.py
+# Run:  python scripts/developer/11_run_simulation_matrix.py
 # =============================================================================
 
 standard_print:

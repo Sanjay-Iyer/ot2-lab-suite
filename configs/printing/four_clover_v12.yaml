@@ -10,7 +10,7 @@
 # BUILD (dry run, generates + simulates):
 #   python scripts/build_vial_dilution_print.py --config configs/printing/four_clover_v12.yaml
 # PLOT the resolved layout before uploading anything:
-#   python scripts/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
+#   python scripts/developer/plot_four_clover_layout.py --config configs/printing/four_clover_v12.yaml
 protocol_version: 15            # builder ID -> src/protocols/printing/12_four_clover_paper_print.py
 protocol_label: v12
 destination_config: configs/printing/four_clover_locations.yaml

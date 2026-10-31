@@ -1,5 +1,5 @@
 # AI-GENERATED CONFIGURATION - not a hand-validated ground truth.
-# Produced by scripts/reproduce_ground_truth_from_language.py from a
+# Produced by scripts/developer/reproduce_ground_truth_from_language.py from a
 # natural-language request alone. Review it before any physical run.
 machine_profile: configs/machines/ot2_standard_printing_p20_v1.yaml
 experiment:
