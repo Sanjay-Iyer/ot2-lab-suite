@@ -7,7 +7,7 @@ from src.printing.dilution.loader import load_dilution_config
 
 
 REPO = Path(__file__).resolve().parents[1]
-CONFIG = REPO / "configs" / "experiments" / "18_dye_column11_5x_to_100x.yaml"
+CONFIG = REPO / "configs" / "experiments" / "specialized" / "18_dye_column11_5x_to_100x.yaml"
 
 
 def test_column11_dye_dilution_plan_is_exact_and_within_p20_range():

@@ -2,10 +2,10 @@
 """Build + locally simulate the print-from-plate workflow. No robot contact.
 
     python scripts/manual/build_print_from_plate.py
-    python scripts/manual/build_print_from_plate.py --config configs/experiments/01b_print_from_plate.yaml
+    python scripts/manual/build_print_from_plate.py --config configs/experiments/specialized/01b_print_from_plate.yaml
     python scripts/manual/build_print_from_plate.py --summary
 
-Reads configs/experiments/01b_print_from_plate.yaml (or --config), flattens it
+Reads configs/experiments/specialized/01b_print_from_plate.yaml (or --config), flattens it
 against its referenced machine profile, writes the upload-ready artifact to
 src/protocols/generated/01b_print_from_plate_latest.py, and simulates it
 locally via opentrons.simulate. Nothing here contacts, discovers, or moves a
@@ -22,7 +22,7 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-DEFAULT_CONFIG = "configs/experiments/01b_print_from_plate.yaml"
+DEFAULT_CONFIG = "configs/experiments/specialized/01b_print_from_plate.yaml"
 UPLOAD_PATH = REPO / "src" / "protocols" / "generated" / "01b_print_from_plate_latest.py"
 
 RULE = "=" * 78

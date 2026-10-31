@@ -36,7 +36,7 @@ from src.agents.optional.printing_agent import plan_printing_intent
 from src.agents.optional.printing_tools import draft_printing_experiment
 
 
-REFERENCE_CONFIG = Path("configs/experiments/nanoparticle_drop_series_triplicate_v1.yaml")
+REFERENCE_CONFIG = Path("configs/experiments/sers/nanoparticle_drop_series_triplicate_v1.yaml")
 STANDARD_TEMPLATE = Path("configs/templates/printing/standard_paper_printing.yaml")
 
 

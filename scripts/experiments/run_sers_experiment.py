@@ -5,11 +5,11 @@ This is the deterministic path: no LLM, no agent, no conversation. It accepts
 both config formats.
 
   sers-experiment-intent/v1   the experiment contract the agent also writes
-                              (configs/experiments/*.yaml) - resolved here
+                              (configs/experiments/sers/*.yaml) - resolved here
   sers-experiment/v1          a hand-written low-level execution config
                               (configs/sers_cv_titration_demo.yaml)
 
-    python scripts/experiments/run_sers_experiment.py --config configs/experiments/sers_exp1_np_cv.yaml
+    python scripts/experiments/run_sers_experiment.py --config configs/experiments/sers/sers_exp1_np_cv.yaml
     python scripts/experiments/run_sers_experiment.py --config <path> --plan       # review only
     python scripts/experiments/run_sers_experiment.py --config <path> --live --confirm-robot-ready
 
@@ -40,7 +40,7 @@ from src.sers_engine.schema import SERSConfigError, config_as_dict, load_experim
 from src.sers_engine.state import ExperimentSession  # noqa: E402
 from src.sers_engine.summary import render_review_plan  # noqa: E402
 
-DEFAULT_CONFIG = REPO_ROOT / "configs" / "experiments" / "sers_exp1_np_cv.yaml"
+DEFAULT_CONFIG = REPO_ROOT / "configs" / "experiments" / "sers" / "sers_exp1_np_cv.yaml"
 LOG = logging.getLogger("sers_engine")
 
 
@@ -159,7 +159,7 @@ def _run_legacy_config(args: argparse.Namespace, record) -> int:
         LOG.error(
             "--live is not supported for the legacy sers-experiment/v1 format; "
             "port the config to sers-experiment-intent/v1 (see "
-            "configs/experiments/sers_exp1_np_cv.yaml) so it goes through the "
+            "configs/experiments/sers/sers_exp1_np_cv.yaml) so it goes through the "
             "guarded execution gates"
         )
         return 1

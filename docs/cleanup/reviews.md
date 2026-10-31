@@ -149,3 +149,34 @@ Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Both
 independently checked all seven original/archive/new template bytes and unchanged
 version/API/default semantics. Corrected the scoped changelist to include the
 critical registry prefix and both handwritten indexes. No corrections remain.
+
+## C3b — experiment YAML grouping (PASS/PASS)
+
+Starting commit `900b3b3`. Moved 46 formerly flat experiment YAML files byte-for-byte
+into paper_printing (2), sers (2) and specialized (42). NanoDrop example directories,
+shared base, machine profiles, labware and template catalogs stay in place.
+External `C3b-experiment-configs` preserves 46 originals; all archive/current byte
+pairs passed. Recursive YAML scalar audit found no include fields referencing the
+moved files; no experiment-root glob discovery was found. Original method headers
+and immutable run/provenance records retain historical paths, with mapping here.
+
+Repaired manual defaults, optional workflow lookup, SERS default, layered scripts,
+file-based tests, exporter inputs and current command guide. Standard/clover
+canonical job/plan hashes are unchanged; SERS offline plan exits0. Evidence:
+`.test_tmp/C3b-before-plans.json`, `C3b-verification.json`, `C3b-map*.json`.
+
+Existing A11/manual workflow checks: **31 passed, 2 pre-existing failures**. The
+failures are the already documented1.1-versus0.5mm print-height expectation and
+clover frozen-engine comparison; relevant method/config bytes are unchanged.
+Do not change physical parameters or methods to make these tests green. These
+remain WORK-validation/method-history issues, not relocation regressions.
+
+Preserved descriptive metadata in the maintained clover protocol also mentions
+its original YAML location. It is not opened at runtime; it remains immutable
+method provenance alongside historical header comments.
+
+Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Both
+verified all 46 YAML byte pairs and durable relocation associations; canonical
+standard/clover fingerprints match. Corrected two relative paths in the current
+config index and included that file in the scoped commit. No required cleanup
+corrections remain; the two pre-existing method failures are retained explicitly.

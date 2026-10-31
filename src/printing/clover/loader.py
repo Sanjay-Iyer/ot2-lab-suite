@@ -97,7 +97,7 @@ def load_manual_executor_config(reference: str | Path) -> tuple[dict[str, Any], 
     """Load a hand-written flat executor config, the manual fallback format.
 
     Returns ``(config, run_modes)``. This is the shape of the validated ground
-    truth ``configs/experiments/02_printing_four_clover.yaml``: the machine values
+    truth ``configs/experiments/paper_printing/02_printing_four_clover.yaml``: the machine values
     are written out in full rather than referenced, because that file must stay
     runnable with no agent, no profile indirection, and no schema layer.
     """

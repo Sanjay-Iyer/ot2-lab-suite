@@ -41,8 +41,8 @@ from src.printing.clover.resolver import (  # noqa: E402
 )
 from src.printing.clover.review import render_clover_review  # noqa: E402
 
-STANDARD_GROUND_TRUTH = REPO / "configs" / "experiments" / "01_printing_standard.yaml"
-CLOVER_GROUND_TRUTH = REPO / "configs" / "experiments" / "02_printing_four_clover.yaml"
+STANDARD_GROUND_TRUTH = REPO / "configs" / "experiments" / "paper_printing" / "01_printing_standard.yaml"
+CLOVER_GROUND_TRUTH = REPO / "configs" / "experiments" / "paper_printing" / "02_printing_four_clover.yaml"
 
 TEMPLATE_DIR = REPO / "configs" / "templates" / "printing"
 STANDARD_TEMPLATE = TEMPLATE_DIR / "01_printing_standard.template.yaml"
@@ -504,7 +504,7 @@ def test_the_template_tool_is_an_allowlist_not_filesystem_access() -> None:
     assert "four-clover-experiment-job/v1" in text
     with pytest.raises(Exception):
         load_printing_experiment_template.invoke(
-            {"workflow_family": "../../configs/experiments/01_printing_standard.yaml"}
+            {"workflow_family": "../../configs/experiments/paper_printing/01_printing_standard.yaml"}
         )
 
 

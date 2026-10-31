@@ -7,7 +7,7 @@ from src.printing.dilution.loader import load_dilution_config
 
 
 REPO = Path(__file__).resolve().parents[1]
-CONFIG = REPO / "configs" / "experiments" / "20_consolidate_b11_c11_into_a11.yaml"
+CONFIG = REPO / "configs" / "experiments" / "specialized" / "20_consolidate_b11_c11_into_a11.yaml"
 
 # BRAND 781662: 6.94 mm circular flat-bottom well, 37.83 uL per mm of depth.
 UL_PER_MM = 37.83

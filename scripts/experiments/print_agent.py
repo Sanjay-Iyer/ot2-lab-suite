@@ -122,7 +122,7 @@ def _standard_yaml(spec: dict) -> dict:
 
 def _clover_yaml(spec: dict) -> dict:
     """Reuse the committed clover config, swapping only source + clover centers."""
-    base_path = REPO / "configs" / "experiments" / "02_printing_four_clover.yaml"
+    base_path = REPO / "configs" / "experiments" / "paper_printing" / "02_printing_four_clover.yaml"
     config = yaml.safe_load(base_path.read_text(encoding="utf-8"))
     source_type = spec.get("source_type", "vial_rack")
     wells = [str(w).upper() for w in (spec.get("source_wells") or ["A1"])]

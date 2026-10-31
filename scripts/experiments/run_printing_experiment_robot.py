@@ -94,99 +94,99 @@ REPO = Path(__file__).resolve().parent.parent.parent
 
 #: workflow name -> (family, default config). All rebuild fresh from the YAML.
 WORKFLOWS = {
-    "print-from-vial": ("standard", "configs/experiments/01_print_from_vial.yaml"),
+    "print-from-vial": ("standard", "configs/experiments/specialized/01_print_from_vial.yaml"),
     "print-from-corning-plate": (
-        "standard", "configs/experiments/01_print_from_corning_plate.yaml"),
+        "standard", "configs/experiments/specialized/01_print_from_corning_plate.yaml"),
     "print-from-brand-plate": (
-        "standard", "configs/experiments/01_print_from_brand_plate.yaml"),
-    "clover": ("clover", "configs/experiments/02_printing_four_clover.yaml"),
+        "standard", "configs/experiments/specialized/01_print_from_brand_plate.yaml"),
+    "clover": ("clover", "configs/experiments/paper_printing/02_printing_four_clover.yaml"),
     "clover-from-corning-plate": (
-        "clover", "configs/experiments/02_clover_from_corning_plate.yaml"),
+        "clover", "configs/experiments/specialized/02_clover_from_corning_plate.yaml"),
     "clover-from-brand-plate": (
-        "clover", "configs/experiments/02_clover_from_brand_plate.yaml"),
-    "dye-demo": ("dye-demo", "configs/experiments/03_dye_dilution_print_demo.yaml"),
-    "single-spot": ("standard", "configs/experiments/04_single_spot_stack.yaml"),
+        "clover", "configs/experiments/specialized/02_clover_from_brand_plate.yaml"),
+    "dye-demo": ("dye-demo", "configs/experiments/specialized/03_dye_dilution_print_demo.yaml"),
+    "single-spot": ("standard", "configs/experiments/specialized/04_single_spot_stack.yaml"),
     "quick-print": (
-        "standard", "configs/experiments/05_quick_print_brand_to_paper11.yaml"),
+        "standard", "configs/experiments/specialized/05_quick_print_brand_to_paper11.yaml"),
     "three-clovers": (
-        "clover", "configs/experiments/06_three_clovers_brand_to_paper11.yaml"),
+        "clover", "configs/experiments/specialized/06_three_clovers_brand_to_paper11.yaml"),
     "topup-b11": (
-        "dilution", "configs/experiments/07_topup_b11_5x_100ul.yaml"),
+        "dilution", "configs/experiments/specialized/07_topup_b11_5x_100ul.yaml"),
     "column8-timecourse": (
-        "standard", "configs/experiments/08_column8_timecourse.yaml"),
+        "standard", "configs/experiments/specialized/08_column8_timecourse.yaml"),
     "column9-timecourse": (
-        "standard", "configs/experiments/10_column9_timecourse.yaml"),
+        "standard", "configs/experiments/specialized/10_column9_timecourse.yaml"),
     "combined-timecourses": (
-        "standard", "configs/experiments/11_combined_timecourses.yaml"),
+        "standard", "configs/experiments/specialized/11_combined_timecourses.yaml"),
     "combined_layer2start": (
-        "standard", "configs/experiments/12_combined_layer2start.yaml"),
+        "standard", "configs/experiments/specialized/12_combined_layer2start.yaml"),
     "nanoparticle-column1": (
-        "standard", "configs/experiments/13_nanoparticle_column1_a10.yaml"),
+        "standard", "configs/experiments/specialized/13_nanoparticle_column1_a10.yaml"),
     "dye-column1-top3": (
-        "standard", "configs/experiments/14_dye_b11_column1_rows_a_c.yaml"),
+        "standard", "configs/experiments/specialized/14_dye_b11_column1_rows_a_c.yaml"),
     "b10-column2-top3": (
-        "standard", "configs/experiments/15_b10_column2_rows_a_c.yaml"),
+        "standard", "configs/experiments/specialized/15_b10_column2_rows_a_c.yaml"),
     "nanoparticle-column1-layer2": (
         "standard",
-        "configs/experiments/16_nanoparticle_column1_layer2_resume.yaml"),
+        "configs/experiments/specialized/16_nanoparticle_column1_layer2_resume.yaml"),
     "cv-dye-layered-spots": (
-        "standard", "configs/experiments/17_cv_dye_c11_layered_spots.yaml"),
+        "standard", "configs/experiments/specialized/17_cv_dye_c11_layered_spots.yaml"),
     "a10-paper-column3": (
-        "standard", "configs/experiments/20_a10_to_paper_column3.yaml"),
+        "standard", "configs/experiments/specialized/20_a10_to_paper_column3.yaml"),
     "column11-paper-columns3-4": (
         "standard",
-        "configs/experiments/21_column11_dilutions_to_paper_columns3_4.yaml"),
+        "configs/experiments/specialized/21_column11_dilutions_to_paper_columns3_4.yaml"),
     "a10-paper5-column3": (
-        "standard", "configs/experiments/22_a10_to_paper5_column3.yaml"),
+        "standard", "configs/experiments/specialized/22_a10_to_paper5_column3.yaml"),
     "column11-paper5-columns3-4": (
         "standard",
-        "configs/experiments/23_column11_dilutions_to_paper5_columns3_4.yaml"),
+        "configs/experiments/specialized/23_column11_dilutions_to_paper5_columns3_4.yaml"),
     "column11-paper5-column4": (
         "standard",
-        "configs/experiments/24_column11_dilutions_to_paper5_column4.yaml"),
+        "configs/experiments/specialized/24_column11_dilutions_to_paper5_column4.yaml"),
     "column11-paper5-column3": (
         "standard",
-        "configs/experiments/25_column11_dilutions_to_paper5_column3.yaml"),
+        "configs/experiments/specialized/25_column11_dilutions_to_paper5_column3.yaml"),
     "np-a9-b9-paper5-11": (
         "standard",
-        "configs/experiments/26_np_a9_b9_to_paper5_11_columns1_2.yaml"),
+        "configs/experiments/specialized/26_np_a9_b9_to_paper5_11_columns1_2.yaml"),
     "dye-column11-over-np-paper5-11": (
         "standard",
-        "configs/experiments/27_dye_column11_over_np_paper5_11_columns1_2.yaml"),
+        "configs/experiments/specialized/27_dye_column11_over_np_paper5_11_columns1_2.yaml"),
     "dye-e11-redo-paper5-e1": (
         "standard",
-        "configs/experiments/28_dye_e11_redo_paper5_e1.yaml"),
+        "configs/experiments/specialized/28_dye_e11_redo_paper5_e1.yaml"),
     "a9-a11-paper5-columns5-6-7": (
         "standard",
-        "configs/experiments/29_a9_a11_paper5_columns5_6_7.yaml"),
+        "configs/experiments/specialized/29_a9_a11_paper5_columns5_6_7.yaml"),
     "a11-paper5-column12-height-sweep": (
         "standard",
-        "configs/experiments/30_a11_paper5_column12_height_sweep.yaml"),
+        "configs/experiments/specialized/30_a11_paper5_column12_height_sweep.yaml"),
     "a9-paper5-column7-repeats": (
         "standard",
-        "configs/experiments/31_a9_paper5_column7_repeats.yaml"),
+        "configs/experiments/specialized/31_a9_paper5_column7_repeats.yaml"),
     "a11-paper5-column11-height-sweep": (
         "standard",
-        "configs/experiments/32_a11_paper5_column11_height_sweep.yaml"),
+        "configs/experiments/specialized/32_a11_paper5_column11_height_sweep.yaml"),
     "a11-paper5-column10-height-sweep": (
         "standard",
-        "configs/experiments/33_a11_paper5_column10_height_sweep.yaml"),
+        "configs/experiments/specialized/33_a11_paper5_column10_height_sweep.yaml"),
     "a11-paper5-column9-dwell-sweep": (
         "standard",
-        "configs/experiments/34_a11_paper5_column9_dwell_sweep.yaml"),
+        "configs/experiments/specialized/34_a11_paper5_column9_dwell_sweep.yaml"),
     "a11-paper5-column8-repeatability": (
         "standard",
-        "configs/experiments/35_a11_paper5_column8_repeatability.yaml"),
+        "configs/experiments/specialized/35_a11_paper5_column8_repeatability.yaml"),
     "add-dye": (
-        "dilution", "configs/experiments/09_add_dye_to_a11.yaml"),
+        "dilution", "configs/experiments/specialized/09_add_dye_to_a11.yaml"),
     "prepare-c11-d11": (
-        "dilution", "configs/experiments/12_prepare_c11_d11_5x.yaml"),
+        "dilution", "configs/experiments/specialized/12_prepare_c11_d11_5x.yaml"),
     "dye-column11-dilutions": (
-        "dilution", "configs/experiments/18_dye_column11_5x_to_100x.yaml"),
+        "dilution", "configs/experiments/specialized/18_dye_column11_5x_to_100x.yaml"),
     "a11-column11-dilutions": (
-        "dilution", "configs/experiments/19_a11_dilutions_into_column11.yaml"),
+        "dilution", "configs/experiments/specialized/19_a11_dilutions_into_column11.yaml"),
     "consolidate-b11-c11": (
-        "dilution", "configs/experiments/20_consolidate_b11_c11_into_a11.yaml"),
+        "dilution", "configs/experiments/specialized/20_consolidate_b11_c11_into_a11.yaml"),
     # --- the three general, agent-facing workflows ---------------------------
     "dilution": ("dilution", "configs/generated/current_dilution.yaml"),
     "standard-print": ("standard", "configs/generated/current_standard_print.yaml"),

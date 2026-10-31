@@ -4,7 +4,7 @@ This is the central claim of the paper architecture at this stage:
 
     01_printing_standard_ground_truth.py      (independently written Python)
                     ==
-    configs/experiments/01_printing_standard.yaml
+    configs/experiments/paper_printing/01_printing_standard.yaml
         -> PrintExperimentJobV1 -> ResolvedExperimentPlanV1
         -> src/protocols/printing/01_printing_standard.py
 
@@ -27,7 +27,7 @@ from src.printing.standard.review import render_plan_review, render_substrate_ma
 
 
 REPO = Path(__file__).resolve().parents[1]
-CONFIG = "configs/experiments/01_printing_standard.yaml"
+CONFIG = "configs/experiments/paper_printing/01_printing_standard.yaml"
 STATIC_TRACE = REPO / "experiment_01" / "ground_truth" / "static_canonical_trace.json"
 PAPER = REPO / "labware" / "paper_print_96_flat.json"
 ROWS = "ABCDEFGH"

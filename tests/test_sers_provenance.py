@@ -555,7 +555,7 @@ def test_the_manual_runner_records_a_full_session_without_any_agent(tmp_path, mo
 
     import scripts.experiments.run_sers_experiment as runner
 
-    config = Path("configs/experiments/sers_exp1_np_cv.yaml")
+    config = Path("configs/experiments/sers/sers_exp1_np_cv.yaml")
     assert config.is_file(), "the reference intent config is missing"
     code = runner.main(["--config", str(config)])
     assert code == 0

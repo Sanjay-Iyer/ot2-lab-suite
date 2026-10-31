@@ -2,9 +2,9 @@
 
 These tests guard the path an operator uses at the instrument laptop:
 
-    configs/experiments/01_printing_standard.yaml
+    configs/experiments/paper_printing/01_printing_standard.yaml
         -> src/protocols/printing/01_printing_standard.py
-    configs/experiments/02_printing_four_clover.yaml
+    configs/experiments/paper_printing/02_printing_four_clover.yaml
         -> src/protocols/printing/02_printing_four_clover.py
 
 Nothing here imports an agent, a skill, or an approval workflow, and nothing here
@@ -30,9 +30,9 @@ from src.printing.standard.loader import load_experiment_job  # noqa: E402
 from src.printing.standard.resolver import resolve_experiment_job  # noqa: E402
 
 
-STANDARD_CONFIG = "configs/experiments/01_printing_standard.yaml"
+STANDARD_CONFIG = "configs/experiments/paper_printing/01_printing_standard.yaml"
 STANDARD_EXECUTOR = REPO / "src" / "protocols" / "printing" / "01_printing_standard.py"
-CLOVER_CONFIG = REPO / "configs" / "experiments" / "02_printing_four_clover.yaml"
+CLOVER_CONFIG = REPO / "configs" / "experiments" / "paper_printing" / "02_printing_four_clover.yaml"
 CLOVER_EXECUTOR = REPO / "src" / "protocols" / "printing" / "02_printing_four_clover.py"
 VALIDATED_CLOVER = REPO / "src" / "protocols" / "printing" / "12_four_clover_paper_print.py"
 PAPER_LABWARE = REPO / "labware" / "paper_print_96_flat.json"

@@ -6,7 +6,7 @@ from src.printing.print_from_vial.loader import load_print_from_vial_config
 
 
 REPO = Path(__file__).resolve().parents[1]
-CONFIG = REPO / "configs" / "experiments" / "28_dye_e11_redo_paper5_e1.yaml"
+CONFIG = REPO / "configs" / "experiments" / "specialized" / "28_dye_e11_redo_paper5_e1.yaml"
 
 
 def test_redo_prints_exactly_one_droplet_from_e11_into_e1_on_slot_5():
@@ -50,5 +50,5 @@ def test_named_robot_runner_registers_the_redo_script():
 
     assert runner.WORKFLOWS["dye-e11-redo-paper5-e1"] == (
         "standard",
-        "configs/experiments/28_dye_e11_redo_paper5_e1.yaml",
+        "configs/experiments/specialized/28_dye_e11_redo_paper5_e1.yaml",
     )

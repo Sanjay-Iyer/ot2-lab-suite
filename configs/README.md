@@ -8,8 +8,8 @@
 | `workflows/defaults/ai_agent_dilution_print_demo.yaml` | Existing terminal and NiceGUI `--config`; shared NanoDrop base |
 | `checks/ot2.yaml` → `robot.yaml` | `scripts/check_ot2.py --config ...`; existing connection helpers use `robot.yaml` |
 | `checks/single_dilution.yaml` | `scripts/manual/test_single_dilution_c12.py --config ...` |
-| `experiments/01_printing_standard.yaml` | `scripts/manual/run_printing_workflow.py standard --config ...` |
-| `experiments/02_printing_four_clover.yaml` | `scripts/manual/run_printing_workflow.py four-clover --config ...` |
+| `experiments/paper_printing/01_printing_standard.yaml` | `scripts/manual/run_printing_workflow.py standard --config ...` |
+| `experiments/paper_printing/02_printing_four_clover.yaml` | `scripts/manual/run_printing_workflow.py four-clover --config ...` |
 | `machines/`, `labware/`, `constraints/`, root `labware/*.json` | Existing shared laboratory profiles, geometry and physical bounds |
 | Other `experiments/`, `workflows/defaults/` | Existing specialized builders/runners; preserved at their current paths |
 

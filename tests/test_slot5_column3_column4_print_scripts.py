@@ -6,12 +6,12 @@ from src.printing.print_from_vial.loader import load_print_from_vial_config
 
 
 REPO = Path(__file__).resolve().parents[1]
-A10_CONFIG = REPO / "configs" / "experiments" / "22_a10_to_paper5_column3.yaml"
+A10_CONFIG = REPO / "configs" / "experiments" / "specialized" / "22_a10_to_paper5_column3.yaml"
 DILUTIONS_CONFIG = (
     REPO
     / "configs"
     / "experiments"
-    / "23_column11_dilutions_to_paper5_columns3_4.yaml"
+    / "specialized" / "23_column11_dilutions_to_paper5_columns3_4.yaml"
 )
 ROWS = "ABCDEFGH"
 
@@ -70,9 +70,9 @@ def test_named_robot_runner_registers_both_slot5_scripts():
 
     assert runner.WORKFLOWS["a10-paper5-column3"] == (
         "standard",
-        "configs/experiments/22_a10_to_paper5_column3.yaml",
+        "configs/experiments/specialized/22_a10_to_paper5_column3.yaml",
     )
     assert runner.WORKFLOWS["column11-paper5-columns3-4"] == (
         "standard",
-        "configs/experiments/23_column11_dilutions_to_paper5_columns3_4.yaml",
+        "configs/experiments/specialized/23_column11_dilutions_to_paper5_columns3_4.yaml",
     )

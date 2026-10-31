@@ -409,7 +409,7 @@ def test_machine_profile_must_come_from_the_registered_directory():
         load_experiment_job_mapping(
             {
                 "schema_version": "print-experiment-job/v1",
-                "machine_profile": "configs/experiments/01_printing_standard.yaml",
+                "machine_profile": "configs/experiments/paper_printing/01_printing_standard.yaml",
                 "experiment": {
                     "metadata": {"experiment_id": "x", "title": "x"},
                     "liquids": [],

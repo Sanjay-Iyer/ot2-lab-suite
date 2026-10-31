@@ -72,8 +72,8 @@ Existing standard/four-clover engines retain their schemas and scripts (both
 summary commands checked):
 
 ```powershell
-python scripts/manual/run_printing_workflow.py standard --config configs/experiments/01_printing_standard.yaml --summary
-python scripts/manual/run_printing_workflow.py four-clover --config configs/experiments/02_printing_four_clover.yaml --summary
+python scripts/manual/run_printing_workflow.py standard --config configs/experiments/paper_printing/01_printing_standard.yaml --summary
+python scripts/manual/run_printing_workflow.py four-clover --config configs/experiments/paper_printing/02_printing_four_clover.yaml --summary
 ```
 
 Omitting `--summary` builds and simulates with those existing engines, including

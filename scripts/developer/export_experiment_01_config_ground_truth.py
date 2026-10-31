@@ -25,7 +25,7 @@ from src.printing.standard.resolver import resolve_experiment_job  # noqa: E402
 from src.printing.standard.review import render_plan_review  # noqa: E402
 
 
-CONFIG_REFERENCE = "configs/experiments/01_printing_standard.yaml"
+CONFIG_REFERENCE = "configs/experiments/paper_printing/01_printing_standard.yaml"
 GROUND_TRUTH = REPO / "experiment_01" / "ground_truth"
 COMPARISON = REPO / "experiment_01" / "comparison"
 STATIC_TRACE = GROUND_TRUTH / "static_canonical_trace.json"

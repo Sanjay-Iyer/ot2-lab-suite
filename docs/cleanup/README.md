@@ -25,7 +25,7 @@ Earlier verified preservation snapshots remain independently available under
 | C0 baseline and inventory | PASS/PASS; external snapshot verified |
 | C1 scripts | PASS/PASS; 48 → 6 top-level scripts; 42 grouped, callers repaired |
 | C2 agent families | PASS/PASS; 13 optional modules grouped, 2 historical harnesses archived |
-| C3 protocols/configs | Pending |
+| C3 protocols/configs | PASS/PASS; 7 legacy templates and 46 YAMLs grouped byte-identically |
 | C4 generated artifacts/caches | Pending |
 | C5 documentation | Pending |
 | C6 old worktrees | Pending |

@@ -12,11 +12,11 @@ CONFIGS = {
     4: REPO
     / "configs"
     / "experiments"
-    / "24_column11_dilutions_to_paper5_column4.yaml",
+    / "specialized" / "24_column11_dilutions_to_paper5_column4.yaml",
     3: REPO
     / "configs"
     / "experiments"
-    / "25_column11_dilutions_to_paper5_column3.yaml",
+    / "specialized" / "25_column11_dilutions_to_paper5_column3.yaml",
 }
 ROWS = "ABCDEFGH"
 
@@ -60,9 +60,9 @@ def test_named_robot_runner_registers_both_split_scripts():
 
     assert runner.WORKFLOWS["column11-paper5-column4"] == (
         "standard",
-        "configs/experiments/24_column11_dilutions_to_paper5_column4.yaml",
+        "configs/experiments/specialized/24_column11_dilutions_to_paper5_column4.yaml",
     )
     assert runner.WORKFLOWS["column11-paper5-column3"] == (
         "standard",
-        "configs/experiments/25_column11_dilutions_to_paper5_column3.yaml",
+        "configs/experiments/specialized/25_column11_dilutions_to_paper5_column3.yaml",
     )

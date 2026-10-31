@@ -33,8 +33,8 @@ RULE = "=" * 78
 
 GENERATED_DIR = REPO / "configs" / "generated"
 
-STANDARD_GROUND_TRUTH = "configs/experiments/01_printing_standard.yaml"
-CLOVER_GROUND_TRUTH = "configs/experiments/02_printing_four_clover.yaml"
+STANDARD_GROUND_TRUTH = "configs/experiments/paper_printing/01_printing_standard.yaml"
+CLOVER_GROUND_TRUTH = "configs/experiments/paper_printing/02_printing_four_clover.yaml"
 
 STANDARD_GENERATED = GENERATED_DIR / "01_printing_standard.generated.yaml"
 CLOVER_GENERATED = GENERATED_DIR / "02_printing_four_clover.generated.yaml"

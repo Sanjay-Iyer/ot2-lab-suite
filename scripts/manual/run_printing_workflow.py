@@ -11,12 +11,12 @@ it locally. Nothing here contacts, discovers, or moves a robot, and nothing here
 uses an agent, an LLM, a runtime skill, or an approval workflow.
 
     WORKFLOW 1 - standard 96-position SERS printing
-      config    configs/experiments/01_printing_standard.yaml
+      config    configs/experiments/paper_printing/01_printing_standard.yaml
       executor  src/protocols/printing/01_printing_standard.py
       upload    src/protocols/generated/01_printing_standard_latest.py
 
     WORKFLOW 2 - four-clover printing
-      config    configs/experiments/02_printing_four_clover.yaml
+      config    configs/experiments/paper_printing/02_printing_four_clover.yaml
       executor  src/protocols/printing/02_printing_four_clover.py
       upload    src/protocols/generated/02_printing_four_clover_latest.py
 
@@ -40,13 +40,13 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-STANDARD_CONFIG = "configs/experiments/01_printing_standard.yaml"
+STANDARD_CONFIG = "configs/experiments/paper_printing/01_printing_standard.yaml"
 STANDARD_EXECUTOR = REPO / "src" / "protocols" / "printing" / "01_printing_standard.py"
 STANDARD_UPLOAD = (
     REPO / "src" / "protocols" / "generated" / "01_printing_standard_latest.py"
 )
 
-CLOVER_CONFIG = "configs/experiments/02_printing_four_clover.yaml"
+CLOVER_CONFIG = "configs/experiments/paper_printing/02_printing_four_clover.yaml"
 CLOVER_EXECUTOR = REPO / "src" / "protocols" / "printing" / "02_printing_four_clover.py"
 CLOVER_UPLOAD = (
     REPO / "src" / "protocols" / "generated" / "02_printing_four_clover_latest.py"

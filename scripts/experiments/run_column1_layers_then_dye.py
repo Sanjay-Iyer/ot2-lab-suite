@@ -7,12 +7,12 @@ Run the column-1 build-up and its CV dye finish as ONE command.
 Two protocols, played back to back on the robot, with nothing for you to do in
 between:
 
-  1. configs/experiments/16_nanoparticle_column1_layer2_resume.yaml
+  1. configs/experiments/specialized/16_nanoparticle_column1_layer2_resume.yaml
      Nanoparticles from BRAND A10 onto E1 (+3 drops) and F1 (+9 drops), both
      paper sheets. Layers 2-10, 1.5 hours of drying between layers.
      24 deposits, 120 uL. Roughly 12 hours.
 
-  2. configs/experiments/17_cv_dye_c11_layered_spots.yaml
+  2. configs/experiments/specialized/17_cv_dye_c11_layered_spots.yaml
      A two-hour no-motion hold -- which begins the moment the last nanoparticle
      drop lands -- then CV dye from BRAND C11 onto E1 and F1, both sheets.
      4 deposits, 20 uL.
@@ -81,11 +81,11 @@ REPO = Path(__file__).resolve().parent.parent.parent
 STEPS = [
     (
         "nanoparticle layers 2-10",
-        "configs/experiments/16_nanoparticle_column1_layer2_resume.yaml",
+        "configs/experiments/specialized/16_nanoparticle_column1_layer2_resume.yaml",
     ),
     (
         "CV dye after a 2 hour hold",
-        "configs/experiments/17_cv_dye_c11_layered_spots.yaml",
+        "configs/experiments/specialized/17_cv_dye_c11_layered_spots.yaml",
     ),
 ]
 
