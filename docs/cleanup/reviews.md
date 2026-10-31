@@ -129,3 +129,23 @@ verified all 15 archive pairs and the 355-module old-reference scan; prior-dirty
 test changes were compared with C0. Lab independently checked 415 method/resource
 pairs and all moved source diffs. Corrected the model-catalog root comment;
 no method or runtime behavior changes. No required corrections remain.
+
+## C3a — legacy protocol classification (PASS/PASS)
+
+Starting commit `59a0ea3`. Moved seven templates for IDs1,2,3,4,6,7,8 byte-identically
+to `src/protocols/printing/legacy/`; external originals in `C3a-legacy-protocols`.
+Registry IDs, stems, default configs, capabilities and pinned-v3 handling remain.
+Updated `_legacy` registry prefix, builder default, validator fallback paths,
+literal file tests and current documentation references. Original method/header
+bytes are preserved, including historical comments; YAML contains no active
+references to former template paths (only two historical comments).
+
+Existing focused checks: registry/default/compatibility tests **3 passed**, seven
+unselected; existing API2.15-v3 + NanoDrop fake-protocol regressions **31 passed**.
+Mapping/change files `.test_tmp/C3a-map*.json`. No liquid-handling algorithm,
+physical parameter, experiment record or generated protocol content changed.
+
+Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Both
+independently checked all seven original/archive/new template bytes and unchanged
+version/API/default semantics. Corrected the scoped changelist to include the
+critical registry prefix and both handwritten indexes. No corrections remain.

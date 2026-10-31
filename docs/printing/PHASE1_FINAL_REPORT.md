@@ -30,7 +30,7 @@ build-time validation, examples, tests, simulation, focused organization, and LL
 - `archive/ARCHIVE_MANIFEST.md`
 
 ## 2. Files modified
-- `src/protocols/printing/01_vial_dilution_paper_print.py` — multi-pipette load; per-pipette tip racks;
+- `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` — multi-pipette load; per-pipette tip racks;
   group-based print dispatch (`column_8up`→P300, `single_spot`→P20); mixing decoupled;
   tip reuse/return per pipette; preflight made schema-tolerant; dead print-branch code
   removed; imaging consolidated to one before + one after.
@@ -51,7 +51,7 @@ filename==loadName rule preserved). Physical relocation of `src/`/`protocols/` i
 
 ## 4. Production protocol & behaviors
 
-**Primary protocol:** `src/protocols/printing/01_vial_dilution_paper_print.py` (robot entry point; runs from
+**Primary protocol:** `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` (robot entry point; runs from
 embedded CONFIG). Built from YAML by `scripts/manual/build_vial_dilution_print.py`.
 
 **Pipette selection:** at build time, `select_pipette` picks the smallest-capacity mounted

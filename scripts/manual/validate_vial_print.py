@@ -15,7 +15,7 @@ expected operations, turning the run-mode matrix into a real pass/fail gate.
 TARGET FILE PRIORITY
 --------------------
   1. src/protocols/generated/vial_dilution_print_latest.py  (deployed artifact)
-  2. src/protocols/printing/01_vial_dilution_paper_print.py (base template, fallback)
+  2. src/protocols/printing/legacy/01_vial_dilution_paper_print.py (base template, fallback)
 
 Always validate the generated file when it exists — that is what actually runs on
 the robot. Fall back to the base template if no generated file is present yet.
@@ -68,11 +68,11 @@ _GENERATED_DIR = REPO / "src" / "protocols" / "generated"
 _PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
 _VERSION_FILES: dict[int, tuple[Path, Path]] = {
     1: (_GENERATED_DIR / "vial_dilution_print_latest.py",
-        _PRINTING_DIR / "01_vial_dilution_paper_print.py"),
+        _PRINTING_DIR / "legacy" / "01_vial_dilution_paper_print.py"),
     2: (_GENERATED_DIR / "vial_dilution_print_v2_latest.py",
-        _PRINTING_DIR / "02_vial_dilution_paper_print_p20_dilution.py"),
+        _PRINTING_DIR / "legacy" / "02_vial_dilution_paper_print_p20_dilution.py"),
     3: (_GENERATED_DIR / "vial_dilution_print_v3_latest.py",
-        _PRINTING_DIR / "03_vial_dilution_paper_print_v3.py"),
+        _PRINTING_DIR / "legacy" / "03_vial_dilution_paper_print_v3.py"),
 }
 
 V3_SIMULATOR_VERSION = "7.0.2"

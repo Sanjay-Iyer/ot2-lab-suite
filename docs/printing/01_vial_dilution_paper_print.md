@@ -18,7 +18,7 @@ one before image + one after image
 ## Files (all share the `01_` number)
 | Kind | Path |
 |---|---|
-| Protocol (entry point) | `src/protocols/printing/01_vial_dilution_paper_print.py` |
+| Protocol (entry point) | `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` |
 | Configs | `configs/printing/01_vial_dilution_paper_print.{p20_only,p300_only,mixed}.yaml` |
 | Legacy config (auto-migrated) | `configs/workflows/defaults/vial_dilution_print.yaml` |
 | Builder | `scripts/manual/build_vial_dilution_print.py` |

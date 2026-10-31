@@ -68,7 +68,7 @@ def _legacy(
     return PrintingWorkflowSpec(
         name=name,
         builder_version=version,
-        base_protocol=_PRINT / protocol,
+        base_protocol=_PRINT / "legacy" / protocol,
         generated_stem=stem,
         default_config=(_WORKFLOW_DEFAULTS / config) if config else None,
         lifecycle=Lifecycle.DEPRECATED,

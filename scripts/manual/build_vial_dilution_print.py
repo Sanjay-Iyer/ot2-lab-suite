@@ -3,7 +3,7 @@
 scripts/manual/build_vial_dilution_print.py
 ====================================
 Turn configs/workflows/defaults/vial_dilution_print.yaml into a robot-ready copy of
-src/protocols/printing/01_vial_dilution_paper_print.py with the YAML embedded as the CONFIG dict, then
+src/protocols/printing/legacy/01_vial_dilution_paper_print.py with the YAML embedded as the CONFIG dict, then
 simulate it. This is how the YAML reaches the OT-2 (the robot can't read the repo).
 
   conda activate ai
@@ -39,7 +39,7 @@ from src.lab.robot_connection import max_api_level
 from src.printing.workflows.registry import builder_protocol_versions, embed_raw_versions
 
 PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
-BASE_PROTOCOL = PRINTING_DIR / "01_vial_dilution_paper_print.py"
+BASE_PROTOCOL = PRINTING_DIR / "legacy" / "01_vial_dilution_paper_print.py"
 
 # Historical integer IDs remain builder-compatible, while the registry supplies
 # agent-visible family/design metadata and hides legacy entries from discovery.

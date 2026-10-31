@@ -6,7 +6,7 @@ them is uncertain or would break a reference. Each needs a human decision before
 
 | File | Why it looks archivable | Why it was NOT archived | Suggested action |
 |---|---|---|---|
-| `_legacy_run_single_tip_print()` in `src/protocols/printing/01_vial_dilution_paper_print.py` | Dead code: never called; references undefined names if it ever were. | It lives *inside* the active flagship file; removing it is a code edit, not a file move. | Delete the function in a focused cleanup PR (low risk, improves readability). |
+| `_legacy_run_single_tip_print()` in `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` | Dead code: never called; references undefined names if it ever were. | It lives *inside* the active flagship file; removing it is a code edit, not a file move. | Delete the function in a focused cleanup PR (low risk, improves readability). |
 | `src/protocols/printing.py`, `src/protocols/dilution.py` | Older registry generators (`generate_printing_protocol` / `generate_dilution_protocol`), apiLevel 2.13/2.15. | Still wired into `src/core/workflows/registry.py` and covered by `tests/test_workflows/` (currently skipped). | Confirm the registry path is unused, then archive with its tests. |
 | `src/protocols/printing_demo_protocol.py` + `configs/workflows/defaults/printing_{demo,12,96}.yaml` | Family B (demo generator) — parallel to the flagship. | Actively tested (`tests/test_printing_demo_*`) and documented. Not part of THIS workflow but not dead. | Decide whether Family B is retired; if so, migrate onto the unified schema (Phase 2) before archiving. |
 | `src/protocols/mock_test_protocol.py`, `simulate_protocol.py` | Generic/legacy helpers. | Referenced by SOPs and the AI-agent overview. | Keep until the SOPs are rewritten. |

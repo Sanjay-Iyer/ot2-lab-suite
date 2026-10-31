@@ -4,7 +4,7 @@ Authoritative version: [docs/printing/REPOSITORY_MAP.md](../../docs/printing/REP
 Quick reference for an LLM working inside `skills/`:
 
 ## Entry points & services
-- **Protocol:** `src/protocols/printing/01_vial_dilution_paper_print.py` (embedded CONFIG; robot entry point)
+- **Protocol:** `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` (embedded CONFIG; robot entry point)
 - **Build:** `scripts/manual/build_vial_dilution_print.py` (YAML → validate → embed → simulate)
 - **Selection:** `src/core/pipette_selection.py` (volume → pipette)
 - **Groups:** `src/core/print_groups.py` (schema + layout/destination validation + migration)
@@ -27,7 +27,7 @@ using the `ai` conda env.
 ## File classification
 | Kind | Examples | Edit? |
 |---|---|---|
-| Entry point | `src/protocols/printing/01_vial_dilution_paper_print.py` (logic, not CONFIG) | Yes (logic) |
+| Entry point | `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` (logic, not CONFIG) | Yes (logic) |
 | Library module | `src/core/*.py` | Yes (carefully) |
 | Config | `configs/printing/*.yaml`, `configs/constraints/*.yaml` | Yes |
 | Generated | `src/protocols/generated/*` | No |

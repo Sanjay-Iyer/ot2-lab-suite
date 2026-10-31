@@ -9,7 +9,7 @@ left-mounted `p20_single_gen2` (single-spot), with one image before and one afte
 
 | Role | Path | Notes |
 |---|---|---|
-| **Protocol entry point** | [src/protocols/printing/01_vial_dilution_paper_print.py](../../src/protocols/printing/01_vial_dilution_paper_print.py) | The flagship. Reads its embedded `CONFIG`; executes dilution + group-based printing. Edit the YAML, not the generated copy. |
+| **Protocol entry point** | [src/protocols/printing/legacy/01_vial_dilution_paper_print.py](../../src/protocols/printing/legacy/01_vial_dilution_paper_print.py) | The flagship. Reads its embedded `CONFIG`; executes dilution + group-based printing. Edit the YAML, not the generated copy. |
 | **Build script** | [scripts/manual/build_vial_dilution_print.py](../../scripts/manual/build_vial_dilution_print.py) | YAML → validate (shared validators) → embed CONFIG → generate → simulate. |
 | **Generated (do not edit)** | `src/protocols/generated/vial_dilution_print_latest.py` | Build output; regenerated each build. |
 | **Pipette selection service** | [src/core/pipette_selection.py](../../src/core/pipette_selection.py) | ONE authoritative volume→pipette resolver (auto + explicit). |

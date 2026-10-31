@@ -11,7 +11,7 @@ treat the files below as tools.
 ## 1. Repository structure & entry points
 Full map: [REPOSITORY_MAP.md](REPOSITORY_MAP.md) (mirrors `docs/printing/REPOSITORY_MAP.md`).
 
-- **Primary protocol (entry point):** `src/protocols/printing/01_vial_dilution_paper_print.py`. It runs on
+- **Primary protocol (entry point):** `src/protocols/printing/legacy/01_vial_dilution_paper_print.py`. It runs on
   the OT-2 from its embedded `CONFIG`. **Do not edit the `CONFIG` block by hand** — edit a
   YAML and rebuild. The Python IS safe to edit for motion/logic changes.
 - **Generated (never edit):** `src/protocols/generated/vial_dilution_print_latest.py`.

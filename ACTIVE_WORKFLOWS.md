@@ -15,7 +15,7 @@ print droplets onto paper (96-well coordinate grid) with the P300 (8-up) and/or 
 (single-spot) → capture one image before and one after.
 
 ### Protocol (entry point)
-`src/protocols/printing/01_vial_dilution_paper_print.py` — robot entry point; runs from its
+`src/protocols/printing/legacy/01_vial_dilution_paper_print.py` — robot entry point; runs from its
 embedded `CONFIG`. Do **not** hand-edit the `CONFIG` block; edit a YAML and rebuild.
 
 ### Configurations (the three primary examples)
@@ -30,8 +30,8 @@ generates under its own basename, so the two never overwrite each other.
 
 | version | base protocol | generated artifact | dilution |
 |---|---|---|---|
-| 1 (default) | `src/protocols/printing/01_vial_dilution_paper_print.py` | `generated/vial_dilution_print_latest.py` | every vial→plate transfer on the P300 |
-| 2 | `src/protocols/printing/02_vial_dilution_paper_print_p20_dilution.py` | `generated/vial_dilution_print_v2_latest.py` | transfers ≤ `dilution_plan.small_volume.threshold_ul` on the P20 |
+| 1 (default) | `src/protocols/printing/legacy/01_vial_dilution_paper_print.py` | `generated/vial_dilution_print_latest.py` | every vial→plate transfer on the P300 |
+| 2 | `src/protocols/printing/legacy/02_vial_dilution_paper_print_p20_dilution.py` | `generated/vial_dilution_print_v2_latest.py` | transfers ≤ `dilution_plan.small_volume.threshold_ul` on the P20 |
 
 v2 also adds a **pipette check** bring-up mode (`--pipette-check`): it picks up and
 returns every tip the config uses on both mounts, visiting each labware at its working

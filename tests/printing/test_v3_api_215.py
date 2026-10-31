@@ -21,7 +21,7 @@ REPO = Path(__file__).resolve().parents[2]
 CONFIG_PATH = REPO / "configs" / "printing" / "bp_20260723_v3.yaml"
 PROTOCOL_PATH = (
     REPO / "src" / "protocols" / "printing"
-    / "03_vial_dilution_paper_print_v3.py"
+    / "legacy" / "03_vial_dilution_paper_print_v3.py"
 )
 
 
