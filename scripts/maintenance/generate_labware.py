@@ -16,7 +16,7 @@ The engine lives in ``src/labware/``:
     pipeline.py    runs all of the above in order
 
 This module stays as the CLI plus the ``LabwareSpec`` dataclass that
-``src/agents/labware_tools.py`` builds configs from.
+``src/agents/optional/labware_tools.py`` builds configs from.
 
 Coordinate convention (OT-2, millimetres)
 -----------------------------------------

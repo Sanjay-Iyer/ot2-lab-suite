@@ -14,8 +14,8 @@ Remove all manual `sys.path.append` modifications from:
 - `src/printing/tools/dilution_planner.py`
 - `src/agents/test_simulation_agent.py`
 - `src/agents/run_stress_tests.py`
-- `src/agents/main.py`
-- `src/agents/check_models.py`
+- `src/agents/optional/main.py`
+- `src/agents/optional/check_models.py`
 - `scripts/maintenance/sync_robot.py`
 - `scripts/maintenance/deploy.py`
 - `scripts/maintenance/check_connectivity.py`
@@ -32,7 +32,7 @@ Remove all manual `sys.path.append` modifications from:
 
 ### Standardize Documentation
 - Provide standard powershell commands for starting the environment and running core routines in a new `docs/README_USAGE.md` (or append to existing docs):
-  - Agent Launch: `python -m src.agents.main ...`
+  - Agent Launch: `python -m src.agents.optional.main ...`
   - Tests: `python -m pytest tests`
   - Validation: `python -m scripts.developer.audit_paths`
   - Diagnostics: `python -m scripts.maintenance.check_connectivity`
@@ -44,4 +44,4 @@ Remove all manual `sys.path.append` modifications from:
 - Run `python -m pytest tests` to ensure test execution still functions without `sys.path` hacks.
 - Run `python -m scripts.maintenance.check_connectivity` to review the new diagnostic output.
 - Run `python -m scripts.developer.audit_paths` to prove no pathing errors exist.
-- Run `python -m src.agents.main "Configure a standard printing run and run a simulation"` to ensure the agent executes correctly via module invocation.
+- Run `python -m src.agents.optional.main "Configure a standard printing run and run a simulation"` to ensure the agent executes correctly via module invocation.

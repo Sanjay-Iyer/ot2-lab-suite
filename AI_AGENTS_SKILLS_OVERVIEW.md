@@ -100,7 +100,7 @@ Steps 1–3 are safe on any machine (no robot connection). Deployment/execution 
 **lab laptop only** — see [ot2-robot-control](skills/ot2-robot-control/SKILL.md).
 
 You can also drive this entire pipeline **conversationally**: the
-`src/agents/vial_print_agent.py` LangChain agent maps natural-language requests
+`src/agents/optional/vial_print_agent.py` LangChain agent maps natural-language requests
 ("5 dilutions, 20 µL droplets, 3 replicates") onto the YAML and runs
 build → validate → CV for you. It **wraps** these gates rather than bypassing them,
 and edits a *user* YAML copy — the rules below still apply in full. See

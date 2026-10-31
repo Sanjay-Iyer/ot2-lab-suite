@@ -10,13 +10,13 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from pydantic import Field, ValidationError
 
-from src.agents.custom_labware_agent import (
+from src.agents.optional.custom_labware_agent import (
     create_custom_labware_agent,
     labware_agent_prompt,
     load_labware_skill,
     plan_labware_intent,
 )
-from src.agents.labware_tools import generate_96_well_labware
+from src.agents.optional.labware_tools import generate_96_well_labware
 from src.labware.builder import read_labware_json
 from src.labware.families import get_family
 from src.labware.pipeline import generate_labware
@@ -243,7 +243,7 @@ def test_golden_reference_is_geometrically_equivalent():
 
 
 def test_bounded_tool_returns_structured_saved_result(monkeypatch, tmp_path):
-    import src.agents.labware_tools as tools_module
+    import src.agents.optional.labware_tools as tools_module
 
     original = generate_labware
     monkeypatch.setattr(
@@ -301,7 +301,7 @@ class CapturingFakeToolModel(FakeMessagesListChatModel):
 
 
 def test_production_react_path_has_skill_schema_and_bounded_tool(monkeypatch, tmp_path):
-    import src.agents.labware_tools as tools_module
+    import src.agents.optional.labware_tools as tools_module
 
     spec_payload = payload()
     spec_payload["identity"]["load_name"] = "agent_spacing_8_probe"

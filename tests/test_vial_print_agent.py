@@ -2,7 +2,7 @@
 tests/test_vial_print_agent.py
 ==============================
 Offline tests for the conversational vial-dilution-print agent layer
-(src/agents/vial_print_tools.py + src/agents/vial_print_agent.py).
+(src/agents/optional/vial_print_tools.py + src/agents/optional/vial_print_agent.py).
 
 No live LLM and no robot connection. Two tiers:
 
@@ -16,6 +16,7 @@ No live LLM and no robot connection. Two tiers:
 from __future__ import annotations
 
 import copy
+import os
 import sys
 from pathlib import Path
 
@@ -26,8 +27,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.agents import vial_print_tools as vpt
-from src.agents.vial_print_agent import (
+from src.agents.optional import vial_print_tools as vpt
+from src.agents.optional.vial_print_agent import (
     get_vial_print_tools,
     parse_request,
     _log_block,
@@ -158,7 +159,9 @@ def test_color_plate_column_knobs_update_named_series(default_cfg, default_folds
     assert by_name["blue"]["destination_column"] == "8"
 
 
-def test_save_and_load_vial_print_template(default_cfg, default_folds):
+def test_save_and_load_vial_print_template(default_cfg, default_folds, tmp_path, monkeypatch):
+    monkeypatch.setattr(vpt, "TEMPLATE_DIR", tmp_path)
+    monkeypatch.setattr(vpt, "PROJECT_ROOT", tmp_path)
     name = "pytest_orange12_blue8_template"
     path = vpt.TEMPLATE_DIR / f"{name}.yaml"
     cfg, _ = vpt._apply_params(
@@ -261,8 +264,8 @@ def test_sanitize_chat_history_drops_empty_and_non_chat_messages():
     ]
 
 
-def test_log_block_appends_readable_log():
-    path = REPO_ROOT / "robot_data" / "data" / "logs" / "agents" / "test_log_block.log"
+def test_log_block_appends_readable_log(tmp_path):
+    path = tmp_path / "test_log_block.log"
     try:
         if path.exists():
             path.unlink()
@@ -282,11 +285,15 @@ def test_log_block_appends_readable_log():
 # ════════════════════════════════════════════════════════════════════════════════
 
 def _opentrons_available() -> bool:
-    return (vpt.BUILD_SCRIPT.exists() and vpt.VALIDATE_SCRIPT.exists()
+    # Legacy tools write shared _latest/user YAML/simulation records. Opt in
+    # only inside an explicitly marked disposable checkout.
+    return (os.environ.get("OT2_RUN_ISOLATED_PIPELINE") == "1"
+            and (REPO_ROOT / ".ot2-disposable-baseline").is_file()
+            and vpt.BUILD_SCRIPT.exists() and vpt.VALIDATE_SCRIPT.exists()
             and vpt.CV_SCRIPT.exists())
 
 
-@pytest.mark.skipif(not _opentrons_available(), reason="pipeline scripts missing")
+@pytest.mark.skipif(not _opentrons_available(), reason="requires explicit disposable-checkout offline pipeline")
 def test_offline_pipeline_build_validate_cv():
     """End-to-end: load -> update -> build -> validate(--config) -> CV, all green.
 
@@ -317,7 +324,7 @@ def test_offline_pipeline_build_validate_cv():
     assert "CV PASS" in cv_out, cv_out
 
 
-@pytest.mark.skipif(not _opentrons_available(), reason="pipeline scripts missing")
+@pytest.mark.skipif(not _opentrons_available(), reason="requires explicit disposable-checkout offline pipeline")
 def test_user_yaml_matches_working_config():
     """The built user YAML reflects the conversational edits (4 dilutions)."""
     vpt.load_vial_print_defaults.invoke({})

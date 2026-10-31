@@ -1,5 +1,5 @@
 """
-src/agents/vial_print_agent.py
+src/agents/optional/vial_print_agent.py
 ==============================
 Conversational AI driver for the flagship **vial-dilution-print** demo
 (20 mL vials -> 96-well dilution series -> 8-channel paper print).
@@ -12,12 +12,12 @@ Run (from the repo root; use conda `llm` on the real robot laptop, `ai` on the
 simulation laptop):
 
     # Conversational agent (simulation may use GOOGLE_API_KEY; live robot uses Vertex AI / gcloud ADC)
-    python -m src.agents.vial_print_agent
-    python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
-    python -m src.agents.vial_print_agent --simulation-only "build and validate the default orange and blue workflow"
+    python -m src.agents.optional.vial_print_agent
+    python -m src.agents.optional.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+    python -m src.agents.optional.vial_print_agent --simulation-only "build and validate the default orange and blue workflow"
 
     # Deterministic offline pipeline — no LLM / API key (build -> validate -> CV)
-    python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
+    python -m src.agents.optional.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
 
 Flags:
     --no-llm / --mock   Run the tool pipeline directly from a parsed request (no LLM).
@@ -41,12 +41,12 @@ from src.utils.paths import AGENT_LOG_DIR, ensure_project_dirs
 # Run as a module from the repo root.
 if __name__ == "__main__" and not __package__:
     print("ERROR: run as a module from the project root:")
-    print("       python -m src.agents.vial_print_agent")
+    print("       python -m src.agents.optional.vial_print_agent")
     sys.exit(1)
 
 ensure_project_dirs()
 
-from src.agents.vial_print_tools import (
+from src.agents.optional.vial_print_tools import (
     load_vial_print_defaults,
     list_vial_print_templates,
     save_vial_print_template,
@@ -405,8 +405,8 @@ def get_vial_print_tools(simulation_only: bool = False):
     if simulation_only:
         return list(CONFIG_TOOLS)
 
-    from src.agents.tools import get_robot_hardware_status
-    from src.agents.robot_http_tools import (
+    from src.agents.optional.tools import get_robot_hardware_status
+    from src.agents.optional.robot_http_tools import (
         check_robot_http_api,
         list_robot_http_protocols,
         run_vial_print_robot_http,

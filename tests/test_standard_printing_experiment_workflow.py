@@ -11,10 +11,10 @@ import sys
 import pytest
 import yaml
 
-import src.agents.printing_tools as printing_tools
-from src.agents.printing_agent import STANDARD_EXPERIMENT_AGENT_TOOLS
-from src.agents.printing_tools import StandardExperimentProposalV1
-from src.agents.standard_experiment_workflow import (
+import src.agents.optional.printing_tools as printing_tools
+from src.agents.optional.printing_agent import STANDARD_EXPERIMENT_AGENT_TOOLS
+from src.agents.optional.printing_tools import StandardExperimentProposalV1
+from src.agents.optional.standard_experiment_workflow import (
     StandardExperimentLifecycle,
     StandardExperimentWorkflowTransitionError,
     approve_standard_experiment_workflow,
@@ -162,7 +162,7 @@ def test_durable_approval_record_verifies_in_a_fresh_process(proposal):
     )
     code = (
         "import sys; "
-        "from src.agents.printing_tools import "
+        "from src.agents.optional.printing_tools import "
         "StandardExperimentApprovalSealV1, _verify_standard_approval; "
         "a=StandardExperimentApprovalSealV1.model_validate_json(sys.argv[1]); "
         "_verify_standard_approval(sys.argv[2], a)"

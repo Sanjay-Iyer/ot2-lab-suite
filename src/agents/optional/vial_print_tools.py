@@ -1,5 +1,5 @@
 """
-src/agents/vial_print_tools.py
+src/agents/optional/vial_print_tools.py
 ==============================
 LangChain tools that let an AI agent drive the flagship **vial-dilution-print**
 demo (20 mL vials -> 96-well dilution series -> 8-channel paper print) entirely
@@ -22,7 +22,7 @@ Design rules (see AI_AGENTS_SKILLS_OVERVIEW.md):
     bounds (skills/vial-dilution-print/PARAMETERS.md).
 
 The robot-side tools (deploy/execute) are NOT here — they are reused unchanged
-from src/agents/tools.py and are lab-laptop only.
+from src/agents/optional/tools.py and are lab-laptop only.
 """
 from __future__ import annotations
 
@@ -372,7 +372,7 @@ def _template_brief(path: Path) -> str:
 
 def _record_pass(protocol_path: Path, sha256: str, output: str) -> None:
     """Write a PASS record to simulations.json (same schema/path that
-    execute_protocol_on_robot in src/agents/tools.py reads from), so the robot
+    execute_protocol_on_robot in src/agents/optional/tools.py reads from), so the robot
     execution hash-gate is satisfied for this generated artifact."""
     records: dict = {}
     if SIMULATION_RECORDS_PATH.exists():

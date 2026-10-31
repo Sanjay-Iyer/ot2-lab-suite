@@ -310,7 +310,7 @@ Common messages:
 
 | Message | Meaning and action |
 |---|---|
-| `LLM STARTUP FAILED` | No LLM connection. Check the network/VPN and `python -m src.agents.check_llm_auth`, then start again. |
+| `LLM STARTUP FAILED` | No LLM connection. Check the network/VPN and `python -m src.agents.optional.check_llm_auth`, then start again. |
 | `You said "spot 7." Did you mean OT-2 deck SLOT 7?` | Answer yes, or no and restate with established terms (deck slot, plate well, paper position, vial, tip). |
 | `Cannot apply that deck change yet.` | The target slot is occupied. Say where the other labware goes (a free slot or OFF DECK) in the same request. |
 | `I did not change anything, because: ...` | The request was physically invalid, or a value was missing or contradicted; the reason is shown. Use the parameter table above. |

@@ -41,8 +41,8 @@ No robot connection required — runs on the dev laptop or the lab laptop.
 | — template inheritance | [`templates.py`](../../src/labware/templates.py) |
 | — family registry | [`families.py`](../../src/labware/families.py) |
 | CLI | [`scripts/maintenance/generate_labware.py`](../../scripts/maintenance/generate_labware.py) |
-| Agent tools | [`src/agents/labware_tools.py`](../../src/agents/labware_tools.py) |
-| Specialized agent | [`src/agents/custom_labware_agent.py`](../../src/agents/custom_labware_agent.py) |
+| Agent tools | [`src/agents/optional/labware_tools.py`](../../src/agents/optional/labware_tools.py) |
+| Specialized agent | [`src/agents/optional/custom_labware_agent.py`](../../src/agents/optional/custom_labware_agent.py) |
 | YAML configs (inputs) | `configs/labware/*.yaml` |
 | Generated JSON (outputs) | `labware/<load_name>.json` |
 | Config template | `configs/labware/_template.yaml` |
@@ -66,7 +66,7 @@ currently generated as a 2x4 `rectangular_grid`, which reproduces it exactly.
 ## Path A — via the AI agent (recommended)
 
 ```bash
-python -m src.agents.custom_labware_agent
+python -m src.agents.optional.custom_labware_agent
 ```
 
 ```
@@ -75,7 +75,7 @@ python -m src.agents.custom_labware_agent
          Wrote labware/paper_test_01.json — schema=PASS geometry=PASS json=PASS opentrons=PASS
 ```
 
-The general agent (`python -m src.agents.main`) has the same labware tools.
+The general agent (`python -m src.agents.optional.main`) has the same labware tools.
 
 ### Agent tools
 

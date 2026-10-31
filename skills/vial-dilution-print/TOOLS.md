@@ -166,7 +166,7 @@ Add new behaviour here as invariant assertions, not hardcoded expected strings.
 
 ---
 
-## 5. `src/agents/vial_print_agent.py` — conversational driver
+## 5. `src/agents/optional/vial_print_agent.py` — conversational driver
 
 A standalone LangChain + LangGraph (Gemini) agent that runs the whole pipeline from
 natural language. It wraps the three tools above — it does **not** replace them, so
@@ -176,11 +176,11 @@ every safety gate still fires.
 # Live/simulation agent:
 # - simulation laptop: LLM_PROVIDER=api-key + GOOGLE_API_KEY is allowed for testing
 # - real robot laptop: LLM_PROVIDER=vertexai + GOOGLE_CLOUD_PROJECT is required
-python -m src.agents.vial_print_agent
-python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+python -m src.agents.optional.vial_print_agent
+python -m src.agents.optional.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
 
 # Deterministic offline pipeline — no LLM / API key (load->update->build->validate->CV)
-python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
+python -m src.agents.optional.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 replicates"
 ```
 
 **The three conversational knobs → YAML** (see [PARAMETERS.md](PARAMETERS.md)):
@@ -194,12 +194,12 @@ python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets, 3 r
 Anything else (fold strengths, total volume, mix reps, columns, slots) goes through
 `update_vial_print_params(advanced_updates={...})`.
 
-**Tools** (`src/agents/vial_print_tools.py`): `load_vial_print_defaults`,
+**Tools** (`src/agents/optional/vial_print_tools.py`): `load_vial_print_defaults`,
 `update_vial_print_params`, `preview_dilution_plan`, `show_vial_print_config`,
 `build_vial_print_protocol` (→ writes a user YAML under `configs/workflows/user/`,
 runs the builder, records a PASS in `simulations.json`), `validate_vial_print_matrix`
 (runs the matrix with `--config`), `verify_print_droplets_mock`. Robot deploy/execute
-are reused unchanged from `src/agents/tools.py` (lab laptop only, behind `RUN ROBOT`).
+are reused unchanged from `src/agents/optional/tools.py` (lab laptop only, behind `RUN ROBOT`).
 For live vial-print runs, `scripts/manual/run_vial_print_robot.py` pulls robot-side camera
 images from `/data/vision/vial_dilution_print` into
 `vision_runs/vial_dilution_print/run_YYYYMMDD_HHMMSS/` automatically after the run

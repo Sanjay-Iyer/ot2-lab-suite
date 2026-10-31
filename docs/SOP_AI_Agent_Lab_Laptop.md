@@ -67,8 +67,8 @@ $env:GOOGLE_CLOUD_LOCATION = "us-central1"
 $env:GOOGLE_VERTEX_API_TRANSPORT = "rest"
 $env:GEMINI_MODEL = "gemini-2.5-flash"
 
-python -m src.agents.check_llm_auth
-python -m src.agents.vial_print_agent --simulation-only "Use the default orange and blue vial-dilution-print workflow. Build the protocol, run simulation, run validation, and run mock CV only. Do not check robot hardware, do not call HTTP robot tools, and do not run live."
+python -m src.agents.optional.check_llm_auth
+python -m src.agents.optional.vial_print_agent --simulation-only "Use the default orange and blue vial-dilution-print workflow. Build the protocol, run simulation, run validation, and run mock CV only. Do not check robot hardware, do not call HTTP robot tools, and do not run live."
 ```
 
 Expected startup lines include:
@@ -95,7 +95,7 @@ GEMINI_MODEL=gemini-2.5-flash
 
 **Recommended for the current vial dilution -> paper print workflow:**
 ```bash
-python -m src.agents.vial_print_agent
+python -m src.agents.optional.vial_print_agent
 ```
 
 This dedicated agent builds and validates the vial-print protocol, then launches
@@ -104,22 +104,22 @@ you reply exactly `RUN ROBOT`.
 
 **Standard mode (Gemini LLM, no rate limiting):**
 ```bash
-python -m src.agents.main
+python -m src.agents.optional.main
 ```
 
 **If you hit Gemini 429 rate-limit errors (Free Tier):**
 ```bash
-python -m src.agents.main --rate-limit
+python -m src.agents.optional.main --rate-limit
 ```
 
 **Mock mode (no API calls, for testing agent logic only):**
 ```bash
-python -m src.agents.main --mock
+python -m src.agents.optional.main --mock
 ```
 
 **Pass an initial prompt directly:**
 ```bash
-python -m src.agents.main "Set up a dilution workflow with 8 steps"
+python -m src.agents.optional.main "Set up a dilution workflow with 8 steps"
 ```
 
 You will see:
@@ -196,12 +196,12 @@ Type natural language. The agent handles all tool calls internally.
 
 | Command | Purpose |
 |---------|---------|
-| `python -m src.agents.main` | Start agent (normal mode) |
-| `python -m src.agents.main --rate-limit` | Start with Gemini rate limiting |
-| `python -m src.agents.main --mock` | Start in mock mode (no LLM calls) |
-| `python -m src.agents.run_stress_tests` | Run 10-test validation benchmark |
-| `python -m src.agents.test_simulation_agent` | Run simulation integration test |
-| `python -m src.agents.check_models` | List available Gemini models |
+| `python -m src.agents.optional.main` | Start agent (normal mode) |
+| `python -m src.agents.optional.main --rate-limit` | Start with Gemini rate limiting |
+| `python -m src.agents.optional.main --mock` | Start in mock mode (no LLM calls) |
+| Historical stress harness | Archived in external cleanup batch C2; not a current validation command |
+| Historical simulation harness | Archived in external cleanup batch C2; depends on removed tools |
+| `python -m src.agents.optional.check_models` | List available Gemini models |
 
 ---
 

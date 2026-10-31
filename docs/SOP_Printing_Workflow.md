@@ -25,7 +25,7 @@ Always perform a simulation before touching the physical robot.
 1.  **Launch the Agent**:
     Start a session with a printing-specific request:
     ```powershell
-    python -m src.agents.main "Configure a standard printing run and run a simulation"
+    python -m src.agents.optional.main "Configure a standard printing run and run a simulation"
     ```
 
 2.  **Review Configuration**:

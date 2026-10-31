@@ -538,10 +538,10 @@ happens. A tool can refuse an unsafe request even if the LLM asks for it.
 Entry point:
 
 ```text
-python -m src.agents.main
+python -m src.agents.optional.main
 ```
 
-`src/agents/main.py` constructs one LangGraph ReAct agent with 18 registered
+`src/agents/optional/main.py` constructs one LangGraph ReAct agent with 18 registered
 tools: 12 generic workflow/robot tools and 6 labware tools.
 
 ### 10.1 Generic workflow and robot tools exposed by `main.py`
@@ -561,7 +561,7 @@ tools: 12 generic workflow/robot tools and 6 labware tools.
 | `deploy_protocol_to_robot` | Stage a manifest and copy files with SSH/SCP |
 | `execute_protocol_on_robot` | Enforce the simulation-hash gate, then call `opentrons_execute` |
 
-`src/agents/tools.py` also defines `deploy_and_run_on_robot`, but the current
+`src/agents/optional/tools.py` also defines `deploy_and_run_on_robot`, but the current
 general agent does not register that wrapper as an available tool.
 
 At generation time, the tool re-reads the pipette block from committed defaults
@@ -605,7 +605,7 @@ interactions and require a passing simulation record.
 Entry point:
 
 ```text
-python -m src.agents.vial_print_agent
+python -m src.agents.optional.vial_print_agent
 ```
 
 This agent exists because the flagship workflow has a stronger build/validate/CV
@@ -690,7 +690,7 @@ The run tool independently refuses if:
 
 ### 11.5 No-LLM deterministic mode
 
-`python -m src.agents.vial_print_agent --no-llm "..."` uses regular expressions
+`python -m src.agents.optional.vial_print_agent --no-llm "..."` uses regular expressions
 to parse common knobs and directly runs load → update → preview → build → matrix
 → mock CV. It is useful for offline verification and CI because it needs no model
 credential. It is still digital automation even though it shares the agent entry
@@ -698,7 +698,7 @@ module.
 
 ## 12. Robot protocol registry
 
-`src/agents/robot_protocol_registry.py` describes live runner availability:
+`src/agents/optional/robot_protocol_registry.py` describes live runner availability:
 
 | Key | Runner transport | Agent exposure |
 |---|---|---|

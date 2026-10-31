@@ -10,10 +10,10 @@ from datetime import datetime
 # Import centralized paths
 from src.utils.paths import PROJECT_ROOT, AGENT_LOG_DIR, ensure_project_dirs
 
-# Run this script using `python -m src.agents.main` from the project root.
+# Run this script using `python -m src.agents.optional.main` from the project root.
 if __name__ == "__main__" and not __package__:
     print("ERROR: This script must be run as a module from the project root.")
-    print("Command: python -m src.agents.main")
+    print("Command: python -m src.agents.optional.main")
     sys.exit(1)
 
 from src.core.config import Config

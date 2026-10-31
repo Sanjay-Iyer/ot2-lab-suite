@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from src.agents.printing_tools import (
+from src.agents.optional.printing_tools import (
     PRINTING_TOOLS,
     describe_printing_workflow,
     list_printing_designs,
     list_printing_workflows,
     validate_printing_request,
 )
-from src.agents.robot_http_tools import run_vial_print_robot_http
-from src.agents.vial_print_tools import load_vial_print_defaults, update_vial_print_params
+from src.agents.optional.robot_http_tools import run_vial_print_robot_http
+from src.agents.optional.vial_print_tools import load_vial_print_defaults, update_vial_print_params
 from src.printing.artifacts import (
     build_prepared_artifact,
     prepare_printing_request,
@@ -123,7 +123,7 @@ def test_legacy_vial_advanced_updates_cannot_switch_protocol_or_run_mode():
 
 
 def test_general_agent_prompt_and_surface_end_at_manual_handoff():
-    source = (Path(__file__).resolve().parents[1] / "src/agents/main.py").read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "src/agents/optional/main.py").read_text(encoding="utf-8")
     tool_list = source.split("tools = [", 1)[1].split("]", 1)[0]
     assert "deploy_protocol_to_robot" not in tool_list
     assert "execute_protocol_on_robot" not in tool_list

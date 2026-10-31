@@ -379,7 +379,7 @@ conda activate llm
 gcloud auth login
 gcloud auth application-default login
 gcloud config set project YOUR_GCP_PROJECT_ID
-python -m src.agents.check_llm_auth
+python -m src.agents.optional.check_llm_auth
 ```
 
 `.env` (do not commit credentials):

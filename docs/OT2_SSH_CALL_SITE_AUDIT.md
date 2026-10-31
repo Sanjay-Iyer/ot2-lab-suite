@@ -26,10 +26,10 @@ not disable host-key checking.
 | `vision/transfer_images.py` | `check_connectivity()` | Harmless remote echo | Centralized |
 | `vision/transfer_images.py` | `discover_remote_files()` | Remote file discovery | Centralized |
 | `vision/transfer_images.py` | `transfer_images()` | Per-file SCP downloads | Centralized |
-| `src/agents/tools.py` | `get_robot_hardware_status()` | Remote instrument inspection | Centralized |
-| `src/agents/tools.py` | `check_robot_connection()` | Remote path/executable checks | Centralized |
-| `src/agents/tools.py` | `deploy_protocol_to_robot()` | Remote mkdir and recursive SCP upload | Centralized |
-| `src/agents/tools.py` | `execute_protocol_on_robot()` | Remote verify and `opentrons_execute` | Centralized |
+| `src/agents/optional/tools.py` | `get_robot_hardware_status()` | Remote instrument inspection | Centralized |
+| `src/agents/optional/tools.py` | `check_robot_connection()` | Remote path/executable checks | Centralized |
+| `src/agents/optional/tools.py` | `deploy_protocol_to_robot()` | Remote mkdir and recursive SCP upload | Centralized |
+| `src/agents/optional/tools.py` | `execute_protocol_on_robot()` | Remote verify and `opentrons_execute` | Centralized |
 | `src/protocols/printing_demo_protocol.py` | host-side real-robot branch | SCP upload/download and SSH execution/cleanup | Centralized |
 | `src/protocols/generated/printing_demo_run.py` | legacy generated host branch | SCP upload/download and SSH execution/cleanup | Centralized |
 
@@ -37,7 +37,7 @@ The following nearby paths were inspected and intentionally left as HTTP-only:
 
 | File/path | Reason |
 |---|---|
-| `src/agents/robot_http_tools.py` | Invokes HTTP runner scripts; it does not construct SSH/SCP commands |
+| `src/agents/optional/robot_http_tools.py` | Invokes HTTP runner scripts; it does not construct SSH/SCP commands |
 | `scripts/developer/run_robot_template.py` | HTTP API template; optional SCP guidance now points to centralized examples |
 | `scripts/manual/run_smoke_test.py` | HTTP API physical dry-motion runner; no SSH/SCP command |
 | `scripts/manual/run_plate_waste_disposal.py` | HTTP API runner |

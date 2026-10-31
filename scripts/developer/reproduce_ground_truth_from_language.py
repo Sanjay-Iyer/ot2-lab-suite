@@ -108,7 +108,7 @@ def _extract_config(messages: list, tool_name: str) -> dict | None:
 
 
 def _run_agent(request: str, *, recursion_limit: int = 40) -> list:
-    from src.agents.printing_agent import create_printing_experiment_agent
+    from src.agents.optional.printing_agent import create_printing_experiment_agent
 
     agent = create_printing_experiment_agent()
     result = agent.invoke(

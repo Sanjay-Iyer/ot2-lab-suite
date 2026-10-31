@@ -32,8 +32,8 @@ from src.printing.experiment_workflow import (
     transition_workflow,
 )
 from src.printing.schemas import parse_resolved_print_plan_json
-from src.agents.printing_agent import plan_printing_intent
-from src.agents.printing_tools import draft_printing_experiment
+from src.agents.optional.printing_agent import plan_printing_intent
+from src.agents.optional.printing_tools import draft_printing_experiment
 
 
 REFERENCE_CONFIG = Path("configs/experiments/nanoparticle_drop_series_triplicate_v1.yaml")

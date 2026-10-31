@@ -11,7 +11,11 @@ area, with the exact commands, file paths, and safety gates needed to perform it
 > work. LLM-backed testing on the simulation laptop may use
 > `LLM_PROVIDER=api-key` + `GOOGLE_API_KEY`; live robot laptop agent runs must use
 > Vertex AI / gcloud ADC with `LLM_PROVIDER=vertexai` and `GOOGLE_CLOUD_PROJECT`.
-> See [project_dev_setup](../../../.claude memory) for the two-machine split.
+> See [commands](../docs/COMMANDS.md) for the two-machine split.
+
+The primary publication demo is [Agent NanoDrop](../src/agents/dye_demo/README.md).
+Its runtime skills are the four `nanodrop-*` entries below; other skills and
+older agent tool libraries remain available for their original workflows.
 
 ## Skills
 
@@ -31,17 +35,17 @@ area, with the exact commands, file paths, and safety gates needed to perform it
 | **nanodrop-plan-settings** | [`nanodrop-plan-settings/`](nanodrop-plan-settings/SKILL.md) | Agent NanoDrop router: deck, vials, tips, liquid-handling switches, lab-owned fields, physical reports. |
 
 The four `nanodrop-*` skills (frontmatter `domain: dye_demo`, `agent: nanodrop`) are runtime procedures of the
-Agent NanoDrop dye demo: [`src/agents/dye_demo/skills.py`](../src/agents/dye_demo/skills.py) loads all of them, in
+Agent NanoDrop dye demo: [`src/agents/dye_demo/skills/`](../src/agents/dye_demo/skills/__init__.py) loads all of them, in
 their `order`, after the router's fixed output contract (`conversation.CORE_ROUTER_PROMPT`). Editing one changes how
 the router reads messages; Python still executes the edit modes and every physical check.
 
 ## How these relate to the AI agent
 
-The agent in [`src/agents/main.py`](../src/agents/main.py) exposes 18 LangChain
+The agent in [`src/agents/optional/main.py`](../src/agents/optional/main.py) exposes 18 LangChain
 tools that already orchestrate most of these steps conversationally. These skill
 files document **both** paths:
 
-1. **Agent path** — what to say to the running agent (`python -m src.agents.main`)
+1. **Agent path** — what to say to the running agent (`python -m src.agents.optional.main`)
 2. **Manual path** — the underlying CLI commands / scripts, for when you want to
    do it by hand or debug a failure
 

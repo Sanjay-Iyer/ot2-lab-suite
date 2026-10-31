@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from src.agents import robot_http_tools as rht
-from src.agents import robot_protocol_registry as rpr
-from src.agents.robot_protocol_registry import RobotProtocol
-from src.agents.vial_print_agent import SYSTEM_PROMPT
+from src.agents.optional import robot_http_tools as rht
+from src.agents.optional import robot_protocol_registry as rpr
+from src.agents.optional.robot_protocol_registry import RobotProtocol
+from src.agents.optional.vial_print_agent import SYSTEM_PROMPT
 from src.utils.hashing import hash_file
 
 

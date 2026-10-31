@@ -11,7 +11,7 @@ from typing import Any, Optional
 import requests
 from langchain.tools import tool
 
-from src.agents.robot_protocol_registry import describe_robot_protocols, get_robot_protocol
+from src.agents.optional.robot_protocol_registry import describe_robot_protocols, get_robot_protocol
 from src.core.config import Config
 from src.lab.robot_connection import base_url, resolve_host
 from src.utils.hashing import hash_file

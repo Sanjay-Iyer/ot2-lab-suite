@@ -1,7 +1,7 @@
 """Regression for the explicitly deprecated generic-agent mock path."""
 from __future__ import annotations
 
-from src.agents.main import create_opentrons_agent
+from src.agents.optional.main import create_opentrons_agent
 
 
 def test_generic_mock_path_is_defined_and_fails_closed():

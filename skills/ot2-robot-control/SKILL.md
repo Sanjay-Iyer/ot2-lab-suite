@@ -84,7 +84,7 @@ python scripts\maintenance\check_ot2_ssh.py `
 ## Path A — via the AI agent (recommended, with safety gates)
 
 ```bash
-python -m src.agents.main
+python -m src.agents.optional.main
 ```
 
 The agent enforces the full safety sequence before any physical run:

@@ -28,10 +28,10 @@ python -m scripts.maintenance.check_connectivity
 ### 5. Launch the Agent
 ```powershell
 # Interactive mode
-python -m src.agents.main
+python -m src.agents.optional.main
 
 # Single prompt execution
-python -m src.agents.main "Configure a standard printing run and run a simulation"
+python -m src.agents.optional.main "Configure a standard printing run and run a simulation"
 ```
 
 ## Troubleshooting Stale DNS/VPN State

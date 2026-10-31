@@ -110,7 +110,7 @@ class TestConfiguration:
 
     def test_missing_ssh_key_fails_cleanly(self):
         """Test that missing SSH key in tools fails clearly with no silent id_rsa fallback."""
-        from src.agents.tools import check_robot_connection
+        from src.agents.optional.tools import check_robot_connection
 
         env = {
             "LLM_PROVIDER": "vertexai",

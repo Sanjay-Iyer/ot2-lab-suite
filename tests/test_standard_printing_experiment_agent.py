@@ -13,11 +13,11 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from pydantic import Field
 
-from src.agents.printing_agent import (
+from src.agents.optional.printing_agent import (
     STANDARD_EXPERIMENT_AGENT_TOOLS,
     create_standard_experiment_agent,
 )
-import src.agents.printing_tools as printing_tools
+import src.agents.optional.printing_tools as printing_tools
 
 
 class CapturingModel(FakeMessagesListChatModel):

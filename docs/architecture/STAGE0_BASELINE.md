@@ -23,8 +23,8 @@ All 16 failures are PRE-EXISTING. See "Pre-existing failures" below.
 
 | Agent | File | Tools wired | Skills loaded |
 |---|---|---|---|
-| Generic OT-2 agent | `src/agents/main.py` | 18 (12 workflow + 6 labware) | none |
-| Vial-print agent | `src/agents/vial_print_agent.py` | 10 config + 3 robot HTTP | none |
+| Generic OT-2 agent | `src/agents/optional/main.py` | 18 (12 workflow + 6 labware) | none |
+| Vial-print agent | `src/agents/optional/vial_print_agent.py` | 10 config + 3 robot HTTP | none |
 
 Both are `langgraph.prebuilt.create_react_agent` with a single hard-coded
 `system_prompt` string.
@@ -33,10 +33,10 @@ Both are `langgraph.prebuilt.create_react_agent` with a single hard-coded
 
 | Module | Count | Domain |
 |---|---|---|
-| `src/agents/tools.py` | 13 | generic workflow registry, generate/simulate, SSH deploy+execute |
-| `src/agents/vial_print_tools.py` | 10 | workflow-01 vial->dilution->print only |
-| `src/agents/labware_tools.py` | 6 | custom labware JSON generation |
-| `src/agents/robot_http_tools.py` | 3 | OT-2 HTTP API run of workflow 01 |
+| `src/agents/optional/tools.py` | 13 | generic workflow registry, generate/simulate, SSH deploy+execute |
+| `src/agents/optional/vial_print_tools.py` | 10 | workflow-01 vial->dilution->print only |
+| `src/agents/optional/labware_tools.py` | 6 | custom labware JSON generation |
+| `src/agents/optional/robot_http_tools.py` | 3 | OT-2 HTTP API run of workflow 01 |
 
 **Finding:** zero tools reach the modern printing families. A grep for
 `four_clover|complementary|PROTOCOL_VERSIONS` across `src/agents/` returns nothing but
@@ -139,7 +139,7 @@ Filenames must equal the internal `loadName`.
   `configs/robot.yaml` records `discovered.ip: 169.254.252.252`. Two different addresses
   in two places; `AGENTS.md` says `configs/robot.yaml` is authoritative.
 - **Transports:** HTTP API (`scripts/manual/run_vial_print_robot.py`, `robot_http_tools.py`) is
-  the standard for runs; SSH/SCP (`src/utils/ot2_ssh.py`, `src/agents/tools.py`) is used
+  the standard for runs; SSH/SCP (`src/utils/ot2_ssh.py`, `src/agents/optional/tools.py`) is used
   by the older deploy/execute path.
 
 ## Pre-existing failures (16), grouped by root cause
@@ -208,7 +208,7 @@ resolves the host can rewrite a tracked config.
 - `ACTIVE_WORKFLOWS.md` is the repo's real human-facing workflow catalogue. It has no
   section for the 09/10/11 grid family and its four-clover table omits the two newest
   configs.
-- **`src/agents/main.py` is broken.** `MockToolCallingLLM` was stripped (line 58 is a
+- **`src/agents/optional/main.py` is broken.** `MockToolCallingLLM` was stripped (line 58 is a
   placeholder comment) but is still called. Verified: `create_opentrons_agent(use_mock=True)`
   raises `NameError`. `src/agents/test_simulation_agent.py` imports it.
 - `_center_specs()` and `_print_order()` also read module-global `CONFIG` and are hard

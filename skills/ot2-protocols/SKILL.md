@@ -28,7 +28,7 @@ robot connection. Only deployment/execution (see
 | Workflow registry | [`src/core/workflows/registry.py`](../../src/core/workflows/registry.py) |
 | Generated protocols | `src/protocols/generated/generated_<workflow>.py` |
 | Simulation records | `robot_data/data/simulations.json` |
-| Agent tools | [`src/agents/tools.py`](../../src/agents/tools.py) |
+| Agent tools | [`src/agents/optional/tools.py`](../../src/agents/optional/tools.py) |
 
 ## Registered workflows
 
@@ -57,7 +57,7 @@ hasn't passed both validation and simulation.
 ## Path A — via the AI agent (recommended)
 
 ```bash
-python -m src.agents.main
+python -m src.agents.optional.main
 # add --rate-limit if you hit Gemini 429 errors
 ```
 

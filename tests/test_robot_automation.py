@@ -4,7 +4,10 @@ from pathlib import Path
 import json
 import shutil
 import os
-from src.agents.tools import (
+import sys
+import tempfile
+from src.agents.optional import tools as robot_tools
+from src.agents.optional.tools import (
     check_robot_connection, 
     deploy_protocol_to_robot, 
     execute_protocol_on_robot,
@@ -17,28 +20,28 @@ from src.utils.paths import SIMULATION_RECORDS_PATH, DEPLOY_BASE_DIR
 class TestRobotAutomation(unittest.TestCase):
 
     def setUp(self):
-        # Ensure clean state for each test
-        if SIMULATION_RECORDS_PATH.exists():
-            SIMULATION_RECORDS_PATH.unlink()
-        if DEPLOY_BASE_DIR.exists():
-            shutil.rmtree(DEPLOY_BASE_DIR)
-        DEPLOY_BASE_DIR.mkdir(parents=True, exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(prefix="ot2-automation-test-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        # Patch test aliases and the module that consumes the paths.
+        for module in (sys.modules[__name__], robot_tools):
+            for name, path in (("SIMULATION_RECORDS_PATH", root / "simulations.json"),
+                               ("DEPLOY_BASE_DIR", root / "deploy")):
+                patcher = patch.object(module, name, path)
+                patcher.start()
+                self.addCleanup(patcher.stop)
+        host = patch.object(robot_tools, "resolve_host", return_value="robot.test")
+        host.start()
+        self.addCleanup(host.stop)
+        DEPLOY_BASE_DIR.mkdir()
         
         # Create a dummy protocol file
-        self.dummy_protocol = Path("dummy_protocol.py")
+        self.dummy_protocol = root / "dummy_protocol.py"
         self.dummy_protocol.write_text("metadata = {'apiLevel': '2.15'}\ndef run(ctx): pass")
         self.dummy_hash = "f5f5f5f5" # Mocked later
-        self.dummy_key = Path(".test_tmp") / "robot_automation" / "dummy_key"
+        self.dummy_key = root / "dummy_key"
         self.dummy_key.parent.mkdir(parents=True, exist_ok=True)
         self.dummy_key.write_text("test fixture", encoding="utf-8")
-
-    def tearDown(self):
-        if self.dummy_protocol.exists():
-            self.dummy_protocol.unlink()
-        if SIMULATION_RECORDS_PATH.exists():
-            SIMULATION_RECORDS_PATH.unlink()
-        if self.dummy_key.exists():
-            self.dummy_key.unlink()
 
     @patch("subprocess.run")
     def test_check_robot_connection_success(self, mock_run):
@@ -64,7 +67,7 @@ class TestRobotAutomation(unittest.TestCase):
             self.assertIn("Connectivity FAILED", result)
 
     @patch("subprocess.run")
-    @patch("src.agents.tools.hash_file")
+    @patch("src.agents.optional.tools.hash_file")
     def test_simulate_protocol_saves_record(self, mock_hash, mock_run):
         mock_hash.return_value = "hash123"
         mock_run.return_value = MagicMock(returncode=0, stdout="Sim output", stderr="")
@@ -85,7 +88,7 @@ class TestRobotAutomation(unittest.TestCase):
         self.assertEqual(records["hash123"]["status"], "PASS")
 
     @patch("subprocess.run")
-    @patch("src.agents.tools.hash_file")
+    @patch("src.agents.optional.tools.hash_file")
     def test_deploy_protocol_creates_manifest(self, mock_hash, mock_run):
         mock_hash.return_value = "hash123"
         mock_run.return_value = MagicMock(returncode=0)
@@ -118,7 +121,7 @@ class TestRobotAutomation(unittest.TestCase):
         self.assertIn("Error: No simulation record found", result)
 
     @patch("subprocess.run")
-    @patch("src.agents.tools.hash_file")
+    @patch("src.agents.optional.tools.hash_file")
     def test_execute_on_robot_blocks_failed_simulation(self, mock_hash, mock_run):
         # Record a failed simulation
         mock_hash.return_value = "badhash"
@@ -130,7 +133,7 @@ class TestRobotAutomation(unittest.TestCase):
         self.assertIn("Refusing to run on physical hardware", result)
 
     @patch("subprocess.run")
-    @patch("src.agents.tools.hash_file")
+    @patch("src.agents.optional.tools.hash_file")
     def test_execute_on_robot_success(self, mock_hash, mock_run):
         # 1. Record a passing simulation
         mock_hash.return_value = "goodhash"

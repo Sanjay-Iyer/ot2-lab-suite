@@ -460,7 +460,7 @@ def test_review_is_readable_without_the_yaml() -> None:
     ],
 )
 def test_one_agent_routes_the_request_to_a_family(request_text: str, expected: str) -> None:
-    from src.agents.printing_agent import select_printing_workflow_family
+    from src.agents.optional.printing_agent import select_printing_workflow_family
 
     assert select_printing_workflow_family(request_text).value == expected
 
@@ -479,7 +479,7 @@ def test_each_family_loads_only_its_own_skill() -> None:
 
 
 def test_the_single_agent_carries_both_tool_sets_and_no_python_writing_tool() -> None:
-    from src.agents.printing_tools import PRINTING_EXPERIMENT_TOOLS
+    from src.agents.optional.printing_tools import PRINTING_EXPERIMENT_TOOLS
 
     names = {item.name for item in PRINTING_EXPERIMENT_TOOLS}
     assert {
@@ -498,7 +498,7 @@ def test_the_single_agent_carries_both_tool_sets_and_no_python_writing_tool() ->
 
 
 def test_the_template_tool_is_an_allowlist_not_filesystem_access() -> None:
-    from src.agents.printing_tools import load_printing_experiment_template
+    from src.agents.optional.printing_tools import load_printing_experiment_template
 
     text = load_printing_experiment_template.invoke({"workflow_family": "four_clover"})
     assert "four-clover-experiment-job/v1" in text
@@ -509,7 +509,7 @@ def test_the_template_tool_is_an_allowlist_not_filesystem_access() -> None:
 
 
 def test_generated_configurations_never_land_on_a_ground_truth_path() -> None:
-    from src.agents.printing_tools import (
+    from src.agents.optional.printing_tools import (
         FOUR_CLOVER_PROPOSAL_DIR,
         STANDARD_EXPERIMENT_PROPOSAL_DIR,
     )

@@ -104,3 +104,28 @@ compared prior-dirty consumers to the actual C0 working snapshot, confirmed only
 cleanup path replacements, and scanned 357 maintained modules for all 42 moves.
 Lab independently reconfirmed 393 YAML value pairs and 3,026 scientific byte pairs.
 Focused tests: **43 passed in7.50s**. No required corrections remain.
+
+## C2 — optional agents and historical harnesses (PASS/PASS)
+
+Starting commit `58565da`. Grouped 13 older working modules under
+`src/agents/optional/`; NanoDrop, its runtime Skills and Memory stay in place.
+External `C2-agent-families` preserves all 15 original files with verified SHA/CRC.
+Archived `test_simulation_agent.py` and `run_stress_tests.py` after both reviewers
+confirmed no unique liquid-handling implementation: the former uses removed
+tools, the latter only counts returned responses to historical prompts.
+
+Updated absolute imports, file paths, tests and docs; sibling-relative imports
+retain their meaning. Current SOP no longer advertises archived harness commands.
+No compatibility duplicates or eager optional-package imports were added.
+`check_models.py` retains its existing import-time network behavior; AST only
+on HOME. The other 12 optional modules import successfully.
+
+Focused existing NanoDrop + generic mock/dependency checks: **46 passed in15.46s**,
+two existing upstream deprecation warnings. Evidence `.test_tmp/C2-imports.json`;
+mapping/changed files `.test_tmp/C2-map.json`, `.test_tmp/C2-changes.json`.
+
+Final Python **PASS**, laboratory **PASS**, mutual cross-review **PASS**. Python
+verified all 15 archive pairs and the 355-module old-reference scan; prior-dirty
+test changes were compared with C0. Lab independently checked 415 method/resource
+pairs and all moved source diffs. Corrected the model-catalog root comment;
+no method or runtime behavior changes. No required corrections remain.

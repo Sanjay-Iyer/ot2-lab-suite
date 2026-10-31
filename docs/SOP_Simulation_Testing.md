@@ -57,10 +57,10 @@ GOOGLE_API_KEY=your_actual_api_key_here
 **Command the AI to configure and simulate:**
 ```powershell
 # Default (no rate limiting delay)
-python -m src.agents.main "Configure a standard printing run and run a simulation."
+python -m src.agents.optional.main "Configure a standard printing run and run a simulation."
 
 # With rate limiting (adds a 5-second delay between API calls to avoid 429 errors)
-python -m src.agents.main --rate-limit "Configure a standard printing run and run a simulation."
+python -m src.agents.optional.main --rate-limit "Configure a standard printing run and run a simulation."
 ```
 *Expected Result: The AI will generate the protocol file, run the Opentrons simulator under the hood, and report whether the simulation passed or failed based on hardware constraints.*
 
@@ -130,7 +130,7 @@ Let the AI orchestrate the connection, staging, and execution on the physical OT
 
 **Command the AI to deploy and execute:**
 ```powershell
-python -m src.agents.main "I want to deploy and run the protocol we just generated on the physical robot. Please check the connection, deploy the file, and execute it."
+python -m src.agents.optional.main "I want to deploy and run the protocol we just generated on the physical robot. Please check the connection, deploy the file, and execute it."
 ```
 
 *Expected Result: The AI will use `check_robot_connection()` to ping the instrument, `deploy_protocol_to_robot()` to transfer the file via SCP, and `execute_protocol_on_robot()` to trigger it over SSH. It will stream the execution output back to you in the terminal.*

@@ -5,7 +5,7 @@ import argparse
 import json
 from typing import Any, Callable
 
-from src.agents.printing_tools import (
+from src.agents.optional.printing_tools import (
     build_printing_protocol,
     describe_printing_workflow,
     list_printing_designs,

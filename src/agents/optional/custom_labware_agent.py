@@ -1,5 +1,5 @@
 """
-src/agents/custom_labware_agent.py
+src/agents/optional/custom_labware_agent.py
 ==================================
 Conversational AI driver for **custom Opentrons labware definitions**.
 
@@ -13,8 +13,8 @@ structured parameters and hands them to the deterministic generator in
 
 Run (from the repo root; `conda activate ai` on the simulation laptop):
 
-    python -m src.agents.custom_labware_agent
-    python -m src.agents.custom_labware_agent "make the paper plate with 8 mm spacing"
+    python -m src.agents.optional.custom_labware_agent
+    python -m src.agents.optional.custom_labware_agent "make the paper plate with 8 mm spacing"
 
 Flags:
     --rate-limit    Enable the 60 s rolling-window guard (Gemini free tier).
@@ -39,12 +39,12 @@ from src.utils.paths import AGENT_LOG_DIR, ensure_project_dirs
 # Run as a module from the repo root.
 if __name__ == "__main__" and not __package__:
     print("ERROR: run as a module from the project root:")
-    print("       python -m src.agents.custom_labware_agent")
+    print("       python -m src.agents.optional.custom_labware_agent")
     sys.exit(1)
 
 ensure_project_dirs()
 
-from src.agents.labware_tools import (
+from src.agents.optional.labware_tools import (
     generate_registered_labware,
     list_labware_families,
     list_registered_labware_templates,

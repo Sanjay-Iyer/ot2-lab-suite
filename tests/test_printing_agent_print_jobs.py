@@ -10,8 +10,8 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from pydantic import Field
 
-from src.agents.printing_agent import PRINTING_AGENT_TOOLS, create_printing_agent
-from src.agents.printing_tools import (
+from src.agents.optional.printing_agent import PRINTING_AGENT_TOOLS, create_printing_agent
+from src.agents.optional.printing_tools import (
     create_and_compile_print_job,
     list_printing_capabilities,
     list_registered_materials,

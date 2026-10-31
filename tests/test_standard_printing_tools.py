@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-import src.agents.printing_tools as printing_tools
-from src.agents.printing_tools import (
+import src.agents.optional.printing_tools as printing_tools
+from src.agents.optional.printing_tools import (
     STANDARD_PRINT_EXPERIMENT_TOOLS,
     StandardExperimentConfigArtifactV1,
     StandardExperimentPreviewResultV1,

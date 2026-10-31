@@ -41,7 +41,7 @@ design names from the workflow registry and skill metadata.
 
 ## Tools: what the laboratory software can do
 
-`src/agents/printing_tools.py` exposes only these high-level capabilities:
+`src/agents/optional/printing_tools.py` exposes only these high-level capabilities:
 
 | Tool | Result |
 |---|---|
@@ -81,7 +81,7 @@ the Printing Agent.
 
 ## Agent: bounded scientific-intent routing
 
-`src/agents/printing_agent.py` owns interpretation and selection only:
+`src/agents/optional/printing_agent.py` owns interpretation and selection only:
 
 - family, workflow and design selection;
 - relevant skill selection;
@@ -93,8 +93,8 @@ is the production dynamic context hook used by `create_printing_agent()`. Schema
 validators, registries, compilers and protocol code—not natural-language instructions—
 decide physical validity and robot-level behavior.
 
-The generic `src/agents/main.py --mock` compatibility path is explicitly deprecated
-and fails closed without tools/network/robot. `src/agents/vial_print_agent.py` remains
+The generic `src/agents/optional/main.py --mock` compatibility path is explicitly deprecated
+and fails closed without tools/network/robot. `src/agents/optional/vial_print_agent.py` remains
 the legacy workflow-01 specialist but its AI surface also stops at manual handoff.
 
 ## Schemas: the AI-to-deterministic boundary
@@ -232,9 +232,9 @@ The safe dry-run latest is rebuilt afterward. See `docs/OT2_PRINTING_GUIDE.md`.
 
 | Concept | Production files |
 |---|---|
-| Agent | `src/agents/printing_agent.py` |
+| Agent | `src/agents/optional/printing_agent.py` |
 | Skills | three scoped printing `SKILL.md` files, `src/printing/skills.py` |
-| Tools/CLI | `src/agents/printing_tools.py`, `src/printing/cli.py` |
+| Tools/CLI | `src/agents/optional/printing_tools.py`, `src/printing/cli.py` |
 | Schemas/compiler | `src/printing/schemas/`, `src/printing/compiler.py`, `src/printing/config.py` |
 | Validation | `src/printing/validation.py` plus delegated production protocol resolvers |
 | Workflows/designs | `src/printing/workflows/`, `src/printing/designs/` |

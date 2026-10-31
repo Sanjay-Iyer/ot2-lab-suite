@@ -1,11 +1,11 @@
 """
-src/agents/check_llm_auth.py
+src/agents/optional/check_llm_auth.py
 ============================
 Small smoke test for the configured LLM auth path.
 
 Run from the repo root:
 
-    python -m src.agents.check_llm_auth
+    python -m src.agents.optional.check_llm_auth
 
 If LLM_PROVIDER=vertexai, this uses Vertex AI through gcloud ADC. If
 LLM_PROVIDER=api-key, this uses GOOGLE_API_KEY.

@@ -15,7 +15,7 @@ from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.tools import tool
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.agents.printing_tools import (
+from src.agents.optional.printing_tools import (
     PRINT_EXPERIMENT_TOOLS,
     PRINT_JOB_TOOLS,
     PRINTING_EXPERIMENT_TOOLS,

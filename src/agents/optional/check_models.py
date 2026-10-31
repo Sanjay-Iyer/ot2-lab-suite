@@ -5,11 +5,11 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 # --- Root-Aware Discovery ---
-# This file is in src/agents, so root is 2 levels up.
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# This optional module resolves the repository root before loading local settings.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 if __name__ == "__main__" and not __package__:
     print("ERROR: This script must be run as a module from the project root.")
-    print("Command: python -m src.agents.check_models")
+    print("Command: python -m src.agents.optional.check_models")
     sys.exit(1)
 
 from src.utils.paths import PROJECT_ROOT

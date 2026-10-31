@@ -186,7 +186,7 @@ ssh @OPTS root@OT2CEP20220929R02.local "opentrons_execute /var/lib/opentrons/use
 
 Let the AI handle connectivity checks, file transfer, and execution in one session:
 ```powershell
-python -m src.agents.main "Check the robot connection, deploy the printing protocol, and execute it."
+python -m src.agents.optional.main "Check the robot connection, deploy the printing protocol, and execute it."
 ```
 
 The agent will:

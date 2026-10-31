@@ -50,7 +50,7 @@ dev laptop. Only step 5 needs the lab laptop.
 
 ### Or drive it conversationally (AI agent)
 
-`src/agents/vial_print_agent.py` is a LangChain + LangGraph (Gemini) agent that runs
+`src/agents/optional/vial_print_agent.py` is a LangChain + LangGraph (Gemini) agent that runs
 this exact pipeline from natural language — adjust the number of dilutions, droplet
 volume, and replicates by talking to it. It **wraps** the CLI tools (it does not
 bypass any gate) and edits a *user* YAML copy, never the committed default.
@@ -62,8 +62,8 @@ ADC (`LLM_PROVIDER=vertexai`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`);
 do not use `GOOGLE_API_KEY` for live robot runs.
 
 ```bash
-python -m src.agents.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
-python -m src.agents.vial_print_agent --no-llm "5 dilutions, 20 uL droplets"   # offline, no API key
+python -m src.agents.optional.vial_print_agent "set up 5 dilutions, 20 uL droplets, 3 replicates"
+python -m src.agents.optional.vial_print_agent --no-llm "5 dilutions, 20 uL droplets"   # offline, no API key
 ```
 
 See [TOOLS.md](TOOLS.md) §5 for the tool list and the knob→YAML mapping.
