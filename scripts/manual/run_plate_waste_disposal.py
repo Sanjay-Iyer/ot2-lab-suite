@@ -44,7 +44,7 @@ from src.utils.robot_run_log import RobotRunLog, repo_relative
 
 
 REPO = Path(__file__).resolve().parent.parent.parent
-DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "plate_waste_disposal_latest.py"
+DEFAULT_PROTOCOL = REPO / "generated" / "protocols" / "current" / "plate_waste_disposal_latest.py"
 HEADERS = {"opentrons-version": "*"}
 TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}
 

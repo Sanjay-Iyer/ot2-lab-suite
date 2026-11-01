@@ -1,0 +1,13 @@
+# HOME defaults: existing simulation backend, no model or instrument connection.
+interface: gui
+simulate: true
+offline: true
+workflow_config: configs/workflows/defaults/ai_agent_dilution_print_demo.yaml
+operator: null                 # asked by the existing interface
+session_label: HOME
+model: null                    # retain GEMINI_MODEL from .env when AI is enabled
+temperature: 0
+host: 127.0.0.1
+port: 8080
+no_browser: false
+# Set offline: false for AI-assisted simulation with the existing API-key setup.

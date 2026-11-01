@@ -32,7 +32,7 @@ python scripts\manual\build_vial_dilution_print.py        # validate -> embed ->
 ```
 
 The builder validates the YAML, writes
-`src/protocols/generated/vial_dilution_print_run_<ts>.py` (and `…_latest.py`) with your
+`generated/protocols/current/vial_dilution_print_run_<ts>.py` (and `…_latest.py`) with your
 `CONFIG` baked in, and simulates it. That generated file is what you deploy/run on the
 robot (the robot can't read the repo YAML — the config must be embedded). For a quick
 one-off you can also edit the `CONFIG` dict directly at the top of

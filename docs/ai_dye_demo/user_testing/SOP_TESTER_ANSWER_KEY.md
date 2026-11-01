@@ -25,7 +25,7 @@ All values below come from the demo's own plan code (`src/agents/dye_demo/plan.p
 
 Every message is recorded in `runs\ai_dye_demo\<timestamp>\turns.jsonl`, one line per message, with its
 classification (question, instruction, confirmation, ...), proposals, approvals and runs. The number of lines is the
-number of messages typed. Each simulated `run` also writes `src\protocols\generated\ai_agent_dilution_print_demo_run_<timestamp>.py`
+number of messages typed. Each simulated `run` also writes `generated\protocols\ai_agent_dilution_print_demo_run_<timestamp>.py`
 and refreshes `..._latest.py`, as every simulation of this demo does.
 
 ## 2. Scoring

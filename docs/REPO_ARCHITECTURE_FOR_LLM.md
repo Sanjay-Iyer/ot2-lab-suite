@@ -77,7 +77,7 @@ confirmation.
 | `labware/` | Generated Opentrons schema-v2 custom labware JSON definitions |
 | `src/core/` | Central environment config, Pydantic models, constraint loading, validation, and workflow registry |
 | `src/protocols/` | OT-2 protocol templates and generic Python protocol generators |
-| `src/protocols/generated/` | Generated robot-ready Python artifacts; do not edit these directly |
+| `generated/protocols/current/` | Generated robot-ready Python artifacts; do not edit these directly |
 | `scripts/` | Deterministic builders, validators, robot runners, deploy/sync, camera, and labware utilities |
 | `src/agents/` | LangGraph agent entry points and LangChain tool definitions |
 | `skills/` | Human/LLM playbooks: procedures, parameter dictionaries, safety constraints, and command references |
@@ -197,7 +197,7 @@ For `dilution` and `printing`:
 2. `src/protocols/dilution.py` or `src/protocols/printing.py` renders a standalone
    Python source string.
 3. The general agent writes it to
-   `src/protocols/generated/generated_<workflow>.py`.
+   `generated/protocols/current/generated_<workflow>.py`.
 4. The exact file is hashed with SHA-256.
 
 These generated protocols use low API levels (`2.13` or `2.15`) and a relatively
@@ -228,7 +228,7 @@ For vial printing, `scripts/manual/build_vial_dilution_print.py`:
 5. Replaces the region between `# >>> CONFIG START >>>` and
    `# <<< CONFIG END <<<` in `src/protocols/printing/legacy/01_vial_dilution_paper_print.py`.
 6. Writes a timestamped artifact and
-   `src/protocols/generated/vial_dilution_print_latest.py`.
+   `generated/protocols/current/vial_dilution_print_latest.py`.
 7. Simulates the timestamped artifact with the repository's custom labware.
 8. Requires both a zero process status and no recognized error markers in the
    simulator text before printing `SIMULATION OK`.
@@ -358,7 +358,7 @@ $OPTS = @(
 )
 
 ssh @OPTS root@$IP "mkdir -p $REMOTE"
-scp -O @OPTS "src/protocols/generated/generated_dilution.py" "root@${IP}:$REMOTE/generated_dilution.py"
+scp -O @OPTS "generated/protocols/current/generated_dilution.py" "root@${IP}:$REMOTE/generated_dilution.py"
 ssh @OPTS root@$IP "ls -lah $REMOTE/generated_dilution.py"
 ssh @OPTS root@$IP "opentrons_execute $REMOTE/generated_dilution.py"
 ```

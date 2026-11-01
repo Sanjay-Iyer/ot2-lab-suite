@@ -1,0 +1,644 @@
+diff --git a/docs/reviews/task-1.1/implementation.md b/docs/reviews/task-1.1/implementation.md
+new file mode 100644
+index 0000000..d6d4378
+--- /dev/null
++++ b/docs/reviews/task-1.1/implementation.md
+@@ -0,0 +1,32 @@
++# Task 1.1 implementation
++
++**The defect.** In the semantic pipeline, `session.py` applied a proposal whenever the router labeled
++a message `approve`. "Looks good." could change the plan, although `known_limitations.md` says it cannot.
++
++**The change.**
++
++- A model `approve` no longer applies anything. The proposal stays waiting, the operator is told what
++  to do, and `model_approval_refused` is logged.
++- Explicit decisions are read by code before the model is consulted. `_explicit_decision` holds the
++  logic the legacy reader already used, and both readers now share it. It covers `yes`, `apply`,
++  `confirm`, `approve it`, `Yes, I approve proposal #1.`, and `no`, `discard`, `reject`.
++- An approval that names another proposal number, or is joined to a new request, applies nothing.
++- The page's Apply and Discard now call `decide_proposal(apply, proposal_id, revision)` with the proposal
++  and revision last drawn on the page. `decide_from_button` refuses a mismatch, so a click on a replaced
++  proposal cannot apply its replacement. A valid click follows the same turn record and code path as a typed decision.
++- The router's prompt now tells the model it cannot apply a proposal.
++
++**Deliberately unchanged.**
++
++- `yes` typed in chat applies the proposal waiting at that moment, which is the one on screen.
++- A model `discard` still discards, because it changes no plan and the proposal can be requested again.
++- `cancel` keeps its existing behavior, including clearing a held safety question.
++- `state.apply` keeps its revision and staleness checks, which remain the final guard.
++
++**Behavior difference on the semantic path.** "Yes, I approve proposal #1. Now move the plate" used to go
++to the model, and could become a replacement proposal. It now stays waiting and asks for a plain yes
++first, matching the legacy reader and `known_limitations.md`. More wordings now approve directly without
++a model call, because they are the existing explicit-word set.
++
++No robot motion, protocol, compiler or physical setting changed. Golden traces are unaffected because
++this task changes only how a proposal is accepted.
+diff --git a/docs/reviews/task-1.1/task.md b/docs/reviews/task-1.1/task.md
+new file mode 100644
+index 0000000..86c4e09
+--- /dev/null
++++ b/docs/reviews/task-1.1/task.md
+@@ -0,0 +1,13 @@
++# Task 1.1 — Deterministic proposal approval
++
++An LLM interpretation alone must not approve a pending proposal. Require an explicit operator
++action tied to the exact proposal and its revision, and ensure ordinary questions do not modify
++the approved plan. Test ambiguous statements, including "Looks good.", "What would this change?",
++"Explain this proposal." and "I agree with the reasoning, but change the volume."
++
++Scope: `src/agents/dye_demo/session.py`, `conversation.py` (router prompt text),
++`gui/adapter.py`, `gui/app.py`, and a new test file. No robot motion, protocol or physical
++parameter changes.
++
++Acceptance: no plan mutation occurs without a valid explicit approval action.
++Physical qualification is not affected by this task.
+diff --git a/docs/reviews/task-1.1/tests.txt b/docs/reviews/task-1.1/tests.txt
+new file mode 100644
+index 0000000..a16a9ed
+--- /dev/null
++++ b/docs/reviews/task-1.1/tests.txt
+@@ -0,0 +1,22 @@
++Task 1.1 — executed evidence, HOME simulation-only, 2026-10-30
++Worktree: C:\code\opentrons_home\ot2-wt-phase1, branch codex/task-1-1-deterministic-approval, from 0129290.
++Interpreter: conda ai. No model, robot or physical calls: the router is scripted.
++
++1. New tests before the fix, confirming they detect the defect
++   python -B -m pytest tests/test_ai_dye_demo_approval.py -q
++   35 failed, 14 passed in 13.04s.
++
++2. New tests after the fix
++   python -B -m pytest tests/test_ai_dye_demo_approval.py -q
++   49 passed in 5.78s.
++
++3. Every demo test in the worktree (no pinned simulator there, so its 10 tests skip)
++   python -B -m pytest tests -q -k ai_dye_demo --ignore=tests/test_gemini.py
++   9 failed, 1294 passed, 10 skipped, 989 deselected in 196.10s.
++   All 9 failures are classified in Task 0.4 and none is new:
++     repeated_request_with_model_extra_001; test_drops_at_named_positions...;
++     test_decision_routes_carry_no_changes; test_an_aborted_live_run...; 3 SOP drop-count cases;
++     flaky test_discard_leaves_authoritative_state_unchanged; flaky test_the_page_opens_its_run_dialog...
++
++Not run: guarded disposable-checkout run (waits for Task 0.4's runner to be committed), pinned simulator
++tests, golden trace comparison (no motion code changed; rerun at Task 1.6), live model, physical robot.
+diff --git a/src/agents/dye_demo/conversation.py b/src/agents/dye_demo/conversation.py
+index e42692a..70dffc0 100644
+--- a/src/agents/dye_demo/conversation.py
++++ b/src/agents/dye_demo/conversation.py
+@@ -375,7 +375,9 @@ KINDS - every message is exactly one (the SKILL nanodrop-edit-semantics says how
+ - undo: undo the last applied change(s) ("undo that", "go back to how it was before"); "revision": the revision to
+   restore when the scientist names one (from APPLIED CHANGES), else omit it.
+ - cancel: drop what is waiting (the proposal or your open question) without anything else ("never mind", "forget it").
+-- approve / discard: only while a PROPOSAL WAITING FOR APPROVAL is shown, accepting or rejecting it as a whole.
++- approve: only while a PROPOSAL WAITING FOR APPROVAL is shown and the scientist accepts it as a whole. You cannot apply
++  it: Python keeps it waiting and asks for an explicit yes or the Apply button.
++- discard: only while a PROPOSAL WAITING FOR APPROVAL is shown and the scientist rejects it as a whole.
+ - history: saved experiments from earlier sessions ("load my last experiment", "what did I run yesterday?") with
+   "history".
+ - clarification: ONLY when two readings would do materially different physical things and neither the conversation nor
+diff --git a/src/agents/dye_demo/gui/adapter.py b/src/agents/dye_demo/gui/adapter.py
+index 27a45ed..55e18af 100644
+--- a/src/agents/dye_demo/gui/adapter.py
++++ b/src/agents/dye_demo/gui/adapter.py
+@@ -257,6 +257,13 @@ class DemoGuiAdapter:
+         text = text.strip()
+         return bool(text) and self._offer(text, shown=text)
+ 
++    def decide_proposal(self, apply: bool, proposal_id: int | None, revision: int | None) -> bool:
++        """Apply or Discard, for the proposal and revision the page was showing. False when no proposal is waiting."""
++        if proposal_id is None or revision is None:
++            return False
++        return self._offer(lambda: self.session.decide_from_button(apply, proposal_id, revision),
++                           shown="Apply" if apply else "Discard", states=("proposal",))
++
+     def _request_run_confirmation(self) -> None:
+         with self._lock:
+             self._run_confirmation_requested = True
+diff --git a/src/agents/dye_demo/gui/app.py b/src/agents/dye_demo/gui/app.py
+index bcb5812..bd0ede0 100644
+--- a/src/agents/dye_demo/gui/app.py
++++ b/src/agents/dye_demo/gui/app.py
+@@ -315,10 +315,10 @@ def build_page(adapter: DemoGuiAdapter) -> None:
+                     status_badge = ui.badge("READY", color="primary").classes("text-sm px-3 py-2")
+                     with ui.row().classes("items-center gap-1") as top_proposal_actions:
+                         top_apply_button = ui.button("Apply", icon="check",
+-                                                     on_click=lambda: adapter.submit_text("yes"),
++                                                     on_click=lambda: decide_shown_proposal(True),
+                                                      color="positive").props("dense size=sm")
+                         top_discard_button = ui.button("Discard", icon="close",
+-                                                       on_click=lambda: adapter.submit_text("no"),
++                                                       on_click=lambda: decide_shown_proposal(False),
+                                                        color="negative").props("outline dense size=sm")
+                 top_proposal_actions.set_visibility(False)
+                 with ui.column().classes("items-end gap-1"):
+@@ -405,6 +405,12 @@ def build_page(adapter: DemoGuiAdapter) -> None:
+             if snapshot.validation != "All plan checks passed.":
+                 ui.label(snapshot.validation).classes("w-full whitespace-pre-wrap bg-amber-50 text-amber-900 p-3 rounded")
+ 
++    def decide_shown_proposal(apply: bool) -> None:
++        # the proposal and revision last drawn on this page, never whatever happens to be waiting by the time of the click
++        if last["plan"] is not None:
++            _, revision, proposal_id = last["plan"]
++            adapter.decide_proposal(apply, proposal_id, revision)
++
+     @ui.refreshable
+     def render_proposed() -> None:
+         snapshot = adapter.snapshot()
+@@ -423,9 +429,11 @@ def build_page(adapter: DemoGuiAdapter) -> None:
+                         for item in snapshot.proposal_attention:
+                             ui.label(item).classes("whitespace-pre-wrap")
+                 with ui.row().classes("w-full justify-center gap-3 mt-3"):
+-                    ui.button("Apply", icon="check", on_click=lambda: adapter.submit_text("yes"), color="positive")
+-                    ui.button("Discard", icon="close", on_click=lambda: adapter.submit_text("no"), color="negative").props(
+-                        "outline")
++                    ui.button("Apply", icon="check", color="positive",
++                              on_click=lambda: adapter.decide_proposal(True, snapshot.proposal_id, snapshot.revision))
++                    ui.button("Discard", icon="close", color="negative",
++                              on_click=lambda: adapter.decide_proposal(False, snapshot.proposal_id, snapshot.revision)
++                              ).props("outline")
+ 
+     busy_note = "finish the current step first (answer the question, or apply or discard the proposal)."
+ 
+diff --git a/src/agents/dye_demo/session.py b/src/agents/dye_demo/session.py
+index 9808d66..d51d8a7 100644
+--- a/src/agents/dye_demo/session.py
++++ b/src/agents/dye_demo/session.py
+@@ -14,8 +14,10 @@ THE SEMANTIC PIPELINE (settings.llm_first: the page, and the terminal whenever a
+       -> RUN: compiler.compile_plan resolves references and lays out every print into the exact print map; every
+          check runs on the compiled plan, and only the compiled config is executed
+ 
+-Only the page's own controls (Apply/Discard, cancel, a yes/no to my own yes/no question) are read here without the
+-model. The legacy reader below (llm_first off) is kept for the offline terminal and its regression tests.
++Only the operator's own decisions (an explicit yes or no to the waiting proposal, Apply/Discard, cancel, a yes/no to my
++own yes/no question) are read here without the model, and nothing the model returns can approve a proposal: its
++"approve" keeps the proposal waiting. The legacy reader below (llm_first off) is kept for the offline terminal and its
++regression tests.
+ 
+ THE LEGACY READER
+ 
+@@ -1114,21 +1116,19 @@ class DemoSession:
+         The router (conversation.interpret) reads the message in context and returns a TurnInterpretation; Python acts
+         on its kind. A question is answered and nothing else happens - it never passes through proposal or run checks.
+         A plan change is a list of semantic patch operations (patches.py) proposed with ExperimentState.propose_patch.
+-        Read here without the model are only the page's own controls: Apply / Discard ("yes" / "no" while a proposal
+-        waits), cancel, and a yes/no answer to one of my own yes/no questions."""
++        Read here without the model are only the operator's own decisions: an explicit yes or no to the waiting
++        proposal, cancel, and a yes/no answer to one of my own yes/no questions."""
+         lowered = " ".join(text.lower().split()).strip(" .!")
+-        if self.pending is not None and lowered in {"yes", "y", "apply"}:
+-            self._classify("confirmation")
+-            self._apply_pending()
+-            return
+-        if self.pending is not None and lowered in {"no", "n", "discard"}:
+-            self._classify("confirmation")
+-            self._discard_pending("no")
+-            return
+         if lowered in {"cancel", "stop", "never mind"}:
+             self._classify("cancel")
+             self._cancel()
+             return
++        # The analysis recognizes an explicit decision on the waiting proposal and separates quoted or pasted reference
++        # material for the router; it decides nothing else.
++        analysis = analyze_turn(text, self._turn_context())
++        if self.pending is not None and self._explicit_decision(text, analysis):
++            self._classify("confirmation", analysis)
++            return
+         if self.clarifying is not None and self.clarifying.ambiguity is not None \
+                 and self.clarifying.ambiguity.yes_no and lowered in {"yes", "no"}:
+             self._with_clarifying(text, analyze_turn(text, self._turn_context()))
+@@ -1138,8 +1138,6 @@ class DemoSession:
+             self._classify("confirmation")
+             self._answer_safety(lowered in {"no", "n"}, [], original=text)     # yes: the sample is already there
+             return
+-        # The analysis only separates quoted or pasted reference material for the router; it decides nothing.
+-        analysis = analyze_turn(text, self._turn_context())
+         self._classify("llm_first", analysis)
+         result = self._interpret(text, analysis)
+         if result is None:
+@@ -1160,13 +1158,18 @@ class DemoSession:
+                 self.clarifying = None  # superseded optional planning question
+             self._request_gui_run()
+             return
+-        if kind in {conversation.APPROVE, conversation.DISCARD}:
+-            if kind == conversation.APPROVE and self.pending is not None:
+-                self._apply_pending()
+-            elif kind == conversation.DISCARD and self.pending is not None:
+-                self._discard_pending("model-interpreted discard")
+-            else:
+-                self.say("agent> No proposal is waiting for that decision.")
++        if kind in {conversation.APPROVE, conversation.DISCARD} and self.pending is None:
++            self.say("agent> No proposal is waiting for that decision.")
++            return
++        if kind == conversation.APPROVE:
++            # The model's reading is never authorization: only the operator's explicit yes or Apply changes the plan.
++            self.say(f"agent> Nothing was applied: proposal #{self.pending.id} is still waiting. Type yes or press Apply "
++                     "to apply it, or tell me what to change.")
++            self.log.write("model_approval_refused", proposal=self.pending.id, message=text)
++            self._event("noop", reason="model approval is not authorization")
++            return
++        if kind == conversation.DISCARD:
++            self._discard_pending("model-interpreted discard")
+             return
+         if kind == conversation.CANCEL:
+             self._cancel()
+@@ -3176,34 +3179,62 @@ class DemoSession:
+ 
+     # ── a proposal is waiting ────────────────────────────────────────────────
+ 
+-    def _with_pending(self, text: str, analysis: TurnAnalysis) -> None:
++    def _explicit_decision(self, text: str, analysis: TurnAnalysis) -> bool:
++        """The operator's explicit yes or no to the waiting proposal, read by code and never by a model. True when this
++        message was such a decision, whether or not it applied anything."""
+         proposal = self.pending
+         assert proposal is not None
+-        kind = analysis.kind
+-        if kind == "confirmation":
++        if analysis.kind == "confirmation":
+             named = analysis.details.get("proposal_id")
+             if analysis.confirmation == "yes" and named is not None and named != proposal.id:
+                 self.say(f"agent> That approves proposal #{named}, but proposal #{proposal.id} is the one waiting, so "
+                          f"nothing was applied. Type yes to apply proposal #{proposal.id} or no to discard it.")
+                 self._event("noop", reason="approval named another proposal")
+-                return
++                return True
+             if analysis.confirmation == "yes":
+                 self._apply_pending()
+             else:
+                 self._discard_pending("no")
+-            return
++            return True
+         approved_with_request = analysis.details.get("approval_with_request")
+-        if approved_with_request is not None:
+-            if approved_with_request == proposal.id and not analysis.actionable and not analysis.facts \
+-                    and not analysis.informational and not analysis.details.get("undo") and "?" not in text:
+-                self._apply_pending()            # "Yes, I approve proposal #1. Thanks." - only courtesy words around it
+-                return
+-            if analysis.details.get("unsupported"):
+-                self.say("agent> " + " ".join(dict.fromkeys(analysis.details["unsupported"])))
+-            self.say(f"agent> Your message approves proposal #{approved_with_request} and also asks for something else. "
+-                     f"Nothing was applied yet: proposal #{proposal.id} is still waiting. Type yes to apply it first, "
+-                     "then send the next request.")
+-            self._event("noop", reason="approval together with another request")
++        if approved_with_request is None:
++            return False
++        if approved_with_request == proposal.id and not analysis.actionable and not analysis.facts \
++                and not analysis.informational and not analysis.details.get("undo") and "?" not in text:
++            self._apply_pending()            # "Yes, I approve proposal #1. Thanks." - only courtesy words around it
++            return True
++        if analysis.details.get("unsupported"):
++            self.say("agent> " + " ".join(dict.fromkeys(analysis.details["unsupported"])))
++        self.say(f"agent> Your message approves proposal #{approved_with_request} and also asks for something else. "
++                 f"Nothing was applied yet: proposal #{proposal.id} is still waiting. Type yes to apply it first, "
++                 "then send the next request.")
++        self._event("noop", reason="approval together with another request")
++        return True
++
++    def decide_from_button(self, apply: bool, proposal_id: int, revision: int) -> None:
++        """The page's Apply or Discard, for the exact proposal and revision on screen. The same turn record and code path
++        as typing yes or no. The GUI calls this on the worker thread that owns ``run()``."""
++        self.log.write("gui_proposal_button", action="apply" if apply else "discard", proposal=proposal_id,
++                       revision=revision)
++        pending = self.pending
++        if pending is None or pending.id != proposal_id or pending.base_revision != revision \
++                or self.state.revision != revision:
++            self.say(f"agent> Nothing was {'applied' if apply else 'discarded'}: the proposal on screen is out of date. "
++                     "Check the plan now shown, then choose again.")
++            self.log.write("gui_proposal_button_stale", proposal=proposal_id, revision=revision,
++                           pending=pending.id if pending else None, current_revision=self.state.revision)
++            return
++        self._from_button = True
++        try:
++            self._handle("yes" if apply else "no")
++        finally:
++            self._from_button = False
++
++    def _with_pending(self, text: str, analysis: TurnAnalysis) -> None:
++        proposal = self.pending
++        assert proposal is not None
++        kind = analysis.kind
++        if self._explicit_decision(text, analysis):
+             return
+         if kind == "uncertain":
+             self.say(f"agent> That is not a clear yes, so nothing was applied. Type yes to apply proposal "
+diff --git a/tests/test_ai_dye_demo_approval.py b/tests/test_ai_dye_demo_approval.py
+new file mode 100644
+index 0000000..9627e7d
+--- /dev/null
++++ b/tests/test_ai_dye_demo_approval.py
+@@ -0,0 +1,314 @@
++"""Task 1.1: a pending proposal changes the plan only through the operator's explicit, exact approval.
++
++The router here is scripted so it can be wrong on purpose. Nothing is ever applied because of how a model read a message.
++"""
++from __future__ import annotations
++
++import json
++import time
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++
++from src.agents.dye_demo.gui.adapter import DemoGuiAdapter
++from src.agents.dye_demo.llm import LLMClient
++from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config
++from src.agents.dye_demo.session import DemoSession, SessionSettings
++
++REQUEST = "make it 3 replicates"
++PROPOSE = {"kind": "plan_change", "response": "This would print 3 replicates.", "edit_modes": {"printing": "modify"},
++           "operations": [{"op": "set", "path": "print.replicates", "value": 3}]}
++APPROVE = {"kind": "approve", "response": "Applying that now."}
++
++
++class Router:
++    """Answers scripted messages. A message that should never reach the model fails the test."""
++
++    def __init__(self, replies):
++        self.replies, self.seen = replies, []
++
++    def invoke(self, messages):
++        message = messages[-1][1].split("SCIENTIST'S MESSAGE:\n")[-1].strip()
++        self.seen.append(message)
++        return SimpleNamespace(content=json.dumps(self.replies[message]))
++
++
++def session(tmp_path: Path, replies: dict, *, run_button="Run on OT-2"):
++    model = Router({REQUEST: PROPOSE, **replies})
++    output: list[str] = []
++    settings = SessionSettings(simulate=True, config_source=DEFAULT_CONFIG, working_config=tmp_path / "working.yaml",
++                               run_dir=tmp_path / "run", session_label="approval", operator="Tester",
++                               skip_llm_startup=True, run_button=run_button, llm_first=True, raise_errors=True)
++    demo = DemoSession(settings, load_config(DEFAULT_CONFIG), llm=LLMClient(lambda: model),
++                       executor=lambda *_: 0, input_fn=lambda _prompt: "yes", output_fn=output.append,
++                       sleep=lambda _: None)
++    demo.operator = "Tester"
++    demo.request_run_confirmation = lambda: output.append("CONFIRM RUN")
++    return demo, model, output
++
++
++def replicates(demo) -> int:
++    return demo.state.config["print"]["replicates"]
++
++
++def assert_unchanged(demo, fingerprint):
++    assert demo.state.revision == 0 and replicates(demo) == 1
++    assert demo.state.full_fingerprint() == fingerprint
++
++
++def with_proposal(tmp_path, replies=None, **kwargs):
++    demo, model, output = session(tmp_path, replies or {}, **kwargs)
++    fingerprint = demo.state.full_fingerprint()
++    demo._handle(REQUEST)
++    assert demo.pending is not None and demo.pending.id == 1
++    assert_unchanged(demo, fingerprint)
++    return demo, model, output, fingerprint
++
++
++# ── the model's reading is never authorization ──────────────────────────────────
++
++@pytest.mark.parametrize("message", ["Looks good.", "sure", "ok", "yeah go ahead", "perfect, thanks",
++                                     "I agree, do it", "That seems right to me"])
++def test_a_model_read_approval_applies_nothing(tmp_path, message):
++    demo, model, output, fingerprint = with_proposal(tmp_path, {message: APPROVE})
++    demo._handle(message)
++    assert message in model.seen, "this message is for the model to read, and its reading must not apply anything"
++    assert demo.pending is not None and demo.pending.id == 1
++    assert_unchanged(demo, fingerprint)
++    said = "\n".join(output)
++    assert "Nothing was applied" in said and "Applying that now" not in said
++    assert demo.turns[-1]["events"][-1] == {"type": "noop", "reason": "model approval is not authorization"}
++
++
++@pytest.mark.parametrize("reply", [
++    {"route": "approve_proposal"},
++    {"kind": "approve_proposal", "response": "ok"},
++    {"kind": "approve", "response": "ok", "revises": True},
++    {"kind": "approve", "response": "ok", "operations": [{"op": "set", "path": "print.replicates", "value": 3}]},
++], ids=["old_route", "alias", "revises", "with_operations"])
++def test_no_spelling_of_a_model_approval_applies_anything(tmp_path, reply):
++    demo, _, _, fingerprint = with_proposal(tmp_path, {"fine": reply})
++    demo._handle("fine")
++    assert demo.pending is not None
++    assert_unchanged(demo, fingerprint)
++
++
++def test_a_question_misread_as_approval_changes_nothing(tmp_path):
++    demo, _, _, fingerprint = with_proposal(tmp_path, {"What would this change?": APPROVE})
++    demo._handle("What would this change?")
++    assert demo.pending is not None
++    assert_unchanged(demo, fingerprint)
++
++
++@pytest.mark.parametrize("message", ["What would this change?", "Explain this proposal."])
++def test_a_question_about_the_proposal_is_answered_and_it_keeps_waiting(tmp_path, message):
++    answer = {"kind": "question", "response": "It would print three replicates of each dilution."}
++    demo, _, output, fingerprint = with_proposal(tmp_path, {message: answer})
++    demo._handle(message)
++    assert demo.pending is not None and demo.pending.id == 1
++    assert_unchanged(demo, fingerprint)
++    assert any("three replicates" in line for line in output)
++
++
++def test_agreeing_while_asking_for_a_change_replaces_the_proposal_and_applies_nothing(tmp_path):
++    message = "I agree with the reasoning, but change the volume."
++    change = {"kind": "plan_change", "response": "This would print 3 uL drops.", "edit_modes": {"printing": "modify"},
++              "operations": [{"op": "set", "path": "print.droplet_volume_ul", "value": 3.0}]}
++    demo, _, _, _ = with_proposal(tmp_path, {message: change})
++    demo._handle(message)
++    assert demo.pending is not None and demo.pending.id != 1
++    assert demo.state.revision == 0 and demo.state.config["print"]["droplet_volume_ul"] == 5.0
++
++
++def test_a_model_approval_with_nothing_waiting_is_answered(tmp_path):
++    demo, _, output = session(tmp_path, {"Looks good.": APPROVE})
++    demo._handle("Looks good.")
++    assert demo.pending is None and demo.state.revision == 0
++    assert any("No proposal is waiting" in line for line in output)
++
++
++def test_the_terminal_path_refuses_a_model_approval_too(tmp_path):
++    demo, _, _, fingerprint = with_proposal(tmp_path, {"Looks good.": APPROVE}, run_button=None)
++    demo._handle("Looks good.")
++    assert demo.pending is not None
++    assert_unchanged(demo, fingerprint)
++
++
++def test_a_following_explicit_yes_applies_the_waiting_proposal(tmp_path):
++    demo, _, _, _ = with_proposal(tmp_path, {"Looks good.": APPROVE})
++    demo._handle("Looks good.")
++    demo._handle("yes")
++    assert demo.pending is None and demo.state.revision == 1 and replicates(demo) == 3
++
++
++def test_saying_yes_to_a_question_makes_a_proposal_and_not_a_change(tmp_path):
++    question = {"kind": "question", "response": "Yes, that is possible.",
++                "hypothetical": [{"op": "set", "path": "print.replicates", "value": 3}]}
++    demo, _, _ = session(tmp_path, {"Could I print 3 replicates?": question, "Yes, do that.": PROPOSE})
++    demo._handle("Could I print 3 replicates?")
++    demo._handle("Yes, do that.")
++    assert demo.pending is not None and demo.state.revision == 0 and replicates(demo) == 1
++
++
++# ── what does approve: the operator's explicit words ────────────────────────────
++
++@pytest.mark.parametrize("message", ["yes", "Yes.", "y", "apply", "yes please", "confirm", "approve", "approve it",
++                                     "Yes, I approve proposal #1."])
++def test_explicit_approval_applies_without_asking_the_model(tmp_path, message):
++    demo, model, _, _ = with_proposal(tmp_path)
++    demo._handle(message)
++    assert model.seen == [REQUEST], "an explicit decision is read by code"
++    assert demo.pending is None and demo.state.revision == 1 and replicates(demo) == 3
++
++
++def test_approving_another_proposal_number_applies_nothing(tmp_path):
++    demo, model, output, fingerprint = with_proposal(tmp_path)
++    demo._handle("Yes, I approve proposal #2.")
++    assert model.seen == [REQUEST]
++    assert demo.pending is not None
++    assert_unchanged(demo, fingerprint)
++    assert any("approves proposal #2" in line for line in output)
++
++
++def test_approval_joined_to_a_new_request_applies_nothing(tmp_path):
++    demo, model, _, fingerprint = with_proposal(tmp_path)
++    demo._handle("Yes, I approve proposal #1. Now move the plate to slot 2.")
++    assert model.seen == [REQUEST]
++    assert demo.pending is not None
++    assert_unchanged(demo, fingerprint)
++
++
++@pytest.mark.parametrize("message", ["no", "discard", "reject", "no thanks"])
++def test_an_explicit_no_discards_without_asking_the_model(tmp_path, message):
++    demo, model, _, fingerprint = with_proposal(tmp_path)
++    demo._handle(message)
++    assert model.seen == [REQUEST]
++    assert demo.pending is None
++    assert_unchanged(demo, fingerprint)
++
++
++def test_cancel_still_drops_the_proposal(tmp_path):
++    demo, _, _, fingerprint = with_proposal(tmp_path)
++    demo._handle("cancel")
++    assert demo.pending is None
++    assert_unchanged(demo, fingerprint)
++
++
++def test_pasted_material_saying_yes_is_not_an_approval(tmp_path):
++    message = 'The SOP says: "yes, apply it"'
++    demo, _, _, fingerprint = with_proposal(tmp_path, {message: {"kind": "question", "response": "That is the SOP."}})
++    demo._handle(message)
++    assert demo.pending is not None
++    assert_unchanged(demo, fingerprint)
++
++
++# ── the page's buttons name the exact proposal and revision ─────────────────────
++
++def test_the_button_applies_the_proposal_it_names(tmp_path):
++    demo, model, _, _ = with_proposal(tmp_path)
++    demo.decide_from_button(True, 1, 0)
++    assert model.seen == [REQUEST]
++    assert demo.pending is None and demo.state.revision == 1 and replicates(demo) == 3
++    assert demo.turns[-1]["classification"] == "confirmation", "a button press is recorded like a typed decision"
++
++
++def test_the_button_discards_the_proposal_it_names(tmp_path):
++    demo, _, _, fingerprint = with_proposal(tmp_path)
++    demo.decide_from_button(False, 1, 0)
++    assert demo.pending is None
++    assert_unchanged(demo, fingerprint)
++
++
++@pytest.mark.parametrize("apply", [True, False])
++@pytest.mark.parametrize("proposal_id,revision", [(2, 0), (1, 1), (99, 99)], ids=["other_id", "other_revision", "both"])
++def test_a_button_for_anything_else_changes_nothing(tmp_path, apply, proposal_id, revision):
++    demo, _, output, fingerprint = with_proposal(tmp_path)
++    demo.decide_from_button(apply, proposal_id, revision)
++    assert demo.pending is not None and demo.pending.id == 1
++    assert_unchanged(demo, fingerprint)
++    assert any("out of date" in line for line in output)
++
++
++def test_a_click_on_a_replaced_proposal_does_not_apply_its_replacement(tmp_path):
++    other = {"kind": "plan_change", "response": "This would print 4 replicates.", "edit_modes": {"printing": "modify"},
++             "operations": [{"op": "set", "path": "print.replicates", "value": 4}]}
++    demo, _, _, fingerprint = with_proposal(tmp_path, {"actually 4": other})
++    demo._handle("actually 4")
++    replacement = demo.pending.id
++    assert replacement != 1
++    demo.decide_from_button(True, 1, 0)                    # the page still showed the first proposal
++    assert demo.pending is not None and demo.pending.id == replacement
++    assert_unchanged(demo, fingerprint)
++
++
++def test_a_button_with_nothing_waiting_changes_nothing(tmp_path):
++    demo, _, _ = session(tmp_path, {})
++    fingerprint = demo.state.full_fingerprint()
++    demo.decide_from_button(True, 1, 0)
++    assert_unchanged(demo, fingerprint)
++
++
++# ── the same rule through the real page adapter and worker thread ───────────────
++
++def wait_for(predicate, timeout=5):
++    deadline = time.monotonic() + timeout
++    while time.monotonic() < deadline:
++        if predicate():
++            return
++        time.sleep(0.01)
++    raise AssertionError("timed out waiting for the GUI adapter")
++
++
++def page(tmp_path, replies):
++    model = Router({REQUEST: PROPOSE, **replies})
++    settings = SessionSettings(simulate=True, config_source=DEFAULT_CONFIG, working_config=tmp_path / "working.yaml",
++                               run_dir=tmp_path / "run", session_label="approval", operator="Tester",
++                               skip_llm_startup=True, run_button="Run on OT-2", llm_first=True, raise_errors=True)
++    demo = DemoSession(settings, load_config(DEFAULT_CONFIG), llm=LLMClient(lambda: model), executor=lambda *_: 0,
++                       sleep=lambda _: None)
++    adapter = DemoGuiAdapter(demo)
++    adapter.start()
++    wait_for(lambda: adapter.waiting == "idle")
++    return adapter, demo
++
++
++def test_the_page_applies_only_through_the_shown_proposal(tmp_path):
++    adapter, demo = page(tmp_path, {"Looks good.": APPROVE})
++    try:
++        assert adapter.submit_text(REQUEST)
++        wait_for(lambda: adapter.waiting == "proposal")
++        shown = adapter.snapshot()
++        assert shown.proposal_id == 1
++        assert adapter.submit_text("Looks good.")
++        wait_for(lambda: adapter.waiting == "proposal" and any(
++            "Nothing was applied" in message.text for message in adapter.messages()))
++        assert demo.state.revision == 0 and demo.pending is not None
++        assert adapter.decide_proposal(True, shown.proposal_id, shown.revision)
++        wait_for(lambda: adapter.waiting == "idle" and demo.state.revision == 1)
++        assert demo.pending is None and replicates(demo) == 3
++    finally:
++        adapter.stop()
++
++
++def test_the_page_refuses_a_stale_click_and_stays_usable(tmp_path):
++    adapter, demo = page(tmp_path, {})
++    try:
++        assert adapter.submit_text(REQUEST)
++        wait_for(lambda: adapter.waiting == "proposal")
++        assert adapter.decide_proposal(True, 7, 0)
++        wait_for(lambda: adapter.waiting == "proposal" and any(
++            "out of date" in message.text for message in adapter.messages()))
++        assert demo.state.revision == 0 and demo.pending is not None
++    finally:
++        adapter.stop()
++
++
++def test_the_page_has_nothing_to_decide_without_a_proposal(tmp_path):
++    adapter, demo = page(tmp_path, {})
++    try:
++        assert adapter.decide_proposal(True, None, None) is False
++        assert adapter.decide_proposal(True, 1, 0) is False, "no proposal is waiting"
++        assert demo.state.revision == 0
++    finally:
++        adapter.stop()

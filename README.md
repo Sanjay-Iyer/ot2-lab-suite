@@ -36,6 +36,7 @@ The current NanoDrop series is not a serial well-to-well transfer chain.
 | [src/agents/optional/](src/agents/optional/README.md) | Existing optional general, labware, printing and earlier vial agents |
 | `src/printing/`, `src/core/` | Existing generalized workflow components and configuration |
 | `src/protocols/`, `src/lab/` | Standalone OT-2 protocols, connection and instrument helpers |
+| [generated/](generated/README.md) | Build outputs and retained compatibility snapshots, separate from source |
 | [scripts/](scripts/README.md) | Manual, agent and GUI entry points |
 | [configs/](configs/README.md) | Experiments, launcher profiles and existing laboratory settings |
 | [skills/](skills/README.md) | Shared Markdown experimental instructions |

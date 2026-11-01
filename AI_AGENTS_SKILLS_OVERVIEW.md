@@ -115,7 +115,7 @@ and edits a *user* YAML copy — the rules below still apply in full. See
 - **Edit the YAML, never the generated file.** The robot can't read the repo; the
   builder embeds the YAML as `CONFIG` between the `# >>> CONFIG START >>>` /
   `# <<< CONFIG END <<<` markers and writes a self-contained copy to
-  `src/protocols/generated/`. Edits to generated files are overwritten and never
+  `generated/protocols/current/`. Edits to generated files are overwritten and never
   reach hardware correctly.
 - **`pathlib.Path`, relative to repo root.** All shared file I/O must be OS-agnostic
   (the robot runs Linux, the laptops run Windows). No hardcoded `C:\…` or rigid

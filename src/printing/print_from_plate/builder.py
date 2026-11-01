@@ -29,7 +29,7 @@ BASE_PROTOCOL = (
 LABWARE_DIR = Path(REPO_ROOT) / "labware"
 ARTIFACT_DIR = Path(REPO_ROOT) / ".test_tmp" / "print-from-plate-artifacts"
 GENERATED_PATH = (
-    Path(REPO_ROOT) / "src" / "protocols" / "generated" / "01b_print_from_plate_latest.py"
+    Path(REPO_ROOT) / "generated" / "protocols" / "current" / "01b_print_from_plate_latest.py"
 )
 
 START_SENTINEL = "# >>> CONFIG START >>>"

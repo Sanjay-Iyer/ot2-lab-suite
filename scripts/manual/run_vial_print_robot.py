@@ -55,7 +55,7 @@ from src.printing.workflows.registry import (
 
 
 REPO = Path(__file__).resolve().parent.parent.parent
-GENERATED_PROTOCOL_DIR = REPO / "src" / "protocols" / "generated"
+GENERATED_PROTOCOL_DIR = REPO / "generated" / "protocols" / "current"
 
 # Markers the builder writes around the embedded CONFIG dict (keep in sync with
 # scripts/manual/build_vial_dilution_print.py).

@@ -40,9 +40,9 @@ python scripts/manual/build_vial_dilution_print.py --no-sim
 5. Writes **two** files and simulates the timestamped one.
 
 **Outputs**
-- `src/protocols/generated/vial_dilution_print_run_<YYYYMMDD_HHMMSS>.py` (timestamp
+- `generated/protocols/current/vial_dilution_print_run_<YYYYMMDD_HHMMSS>.py` (timestamp
   is local time with UTC offset applied, for log correlation).
-- `src/protocols/generated/vial_dilution_print_latest.py` (the deploy artifact).
+- `generated/protocols/current/vial_dilution_print_latest.py` (the deploy artifact).
 - Console: `Config validation passed.`, the two generated paths, a key-line
   simulation digest, and `SIMULATION OK` / `SIMULATION FAILED`.
 
@@ -72,7 +72,7 @@ python scripts/manual/validate_vial_print.py --config configs/workflows/user/my_
 | `--config` | path | the committed default YAML | YAML the must-contain assertions are **derived** from. Pass the *same* user config used to build the generated protocol so a custom factor list / `destination_column` validates against its own expectations, not the default's. |
 
 **Target file priority:**
-`src/protocols/generated/vial_dilution_print_latest.py` →
+`generated/protocols/current/vial_dilution_print_latest.py` →
 `src/protocols/printing/legacy/01_vial_dilution_paper_print.py`.
 
 > When the AI agent (below) builds from a user config, it threads that same path

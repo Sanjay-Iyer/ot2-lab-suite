@@ -1,0 +1,40 @@
+R0 — actual evidence, HOME, 2026-10-30
+
+R0.1: git status/branch/worktree/tag/log inspection; candidate Git blob and dirty
+source AST parsing:32Python files,0syntax problems;0application imports/calls.
+Independent JUnit parse of06c0bdd full_r2:2227passed,25failed,5skipped,0errors.
+
+R0.2: python -B docs/reviews/task-R0/preserve_recovery.py
+  Exit0;70948records/11trees;CRC/fileSHA/baseartifact/bundle/status/ref checksPASS.
+Private scratch supplement:9093file records,CRC/fileSHA PASS;76exact known errors,
+0unknown. Both reviewers independently verified scratch bytes/links/empty targets.
+Private post_audit.py:Exit0;95outer evidence SHA pairsPASS;13234mutable hashesPASS;
+0noncache links;exact-manifest reconstruction required.44Git metadata filesPASS.
+
+R0.3: git merge --ff-only f8cfc5d, then a2f8dba, then0129290
+  Exit0each;1196original tracked files byte-identical after EACH integration.
+Whitelisted git restore from06c0bdd:57test/docs/golden paths; inactive pending
+patches preserved with explicit bases. No runtime candidate activated.
+
+R0.4 focused checks:
+  conda activate ai
+  python -B docs/reviews/task-0.3/test_settings_evidence.py
+  Exit0;6testsPASS (0.215s).
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1, PYTHONDONTWRITEBYTECODE=1, OT2_BASELINE_ROOT unset
+  python -B -m pytest --noconftest -p no:cacheprovider --basetemp .test_tmp/R0-hygiene-20261030 tests/test_offline_baseline_hygiene.py -q
+  Exit0;2passed,2expected optional-guard skips (0.16s). No app conftest/model/robot.
+
+Broader baseline and golden tests NOT run as acceptedR0evidence; their own
+ordered task reviews follow. Physical qualification:WORK VALIDATION PENDING.
+
+Final R0.4 checks: all29golden fixtures match06c0bdd (EOL-normalized text only);
+original-plan byte hash and supplied-instruction byte hash match; detailed
+master sections3onward differ only in reviewer-role wording. Runtime/scientific
+tracked paths have no changes; pending1.1/1.2files are absent from active src/tests.
+Existing11worktree registrations remain;01_paperHEAD0129290.
+  git apply --check docs/reviews/task-R0/recovered/task-1.1.patch
+  Exit0at01_paper's0129290base.
+  git apply --check <root>/docs/reviews/task-R0/recovered/task-1.2.patch
+  Exit0read-only in existing clean1838b3a worktree; no file was applied there.
+Retired runner --help:Exit0; no-argument call:expectedExit2before tests/copying.
+New preservation helper and retired runner AST parse:PASS.

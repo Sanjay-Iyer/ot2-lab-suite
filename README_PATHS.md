@@ -21,7 +21,7 @@ config_path = USER_CONFIG_DIR / "my_config.yaml"
 - `LOG_DIR`: `robot_data/data/logs/`
 - `AGENT_LOG_DIR`: `robot_data/data/logs/agents/`
 - `PROTOCOL_DIR`: `src/protocols/`
-- `GENERATED_PROTOCOL_DIR`: `src/protocols/generated/`
+- `GENERATED_PROTOCOL_DIR`: `generated/protocols/current/`
 
 ## Audit Tool: `scripts/developer/audit_paths.py`
 Run this tool to ensure no hardcoded paths are introduced:

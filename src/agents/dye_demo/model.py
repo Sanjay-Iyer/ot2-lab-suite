@@ -889,9 +889,24 @@ def normalize_loaded_config(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_config(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    path = Path(path)
+    path = path if path.is_absolute() else REPO / path
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path} must contain a YAML mapping")
+    # One optional shared laboratory configuration; no recursive inheritance.
+    # The same loader is used by manual scripts, the terminal agent and NiceGUI.
+    reference = data.pop("base_config", None)
+    if reference is not None:
+        if not isinstance(reference, str) or not reference.strip():
+            raise ValueError("base_config must be a non-empty YAML path")
+        base_path = Path(reference)
+        base_path = base_path if base_path.is_absolute() else REPO / base_path
+        base = yaml.safe_load(base_path.read_text(encoding="utf-8"))
+        if not isinstance(base, dict) or "base_config" in base:
+            raise ValueError("base_config must reference a complete YAML mapping without another base_config")
+        from src.core.config_loader import merge_user_updates
+        data = merge_user_updates(base, data)
     return normalize_loaded_config(data)
 
 

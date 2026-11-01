@@ -1,0 +1,22 @@
+# Print existing prepared samples; this configuration does not prepare dilutions.
+# Edit positions, drop volume, drops and replicates; preserve lab-owned geometry.
+base_config: configs/workflows/defaults/ai_agent_dilution_print_demo.yaml
+protocol_version: 19
+run_modes: {dry_run: false, do_dilution: false, do_print: true}
+dilution:
+  enabled: false
+  factors: [2, 5, 10]
+  total_volume_ul: 100.0
+  prepared_volume_ul: 100.0
+  plate_column: '11'
+  start_row: A
+print:
+  enabled: true
+  droplet_volume_ul: 5.0
+  droplets_per_spot: 1
+  replicates: 1
+  paper_start_column: 1
+  source_map:
+    - {source: A11, positions: [A1]}
+    - {source: B11, positions: [B1]}
+    - {source: C11, positions: [C1]}

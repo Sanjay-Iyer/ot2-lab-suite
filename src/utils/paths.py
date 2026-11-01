@@ -35,7 +35,7 @@ AGENT_LOG_DIR = LOG_DIR / "agents"
 OUTPUT_DIR = ROBOT_DATA_MIRROR / "outputs"
 
 PROTOCOL_DIR = PROJECT_ROOT / "src" / "protocols"
-GENERATED_PROTOCOL_DIR = PROTOCOL_DIR / "generated"
+GENERATED_PROTOCOL_DIR = PROJECT_ROOT / "generated" / "protocols" / "current"
 
 # Staging & Tracking
 DEPLOY_BASE_DIR = ROBOT_DATA_DIR / "deploy"

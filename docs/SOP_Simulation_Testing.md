@@ -113,7 +113,7 @@ $OPTS = @("-o", "IdentitiesOnly=yes", "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
 ssh @OPTS root@OT2CEP20220929R02.local "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/run_123"
 
 # Copy the file to the robot (-O forces legacy SCP protocol; the OT-2 lacks sftp-server)
-scp -O @OPTS src\protocols\generated\generated_printing.py root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/run_123/
+scp -O @OPTS generated\protocols\generated_printing.py root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/run_123/
 ```
 
 **Step C: Execute via SSH**

@@ -1,0 +1,47 @@
+{
+  "verification.json": {
+    "status": "verified",
+    "worktrees": 11,
+    "files": 70948,
+    "overlay_files": 52089,
+    "base_files": 18859,
+    "links_metadata_only": 0,
+    "cache_exclusions": 2448,
+    "archive_crc_and_file_sha": "PASS",
+    "base_artifact_hashes": "PASS",
+    "bundle_verify": "PASS",
+    "source_status_refs_unchanged": "PASS"
+  },
+  "scratch-verification.json": {
+    "files": 9093,
+    "base_references": 3793,
+    "links_metadata_only": 1780,
+    "read_errors": 76,
+    "excluded_dirs": 8,
+    "crc_and_file_hashes": "PASS"
+  },
+  "scratch-link-verification.json": {
+    "categories": {
+      "target-bytes-covered": 887,
+      "empty-test-cache-directory-tree": 18,
+      "empty-test-cache-directory": 875
+    },
+    "all_source_and_target_scopes_checked": true,
+    "unknown_read_errors": 0,
+    "known_inaccessible_cache_paths": 76
+  },
+  "post-audit-verification.json": {
+    "outer_evidence_file_sha": "PASS",
+    "outer_evidence_files": 95,
+    "mutable_source_sha": "PASS",
+    "mutable_files_rechecked": 13234,
+    "noncache_links": 0,
+    "noncache_link_targets": "PASS",
+    "scratch_read_errors": 76,
+    "exact_manifest_recovery_required": true
+  },
+  "git_metadata": {
+    "verified_files": 44,
+    "contents_private": true
+  }
+}

@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 BASE_PROTOCOL = REPO_ROOT / "src" / "protocols" / "printing" / "11_clover_print.py"
 GENERATED_PATH = (
-    REPO_ROOT / "src" / "protocols" / "generated" / "11_clover_print_latest.py"
+    REPO_ROOT / "generated" / "protocols" / "current" / "11_clover_print_latest.py"
 )
 LABWARE_DIR = REPO_ROOT / "labware"
 ARTIFACT_DIR = REPO_ROOT / ".test_tmp" / "v11-clover-artifacts"

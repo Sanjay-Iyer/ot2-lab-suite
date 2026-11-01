@@ -7,7 +7,7 @@
 
 Reads configs/experiments/specialized/01_print_from_vial.yaml (or --config), flattens it
 against its referenced machine profile, writes the upload-ready artifact to
-src/protocols/generated/01_print_from_vial_latest.py, and simulates it locally
+generated/protocols/current/01_print_from_vial_latest.py, and simulates it locally
 via opentrons.simulate. Nothing here contacts, discovers, or moves a robot.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 DEFAULT_CONFIG = "configs/experiments/specialized/01_print_from_vial.yaml"
-UPLOAD_PATH = REPO / "src" / "protocols" / "generated" / "01_print_from_vial_latest.py"
+UPLOAD_PATH = REPO / "generated" / "protocols" / "current" / "01_print_from_vial_latest.py"
 
 RULE = "=" * 78
 

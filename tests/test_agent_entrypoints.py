@@ -106,3 +106,30 @@ def test_session_dispatch_uses_existing_relocated_scripts(simulate):
     assert (REPO / command[1]).is_file()
     assert command[1].startswith("scripts/manual/")
     assert ("--live" in command) == (not simulate)
+
+
+def test_relocated_standard_snapshot_can_load_custom_labware():
+    import ast
+    import json
+    from types import SimpleNamespace
+    from typing import Any
+
+    path = REPO / "generated/protocols/current/01_printing_standard_latest.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_load_labware")
+    namespace = {"Path": Path, "json": json, "Any": Any, "__file__": str(path),
+                 "protocol_api": SimpleNamespace(ProtocolContext=object)}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(path), "exec"), namespace)
+
+    class MissingRegisteredLabware:
+        def load_labware(self, *args, **kwargs):
+            raise RuntimeError("Exercise the existing local definition fallback")
+
+        def load_labware_from_definition(self, definition, slot):
+            assert definition == json.loads((REPO / "labware/paper_print_96_flat.json").read_text(encoding="utf-8"))
+            assert slot == "5"
+            return "definition loaded"
+
+    assert namespace["_load_labware"](MissingRegisteredLabware(), {
+        "load_name": "paper_print_96_flat", "slot": 5, "namespace": "custom_beta", "version": 1,
+    }) == "definition loaded"

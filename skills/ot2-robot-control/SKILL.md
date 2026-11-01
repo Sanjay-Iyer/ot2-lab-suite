@@ -142,7 +142,7 @@ $OPTS = @(
 ssh @OPTS root@$IP "mkdir -p $REMOTE"
 
 # 2. SCP the protocol over  (NOTE the -O flag: legacy SCP protocol, required for OT-2)
-scp -O @OPTS "src/protocols/generated/generated_dilution.py" "root@${IP}:$REMOTE/generated_dilution.py"
+scp -O @OPTS "generated/protocols/current/generated_dilution.py" "root@${IP}:$REMOTE/generated_dilution.py"
 
 # 3. Verify it landed
 ssh @OPTS root@$IP "ls -lah $REMOTE/generated_dilution.py"

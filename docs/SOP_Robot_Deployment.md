@@ -151,7 +151,7 @@ $OPTS = @("-o", "IdentitiesOnly=yes", "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
 ssh @OPTS root@OT2CEP20220929R02.local "mkdir -p /var/lib/opentrons/user_storage/ot2_runs/my_run"
 
 # Copy the generated protocol to the robot
-scp -O @OPTS src\protocols\generated\generated_printing.py root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/my_run/
+scp -O @OPTS generated\protocols\generated_printing.py root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/my_run/
 ```
 
 ### 5b. Deploy Custom Labware (only if your protocol uses it)

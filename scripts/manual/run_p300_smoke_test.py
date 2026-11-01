@@ -28,7 +28,7 @@ from src.lab.robot_connection import (
 )
 
 DEFAULT_PROTOCOL = (
-    REPO / "src" / "protocols" / "generated" / "p300_smoke_test.py"
+    REPO / "src" / "protocols" / "checks" / "p300_smoke_test.py"
 )
 DEFAULT_LABWARE = REPO / "labware" / "corning_96_wellplate_360ul_custom.json"
 HEADERS = {"opentrons-version": "*"}

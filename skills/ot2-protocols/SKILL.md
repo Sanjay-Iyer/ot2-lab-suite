@@ -26,7 +26,7 @@ robot connection. Only deployment/execution (see
 | User run configs | `configs/workflows/user/` |
 | Hardware constraints | `configs/constraints/*.yaml` |
 | Workflow registry | [`src/core/workflows/registry.py`](../../src/core/workflows/registry.py) |
-| Generated protocols | `src/protocols/generated/generated_<workflow>.py` |
+| Generated protocols | `generated/protocols/current/generated_<workflow>.py` |
 | Simulation records | `robot_data/data/simulations.json` |
 | Agent tools | [`src/agents/optional/tools.py`](../../src/agents/optional/tools.py) |
 
@@ -89,7 +89,7 @@ Validate or simulate without the agent:
 
 ```bash
 # Local simulation of a generated protocol
-python -m opentrons.simulate src/protocols/generated/generated_dilution.py
+python -m opentrons.simulate generated/protocols/current/generated_dilution.py
 ```
 
 Edit a default config directly under `configs/workflows/defaults/`, or copy it

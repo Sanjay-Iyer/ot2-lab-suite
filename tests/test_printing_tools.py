@@ -136,7 +136,7 @@ def test_tracked_legacy_workflow_defaults_and_latest_artifacts_are_plan_only():
     config = (root / "configs/workflows/defaults/vial_dilution_print.yaml").read_text(encoding="utf-8")
     assert "dry_run: true" in config
     for name in ("vial_dilution_print_latest.py", "vial_dilution_print_v2_latest.py"):
-        source = (root / "src/protocols/generated" / name).read_text(encoding="utf-8")
+        source = (root / "generated/protocols/current" / name).read_text(encoding="utf-8")
         assert "DEFAULT_DRY_RUN     = True" in source
     for name in (
         "01_vial_dilution_paper_print.py",

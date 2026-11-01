@@ -135,7 +135,7 @@ transfer, none when the dilution step is off) and dispenses onto paper (one per 
 | red-team end state (verbose_user, unrelated_parameter_change, revision 13) | 4 | 16 | 8 | OK |
 
 Rerun with `python scripts/developer/ai_dye_demo_redteam.py --simulate-states`. Generated protocols and simulator logs:
-`runs/ai_dye_demo_redteam/simulated_states/` (gitignored). The tracked `src/protocols/generated/*_latest.py` was not
+`runs/ai_dye_demo_redteam/simulated_states/` (gitignored). The tracked `generated/protocols/current/*_latest.py` was not
 overwritten.
 
 ## Remaining risks

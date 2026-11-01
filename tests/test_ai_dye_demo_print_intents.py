@@ -358,7 +358,7 @@ def test_15_unequal_counts_compile_and_run_in_the_simulator(tmp_path):
     run_modes = config.pop("run_modes", {})
     run_modes["dry_run"] = False
     config["protocol_version"] = 19
-    path = tmp_path / "unequal_counts.py"                                          # never src/protocols/generated
+    path = tmp_path / "unequal_counts.py"                                          # never generated/protocols/current
     builder = _builder()
     path.write_text(builder.build_source(BASE_PROTOCOL.read_text(encoding="utf-8"), config, run_modes),
                     encoding="utf-8")

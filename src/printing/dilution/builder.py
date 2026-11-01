@@ -28,7 +28,7 @@ BASE_PROTOCOL = (
 LABWARE_DIR = Path(REPO_ROOT) / "labware"
 ARTIFACT_DIR = Path(REPO_ROOT) / ".test_tmp" / "dilution-artifacts"
 GENERATED_PATH = (
-    Path(REPO_ROOT) / "src" / "protocols" / "generated" / "04_general_dilution_latest.py"
+    Path(REPO_ROOT) / "generated" / "protocols" / "current" / "04_general_dilution_latest.py"
 )
 
 START_SENTINEL = "# >>> CONFIG START >>>"

@@ -12,7 +12,7 @@ simulate it. This is how the YAML reaches the OT-2 (the robot can't read the rep
 
 Pipeline: load YAML -> validate -> embed CONFIG (between the markers in the base
 protocol) + write run_modes into the DEFAULT_* flags -> generate into
-src/protocols/generated/ -> simulate (scans output text for errors).
+generated/protocols/current/ -> simulate (scans output text for errors).
 """
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ EMBED_RAW_VERSIONS = embed_raw_versions()
 # lets the quick test run on a machine that has only the default env installed.
 SIMULATOR_PINNED_VERSIONS = {3}
 
-GENERATED_DIR = REPO / "src" / "protocols" / "generated"
+GENERATED_DIR = REPO / "generated" / "protocols" / "current"
 LABWARE       = REPO / "labware"
 DEFAULT_CONFIG = REPO / "configs" / "workflows" / "defaults" / "vial_dilution_print.yaml"
 

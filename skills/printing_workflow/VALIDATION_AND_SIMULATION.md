@@ -35,7 +35,7 @@ python scripts/manual/build_vial_dilution_print.py --config configs/printing/01_
 ```
 Pipeline: load YAML → `workflow_config.normalize_and_validate` (shared validators) →
 deck-slot check → (legacy only) structural `validate()` → embed CONFIG → generate to
-`src/protocols/generated/` → simulate.
+`generated/protocols/current/` → simulate.
 
 ## Interpreting simulation output (exact criteria)
 `opentrons.simulate` **exits 0 even on runtime errors**, so the verifier scans the output

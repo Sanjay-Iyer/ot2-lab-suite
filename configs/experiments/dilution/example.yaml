@@ -1,0 +1,13 @@
+# Independent dilution factors from stock (not a serial transfer chain).
+# factor = stock concentration / target concentration; total_volume_ul is per well.
+# Shared deck, pipette, physical parameters and limits remain in the existing base.
+base_config: configs/workflows/defaults/ai_agent_dilution_print_demo.yaml
+protocol_version: 19
+run_modes: {dry_run: false, do_dilution: true, do_print: false}
+dilution:
+  enabled: true
+  factors: [2, 5, 10]
+  total_volume_ul: 100.0
+  plate_column: '11'
+  start_row: A
+print: {enabled: false}

@@ -39,7 +39,7 @@ new-tip policy, long red-team end states) and every scripted path of the five us
 (`src/agents/dye_demo/redteam/sop_paths.py`, one state per distinct run configuration, each checked against
 `docs/ai_dye_demo/user_testing/expected/`). It embeds each approved configuration into protocol v19 as the builder does, runs
 the pinned local opentrons simulator (`.venv/ot2-api-2.15-py310`) and checks tip pick-ups, vial aspirations and paper
-drops against the plan. It never overwrites the tracked `src/protocols/generated/*_latest.py`.
+drops against the plan. It never overwrites the tracked `generated/protocols/current/*_latest.py`.
 
 Output: `runs/ai_dye_demo_redteam/<timestamp>/` (gitignored). The exit code is 1 when any conversation
 violated an invariant.

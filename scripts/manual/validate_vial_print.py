@@ -14,7 +14,7 @@ expected operations, turning the run-mode matrix into a real pass/fail gate.
 
 TARGET FILE PRIORITY
 --------------------
-  1. src/protocols/generated/vial_dilution_print_latest.py  (deployed artifact)
+  1. generated/protocols/current/vial_dilution_print_latest.py  (deployed artifact)
   2. src/protocols/printing/legacy/01_vial_dilution_paper_print.py (base template, fallback)
 
 Always validate the generated file when it exists — that is what actually runs on
@@ -64,7 +64,7 @@ LABWARE   = REPO / "labware"
 # Target the generated (deployed) artifact; fall back to the base template. Each
 # protocol version has its own generated basename + base template, selected by the
 # config's `protocol_version` (v2 = P20-assisted dilution).
-_GENERATED_DIR = REPO / "src" / "protocols" / "generated"
+_GENERATED_DIR = REPO / "generated" / "protocols" / "current"
 _PRINTING_DIR  = REPO / "src" / "protocols" / "printing"
 _VERSION_FILES: dict[int, tuple[Path, Path]] = {
     1: (_GENERATED_DIR / "vial_dilution_print_latest.py",

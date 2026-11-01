@@ -1,0 +1,111 @@
+{
+  "active_branch": "01_paper",
+  "accepted_commits": [
+    "f8cfc5d",
+    "a2f8dba",
+    "0129290"
+  ],
+  "recovered_candidates": {
+    "0.4/0.5": {
+      "source": "06c0bdd",
+      "files": [
+        "docs/reviews/packet.py",
+        "docs/reviews/task-0.4/baseline_report.md",
+        "docs/reviews/task-0.4/evidence/full_r2/junit.xml",
+        "docs/reviews/task-0.4/evidence/full_r2/pytest.txt",
+        "docs/reviews/task-0.4/evidence/full_r2/summary.json",
+        "docs/reviews/task-0.4/experiment_01_uncapped_diff.txt",
+        "docs/reviews/task-0.4/implementation.diff",
+        "docs/reviews/task-0.4/implementation.md",
+        "docs/reviews/task-0.4/offline_guard/baseline_plugin.py",
+        "docs/reviews/task-0.4/offline_guard/sitecustomize.py",
+        "docs/reviews/task-0.4/packet_manifest.json",
+        "docs/reviews/task-0.4/run_baseline.py",
+        "docs/reviews/task-0.4/task.md",
+        "docs/reviews/task-0.4/tests.txt",
+        "docs/reviews/task-0.5/implementation.md",
+        "docs/reviews/task-0.5/packet_manifest.json",
+        "docs/reviews/task-0.5/task.md",
+        "docs/reviews/task-0.5/tests.txt",
+        "pytest.ini",
+        "tests/golden_traces/cases.py",
+        "tests/golden_traces/generate.py",
+        "tests/golden_traces/recorder.py",
+        "tests/golden_traces/traces/changed_factors_and_volume.json",
+        "tests/golden_traces/traces/default_eight_dilutions.json",
+        "tests/golden_traces/traces/dilution_only.json",
+        "tests/golden_traces/traces/drops_per_position.json",
+        "tests/golden_traces/traces/dry_run_moves_nothing.json",
+        "tests/golden_traces/traces/explicit_source_map.json",
+        "tests/golden_traces/traces/flow_rates_changed.json",
+        "tests/golden_traces/traces/many_replicates_overflow.json",
+        "tests/golden_traces/traces/mixing_and_shake_variations.json",
+        "tests/golden_traces/traces/moved_deck_and_vials.json",
+        "tests/golden_traces/traces/no_air_gap_blow_out_or_shake.json",
+        "tests/golden_traces/traces/no_mixing.json",
+        "tests/golden_traces/traces/paper_release_at_0_5_mm.json",
+        "tests/golden_traces/traces/per_liquid_multi_position_sources.json",
+        "tests/golden_traces/traces/per_source_counts_and_rows.json",
+        "tests/golden_traces/traces/print_only_prepared.json",
+        "tests/golden_traces/traces/print_only_vials_off_deck.json",
+        "tests/golden_traces/traces/print_release_variations.json",
+        "tests/golden_traces/traces/replicates.json",
+        "tests/golden_traces/traces/second_run_avoids_printed_positions.json",
+        "tests/golden_traces/traces/selected_dilutions_on_named_columns.json",
+        "tests/golden_traces/traces/several_tips_returned.json",
+        "tests/golden_traces/traces/small_remainder_rebalanced.json",
+        "tests/golden_traces/traces/sparse_rows_independent_paper_rows.json",
+        "tests/golden_traces/traces/stacked_drops.json",
+        "tests/golden_traces/traces/tips_new_every_transfer.json",
+        "tests/golden_traces/traces/tips_per_liquid.json",
+        "tests/golden_traces/traces/tips_single_dropped.json",
+        "tests/golden_traces/traces/two_drop_volumes.json",
+        "tests/test_gemini.py",
+        "tests/test_nanodrop_golden_traces.py",
+        "tests/test_offline_baseline_hygiene.py",
+        "tests/test_preflight.py",
+        "tests/test_robot_automation.py",
+        "tests/test_vial_print_agent.py"
+      ],
+      "status": "UNACCEPTED; ordered reviews pending"
+    }
+  },
+  "pending_patches": {
+    "1.1": {
+      "base": "0129290",
+      "source": "1838b3a",
+      "path": "task-1.1.patch",
+      "sha256": "81e6c6d6edf41da44260ac52e2dcc8e5db51fc74361df4238eba790bca7112eb"
+    },
+    "1.2": {
+      "base": "1838b3a",
+      "source_worktree": "C:\\code\\opentrons_home\\ot2-wt-1-2",
+      "path": "task-1.2.patch",
+      "sha256": "98e73424a9bf8df9d33da4f80a31a96c6d9a07bc3ffe515e0e3d74520b53c8c7",
+      "tracked_source_files": [
+        ".env.template",
+        "scripts/run_3d_print_labware_validate.py",
+        "scripts/run_droplet_error_check.py",
+        "scripts/run_p300_single_nozzle_smoke_test.py",
+        "scripts/run_p300_smoke_test.py",
+        "scripts/run_plate_waste_disposal.py",
+        "scripts/run_robot_template.py",
+        "scripts/run_smoke_test.py",
+        "scripts/run_vial_print_robot.py",
+        "src/agents/dye_demo/gui/adapter.py",
+        "src/agents/dye_demo/gui/app.py",
+        "src/agents/dye_demo/session.py",
+        "tests/conftest.py"
+      ],
+      "new_files": [
+        "src/lab/run_gate.py",
+        "tests/test_run_gate.py"
+      ],
+      "private_generated_evidence": [
+        "vision_tests/outputs/cv_report.txt",
+        "vision_tests/outputs/cv_summary.json"
+      ]
+    }
+  },
+  "retained": "All original refs and directories; no new branch/worktree; no runtime candidate activated."
+}

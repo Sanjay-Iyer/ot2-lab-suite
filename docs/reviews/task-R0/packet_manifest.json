@@ -1,0 +1,302 @@
+{
+  "revision": "R1",
+  "files": [
+    {
+      "path": "docs/reviews/PROCESS.md",
+      "sha256": "915284cac7071db11a6bcda274dda5dded46285cdff28ad699c0eb4180fb1e05"
+    },
+    {
+      "path": "docs/reviews/README.md",
+      "sha256": "ef52137a449c965f15d73404dbe52d3fa49095589ab2af7a00dc9e08302acd71"
+    },
+    {
+      "path": "docs/reviews/master_implementation_plan.md",
+      "sha256": "008aaf128919120c99e5dd3a61e5badb44894c970897fa9920d13f422fe0ceae"
+    },
+    {
+      "path": "docs/reviews/master_implementation_plan.original.md",
+      "sha256": "0309dc59cea394fce44d5559ce06c02e35cfd9cb3fafcf69b51f6b57f9c2935b"
+    },
+    {
+      "path": "docs/reviews/packet.py",
+      "sha256": "8e23e618cc430d6185624d45d50bb3d4a9f8b0d2983516f1075de13967d7f370"
+    },
+    {
+      "path": "docs/reviews/single_branch_instructions.md",
+      "sha256": "627ec7967f9f6f26ced840f2964be5a98abd20ddd86019dac8942662854b66b0"
+    },
+    {
+      "path": "docs/reviews/task-0.4/baseline_report.md",
+      "sha256": "5dedc2ee7f01c465e7cb46917640080b530f6d06396af9336bf4ffc8f40376f5"
+    },
+    {
+      "path": "docs/reviews/task-0.4/evidence/full_r2/junit.xml",
+      "sha256": "851117805739f61f85003e61c6eab4b2727e0cf3db305abe10c232ce64e26c3e"
+    },
+    {
+      "path": "docs/reviews/task-0.4/evidence/full_r2/pytest.txt",
+      "sha256": "4dc2a33412444237aac92c3219fd45265907b345d05347beb4289ea14eea2df2"
+    },
+    {
+      "path": "docs/reviews/task-0.4/evidence/full_r2/summary.json",
+      "sha256": "9db19daf43158a23a2d5b4dfb20bff3b834a26ca6f44cf98a4a1d6dff69669f9"
+    },
+    {
+      "path": "docs/reviews/task-0.4/experiment_01_uncapped_diff.txt",
+      "sha256": "2c30886e6202100b43365b262a2281f0dfc862499ada1d9b76dba53e0d8e6f64"
+    },
+    {
+      "path": "docs/reviews/task-0.4/implementation.diff",
+      "sha256": "f35b9c4953a29a0300e7c0305f1e1c74833d877ff82eb87bb6db70c481d01870"
+    },
+    {
+      "path": "docs/reviews/task-0.4/implementation.md",
+      "sha256": "cd72ecf7bf676e613d9f0dbe80b44d1a6a45a1dbfb53c1113e8f2a24782c5f9a"
+    },
+    {
+      "path": "docs/reviews/task-0.4/offline_guard/baseline_plugin.py",
+      "sha256": "5afbd5ec2f1810041951e3307513afd79334b57bc766e0da77ca204574636261"
+    },
+    {
+      "path": "docs/reviews/task-0.4/offline_guard/sitecustomize.py",
+      "sha256": "1fb808f78de2641a2bde8e800a2b439f9b5c7305deb4acfb6818b689e093ed8c"
+    },
+    {
+      "path": "docs/reviews/task-0.4/packet_manifest.json",
+      "sha256": "ebb906b2fdd7af10486fc725ef607da3024dec0edbb23f9e04fe5eee3495accd"
+    },
+    {
+      "path": "docs/reviews/task-0.4/run_baseline.py",
+      "sha256": "1234d40ed8113d349157443b70d4ccc68b7ef3751e225635b0f32ff0b11aa3b7"
+    },
+    {
+      "path": "docs/reviews/task-0.4/task.md",
+      "sha256": "f006d0460a5bdf1eb22bd9efb69db67882aa28719d32ce55318a2118f7d4f3b4"
+    },
+    {
+      "path": "docs/reviews/task-0.4/tests.txt",
+      "sha256": "2ce29aa1238d8bdc2a6b1f637e7f6b40d3df9ea1583a219404c65f92c7437e77"
+    },
+    {
+      "path": "docs/reviews/task-0.5/implementation.md",
+      "sha256": "a49721d52677f1890402bec2edec13acf1956841611ab9463420de1d2684d178"
+    },
+    {
+      "path": "docs/reviews/task-0.5/packet_manifest.json",
+      "sha256": "72a4f1063cc8ccf0e03161eac7f29e7067f36596689b1f2a829a6c0188b14505"
+    },
+    {
+      "path": "docs/reviews/task-0.5/task.md",
+      "sha256": "0092501118d1a8f04580d987a408c21659ab379f10f4e9f31368bd7ee7d8b0ad"
+    },
+    {
+      "path": "docs/reviews/task-0.5/tests.txt",
+      "sha256": "7b50d59dfed99bff2efbf88bca9bbe36a026cdf667a44e8ba5a1d42d47b2149a"
+    },
+    {
+      "path": "docs/reviews/task-R0/implementation.md",
+      "sha256": "94636f89b18e2239e5c303e69171c49ccfe4dd06b4971320d129aa65f26812b4"
+    },
+    {
+      "path": "docs/reviews/task-R0/inventory.md",
+      "sha256": "8565a64a385dfb471a9b44c3f2b14949b799eef1d9bcd971db2598c2d99bee1e"
+    },
+    {
+      "path": "docs/reviews/task-R0/plan_provenance.json",
+      "sha256": "c4a9d89a570a17799f199daffa2f1012e80b8794200c3842e02378ccf8333fa8"
+    },
+    {
+      "path": "docs/reviews/task-R0/preservation.json",
+      "sha256": "ffc96434f7f2112beeeb2573675b11240d3635037562b7220b0332c981e3ee8a"
+    },
+    {
+      "path": "docs/reviews/task-R0/preserve_recovery.py",
+      "sha256": "fd055ac454dfe20428e78c9d68ede2ae833e8d155f845ef030c1cd3e3168951c"
+    },
+    {
+      "path": "docs/reviews/task-R0/recovered/provenance.json",
+      "sha256": "d64c77dbba234faee75ffa5bccecca58e27576eb04dc345de9d21c7bfe90602b"
+    },
+    {
+      "path": "docs/reviews/task-R0/recovered/task-1.1.patch",
+      "sha256": "81e6c6d6edf41da44260ac52e2dcc8e5db51fc74361df4238eba790bca7112eb"
+    },
+    {
+      "path": "docs/reviews/task-R0/recovered/task-1.2.patch",
+      "sha256": "98e73424a9bf8df9d33da4f80a31a96c6d9a07bc3ffe515e0e3d74520b53c8c7"
+    },
+    {
+      "path": "docs/reviews/task-R0/recovery.md",
+      "sha256": "2fc1d3495175fb648d4d93e9cb91e6d022a0a14bc425c9af5cbf30d83a170ff1"
+    },
+    {
+      "path": "docs/reviews/task-R0/task.md",
+      "sha256": "3735c8b18cc35112934e6774d3db095b72aea478ff0ea1ebdd8736f4be8d42f5"
+    },
+    {
+      "path": "docs/reviews/task-R0/tests.txt",
+      "sha256": "d9df72564cbb724e82785ec5435e7a7b43eb041f55ebe3ce83891477ad14d92e"
+    },
+    {
+      "path": "docs/reviews/task-R0/verification.json",
+      "sha256": "1735b1c58f2ff8b96bf2ae2650aba73121cdffe7de72ea31b456eed9f93a6169"
+    },
+    {
+      "path": "pytest.ini",
+      "sha256": "90c1ec32726a7742a3b85abc7f4bdf8a49cd8ed7055bdb086bdb3722bd93be42"
+    },
+    {
+      "path": "tests/golden_traces/cases.py",
+      "sha256": "472a015877d73330d4a14c53ba3edd5697fa6bb95dfff966ace2b279e80cd6e8"
+    },
+    {
+      "path": "tests/golden_traces/generate.py",
+      "sha256": "21e8d17b37f1f3a67c9ff2f1dd805ebf5a9b4ae15ef8077007aadcf9273b29e5"
+    },
+    {
+      "path": "tests/golden_traces/recorder.py",
+      "sha256": "7eaddcc93d1bb4381d83f60d4693893e078c77f759a2d73e8608a2a57aebac75"
+    },
+    {
+      "path": "tests/golden_traces/traces/changed_factors_and_volume.json",
+      "sha256": "a4a46ff80d16632690d29a0e383abf4ef0638c26a1949abaa106e1c3053ffaa2"
+    },
+    {
+      "path": "tests/golden_traces/traces/default_eight_dilutions.json",
+      "sha256": "470f5e9bd75a78660b4b547bb8b2456c61973e16e67f2dd81234bde21491bd5e"
+    },
+    {
+      "path": "tests/golden_traces/traces/dilution_only.json",
+      "sha256": "d68048c8769724ff50eb00ca34a7001f9163e65733f412b77591a49c9bd537b9"
+    },
+    {
+      "path": "tests/golden_traces/traces/drops_per_position.json",
+      "sha256": "6c5903a8fb0d208e6927e1f65480a289c630f0dbf162c8e1a1406781dd1d20aa"
+    },
+    {
+      "path": "tests/golden_traces/traces/dry_run_moves_nothing.json",
+      "sha256": "35ae4362d044760fa542f1cd147dc0e58c6cc072867464e53c2534b817eaaaf5"
+    },
+    {
+      "path": "tests/golden_traces/traces/explicit_source_map.json",
+      "sha256": "a0de9d84467e8e0d069db7f355fb781af07d7c9faac0b1ea0383ae2aef358f3b"
+    },
+    {
+      "path": "tests/golden_traces/traces/flow_rates_changed.json",
+      "sha256": "d3ba09d6ceb7733b1a2d91f9fed81de505478d12fc6eca14d15c61c59d2034d1"
+    },
+    {
+      "path": "tests/golden_traces/traces/many_replicates_overflow.json",
+      "sha256": "e7ceb23a14c8ab6bf2cd2cc6e4957e5e2543f5c81649fdc6dbde897d3feabe42"
+    },
+    {
+      "path": "tests/golden_traces/traces/mixing_and_shake_variations.json",
+      "sha256": "9b832e739792923cec1d9f5f9a3262be874668552e0b874cc96d83531f232122"
+    },
+    {
+      "path": "tests/golden_traces/traces/moved_deck_and_vials.json",
+      "sha256": "0aa057234f8d6928681e39bb8deaf9298e29361bb606a59a5fdda48de740d89e"
+    },
+    {
+      "path": "tests/golden_traces/traces/no_air_gap_blow_out_or_shake.json",
+      "sha256": "4d657fd6cd277f686ccc04e37899fc2b5af5cd6538e711632ff05babfa025f30"
+    },
+    {
+      "path": "tests/golden_traces/traces/no_mixing.json",
+      "sha256": "f4283ddce45abfa4e3cc42c2f28c04144071ac4ab1efb166fa0d462cf39b5fe7"
+    },
+    {
+      "path": "tests/golden_traces/traces/paper_release_at_0_5_mm.json",
+      "sha256": "a0a37a699c0a8d3e094057319e2bfdee0106f8fb1ba76c8bfc7485e9a9cad243"
+    },
+    {
+      "path": "tests/golden_traces/traces/per_liquid_multi_position_sources.json",
+      "sha256": "728ee9f860e9f9cc53609c7db27afe3c8a3c9c30b0cae5bf3dfb415c888f56e1"
+    },
+    {
+      "path": "tests/golden_traces/traces/per_source_counts_and_rows.json",
+      "sha256": "9e3a22969f7f1425a927c18fe4def88c5d767da1199aaa76e4df73cd15753c8b"
+    },
+    {
+      "path": "tests/golden_traces/traces/print_only_prepared.json",
+      "sha256": "6215d8328f5f4d7134d597771ea8fe1b66e812516154b637fa4bd233ec0359ad"
+    },
+    {
+      "path": "tests/golden_traces/traces/print_only_vials_off_deck.json",
+      "sha256": "cd966069a7f09b74d0d1a704a6311301f2603a02e43be603d2d6149bb66b7c1f"
+    },
+    {
+      "path": "tests/golden_traces/traces/print_release_variations.json",
+      "sha256": "7977bd2d2df328718e50abb5d03666ea21e85057594fca338368ff74ae91863e"
+    },
+    {
+      "path": "tests/golden_traces/traces/replicates.json",
+      "sha256": "36ea79f303c2acd90f5a3402f3ad6e32903a83a2b4f50bf62ea3845c05d78b76"
+    },
+    {
+      "path": "tests/golden_traces/traces/second_run_avoids_printed_positions.json",
+      "sha256": "2c0bf5c28320a23fed7bb74b89608a24831a0f9f172e2cc27565ce18c1aff33c"
+    },
+    {
+      "path": "tests/golden_traces/traces/selected_dilutions_on_named_columns.json",
+      "sha256": "6d8078a122bfd937d224fd8979da8b3c91a0ea7dd48cd84471c0c9c86925225f"
+    },
+    {
+      "path": "tests/golden_traces/traces/several_tips_returned.json",
+      "sha256": "4bfb954fced265f2bd20c50a1f1cada65526539b8cd8a6e53acaf7a7dcb9ee01"
+    },
+    {
+      "path": "tests/golden_traces/traces/small_remainder_rebalanced.json",
+      "sha256": "e2b6c6911e182f4bc115d2abc542d530509718f22742243577ece28257b3d284"
+    },
+    {
+      "path": "tests/golden_traces/traces/sparse_rows_independent_paper_rows.json",
+      "sha256": "3de6ec58fd8ee797403b66caa8aea8e0658e343d1ebbc069203cb3416d80fa08"
+    },
+    {
+      "path": "tests/golden_traces/traces/stacked_drops.json",
+      "sha256": "9a848d8bc451b22817191450c0cfa08e1c150922cc79c4d755d434b0ae2e5802"
+    },
+    {
+      "path": "tests/golden_traces/traces/tips_new_every_transfer.json",
+      "sha256": "a42334020c378f2a46966fc1713c144deb1d5f9f446fe4fcd8668567ba827ab7"
+    },
+    {
+      "path": "tests/golden_traces/traces/tips_per_liquid.json",
+      "sha256": "0397301d2a75cdd751120fdcd0ab7d9194f4b27432ba9d3a94d023ccd909829f"
+    },
+    {
+      "path": "tests/golden_traces/traces/tips_single_dropped.json",
+      "sha256": "fbc57739d5ac79e7302be488405a8f079b42cecfa65a0613fd5bc746774d8cb5"
+    },
+    {
+      "path": "tests/golden_traces/traces/two_drop_volumes.json",
+      "sha256": "7be501263eea1006aba406f13360101200563a31802393995cd69eecc6382083"
+    },
+    {
+      "path": "tests/test_gemini.py",
+      "sha256": "ad1ddcfc47e74ce7f69ac2b6c2db2d179d99c630e07568591bbb0ac18311e6a1"
+    },
+    {
+      "path": "tests/test_nanodrop_golden_traces.py",
+      "sha256": "029e061a695831ca19e916101695f83355106a4804cc27132ab844abeed2f6f8"
+    },
+    {
+      "path": "tests/test_offline_baseline_hygiene.py",
+      "sha256": "49f83364068aea3482cee64f67f08636bf793c072e977aadfe828656705ce92b"
+    },
+    {
+      "path": "tests/test_preflight.py",
+      "sha256": "f3b6a708fe1c43f31c958dedce4bede9de22af29957d6946374c1825dcb17c8b"
+    },
+    {
+      "path": "tests/test_robot_automation.py",
+      "sha256": "38e58daae7655cacaf21179af86d06992bd15c5463edb31a67125d316c8596ba"
+    },
+    {
+      "path": "tests/test_vial_print_agent.py",
+      "sha256": "8fe301cdfc65a8636bfc2337c45d6cdef0e0253d5f1b117a01fe8fe307dc53f5"
+    }
+  ],
+  "aggregate_sha256": "8c8f7e83cf78a789f27e2303b52459483793055fb11a02ade4a423107fc5f20e"
+}

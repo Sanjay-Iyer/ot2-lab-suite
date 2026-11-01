@@ -3,19 +3,16 @@ import pathlib
 import os
 import shutil
 import json
+import tempfile
 from src.utils.preflight import PreflightEngine, Finding
 
 class TestPreflight(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.test_dir = pathlib.Path("tests/preflight_fixtures")
-        cls.test_dir.mkdir(parents=True, exist_ok=True)
+        cls.temporary = tempfile.TemporaryDirectory(prefix="ot2-preflight-test-")
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.test_dir = pathlib.Path(cls.temporary.name)
         cls.engine = PreflightEngine()
-
-    @classmethod
-    def tearDownClass(cls):
-        if cls.test_dir.exists():
-            shutil.rmtree(cls.test_dir)
 
     def create_fixture(self, name, content):
         path = self.test_dir / name

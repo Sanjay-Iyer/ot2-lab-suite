@@ -1,0 +1,40 @@
+# Existing one-well test settings, exported unchanged. WORK execution only.
+deck:
+  plate:
+    slot: 4
+    load_name: corning_96_wellplate_360ul_custom
+    namespace: custom_beta
+    version: 1
+  tuberack:
+    slot: 7
+    load_name: tuberack_3dprint_20ml_8vials_v2
+    namespace: custom_beta
+    version: 1
+  tiprack:
+    slot: 9
+    load_name: opentrons_96_tiprack_20ul
+pipette:
+  name: p20_single_gen2
+  mount: left
+destination_well: C12
+final_volume_ul: 100.0
+dilution_factor: 2.0
+water_source: A1
+dye_source: A2
+water_vial_height_mm: 4.0
+dye_vial_height_mm: 4.0
+aspirate_height_mm: 0.3
+dispense_height_mm: 0.3
+mix_height_mm: 0.3
+air_gap_ul: 1.0
+blow_out: true
+touch_tip: true
+mix_volume_ul: 15.0
+mix_repetitions: 2
+aspirate_rate: 3.0
+dispense_rate: 3.0
+return_tip: true
+start_tip: A1
+p20_max_ul: 20.0
+p20_min_ul: 1.0
+max_well_fill_ul: 340.0

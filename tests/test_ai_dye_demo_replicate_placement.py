@@ -318,7 +318,7 @@ def test_the_opentrons_simulator_dispenses_on_exactly_the_allocated_positions(tm
     run_modes = config.pop("run_modes", {})
     run_modes["dry_run"] = False
     config["protocol_version"] = 19
-    path = tmp_path / f"{variant}.py"                                         # never src/protocols/generated
+    path = tmp_path / f"{variant}.py"                                         # never generated/protocols/current
     path.write_text(builder.build_source(BASE_PROTOCOL.read_text(encoding="utf-8"), config, run_modes),
                     encoding="utf-8")
     ok, output = builder.simulate(path, str(PINNED_SIMULATOR))

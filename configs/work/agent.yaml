@@ -1,0 +1,14 @@
+# WORK launcher profile; never replaces instrument settings or credential files.
+# Launching serves the existing GUI. Physical execution remains an operator action.
+interface: gui
+simulate: false
+offline: false
+workflow_config: configs/workflows/defaults/ai_agent_dilution_print_demo.yaml
+operator: null
+session_label: WORK
+model: null                    # retain the existing WORK .env model
+temperature: 0
+host: 127.0.0.1
+port: 8080
+no_browser: false
+# Existing .env must select Vertex AI / gcloud ADC. No credentials belong here.

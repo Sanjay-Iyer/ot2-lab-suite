@@ -153,13 +153,13 @@ config, rebuild its tracked `*_latest.py` from the committed safe YAML:
 python scripts\manual\build_vial_dilution_print.py --config configs\printing\complementary_bp_print_v10a.yaml --no-sim
 python scripts\manual\build_vial_dilution_print.py --config configs\printing\four_clover_spacing_v13.yaml --no-sim
 git diff --check
-git diff -- configs\printing src\protocols\generated
+git diff -- configs\printing generated\protocols
 git status --short
 ```
 
 Do not hand-edit embedded `CONFIG` blocks. Do not commit a latest artifact with
 `DEFAULT_DRY_RUN=False`; forced-motion simulation artifacts belong under
-`.test_tmp/printing-artifacts`, not `src/protocols/generated`.
+`.test_tmp/printing-artifacts`, not `generated/protocols/current`.
 
 ## What local simulation verifies
 
@@ -215,7 +215,7 @@ Runner preflight/simulation is not a substitute for architecture validation.
 # WORK LAPTOP ONLY — phase 1: validate, build/simulate/upload, but DO NOT press play.
 python -m src.printing.cli validate --family standard --workflow complementary_bp_v10a
 python scripts\manual\run_vial_print_robot.py --config configs\printing\complementary_bp_print_v10a.yaml --live --no-start --no-pull-images
-Get-FileHash src\protocols\generated\complementary_bp_print_v10a_latest.py -Algorithm SHA256
+Get-FileHash generated\protocols\complementary_bp_print_v10a_latest.py -Algorithm SHA256
 
 # Compare the exact hash, complete the physical checklist, and explicitly confirm.
 # Phase 2 starts live liquid motion without changing that artifact.
@@ -224,7 +224,7 @@ python scripts\manual\run_vial_print_robot.py --config configs\printing\compleme
 # Four-clover equivalent, also WORK LAPTOP ONLY.
 python -m src.printing.cli validate --family design --workflow four_clover_spacing --design four_clover
 python scripts\manual\run_vial_print_robot.py --config configs\printing\four_clover_spacing_v13.yaml --live --no-start --no-pull-images
-Get-FileHash src\protocols\generated\four_clover_spacing_v13_latest.py -Algorithm SHA256
+Get-FileHash generated\protocols\four_clover_spacing_v13_latest.py -Algorithm SHA256
 # After hash review and explicit physical confirmation:
 python scripts\manual\run_vial_print_robot.py --config configs\printing\four_clover_spacing_v13.yaml --live --skip-build --skip-validate
 ```

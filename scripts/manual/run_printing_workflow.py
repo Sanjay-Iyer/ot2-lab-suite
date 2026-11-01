@@ -13,12 +13,12 @@ uses an agent, an LLM, a runtime skill, or an approval workflow.
     WORKFLOW 1 - standard 96-position SERS printing
       config    configs/experiments/paper_printing/01_printing_standard.yaml
       executor  src/protocols/printing/01_printing_standard.py
-      upload    src/protocols/generated/01_printing_standard_latest.py
+      upload    generated/protocols/current/01_printing_standard_latest.py
 
     WORKFLOW 2 - four-clover printing
       config    configs/experiments/paper_printing/02_printing_four_clover.yaml
       executor  src/protocols/printing/02_printing_four_clover.py
-      upload    src/protocols/generated/02_printing_four_clover_latest.py
+      upload    generated/protocols/current/02_printing_four_clover_latest.py
 
 Useful flags:
     --summary       resolve and report only; skip building and simulating
@@ -43,13 +43,13 @@ if str(REPO) not in sys.path:
 STANDARD_CONFIG = "configs/experiments/paper_printing/01_printing_standard.yaml"
 STANDARD_EXECUTOR = REPO / "src" / "protocols" / "printing" / "01_printing_standard.py"
 STANDARD_UPLOAD = (
-    REPO / "src" / "protocols" / "generated" / "01_printing_standard_latest.py"
+    REPO / "generated" / "protocols" / "current" / "01_printing_standard_latest.py"
 )
 
 CLOVER_CONFIG = "configs/experiments/paper_printing/02_printing_four_clover.yaml"
 CLOVER_EXECUTOR = REPO / "src" / "protocols" / "printing" / "02_printing_four_clover.py"
 CLOVER_UPLOAD = (
-    REPO / "src" / "protocols" / "generated" / "02_printing_four_clover_latest.py"
+    REPO / "generated" / "protocols" / "current" / "02_printing_four_clover_latest.py"
 )
 
 RULE = "=" * 78

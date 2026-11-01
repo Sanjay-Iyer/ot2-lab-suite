@@ -11,7 +11,7 @@ simulate it. This is how the YAML reaches the OT-2 (the robot can't read the rep
   python scripts/manual/build_plate_waste_disposal.py --config my.yaml --no-sim
 
 Pipeline: load YAML -> embed CONFIG (between the markers in the base protocol) +
-write run_modes into the DEFAULT_* flags -> generate into src/protocols/generated/
+write run_modes into the DEFAULT_* flags -> generate into generated/protocols/current/
 -> simulate (scans output text for errors, because opentrons.simulate exits 0 even
 when a protocol raises at runtime).
 """
@@ -29,7 +29,7 @@ import yaml
 
 REPO          = Path(__file__).resolve().parent.parent.parent
 BASE_PROTOCOL = REPO / "src" / "protocols" / "plate_waste_disposal.py"
-GENERATED_DIR = REPO / "src" / "protocols" / "generated"
+GENERATED_DIR = REPO / "generated" / "protocols" / "current"
 LABWARE       = REPO / "labware"
 DEFAULT_CONFIG = REPO / "configs" / "workflows" / "defaults" / "plate_waste_disposal.yaml"
 

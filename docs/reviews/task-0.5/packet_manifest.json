@@ -1,0 +1,114 @@
+{
+  "revision": "R1",
+  "files": [
+    {
+      "path": "docs/reviews/task-0.5/implementation.md",
+      "sha256": "d01d2db2f4b504c2980d07245be6c96e9e59eb15c3f1b1245168b60f69a4ea76"
+    },
+    {
+      "path": "docs/reviews/task-0.5/task.md",
+      "sha256": "daf860d72a6f37a7c51609207d4fd0a54c8f88a0aa65d5b8e230965d3fa188d2"
+    },
+    {
+      "path": "docs/reviews/task-0.5/tests.txt",
+      "sha256": "0a2f21e7de7b3a30f7aa532e38abd31bf2a003175ef842168de929f146670944"
+    },
+    {
+      "path": "tests/golden_traces/cases.py",
+      "sha256": "b6fc0388e9967f0b719c6a2ef4ed86ca6e37e3268318e95fc644ebd94c763b4e"
+    },
+    {
+      "path": "tests/golden_traces/data/changed_factors_and_volume.json",
+      "sha256": "01ecab5dab5bca1c8bb92a4624e069fc2a75446d2af3e5e9ccfe7275a90b56c3"
+    },
+    {
+      "path": "tests/golden_traces/data/default_eight_dilutions.json",
+      "sha256": "c65a52bba855496faea4b4f4986d1505f6541110b6df6a190f23b55dbf42ba65"
+    },
+    {
+      "path": "tests/golden_traces/data/dilution_only.json",
+      "sha256": "5e3d52aa9550a67b5dbfeb434f317a0074b9e93c451dfd03e6e2c93ef9b348ac"
+    },
+    {
+      "path": "tests/golden_traces/data/drops_per_position.json",
+      "sha256": "c39b6dcb1994903b351783147ca446c6eff9dc39cd0cc87e27cc21e16ceaf2ba"
+    },
+    {
+      "path": "tests/golden_traces/data/explicit_source_map.json",
+      "sha256": "7dfc1c4898ba55507c31bd19badead2f21e5c8f9c7b860ab86b682253dc61713"
+    },
+    {
+      "path": "tests/golden_traces/data/moved_deck_and_vials.json",
+      "sha256": "b2cd47bbd7eef223c0e1e0c62d938389d0c8402ad92942c15c9086794dfe6c2a"
+    },
+    {
+      "path": "tests/golden_traces/data/no_air_gap_blow_out_or_shake.json",
+      "sha256": "5c5d8f1b3d7311d15b28eda5846dd3600627fa4caec50ff272d17ceb42388091"
+    },
+    {
+      "path": "tests/golden_traces/data/no_mixing.json",
+      "sha256": "7110725ccd5b8195162ad79055287ef907aba48f3025346e974fab1cad268d5d"
+    },
+    {
+      "path": "tests/golden_traces/data/per_source_counts_and_rows.json",
+      "sha256": "e80d3cb7ee724929e0ea509a04b48c5cea87a420980abccb670f4f624aab88e3"
+    },
+    {
+      "path": "tests/golden_traces/data/print_only_prepared.json",
+      "sha256": "ae0393ac0f78bf7c61ebcd926bb3ef85de8cd0dafd5c6f974670b1983c99c967"
+    },
+    {
+      "path": "tests/golden_traces/data/print_only_vials_off_deck.json",
+      "sha256": "0355f3ed9a0ccafb4597948c8f9e68c34d24f910ed28efdbb6b8fc61ebdf8fc1"
+    },
+    {
+      "path": "tests/golden_traces/data/replicates.json",
+      "sha256": "cfbf66fcc204fee137670a54ef02ec26489970c79209186eb2b6ea56ad26a72a"
+    },
+    {
+      "path": "tests/golden_traces/data/selected_dilutions_on_named_columns.json",
+      "sha256": "47130577809065830c83dc7fcaadb91fe761dd243aec524ef6751fe16eb7f230"
+    },
+    {
+      "path": "tests/golden_traces/data/small_remainder_rebalanced.json",
+      "sha256": "e109572de1cf268fcf79e5f4a726444091f71e6838c318b573b24400192c1b66"
+    },
+    {
+      "path": "tests/golden_traces/data/sparse_rows_independent_paper_rows.json",
+      "sha256": "3b8973bbaaf741752753aabaf35d4f9e614ec7ece24582d22f2bbd6c71cc8cfd"
+    },
+    {
+      "path": "tests/golden_traces/data/stacked_drops.json",
+      "sha256": "5735811c97863b65e2d6f4747e0148ebab406d025c4cfd12c368e1b4b31b0813"
+    },
+    {
+      "path": "tests/golden_traces/data/tips_new_every_transfer.json",
+      "sha256": "052d39ea2b2d019f1cc2893767cd63b151373cfc8ab1fafc5f05bbebf785e233"
+    },
+    {
+      "path": "tests/golden_traces/data/tips_per_liquid.json",
+      "sha256": "c2d12b698905cc3a1f629f3641aead8f6a9fccd1404b3ab9428eace5782e1b6d"
+    },
+    {
+      "path": "tests/golden_traces/data/tips_single_dropped.json",
+      "sha256": "84268dba67392c7606b429c0b509520bb98244729af0b6d06fb80e13403bec20"
+    },
+    {
+      "path": "tests/golden_traces/data/two_drop_volumes.json",
+      "sha256": "f2ad876081cf3d6cae0b4d6718e15bf0a9566eaa58bd3437b331c9ee33fc66f0"
+    },
+    {
+      "path": "tests/golden_traces/generate.py",
+      "sha256": "680bacef21c227089d64da56b26a81e3b6ce6864cf95d0f3f4ee2d7bb561a7c1"
+    },
+    {
+      "path": "tests/golden_traces/recorder.py",
+      "sha256": "b3fbbd2bf26fc45f0299a57d7db0a30af6b7f81aa7b4dae68ce0eabc3ddd9bb8"
+    },
+    {
+      "path": "tests/test_nanodrop_golden_traces.py",
+      "sha256": "50de4de67a2038a87e2e5fb5e72f9938dbbb8fc216e8c370a7f17b3ac1fd4362"
+    }
+  ],
+  "aggregate_sha256": "5a84ff70996b6bb7197737bed0b69ecda80c013c6ef379835f629208218c4c78"
+}

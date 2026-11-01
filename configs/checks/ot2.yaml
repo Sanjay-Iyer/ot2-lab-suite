@@ -1,0 +1,3 @@
+# Instrument identity stays in its existing authoritative file.
+robot_config: configs/robot.yaml
+timeout_s: 2.0

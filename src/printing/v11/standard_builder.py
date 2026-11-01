@@ -31,7 +31,7 @@ BASE_PROTOCOL = (
 LABWARE_DIR = Path(REPO_ROOT) / "labware"
 ARTIFACT_DIR = Path(REPO_ROOT) / ".test_tmp" / "v11-standard-artifacts"
 GENERATED_PATH = (
-    Path(REPO_ROOT) / "src" / "protocols" / "generated" / "11_standard_print_latest.py"
+    Path(REPO_ROOT) / "generated" / "protocols" / "current" / "11_standard_print_latest.py"
 )
 
 START_SENTINEL = "# >>> CONFIG START >>>"

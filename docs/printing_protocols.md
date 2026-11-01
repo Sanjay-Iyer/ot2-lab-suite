@@ -9,7 +9,7 @@ physical hardware and test readiness.
 
 | Property | Value |
 |---|---|
-| File | `src/protocols/generated/protocol_96.py` |
+| File | `generated/protocols/current/protocol_96.py` |
 | Config | `configs/workflows/defaults/printing_96.yaml` |
 | Plate | `opentrons_96_wellplate_200ul_pcr_full_skirt` |
 | Namespace | Default Opentrons (NOT `custom_beta`) |
@@ -62,7 +62,7 @@ scp -O `
     -o IdentitiesOnly=yes `
     -o PubkeyAcceptedAlgorithms=+ssh-rsa `
     -i "$env:USERPROFILE\.ssh\id_rsa_opentrons" `
-    .\src\protocols\generated\protocol_96.py `
+    .\generated\protocols\protocol_96.py `
     root@OT2CEP20220929R02.local:/var/lib/opentrons/user_storage/ot2_runs/protocol_96.py
 ```
 
@@ -91,7 +91,7 @@ ssh -o IdentitiesOnly=yes -o PubkeyAcceptedAlgorithms=+ssh-rsa `
 
 | Property | Value |
 |---|---|
-| File | `src/protocols/generated/protocol_12.py` |
+| File | `generated/protocols/current/protocol_12.py` |
 | Config | `configs/workflows/defaults/printing_12.yaml` |
 | Plate | `usascientific12well_12_wellplate_6000ul` |
 | Namespace | `custom_beta` |

@@ -14,7 +14,7 @@ Full map: [REPOSITORY_MAP.md](REPOSITORY_MAP.md) (mirrors `docs/printing/REPOSIT
 - **Primary protocol (entry point):** `src/protocols/printing/legacy/01_vial_dilution_paper_print.py`. It runs on
   the OT-2 from its embedded `CONFIG`. **Do not edit the `CONFIG` block by hand** — edit a
   YAML and rebuild. The Python IS safe to edit for motion/logic changes.
-- **Generated (never edit):** `src/protocols/generated/vial_dilution_print_latest.py`.
+- **Generated (never edit):** `generated/protocols/current/vial_dilution_print_latest.py`.
 - **Shared services (edit with care; one authoritative rule each):**
   `src/core/pipette_selection.py`, `src/core/print_groups.py`, `src/core/materials.py`,
   `src/core/workflow_config.py`.

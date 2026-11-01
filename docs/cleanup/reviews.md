@@ -180,3 +180,33 @@ verified all 46 YAML byte pairs and durable relocation associations; canonical
 standard/clover fingerprints match. Corrected two relative paths in the current
 config index and included that file in the scoped commit. No required cleanup
 corrections remain; the two pre-existing method failures are retained explicitly.
+
+## C4a — generated artifacts outside source (review pending)
+
+Starting commit `3663cfa`. Preserved all 430 originals in external
+`C4-generated-protocols` with SHA/CRC, per-file relocation classification and
+historical record associations. Three handwritten checks moved byte-identically
+to `src/protocols/checks/`; 32 tracked compatibility snapshots moved unchanged to
+`generated/protocols/current/`; 395 historical artifacts archived (394 dated and
+one obsolete combined host/robot `printing_demo_run.py`). Source-generated Python
+count430 → 0. Current consumers/defaults/output constants repaired; no generation
+algorithm or physical flag/parameter changed.
+
+Both reviewers approved the pre-removal decision after active-reader and saved
+record audits. Historical logs, manifests and simulation indexes remain unchanged.
+SERS exporter does support a path fallback; actual manifest audit found no archived
+timestamp references consumed by it. Association map preserves 28 historical
+reference records, mostly directory listings and session logs.
+
+Location audit caught `parents[3]` in the standard snapshot. Keeping three directory
+levels preserves its root lookup without changing method bytes. New pure fake
+test forces the real `_load_labware` fallback and confirms the repository JSON
+definition is loaded. Fixed UTF-8 reading in that test expectation; no protocol
+fix was needed. The obsolete combined host snapshot has no current local consumer.
+
+Focused protocol/path/mocked smoke tests **54 passed in5.53s**. Full focused
+baseline helper all seven checks PASS, evidence `.test_tmp/cleanup-checks-994ed97a3a`:
+44 tests, two pinned sims, terminal, GUI loopback, offline config/WORK preview.
+`C4-verification.json`: all 35 retained bytes match originals and standard fallback
+root resolves correctly. New output runs ignored; compatibility snapshots remain
+tracked explicitly for fresh-checkout/manual artifact availability.

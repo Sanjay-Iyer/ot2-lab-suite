@@ -11,7 +11,7 @@ left-mounted `p20_single_gen2` (single-spot), with one image before and one afte
 |---|---|---|
 | **Protocol entry point** | [src/protocols/printing/legacy/01_vial_dilution_paper_print.py](../../src/protocols/printing/legacy/01_vial_dilution_paper_print.py) | The flagship. Reads its embedded `CONFIG`; executes dilution + group-based printing. Edit the YAML, not the generated copy. |
 | **Build script** | [scripts/manual/build_vial_dilution_print.py](../../scripts/manual/build_vial_dilution_print.py) | YAML → validate (shared validators) → embed CONFIG → generate → simulate. |
-| **Generated (do not edit)** | `src/protocols/generated/vial_dilution_print_latest.py` | Build output; regenerated each build. |
+| **Generated (do not edit)** | `generated/protocols/current/vial_dilution_print_latest.py` | Build output; regenerated each build. |
 | **Pipette selection service** | [src/core/pipette_selection.py](../../src/core/pipette_selection.py) | ONE authoritative volume→pipette resolver (auto + explicit). |
 | **Print-group schema + validator** | [src/core/print_groups.py](../../src/core/print_groups.py) | Group schema, layout/destination/duplicate/out-of-bounds checks, legacy migration. |
 | **Materials schema + validator** | [src/core/materials.py](../../src/core/materials.py) | Vial materials, conservative volume accounting, filename==loadName check. |
@@ -51,7 +51,7 @@ clear. The 20 µL rack lives in slot 2 (verified collision-free).
 
 ## Data / history (do not rewrite)
 - `configs/workflows/user/*.yaml` — per-run snapshots (immutable history).
-- `src/protocols/generated/*_run_*.py` — timestamped build artifacts.
+- `generated/protocols/current/*_run_*.py` — timestamped build artifacts.
 
 ## Deferred (see final report / ARCHIVE_REVIEW_REQUIRED.md)
 - Physical relocation of `src/protocols/` / `src/core/` into a `src/printing/` package

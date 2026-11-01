@@ -29,10 +29,7 @@ from src.lab.robot_connection import (
 
 DEFAULT_PROTOCOL = (
     REPO
-    / "src"
-    / "protocols"
-    / "generated"
-    / "p300_single_nozzle_smoke_test.py"
+    / "src" / "protocols" / "checks" / "p300_single_nozzle_smoke_test.py"
 )
 DEFAULT_LABWARE = (
     REPO / "labware" / "tuberack_3dprint_20ml_8vials_v2.json",

@@ -286,7 +286,7 @@ bypass a rejected safety or calibration setting.
 | `runs\ai_dye_demo\YYYYMMDD_HHMMSS\session.json` | Session summary: operator, mode, revisions, runs. |
 | `runs\ai_dye_demo\YYYYMMDD_HHMMSS\starting_config.yaml` | Configuration at session start. |
 | `runs\ai_dye_demo\YYYYMMDD_HHMMSS\executed_config_runN.yaml` | Exact configuration used by run N. |
-| `src\protocols\generated\ai_agent_dilution_print_demo_latest.py` | Generated deterministic OT-2 protocol. |
+| `generated\protocols\ai_agent_dilution_print_demo_latest.py` | Generated deterministic OT-2 protocol. |
 
 ## Troubleshooting and stop conditions
 

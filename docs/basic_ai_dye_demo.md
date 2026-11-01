@@ -405,4 +405,4 @@ GEMINI_MODEL=gemini-2.5-flash
     and the proposal, approval or run it caused
   - `session.json`: session summary
   - `starting_config.yaml`, `executed_config_runN.yaml`: what was approved and what ran
-- `src/protocols/generated/ai_agent_dilution_print_demo_latest.py`: the uploaded protocol
+- `generated/protocols/current/ai_agent_dilution_print_demo_latest.py`: the uploaded protocol

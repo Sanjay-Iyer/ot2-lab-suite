@@ -1,0 +1,938 @@
+diff --git a/.env.template b/.env.template
+index bbbacf5..7ee049b 100644
+--- a/.env.template
++++ b/.env.template
+@@ -5,6 +5,11 @@
+ #   Do not use GOOGLE_API_KEY for live OT-2 agent interactions.
+ LLM_PROVIDER=vertexai
+ 
++# Which laptop is this? Only the robot laptop may start real OT-2 motion.
++# Unset or anything else means a real run is refused.
++# Work laptop: OT2_LAPTOP_ROLE=work (real-robot also works, and is what the older SERS runner requires)
++OT2_LAPTOP_ROLE=
++
+ # Simulation laptop API-key path:
+ GOOGLE_API_KEY=
+ 
+diff --git a/scripts/run_3d_print_labware_validate.py b/scripts/run_3d_print_labware_validate.py
+index 3cd420d..fe9de36 100644
+--- a/scripts/run_3d_print_labware_validate.py
++++ b/scripts/run_3d_print_labware_validate.py
+@@ -21,6 +21,7 @@ if __name__ == "__main__" and not __package__:
+     repo = Path(__file__).resolve().parent.parent
+     sys.path.insert(0, str(repo))
+ 
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -89,6 +90,7 @@ def create_run(robot_ip: str, protocol_id: str) -> str:
+ 
+ 
+ def play_run(robot_ip: str, run_id: str) -> None:
++    require_live_machine(robot_ip)
+     request_json("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
+     print("Run started.")
+ 
+diff --git a/scripts/run_droplet_error_check.py b/scripts/run_droplet_error_check.py
+index b72c26f..597887d 100644
+--- a/scripts/run_droplet_error_check.py
++++ b/scripts/run_droplet_error_check.py
+@@ -35,6 +35,7 @@ if __name__ == "__main__" and not __package__:
+     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ 
+ from src.core.config import Config
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -111,6 +112,7 @@ def _create_run(robot_ip: str, protocol_id: str, rtp: dict[str, Any]) -> str:
+ 
+ def _play_run(robot_ip: str, run_id: str) -> None:
+     print("\n[play]")
++    require_live_machine(robot_ip)
+     _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
+ 
+ 
+diff --git a/scripts/run_p300_single_nozzle_smoke_test.py b/scripts/run_p300_single_nozzle_smoke_test.py
+index e14b30a..e9f9c48 100644
+--- a/scripts/run_p300_single_nozzle_smoke_test.py
++++ b/scripts/run_p300_single_nozzle_smoke_test.py
+@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parent.parent
+ if __name__ == "__main__" and not __package__:
+     sys.path.insert(0, str(REPO))
+ 
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -195,6 +196,7 @@ def execute_protocol(
+             f"Create-run response did not include data.id:\n"
+             f"{json.dumps(run_payload, indent=2)}"
+         )
++    require_live_machine(robot_ip)
+     _request_json(
+         "POST",
+         robot_ip,
+diff --git a/scripts/run_p300_smoke_test.py b/scripts/run_p300_smoke_test.py
+index 8cfffbd..206c0f6 100644
+--- a/scripts/run_p300_smoke_test.py
++++ b/scripts/run_p300_smoke_test.py
+@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parent.parent
+ if __name__ == "__main__" and not __package__:
+     sys.path.insert(0, str(REPO))
+ 
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -171,6 +172,7 @@ def execute_protocol(
+             f"Create-run response did not include data.id:\n"
+             f"{json.dumps(run_payload, indent=2)}"
+         )
++    require_live_machine(robot_ip)
+     _request_json(
+         "POST",
+         robot_ip,
+diff --git a/scripts/run_plate_waste_disposal.py b/scripts/run_plate_waste_disposal.py
+index e30b032..da57760 100644
+--- a/scripts/run_plate_waste_disposal.py
++++ b/scripts/run_plate_waste_disposal.py
+@@ -34,6 +34,7 @@ if __name__ == "__main__" and not __package__:
+     sys.path.insert(0, str(repo))
+ 
+ from src.core.config import Config
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -121,6 +122,7 @@ def _run_status(robot_ip: str, run_id: str) -> dict[str, Any]:
+ 
+ def _play_run(robot_ip: str, run_id: str) -> None:
+     print("\n[play]")
++    require_live_machine(robot_ip)
+     _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
+ 
+ 
+diff --git a/scripts/run_robot_template.py b/scripts/run_robot_template.py
+index f67f739..09109af 100644
+--- a/scripts/run_robot_template.py
++++ b/scripts/run_robot_template.py
+@@ -39,6 +39,7 @@ import requests
+ if __name__ == "__main__" and not __package__:
+     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+ 
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -110,6 +111,7 @@ def _create_run(robot_ip: str, protocol_id: str, rtp: dict[str, Any]) -> str:
+ 
+ def _play_run(robot_ip: str, run_id: str) -> None:
+     print("\n[play]")
++    require_live_machine(robot_ip)
+     _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
+ 
+ 
+diff --git a/scripts/run_smoke_test.py b/scripts/run_smoke_test.py
+index 4b63c56..e8afbbe 100644
+--- a/scripts/run_smoke_test.py
++++ b/scripts/run_smoke_test.py
+@@ -19,6 +19,7 @@ if __name__ == "__main__" and not __package__:
+     repo = Path(__file__).resolve().parent.parent
+     sys.path.insert(0, str(repo))
+ 
++from src.lab.run_gate import require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -163,6 +164,7 @@ def execute_protocol(
+         raise RuntimeError(
+             f"Create-run response did not include data.id:\n{json.dumps(run_payload, indent=2)}"
+         )
++    require_live_machine(robot_ip)
+     _request_json(
+         "POST",
+         robot_ip,
+diff --git a/scripts/run_vial_print_robot.py b/scripts/run_vial_print_robot.py
+index 0141b31..b38e7c7 100644
+--- a/scripts/run_vial_print_robot.py
++++ b/scripts/run_vial_print_robot.py
+@@ -38,6 +38,7 @@ if __name__ == "__main__" and not __package__:
+     sys.path.insert(0, str(repo))
+ 
+ from src.core.config import Config
++from src.lab.run_gate import RunFacts, RunRefused, evaluate, require_live_machine
+ from src.lab.robot_connection import (
+     add_robot_host_arguments,
+     base_url,
+@@ -712,6 +713,7 @@ def _run_status(robot_ip: str, run_id: str) -> dict[str, Any]:
+ 
+ 
+ def _play_run(robot_ip: str, run_id: str) -> None:
++    require_live_machine(robot_ip)      # every script that starts a run through this helper
+     print("\n[play]")
+     _request("POST", robot_ip, f"/runs/{run_id}/actions", json={"data": {"actionType": "play"}})
+ 
+@@ -886,6 +888,11 @@ def main() -> int:
+     started = False
+ 
+     try:
++        if args.live or args.pipette_check:
++            # The same check as the page and the session. This script has no conversation, so it knows only the laptop.
++            refused = evaluate(RunFacts(live=True, robot_host=args.robot_host, authorization="--live"), starting=True)
++            if refused:
++                raise RunRefused(" ".join(blocker.message for blocker in refused))
+         robot_ip = resolve_host(args.robot_host)
+         os.environ["NO_PROXY"] = f"{os.environ.get('NO_PROXY', 'localhost,127.0.0.1')},{robot_ip}"
+         print(connection_summary(robot_ip))
+@@ -1051,6 +1058,11 @@ def main() -> int:
+     except KeyboardInterrupt as exc:
+         return _abort_after_interrupt(robot_ip, run_id, started, run_log, status_file, poll_s=args.poll_seconds,
+                                       source="Stop request" if isinstance(exc, StopRequested) else "Ctrl-C")
++    except RunRefused as exc:
++        print(f"REFUSED: {exc}", file=sys.stderr)
++        status_file.update(stage="refused", error=str(exc), exit_code=2)
++        run_log.finish("refused", exit_code=2, error=str(exc))
++        return 2
+     except Exception as exc:
+         status_file.update(stage="error", error=str(exc), exit_code=1)
+         run_log.finish("error", exit_code=1, error=str(exc))
+diff --git a/src/agents/dye_demo/gui/adapter.py b/src/agents/dye_demo/gui/adapter.py
+index 55e18af..84f7570 100644
+--- a/src/agents/dye_demo/gui/adapter.py
++++ b/src/agents/dye_demo/gui/adapter.py
+@@ -283,15 +283,18 @@ class DemoGuiAdapter:
+             self._run_confirmation_requested = False
+             return True
+ 
+-    def run(self) -> bool:
+-        """The run button: the session's own run command, only while the session is idle at its main prompt."""
++    def run(self, expected_revision: int | None = None) -> bool:
++        """The run button: the session's own run command, only while the session is idle at its main prompt.
++        `expected_revision` is the plan revision the operator confirmed; a run refuses any other."""
++        def run_current_plan() -> None:
++            self.session.clarifying = None           # only reached when the waiting question does not block a run
++            self.session.run_from_button(expected_revision)
++
+         if self.session.settings.llm_first and self.waiting == "clarify" \
+                 and not self.session.clarification_blocks_run():
+-            def run_current_plan() -> None:
+-                self.session.clarifying = None
+-                self.session.run_from_button()
+             return self._offer(run_current_plan, shown=self.run_label)
+-        return self._offer(self.session.run_from_button, shown=self.run_label, states=("idle",))
++        return self._offer(lambda: self.session.run_from_button(expected_revision), shown=self.run_label,
++                           states=("idle",))
+ 
+     def propose_form(self, values: dict[str, Any]) -> bool:
+         if self.waiting != "idle":
+diff --git a/src/agents/dye_demo/gui/app.py b/src/agents/dye_demo/gui/app.py
+index bd0ede0..613ed66 100644
+--- a/src/agents/dye_demo/gui/app.py
++++ b/src/agents/dye_demo/gui/app.py
+@@ -455,6 +455,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
+         if not snapshot.run_ready:
+             ui.notify("Run unavailable: " + " ".join(snapshot.run_block_reasons), type="warning", multi_line=True)
+             return
++        last["confirmed_revision"] = snapshot.revision      # the plan this dialog is asking about
+         confirm_run.open()
+ 
+     def press_run() -> None:
+@@ -462,7 +463,7 @@ def build_page(adapter: DemoGuiAdapter) -> None:
+ 
+     def start_run() -> None:
+         confirm_run.close()
+-        if not adapter.run():
++        if not adapter.run(last.get("confirmed_revision")):
+             ui.notify("The run was not started: " + busy_note, type="warning")
+ 
+     def stop() -> None:
+diff --git a/src/agents/dye_demo/session.py b/src/agents/dye_demo/session.py
+index d51d8a7..b3ee6b6 100644
+--- a/src/agents/dye_demo/session.py
++++ b/src/agents/dye_demo/session.py
+@@ -155,6 +155,7 @@ from src.agents.dye_demo.state import (
+     StaleProposal,
+     fingerprint,
+ )
++from src.lab import run_gate
+ from src.agents.dye_demo.validation import free_slots
+ 
+ PINNED_SIMULATOR = REPO / ".venv" / "ot2-api-2.15-py310" / "python.exe"
+@@ -699,6 +700,7 @@ class DemoSession:
+         self._report_left: dict[str, set[tuple[str, str | None]] | None] = {}
+         # A live run that may have moved the robot but did not finish: the next live run asks that the robot was checked.
+         self.unverified_run: dict[str, Any] | None = None
++        self._expected_revision: int | None = None
+         self._last_discarded: tuple[int, str] | None = None
+         self._clarify_streak = 0              # router questions in a row
+         self._settling = False                # proposing what is settled after the last allowed question
+@@ -1106,7 +1108,7 @@ class DemoSession:
+                 self.say("agent> Answer or cancel the pending question before running.")
+             else:
+                 self.clarifying = None          # an optional planning question does not hold the current plan
+-                self._run()
++                self._run(authorization="typed run")
+             return True
+         return False
+ 
+@@ -1550,7 +1552,8 @@ class DemoSession:
+                          f"it as an instruction; to start the current plan, type {TRIGGER} by itself.")
+                 self._event("refusal", reason="go-ahead after a hypothetical")
+                 return
+-            self._run()
++            exact = " ".join(analysis.text.lower().split()).strip(" .!") == TRIGGER
++            self._run(authorization="run button" if self._from_button else "typed run" if exact else "go-ahead words")
+             return
+         if kind == "future_plan":
+             instruction = analysis.details.get("future_instruction", "")
+@@ -3024,32 +3027,36 @@ class DemoSession:
+         self._propose_direct(changes, original=request, source="gui-form", title="PROPOSED PLAN", notes=[],
+                              evidence=request)
+ 
++    def _run_facts(self, *, plan_errors: Iterable[str] | None = None, authorization: str | None = None) -> run_gate.RunFacts:
++        """What this session knows about a run of the current plan, for the one eligibility check."""
++        if plan_errors is None:
++            plan_errors = self.state.validate().error_messages()
++        return run_gate.RunFacts(
++            live=not self.settings.simulate, robot_host=getattr(self.executor, "robot_host", None),
++            proposal_waiting=self.pending.id if self.pending else None,
++            question_waiting=self.clarification_blocks_run(),
++            expected_revision=self._expected_revision, current_revision=self.state.revision,
++            plan_errors=tuple(plan_errors), lab_owned_intact=self.state.lab_owned_intact(),
++            unreconciled_reports=tuple(self.unreconciled_reports),
++            safety_question=self.safety.question if self.safety is not None else None,
++            physical_blockers=tuple(self.state.run_blockers()), authorization=authorization)
++
+     def physical_run_blockers(self) -> list[str]:
+-        """What the recorded physical state says against running the current plan now: lab-owned settings changed,
+-        a physical report not yet in the record, wells already full, tips already used, liquid recorded as too low."""
+-        blockers = []
+-        if not self.state.lab_owned_intact():
+-            blockers.append("Lab-owned settings changed during this session.")
+-        blockers += [f"A physical report has not been reconciled: {report}" for report in self.unreconciled_reports]
+-        if self.safety is not None:
+-            blockers.append(f"A safety question is open: {self.safety.question} Answer it, or cancel the held request, "
+-                            "before a run.")
+-        return blockers + self.state.run_blockers()
++        """What the recorded physical state and this laptop say against running the current plan now: lab-owned settings
++        changed, a physical report not yet in the record, an open safety question, wells already full, tips already used,
++        liquid recorded as too low, or a laptop that may not move the robot."""
++        return [blocker.message for blocker in run_gate.evaluate(self._run_facts(plan_errors=()))
++                if blocker.code in run_gate.PHYSICAL_CODES]
+ 
+     def clarification_blocks_run(self) -> bool:
+         return self.clarifying is not None and (not self.settings.llm_first or
+                                                 self.clarifying.purpose in _RUN_CRITICAL_QUESTIONS)
+ 
+     def run_block_reasons(self) -> list[str]:
+-        """Why the current plan cannot run now, in the order to fix them (empty: it can run). The ONE eligibility check
+-        behind the page's Run button, a chat run request and the run itself; the page adds only what it alone knows
+-        (a run already going, the agent still busy)."""
+-        reasons = []
+-        if self.pending is not None:
+-            reasons.append(f"Proposal #{self.pending.id} is waiting: apply or discard it first.")
+-        if self.clarification_blocks_run():
+-            reasons.append("A question is waiting: answer or cancel it first.")
+-        return reasons + self.state.validate().error_messages() + self.physical_run_blockers()
++        """Why the current plan cannot run now, in the order to fix them (empty: it can run). run_gate.evaluate is the ONE
++        eligibility check behind the page's Run button, a chat run request and the run itself; the page adds only what
++        it alone knows (a run already going, the agent still busy)."""
++        return [blocker.message for blocker in run_gate.evaluate(self._run_facts())]
+ 
+     def _request_gui_run(self) -> None:
+         """A chat run intent requests the page's normal confirmation, never execution: the same checks as the Run
+@@ -3068,7 +3075,7 @@ class DemoSession:
+             if not self.settings.run_button:
+                 # the terminal: the same run as typing run, after one explicit yes
+                 if self._yes_no("Run the current plan now? (yes/no)"):
+-                    self._run()
++                    self._run(authorization="confirmed in chat")
+                 else:
+                     self.say("agent> OK - nothing was started.")
+                 return
+@@ -3077,15 +3084,16 @@ class DemoSession:
+         self.request_run_confirmation()
+         self.say("agent> Run confirmation requested. Nothing has started yet.")
+ 
+-    def run_from_button(self) -> None:
++    def run_from_button(self, expected_revision: int | None = None) -> None:
+         """The GUI's run button: the typed run command, through the same turn record, checks and robot path. The GUI
+-        calls this on the worker thread that owns ``run()``, only while nothing is waiting for an answer."""
+-        self.log.write("gui_run_button", revision=self.state.revision)
+-        self._from_button = True
++        calls this on the worker thread that owns ``run()``, only while nothing is waiting for an answer.
++        `expected_revision` is the plan revision the operator confirmed; a run refuses any other."""
++        self.log.write("gui_run_button", revision=self.state.revision, expected_revision=expected_revision)
++        self._from_button, self._expected_revision = True, expected_revision
+         try:
+             self._handle(TRIGGER)
+         finally:
+-            self._from_button = False
++            self._from_button, self._expected_revision = False, None
+ 
+     def _propose_direct(self, changes: list[dict[str, Any]], *, original: str, source: str, title: str,
+                         notes: list[str], physical: dict[str, Any] | None = None, evidence: str = "",
+@@ -3738,23 +3746,18 @@ class DemoSession:
+ 
+     # ── running ──────────────────────────────────────────────────────────────
+ 
+-    def _run(self) -> None:
+-        # Run preparation: the PlanSpec is compiled (compiler.py) - references resolved to wells, every paper position
+-        # decided, the exact print map generated - and every check runs on the result. Only the compiled config runs.
+-        compiled = self.state.compile()
+-        report = compiled.report
+-        if report.errors:
++    def _refuse_run(self, blockers: list[run_gate.Blocker], report: Any) -> None:
++        """Say why the run gate stopped this run, one reason at a time and the first to fix first."""
++        first = blockers[0].code
++        if first == "plan_invalid":
+             self.say(render.render_report(report) + "\nNothing was run.")
+             self.log.write("run_refused", errors=report.error_messages())
+             self._event("refusal", reason="plan invalid")
+-            return
+-        if not self.state.lab_owned_intact():
++        elif first == "lab_owned":
+             self.say(render.attention("REFUSED: lab-owned settings changed during this session. Nothing was run."))
+             self.log.write("run_refused", errors=["lab-owned settings changed"])
+             self._event("refusal", reason="lab-owned changed")
+-            return
+-        self._clear_matched_reports("record matches the report")
+-        if self.unreconciled_reports:
++        elif first == "unreconciled_report":
+             told = " and ".join(f'"{report}"' for report in self.unreconciled_reports)
+             self.say(render.attention(
+                 f"Not running: you told me {told}, and that is not in the record yet.",
+@@ -3762,26 +3765,40 @@ class DemoSession:
+                 "match, and then type run again."))
+             self.log.write("run_refused", errors=["unreconciled physical report"], reports=self.unreconciled_reports)
+             self._event("refusal", reason="unreconciled physical report")
+-            return
+-        blockers = self.state.run_blockers()
+-        if blockers:
+-            self.say(render.attention("Not running: " + " ".join(blockers)))
+-            self.log.write("run_refused", errors=blockers)
++        elif first == "physical":
++            messages = [blocker.message for blocker in blockers if blocker.code == "physical"]
++            self.say(render.attention("Not running: " + " ".join(messages)))
++            self.log.write("run_refused", errors=messages)
+             self._event("refusal", reason="physical blocker")
++        else:
++            self.say(render.attention("Not running: " + blockers[0].message))
++            self.log.write("run_refused", errors=[blockers[0].message], code=first)
++            self._event("refusal", reason=first)
++
++    def _run(self, *, authorization: str | None = None) -> None:
++        # Run preparation: the PlanSpec is compiled (compiler.py) - references resolved to wells, every paper position
++        # decided, the exact print map generated - and every check runs on the result. Only the compiled config runs.
++        compiled = self.state.compile()
++        report = compiled.report
++        self._clear_matched_reports("record matches the report")
++        blockers = run_gate.evaluate(self._run_facts(plan_errors=report.error_messages(), authorization=authorization),
++                                     starting=True)
++        if blockers:
++            self._refuse_run(blockers, report)
+             return
++        self.log.write("run_authorized", by=authorization, revision=self.state.revision, simulate=self.settings.simulate)
+         config = compiled.config
+         plan = compiled.plan
+         # what the scientist designed: the dilutions this plan prints without making them (the live check below)
+         designed = build_plan(self.state.config, occupied=self.state.printed_positions)
+         if not self.settings.simulate:
+-            if self.settings.run_button and hasattr(self.executor, "check_robot"):
++            if hasattr(self.executor, "check_robot"):
+                 self.say("agent> Checking that the OT-2 answers before anything is uploaded ...")
+                 problem = self.executor.check_robot()
+                 if problem:
+                     self.say(render.attention(
+                         "Cannot reach the OT-2, so nothing was run. The plan is unchanged.", "", problem, "",
+-                        f"Check that the robot is on and connected to this laptop, then press {self.settings.run_button} "
+-                        "again."))
++                        f"Check that the robot is on and connected to this laptop, then {self._how_to_run()} again."))
+                     self.log.write("run_refused", errors=["robot not reachable"], detail=problem)
+                     self._event("refusal", reason="robot not reachable")
+                     return
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 25e0b55..2a27cf5 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -18,6 +18,13 @@ from src.printing.standard.loader import load_machine_profile
+ MACHINE_PROFILE_REFERENCE = "configs/machines/ot2_standard_printing_p20_v1.yaml"
+ 
+ 
++@pytest.fixture(autouse=True)
++def _robot_laptop_role_for_fake_robots(monkeypatch):
++    """Tests drive fake executors and fake robot servers, so they may take the robot laptop's path. Tests of the role
++    check itself remove this. A real robot stays out of reach: no test is given a robot address."""
++    monkeypatch.setenv("OT2_LAPTOP_ROLE", "work")
++
++
+ @pytest.fixture(scope="session")
+ def registered_machine() -> dict[str, Any]:
+     """The laboratory-owned OT-2 standard printing profile, as a mapping."""
+diff --git a/src/lab/run_gate.py b/src/lab/run_gate.py
+new file mode 100644
+index 0000000..7028f31
+--- /dev/null
++++ b/src/lab/run_gate.py
+@@ -0,0 +1,96 @@
++"""The one eligibility check behind every way to start an OT-2 run.
++
++The page's Run button, a chat run request, the typed run command and the robot runner all call `evaluate`, so a blocker
++cannot be avoided by choosing another interface. A caller passes the facts it knows; the standalone runner has no
++conversation, so its facts leave those fields at their clear defaults. Nothing here reads words or calls a model.
++
++Machine role comes from OT2_LAPTOP_ROLE, normally set in the laptop's untracked .env. Only the robot laptop may start
++real motion, and a missing or unknown role counts as not the robot laptop. A fake robot on this computer is not motion.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++import os
++from typing import Mapping
++
++ROLE_VARIABLE = "OT2_LAPTOP_ROLE"
++ROBOT_LAPTOP_ROLES = {"work", "real-robot"}
++LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
++
++# Blockers that come from the recorded physical state, in the order the page lists them.
++PHYSICAL_CODES = ("lab_owned", "unreconciled_report", "safety_question", "physical", "machine_role")
++
++
++class RunRefused(RuntimeError):
++    """This laptop may not start real robot motion."""
++
++
++def machine_role(environ: Mapping[str, str] | None = None) -> str:
++    return (os.environ if environ is None else environ).get(ROLE_VARIABLE, "").strip().lower()
++
++
++def may_move_robot(robot_host: str | None, environ: Mapping[str, str] | None = None) -> bool:
++    return machine_role(environ) in ROBOT_LAPTOP_ROLES or (robot_host or "").strip().lower() in LOCAL_HOSTS
++
++
++def role_message(environ: Mapping[str, str] | None = None) -> str:
++    role = machine_role(environ) or "not set"
++    return (f"This laptop is not set up as the robot laptop ({ROLE_VARIABLE} is {role}), so it cannot start the OT-2. "
++            f"On the work laptop, add {ROLE_VARIABLE}=work to .env. Anywhere else, use a simulation.")
++
++
++def require_live_machine(robot_host: str | None) -> None:
++    """For a code path that is about to start real motion and holds no other facts about the run."""
++    if not may_move_robot(robot_host):
++        raise RunRefused(role_message())
++
++
++@dataclass(frozen=True)
++class RunFacts:
++    live: bool
++    robot_host: str | None = None
++    proposal_waiting: int | None = None
++    question_waiting: bool = False
++    expected_revision: int | None = None        # the revision the operator was shown, when known
++    current_revision: int | None = None
++    plan_errors: tuple[str, ...] = ()
++    lab_owned_intact: bool = True
++    unreconciled_reports: tuple[str, ...] = ()
++    safety_question: str | None = None
++    physical_blockers: tuple[str, ...] = ()
++    authorization: str | None = None            # what the operator did to start this run
++
++
++@dataclass(frozen=True)
++class Blocker:
++    code: str
++    message: str
++
++
++def evaluate(facts: RunFacts, *, starting: bool = False) -> list[Blocker]:
++    """Why this run may not start, in the order to fix them; empty when it may. `starting` is for the moment of the run
++    itself, when a live run must also say what authorized it; a readiness check before that leaves it out."""
++    blockers: list[Blocker] = []
++    if facts.proposal_waiting is not None:
++        blockers.append(Blocker("proposal_waiting",
++                                f"Proposal #{facts.proposal_waiting} is waiting: apply or discard it first."))
++    if facts.question_waiting:
++        blockers.append(Blocker("question_waiting", "A question is waiting: answer or cancel it first."))
++    if facts.expected_revision is not None and facts.expected_revision != facts.current_revision:
++        blockers.append(Blocker("stale_revision", "The plan changed after you were shown it: check the current plan, "
++                                                  "then start the run again."))
++    blockers += [Blocker("plan_invalid", message) for message in facts.plan_errors]
++    if not facts.lab_owned_intact:
++        blockers.append(Blocker("lab_owned", "Lab-owned settings changed during this session."))
++    blockers += [Blocker("unreconciled_report", f"A physical report has not been reconciled: {report}")
++                 for report in facts.unreconciled_reports]
++    if facts.safety_question is not None:
++        blockers.append(Blocker("safety_question", f"A safety question is open: {facts.safety_question} Answer it, or "
++                                                   "cancel the held request, before a run."))
++    blockers += [Blocker("physical", message) for message in facts.physical_blockers]
++    if facts.live and not may_move_robot(facts.robot_host):
++        blockers.append(Blocker("machine_role", role_message()))
++    if starting and facts.live and not facts.authorization:
++        blockers.append(Blocker("not_authorized", "Nothing authorized this live run: start it with the Run button or "
++                                                  "the run command."))
++    return blockers
+diff --git a/tests/test_run_gate.py b/tests/test_run_gate.py
+new file mode 100644
+index 0000000..dca7936
+--- /dev/null
++++ b/tests/test_run_gate.py
+@@ -0,0 +1,357 @@
++"""Task 1.2: one run gate. A blocker cannot be avoided by choosing another way to start the run.
++
++Scripted router and fake executors only; no model and no robot.
++"""
++from __future__ import annotations
++
++import json
++import sys
++import time
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++
++from src.agents.dye_demo.gui.adapter import DemoGuiAdapter
++from src.agents.dye_demo.llm import LLMClient
++from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config
++from src.agents.dye_demo.session import DemoSession, SessionSettings, _SafetyQuestion
++from src.lab import run_gate
++from src.lab.run_gate import Blocker, RunFacts, RunRefused, evaluate, may_move_robot, require_live_machine
++
++RUN_INTENT = {"kind": "run_request", "response": "Starting."}
++
++
++class Router:
++    def __init__(self, replies=None):
++        self.replies = {"please run it": RUN_INTENT, **(replies or {})}
++
++    def invoke(self, messages):
++        message = messages[-1][1].split("SCIENTIST'S MESSAGE:\n")[-1].strip()
++        return SimpleNamespace(content=json.dumps(self.replies[message]))
++
++
++class Executor:
++    robot_host = None
++
++    def __init__(self):
++        self.calls = 0
++        self.last_status = {"started": True, "robot_status": "succeeded"}
++
++    def __call__(self, *_):
++        self.calls += 1
++        return 0
++
++
++def session(tmp_path: Path, *, live=True, run_button="Run on OT-2", llm_first=True, answers=("yes",)):
++    executor = Executor()
++    pending_answers = list(answers)
++    settings = SessionSettings(simulate=not live, config_source=DEFAULT_CONFIG, working_config=tmp_path / "w.yaml",
++                               run_dir=tmp_path / "run", session_label="gate", operator="Tester", skip_llm_startup=True,
++                               run_button=run_button, llm_first=llm_first, raise_errors=True)
++    output: list[str] = []
++    demo = DemoSession(settings, load_config(DEFAULT_CONFIG), llm=LLMClient(lambda: Router()) if llm_first else None,
++                       executor=executor, input_fn=lambda _: pending_answers.pop(0) if pending_answers else "no",
++                       output_fn=output.append, sleep=lambda _: None)
++    demo.operator = "Tester"
++    return demo, executor, output
++
++
++# ── the rule itself ─────────────────────────────────────────────────────────────
++
++def test_a_clear_simulation_has_no_blockers():
++    assert evaluate(RunFacts(live=False)) == []
++
++
++@pytest.mark.parametrize("facts,code", [
++    (RunFacts(live=False, proposal_waiting=2), "proposal_waiting"),
++    (RunFacts(live=False, question_waiting=True), "question_waiting"),
++    (RunFacts(live=False, expected_revision=1, current_revision=2), "stale_revision"),
++    (RunFacts(live=False, plan_errors=("bad",)), "plan_invalid"),
++    (RunFacts(live=False, lab_owned_intact=False), "lab_owned"),
++    (RunFacts(live=False, unreconciled_reports=("moved the rack",)), "unreconciled_report"),
++    (RunFacts(live=False, safety_question="Is it there?"), "safety_question"),
++    (RunFacts(live=False, physical_blockers=("tip used",)), "physical"),
++])
++def test_each_fact_blocks_with_its_own_code(facts, code):
++    assert [blocker.code for blocker in evaluate(facts)] == [code]
++
++
++def test_blockers_come_in_the_order_to_fix_them():
++    facts = RunFacts(live=False, physical_blockers=("tip used",), safety_question="q", proposal_waiting=1,
++                     plan_errors=("bad",))
++    assert [blocker.code for blocker in evaluate(facts)] == ["proposal_waiting", "plan_invalid", "safety_question", "physical"]
++
++
++def test_a_matching_revision_does_not_block():
++    assert evaluate(RunFacts(live=False, expected_revision=3, current_revision=3)) == []
++
++
++@pytest.mark.parametrize("role,allowed", [("work", True), ("WORK ", True), ("real-robot", True), ("home", False),
++                                          ("", False), ("simulation", False), ("workstation", False)])
++def test_only_the_robot_laptop_may_move_the_robot(role, allowed):
++    environ = {"OT2_LAPTOP_ROLE": role}
++    assert may_move_robot("169.254.1.1", environ) is allowed
++
++
++def test_a_missing_role_is_not_the_robot_laptop():
++    assert may_move_robot("169.254.1.1", {}) is False
++    assert may_move_robot(None, {}) is False
++
++
++@pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
++def test_a_fake_robot_on_this_computer_is_allowed_without_a_role(host):
++    assert may_move_robot(host, {}) is True
++
++
++def test_live_without_the_role_is_blocked_and_a_simulation_is_not(monkeypatch):
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    assert [blocker.code for blocker in evaluate(RunFacts(live=True, robot_host="169.254.1.1"))] == ["machine_role"]
++    assert evaluate(RunFacts(live=False, robot_host="169.254.1.1")) == []
++
++
++def test_starting_a_live_run_needs_an_authorization(monkeypatch):
++    facts = RunFacts(live=True)
++    assert evaluate(facts) == []
++    assert [blocker.code for blocker in evaluate(facts, starting=True)] == ["not_authorized"]
++    assert evaluate(RunFacts(live=True, authorization="run button"), starting=True) == []
++    assert evaluate(RunFacts(live=False), starting=True) == []
++
++
++def test_require_live_machine_refuses_without_the_role(monkeypatch):
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    with pytest.raises(RunRefused, match="OT2_LAPTOP_ROLE"):
++        require_live_machine("169.254.1.1")
++    require_live_machine("127.0.0.1")
++    monkeypatch.setenv("OT2_LAPTOP_ROLE", "work")
++    require_live_machine("169.254.1.1")
++
++
++# ── every way to start a run, against every blocker ─────────────────────────────
++
++def start_typed(demo):
++    demo._handle("run")
++
++
++def start_chat(demo):
++    demo._handle("please run it")
++
++
++def start_button(demo):
++    demo.run_from_button()
++
++
++def start_direct(demo):
++    demo._run(authorization="test")
++
++
++# Each way to start a run, with the session settings under which that way exists.
++ENTRIES = {
++    "terminal_typed": (start_typed, {"run_button": None}),
++    "terminal_chat": (start_chat, {"run_button": None}),
++    "page_chat": (start_chat, {}),
++    "page_button": (start_button, {}),
++    "legacy_typed": (start_typed, {"run_button": None, "llm_first": False}),
++    "direct": (start_direct, {}),
++}
++
++
++def block_with_safety(demo):
++    demo.safety = _SafetyQuestion(question="Do those wells already hold sample?", reason="r", changes=[], original="o",
++                                  evidence="e")
++
++
++def block_with_report(demo):
++    demo.unreconciled_reports.append("I moved the vial rack")
++
++
++def block_with_used_tip(demo):
++    demo.state.physical["tips_used"] = ["A1"]
++
++
++def block_with_bad_plan(demo):
++    demo.state._config["dilution"]["factors"] = []
++
++
++def block_with_lab_owned_change(demo):
++    demo.state._config["print"]["z_mm"] = 9.0
++
++
++def block_with_role(demo):
++    run_gate_environment.delenv("OT2_LAPTOP_ROLE")
++
++
++BLOCKS = {"safety": block_with_safety, "report": block_with_report, "used_tip": block_with_used_tip,
++          "bad_plan": block_with_bad_plan, "lab_owned": block_with_lab_owned_change, "role": block_with_role}
++run_gate_environment = None
++
++
++@pytest.mark.parametrize("entry", sorted(ENTRIES))
++@pytest.mark.parametrize("block", sorted(BLOCKS))
++def test_no_entry_point_avoids_a_blocker(tmp_path, monkeypatch, entry, block):
++    global run_gate_environment
++    run_gate_environment = monkeypatch
++    start, settings = ENTRIES[entry]
++    demo, executor, _ = session(tmp_path, **settings)
++    assert demo.run_block_reasons() == []
++    BLOCKS[block](demo)
++    assert demo.run_block_reasons(), "the readiness check must also see this blocker"
++    start(demo)
++    assert executor.calls == 0, f"{entry} started a run past {block}"
++    assert not demo.state.runs
++
++
++@pytest.mark.parametrize("entry", ["terminal_typed", "terminal_chat", "page_button", "legacy_typed", "direct"])
++def test_each_entry_point_runs_a_clear_plan(tmp_path, entry):
++    start, settings = ENTRIES[entry]
++    demo, executor, _ = session(tmp_path, **settings)
++    start(demo)
++    assert executor.calls == 1
++
++
++def test_a_chat_run_on_the_page_only_asks_for_the_confirmation(tmp_path):
++    demo, executor, output = session(tmp_path)
++    requested = []
++    demo.request_run_confirmation = lambda: requested.append(True)
++    demo._handle("please run it")
++    assert requested == [True] and executor.calls == 0
++    assert any("Nothing has started" in line for line in output)
++
++
++def test_a_chat_run_declined_on_the_terminal_starts_nothing(tmp_path):
++    demo, executor, _ = session(tmp_path, run_button=None, answers=("no",))
++    demo._handle("please run it")
++    assert executor.calls == 0
++
++
++def test_a_pending_proposal_blocks_a_direct_run(tmp_path):
++    demo, executor, output = session(tmp_path)
++    demo.pending = SimpleNamespace(id=4, base_revision=0)
++    demo._run(authorization="test")
++    assert executor.calls == 0
++    assert any("Proposal #4 is waiting" in line for line in output)
++
++
++def test_a_run_without_an_authorization_never_starts_live(tmp_path):
++    demo, executor, output = session(tmp_path)
++    demo._run()
++    assert executor.calls == 0
++    assert any("Nothing authorized" in line for line in output)
++
++
++def test_the_run_records_what_authorized_it(tmp_path):
++    demo, _, _ = session(tmp_path)
++    demo.run_from_button()
++    log = (tmp_path / "run" / "session.log").read_text(encoding="utf-8")
++    assert "run_authorized" in log and "run button" in log
++
++
++def test_a_button_for_an_older_revision_does_not_run_the_newer_plan(tmp_path):
++    demo, executor, output = session(tmp_path)
++    demo.run_from_button(expected_revision=5)
++    assert executor.calls == 0
++    assert any("plan changed after you were shown it" in line for line in output)
++    assert demo._expected_revision is None, "one stale click must not poison the next run"
++    demo.run_from_button(expected_revision=demo.state.revision)
++    assert executor.calls == 1
++
++
++def test_a_simulation_is_not_stopped_by_the_laptop_role(tmp_path, monkeypatch):
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    demo, executor, _ = session(tmp_path, live=False)
++    demo.run_from_button()
++    assert executor.calls == 1
++
++
++def test_a_fake_robot_host_runs_without_a_role(tmp_path, monkeypatch):
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    demo, executor, _ = session(tmp_path)
++    executor.robot_host = "127.0.0.1"
++    demo.run_from_button()
++    assert executor.calls == 1
++
++
++def test_the_robot_is_checked_on_every_live_entry_point(tmp_path):
++    demo, executor, output = session(tmp_path, run_button=None)
++    executor.check_robot = lambda: "no answer from the OT-2"
++    demo._handle("run")
++    assert executor.calls == 0
++    assert any("Cannot reach the OT-2" in line for line in output)
++
++
++# ── the same list reaches the page ──────────────────────────────────────────────
++
++def wait_for(predicate, timeout=5):
++    deadline = time.monotonic() + timeout
++    while time.monotonic() < deadline:
++        if predicate():
++            return
++        time.sleep(0.01)
++    raise AssertionError("timed out waiting for the GUI adapter")
++
++
++def test_the_page_shows_the_role_blocker_and_disables_run(tmp_path, monkeypatch):
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    demo, _, _ = session(tmp_path)
++    demo.settings.operator = "Tester"
++    adapter = DemoGuiAdapter(demo)
++    adapter.start()
++    try:
++        wait_for(lambda: adapter.waiting == "idle")
++        snapshot = adapter.snapshot()
++        assert not snapshot.run_ready
++        assert any("OT2_LAPTOP_ROLE" in reason for reason in snapshot.run_block_reasons)
++    finally:
++        adapter.stop()
++
++
++# ── the runner, which has no conversation ───────────────────────────────────────
++
++def _runner(monkeypatch, argv):
++    from scripts import run_vial_print_robot as runner
++
++    monkeypatch.setattr(sys, "argv", ["run_vial_print_robot.py", *argv])
++    monkeypatch.setattr(runner, "RobotRunLog", lambda name: SimpleNamespace(
++        path="log", event=lambda *a, **k: None, update=lambda **k: None, finish=lambda *a, **k: None))
++    return runner
++
++
++@pytest.mark.parametrize("flag", ["--live", "--pipette-check"])
++def test_the_runner_refuses_real_motion_before_finding_the_robot(monkeypatch, capsys, flag):
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    runner = _runner(monkeypatch, [flag])
++
++    def no_robot(*_):
++        raise AssertionError("the runner looked for a robot before checking this laptop's role")
++
++    monkeypatch.setattr(runner, "resolve_host", no_robot)
++    assert runner.main() == 2
++    assert "OT2_LAPTOP_ROLE" in capsys.readouterr().err
++
++
++def test_the_play_helper_refuses_without_the_role(monkeypatch):
++    from scripts import run_vial_print_robot as runner
++
++    monkeypatch.delenv("OT2_LAPTOP_ROLE")
++    monkeypatch.setattr(runner, "_request", lambda *a, **k: pytest.fail("sent a play request"))
++    with pytest.raises(RunRefused):
++        runner._play_run("169.254.1.1", "run-1")
++
++
++@pytest.mark.parametrize("name", ["run_robot_template", "run_plate_waste_disposal", "run_droplet_error_check",
++                                  "run_3d_print_labware_validate", "run_smoke_test", "run_p300_smoke_test",
++                                  "run_p300_single_nozzle_smoke_test"])
++def test_every_other_script_checks_the_role_before_play(name):
++    source = (Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py").read_text(encoding="utf-8")
++    assert source.index("require_live_machine(robot_ip)") < source.index('"actionType": "play"')
++
++
++def test_the_page_and_the_run_share_one_list(tmp_path):
++    demo, _, _ = session(tmp_path)
++    block_with_report(demo)
++    block_with_used_tip(demo)
++    reasons = demo.run_block_reasons()
++    assert reasons == [blocker.message for blocker in evaluate(demo._run_facts())]
++    assert all(reason in reasons for reason in demo.physical_run_blockers())
++    assert Blocker("physical", demo.state.run_blockers()[0]) in evaluate(demo._run_facts())
++    assert "physical" in run_gate.PHYSICAL_CODES

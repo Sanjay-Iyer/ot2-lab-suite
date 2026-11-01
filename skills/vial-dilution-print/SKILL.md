@@ -26,7 +26,7 @@ This skill is the ground truth for that pipeline. For its sub-topics see:
 |----------|------|
 | Workflow config (edit this) | [`configs/workflows/defaults/vial_dilution_print.yaml`](../../configs/workflows/defaults/vial_dilution_print.yaml) |
 | Base protocol template | [`src/protocols/printing/legacy/01_vial_dilution_paper_print.py`](../../src/protocols/printing/legacy/01_vial_dilution_paper_print.py) |
-| Generated, robot-ready copies | `src/protocols/generated/vial_dilution_print_latest.py` (+ timestamped) |
+| Generated, robot-ready copies | `generated/protocols/current/vial_dilution_print_latest.py` (+ timestamped) |
 | Vial labware (explicit geometry) | [`labware/tuberack_3dprint_20ml_8vials_v2.json`](../../labware/tuberack_3dprint_20ml_8vials_v2.json) |
 | Plate / paper labware | `labware/corning_96_wellplate_360ul_custom.json` |
 | Builder | [`scripts/manual/build_vial_dilution_print.py`](../../scripts/manual/build_vial_dilution_print.py) |
@@ -71,7 +71,7 @@ See [TOOLS.md](TOOLS.md) §5 for the tool list and the knob→YAML mapping.
 > **Why the YAML must be *built* in, not read at runtime:** the robot cannot see
 > the repo. `build_vial_dilution_print.py` embeds the YAML as the `CONFIG` dict
 > between the `# >>> CONFIG START >>>` / `# <<< CONFIG END <<<` markers and writes
-> a self-contained file to `src/protocols/generated/`. That generated file is the
+> a self-contained file to `generated/protocols/current/`. That generated file is the
 > only thing that ships. **Edit the YAML, never the generated file.**
 
 ## Hard safety invariants (verified by pre-flight + tests — do not break)

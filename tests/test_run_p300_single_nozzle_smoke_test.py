@@ -10,10 +10,7 @@ REPO = Path(__file__).resolve().parent.parent
 RUNNER_PATH = REPO / "scripts" / "manual" / "run_p300_single_nozzle_smoke_test.py"
 PROTOCOL_PATH = (
     REPO
-    / "src"
-    / "protocols"
-    / "generated"
-    / "p300_single_nozzle_smoke_test.py"
+    / "src" / "protocols" / "checks" / "p300_single_nozzle_smoke_test.py"
 )
 
 

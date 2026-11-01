@@ -1,10 +1,10 @@
-# OT-2 Lab Suite: Master Implementation Plan
+# OT-2 Lab Suite — Master Implementation Plan (Single-Branch Edition)
 
 **Project:** `C:\code\opentrons_home\ot2-lab-suite`  
 **Target platform:** Opentrons OT-2  
 **Primary application:** Agent NanoDrop  
-**Status:** Proposed redesign — implementation not started  
-**Execution model:** One coding agent/coordinator + three independent AI review agents + operator approval for physical validation
+**Status:** Implementation in progress; accepted and pending tasks are recorded in `docs/reviews/README.md`  
+**Execution model:** One implementation coordinator + two independent read-only reviewers; development only on `01_paper`; physical validation requires the operator
 
 ---
 
@@ -25,123 +25,39 @@ Redesign the OT-2 repository into a unified automation platform that supports:
 
 **Non-negotiable requirement:** The current working NanoDrop demonstration and its established liquid-handling behavior must remain available until the replacement has passed physical verification on the WORK instrument.
 
-# 2. Four-Agent Development Organization
+# 2. Three-Agent Development and Single-Branch Workflow
 
-The development process will use four roles: one implementation coordinator and three independent reviewers.
+The operator's [provided single-branch instructions](single_branch_instructions.md)
+supersede older procedural instructions. The [original detailed plan](master_implementation_plan.original.md)
+is preserved; scientific requirements and numbered implementation tasks remain.
 
-## Implementation coordinator
+- Only `01_paper` in this repository is used for development. Create no new
+  branches, worktrees or project copies. Retain existing evidence until recovered.
+- The coordinator alone edits files, runs tests, reconciles recovered work and
+  creates local commits. Do not push or rewrite history.
+- An independent Senior Python Engineer and independent Laboratory Automation /
+  OT-2 Expert inspect each task read-only. They check the actual implementation,
+  compare findings, require corrections and independently recheck the final revision.
+- Implement and test, obtain both independent reviews, cross-review findings,
+  fix blockers, rerun affected checks and obtain both final PASS verdicts before
+  accepting a task. Record exact evidence under `docs/reviews/task-X.Y/`, commit
+  on `01_paper`, then continue automatically. Consolidated records are acceptable.
+- Routine local development is authorized. Do not ask repeated permission to
+  continue. No physical robot operation, credential alteration, remote push,
+  destructive history change or permanent scientific-data deletion is authorized.
+- Before integration protect committed, uncommitted, untracked and relevant
+  ignored files, including every existing task worktree. A Git tag alone does not
+  preserve unfinished work. Recovery must distinguish accepted tasks from candidates.
+- HOME is simulation-only (`ai`). WORK uses `llm` and Vertex/gcloud ADC when AI
+  is enabled; manual operation needs no model. Preserve WORK settings and methods.
+- Mark unavailable actual WORK or physical checks `WORK VALIDATION PENDING` and
+  continue eligible software tasks. Simulation never establishes physical acceptance.
+- Keep the working NanoDrop method available until required WORK qualification;
+  never automatically promote a replacement protocol.
 
-Responsible for implementing the assigned task, running preliminary tests, preparing the code diff and producing the evidence package.
-
-The coordinator must not approve its own work or change an agreed scientific method without recording the difference.
-
-## Reviewer Agent A — Software Architecture and Integration
-
-**Primary responsibility:** Verify the integrity of the software architecture.
-
-For every task, check:
-
-- Correct placement of files and modules.
-- Dependency direction and module imports.
-- Reuse of existing functionality rather than duplication.
-- Backward compatibility with current NanoDrop behavior.
-- Configuration ownership and schema consistency.
-- Correct handling of HOME and WORK environments.
-- Unnecessary complexity, duplicate state and redundant abstractions.
-- Impacts on other scripts, protocols and repository components.
-
-**Special authority:** Can block changes that introduce competing workflow engines or break existing application interfaces.
-
-## Reviewer Agent B — OT-2 Hardware, Chemistry and Execution Safety
-
-**Primary responsibility:** Verify the correctness of robot behavior and experimental operations.
-
-For every task, check:
-
-- Pipette and liquid-volume constraints.
-- Aspiration and dispensing depths.
-- Tip selection, reuse, contamination and disposal.
-- Well capacities and liquid accounting.
-- Printing heights and motion sequences.
-- Labware geometry, deck locations and offsets.
-- Timed waits, pauses and unattended operation.
-- Physical-state bookkeeping.
-- Handling of aborts, network failures and uncertain execution status.
-- Differences between software simulation and physically validated behavior.
-
-**Special authority:** Can block any change that modifies robot motion without adequate testing or evidence.
-
-A simulation cannot substitute for physical validation.
-
-## Reviewer Agent C — Testing, Reliability and User Workflow
-
-**Primary responsibility:** Verify that the implementation works as requested.
-
-For every task, check:
-
-- Unit, integration and regression tests.
-- Current NanoDrop GUI functionality.
-- Offline and manual Python execution.
-- AI-agent proposal handling.
-- Negative tests, malformed inputs and adversarial cases.
-- Error messages and failure recovery.
-- Correct operation across HOME and WORK configurations.
-- Documentation and copy-paste commands.
-- Reproducibility of generated experiment artifacts.
-- Whether the task's acceptance criteria are actually demonstrated.
-
-**Special authority:** Can block changes that lack reproducible tests or break supported user workflows.
-
-## Mandatory three-agent review cycle
-
-Every individual task uses the same procedure.
-
-**Round 1 — Independent reviews**
-
-1. Coordinator completes one task on a dedicated branch.
-2. Coordinator prepares a task-specific evidence package.
-3. All three review agents receive the same code diff, task specification and test evidence.
-4. Each reviewer independently inspects the work.
-5. Each reviewer produces a written PASS, CHANGES REQUIRED or BLOCKED verdict.
-
-**Round 2 — Cross-review**
-
-6. Agent A reviews Agent C's findings and checks test coverage against the architecture.
-7. Agent B reviews Agent A's findings and checks their physical-execution implications.
-8. Agent C reviews Agent B's findings and checks that identified risks have executable verification procedures.
-9. Reviewers report contradictions, missed issues and disagreements.
-10. The coordinator resolves the findings and resubmits the revised diff.
-
-**Round 3 — Final acceptance**
-
-11. All three reviewers review the final revision.
-12. Relevant tests are rerun after the last change.
-13. Each reviewer issues a final verdict.
-14. The task is accepted only after all three reviewers pass.
-15. Changes requiring robot testing remain marked `WORK VALIDATION PENDING` even after three software reviews pass.
-
-No reviewer should edit the implementation directly while reviewing. Review agents provide findings; the coordinator makes corrections.
-
-### Standard task review record
-
-Store each review under a proposed location such as:
-
-`docs/reviews/<TASK_ID>/`
-
-Each completed task should include:
-
-- `task.md` — objective, scope, expected files and acceptance criteria.
-- `implementation.md` — summary of code changes.
-- `tests.txt` — executed commands and their actual results.
-- `architecture_review.md` — Agent A.
-- `hardware_review.md` — Agent B.
-- `verification_review.md` — Agent C.
-- `cross_review.md` — reviewer disagreements and resolutions.
-- `final_verdict.md` — final status and unresolved WORK-only checks.
-
-For efficiency, these may be consolidated into fewer files provided that all three independent reviews and the final decision remain traceable.
-
-**Rule:** No phase advances with unresolved blocking defects in its required tasks.
+Each task record reports scope/files, exact tests/results, Python and laboratory
+verdicts, cross-review/corrections, commit, remaining WORK checks and next task.
+R0 recovers the existing accepted and unfinished work before new features proceed.
 
 ---
 
@@ -351,7 +267,7 @@ Record aspiration, dispensing, flow rates, heights, air gaps, blow-outs, touch-t
 
 ### Phase 0 completion gate
 
-All three reviewers must confirm that the repository is recoverable, the active dependencies are documented and the baseline is sufficient to detect behavior changes.
+Both independent reviewers must confirm that the repository is recoverable, the active dependencies are documented and the baseline is sufficient to detect behavior changes.
 
 ---
 
@@ -460,7 +376,7 @@ Do not combine these fixes with a broader code relocation.
 
 ### Phase 1 completion gate
 
-Agents A, B and C must approve all six tasks. The current NanoDrop demo must remain usable before any architectural migration begins.
+Both independent reviewers must approve all six tasks. The current NanoDrop demo must remain usable before any architectural migration begins.
 
 ---
 
@@ -681,7 +597,7 @@ A suggestion must never automatically change the approved workflow.
 
 ### Phase 3 completion gate
 
-All three reviewers verify schema behavior, configuration consistency, physical bounds and preservation of validated method settings.
+Both independent reviewers verify schema behavior, configuration consistency, physical bounds and preservation of validated method settings.
 
 ---
 
@@ -982,7 +898,7 @@ Loading a saved experiment must not automatically restore a claim that the requi
 
 ### Phase 5 completion gate
 
-Agents A, B and C must approve simulation, provenance, execution boundaries and failure handling.
+Both independent reviewers must approve simulation, provenance, execution boundaries and failure handling.
 
 Physical equivalence remains pending until WORK commissioning.
 
@@ -1095,7 +1011,7 @@ Store sufficient provenance to reproduce a previous experiment and determine whi
 
 ### Phase 6 completion gate
 
-All three reviewers verify the GUI, AI proposal boundaries, offline operation and multistep planning experience.
+Both independent reviewers verify the GUI, AI proposal boundaries, offline operation and multistep planning experience.
 
 ---
 
@@ -1183,7 +1099,7 @@ Only after required physical tests pass:
 
 Software reviews are necessary but not sufficient.
 
-All three reviewers must approve the recorded evidence, and the operator must confirm physical acceptance before promotion.
+Both independent reviewers must approve the recorded evidence, and the operator must confirm physical acceptance before promotion.
 
 ---
 

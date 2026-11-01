@@ -1293,7 +1293,7 @@ def host_run(args: Any) -> None:
 
     robot_script_text = _build_robot_script(config_dict)
 
-    generated_dir = Path(__file__).resolve().parent / "generated"
+    generated_dir = PROJECT_ROOT / "generated" / "protocols" / "current"
     generated_dir.mkdir(parents=True, exist_ok=True)
 
     run_script_path = generated_dir / f"printing_demo_run_{timestamp}.py"

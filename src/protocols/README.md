@@ -7,7 +7,9 @@
 - **Legacy compatibility:** `printing/legacy/` contains IDs1,2,3,4,6,7,8. Their
   protocol bytes and liquid-handling operations are unchanged; registry IDs,
   output stems, defaults and pinned-v3 simulation behavior remain available.
-- **Generated artifacts:** currently `generated/`; separated in cleanup C4.
+- **Maintained hardware checks:** `checks/` (P20/P300 and API2.28 single-nozzle).
+- **Generated artifacts:** `generated/protocols/current/` at the repository root;
+  historical artifacts are preserved in the external cleanup archive.
 
 Legacy protocols/config headers can contain original paths as historical comments.
 Use the current registry and [commands](../../docs/COMMANDS.md) rather than copying

@@ -12,7 +12,7 @@ To keep the pipeline simple and easy to maintain, the workflow is built using an
 1. **One YAML Config File**: `configs/workflows/defaults/printing_demo.yaml`
 2. **One Python Protocol/Runner File**: `src/protocols/printing_demo_protocol.py`
 
-When run on your laptop, the protocol runner reads your YAML config, validates it using Pydantic, compiles a self-contained protocol file `src/protocols/generated/printing_demo_run.py` (with the parsed configuration dictionary embedded at the top), simulates it locally using the Opentrons simulator, and optionally deploys and triggers it on the physical OT-2.
+When run on your laptop, the protocol runner reads your YAML config, validates it using Pydantic, compiles a self-contained protocol file `generated/protocols/current/printing_demo_latest.py` (with the parsed configuration dictionary embedded at the top), simulates it locally using the Opentrons simulator, and optionally deploys and triggers it on the physical OT-2.
 
 ---
 

@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from src.agents.dye_demo.experiment_memory import HISTORY_DIR  # noqa: E402
+from src.agents.dye_demo.memory import HISTORY_DIR  # noqa: E402
 from src.agents.dye_demo.llm import LLMClient  # noqa: E402
 from src.agents.dye_demo.model import DEFAULT_CONFIG, load_config  # noqa: E402
 from src.agents.dye_demo.session import DemoSession, SessionSettings, SubprocessExecutor  # noqa: E402
@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="Local only; never discovers or contacts a robot.")
     parser.add_argument("--config", default=str(DEFAULT_CONFIG.relative_to(REPO)),
                         help="Starting YAML; a timestamped working copy is created.")
+    parser.add_argument("--temperature", type=float, default=0, help="LLM temperature (default: 0).")
     parser.add_argument("--operator", default=None,
                         help="Who is running the experiment (skips the startup question).")
     parser.add_argument("--session-label", default=None,
@@ -98,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
         # the same semantic pipeline as the page; --offline keeps the typed commands only
         llm_first=not args.offline,
     )
-    llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=0))
+    llm = None if args.offline else LLMClient(lambda: Config.get_llm(temperature=args.temperature))
     session = DemoSession(settings, load_config(source), llm=llm,
                           executor=SubprocessExecutor(robot_host=args.robot_host))
     return session.run()

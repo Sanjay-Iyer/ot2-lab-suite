@@ -3,7 +3,7 @@
 States come from real DemoSession conversations (replayed through the red-team harness with recorded model
 replies), including the SOP 1 and SOP 2 lab procedure and long red-team end states. Each approved configuration is
 embedded into protocol v19 exactly as scripts/manual/build_vial_dilution_print.py does, written under the output folder
-(never over the tracked src/protocols/generated/*_latest.py), and simulated locally with the pinned API 2.15
+(never over the tracked generated/protocols/current/*_latest.py), and simulated locally with the pinned API 2.15
 interpreter. The simulator output is then checked line by line against the plan, because a simulation run can end
 "successfully" on a protocol that errored.
 

@@ -28,7 +28,7 @@ from src.lab.robot_connection import (
 
 
 REPO = Path(__file__).resolve().parent.parent.parent
-DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "generated" / "smoke_test.py"
+DEFAULT_PROTOCOL = REPO / "src" / "protocols" / "checks" / "smoke_test.py"
 DEFAULT_LABWARE = REPO / "labware" / "corning_96_wellplate_360ul_custom.json"
 HEADERS = {"opentrons-version": "*"}
 TERMINAL_STATUSES = {"succeeded", "failed", "stopped"}

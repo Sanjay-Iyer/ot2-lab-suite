@@ -1,0 +1,14 @@
+{
+  "branch": "01_paper",
+  "accepted_head": "0129290",
+  "registered_worktrees": 11,
+  "runtime_scientific_changes": [],
+  "inactive_runtime_candidates": true,
+  "original_plan_preserved": true,
+  "scientific_master_requirements_unchanged": true,
+  "provided_single_branch_text_preserved": true,
+  "golden_fixtures_unchanged": 29,
+  "retired_runner_exit": 2,
+  "new_branches_or_worktrees_created": 0,
+  "pushes_or_physical_calls": 0
+}

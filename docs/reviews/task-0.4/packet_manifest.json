@@ -1,0 +1,82 @@
+{
+  "revision": "R2",
+  "files": [
+    {
+      "path": "docs/reviews/packet.py",
+      "sha256": "e69a3075c5ac8b9d69032fd09b9bf375edac7b0cf883b2c90c8853fb1199d5b4"
+    },
+    {
+      "path": "docs/reviews/task-0.4/baseline_report.md",
+      "sha256": "4db9567b6d48c37b24a54c3c08cbeb8aef25cde14a16d477943de503c3d35e22"
+    },
+    {
+      "path": "docs/reviews/task-0.4/evidence/full_r2/junit.xml",
+      "sha256": "851117805739f61f85003e61c6eab4b2727e0cf3db305abe10c232ce64e26c3e"
+    },
+    {
+      "path": "docs/reviews/task-0.4/evidence/full_r2/pytest.txt",
+      "sha256": "4dc2a33412444237aac92c3219fd45265907b345d05347beb4289ea14eea2df2"
+    },
+    {
+      "path": "docs/reviews/task-0.4/evidence/full_r2/summary.json",
+      "sha256": "9db19daf43158a23a2d5b4dfb20bff3b834a26ca6f44cf98a4a1d6dff69669f9"
+    },
+    {
+      "path": "docs/reviews/task-0.4/experiment_01_uncapped_diff.txt",
+      "sha256": "2c30886e6202100b43365b262a2281f0dfc862499ada1d9b76dba53e0d8e6f64"
+    },
+    {
+      "path": "docs/reviews/task-0.4/implementation.diff",
+      "sha256": "b2641297ac1df03a5d81be11114c5f3c4d6b765a25cd4d8e45a792e6d3c7961a"
+    },
+    {
+      "path": "docs/reviews/task-0.4/implementation.md",
+      "sha256": "9e0125889189503398a7de46e88805aa20a15adf4f8ba33c2e393be4c0fc652f"
+    },
+    {
+      "path": "docs/reviews/task-0.4/offline_guard/baseline_plugin.py",
+      "sha256": "cceb2c42d05c004cb591f66d1310adf038e0be90f7bcf0dcba4f6733e475d60b"
+    },
+    {
+      "path": "docs/reviews/task-0.4/offline_guard/sitecustomize.py",
+      "sha256": "6062de72ba978e0804a9362037f896e6f801a77a6193a4e89628ddd6fb9a9cfb"
+    },
+    {
+      "path": "docs/reviews/task-0.4/run_baseline.py",
+      "sha256": "2cb046758597630c470977106141c7afcdd94849464dfaebf79731e7a0af9f0a"
+    },
+    {
+      "path": "docs/reviews/task-0.4/task.md",
+      "sha256": "a9ed924ff9359b5796452c4a06c143c9a396ba3f17560e6e1b14d294eae409e5"
+    },
+    {
+      "path": "docs/reviews/task-0.4/tests.txt",
+      "sha256": "bd01e58f2b0f37897b81712f283ddc1f6ed7581259ab1efc20c9dee56a75c8be"
+    },
+    {
+      "path": "pytest.ini",
+      "sha256": "e53306d347dea816f94608aab4b1ba15a1d1497d488456df7d10e42ec2989853"
+    },
+    {
+      "path": "tests/test_gemini.py",
+      "sha256": "b50199c578d39f6e734cc36104390b1ec27f80e7316acf0e19da1d014d245af5"
+    },
+    {
+      "path": "tests/test_offline_baseline_hygiene.py",
+      "sha256": "77f4c16b4d284be10858538eafe40dbe06e2a5935432c63d7229fff16e40e0dc"
+    },
+    {
+      "path": "tests/test_preflight.py",
+      "sha256": "fabce1c5c266380d7ba0f48d9b12940ac632540fc03efdc63ac8ac5297e33442"
+    },
+    {
+      "path": "tests/test_robot_automation.py",
+      "sha256": "c3e63ea99d6db258e912c905e60b49b29766c036059c2a8637d97dba8cf0f26b"
+    },
+    {
+      "path": "tests/test_vial_print_agent.py",
+      "sha256": "22614b444e76ba4d696c138ff0946342e6f839bee2ed7dc99c49f260d41b20c2"
+    }
+  ],
+  "aggregate_sha256": "7f7cb738c3d188a5cbce59b19ede951f197d23982089cd70220990805cdb4c6e"
+}
